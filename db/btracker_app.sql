@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   source_op_block INT NOT NULL, -- Block containing the source operation
 
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
-);
+) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 (
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
       That's why constraint has been eliminated.
   */
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
-);
+) INHERITS (hive.btracker_app);
 
 END
 $$
@@ -113,6 +113,9 @@ $$
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_c(in _from INT, in _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql'
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
 AS
 $$
 DECLARE
@@ -128,7 +131,7 @@ FOR __balance_change IN
     WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
   )
   SELECT bio.account_name AS account, bio.asset_symbol_nai AS nai, bio.amount as balance, ho.id AS source_op, ho.block_num AS source_op_block
-  FROM hive.operations ho
+  FROM hive.btracker_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
   JOIN balance_impacting_ops b ON ho.op_type_id = b.id
   JOIN LATERAL
   (
@@ -165,6 +168,7 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
+  RAISE NOTICE 'Detaching HAF application context...';
   PERFORM hive.app_context_detach(_appContext);
 
   --- You can do here also other things to speedup your app, i.e. disable constrains, remove indexes etc.
@@ -176,23 +180,29 @@ BEGIN
       _last_block := _to;
     END IF;
 
+    RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
+
     PERFORM btracker_app.process_block_range_data_c(b, _last_block);
 
     COMMIT;
+
+    RAISE NOTICE 'Block range: <%, %> processed successfully.', b, _last_block;
 
     EXIT WHEN NOT btracker_app.continueProcessing();
 
   END LOOP;
 
   IF btracker_app.continueProcessing() AND _last_block < _to THEN
+    RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
     --- Supplement last part of range if anything left.
     PERFORM btracker_app.process_block_range_data_c(_last_block, _to);
     _last_block := _to;
 
     COMMIT;
-
+    RAISE NOTICE 'Block range: <%, %> processed successfully.', b, _last_block;
   END IF;
 
+  RAISE NOTICE 'Attaching HAF application context at block: %.', _last_block;
   PERFORM hive.app_context_attach(_appContext, _last_block);
 
  --- You should enable here all things previously disabled at begin of this function...
@@ -217,7 +227,7 @@ $$
   - creates HAF application context,
   - starts application main-loop (which iterates infinitely). To stop it call `btracker_app.stopProcessing();` from another session and commit its trasaction.
 */
-CREATE OR REPLACE PROCEDURE btracker_app.main(IN _appContext VARCHAR)
+CREATE OR REPLACE PROCEDURE btracker_app.main(IN _appContext VARCHAR, IN _maxBlockLimit INT = 0)
 LANGUAGE 'plpgsql'
 AS
 $$
@@ -246,7 +256,7 @@ BEGIN
 
   RAISE NOTICE 'Entering application main loop...';
 
-  WHILE btracker_app.continueProcessing() LOOP
+  WHILE btracker_app.continueProcessing() AND (_maxBlockLimit = 0 OR __last_block < _maxBlockLimit) LOOP
     __next_block_range := hive.app_next_block(_appContext);
 
     IF __next_block_range IS NULL THEN
