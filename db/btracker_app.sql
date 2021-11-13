@@ -269,11 +269,11 @@ BEGIN
     IF __next_block_range IS NULL THEN
       RAISE WARNING 'Waiting for next block...';
     ELSE
-      IF __next_block_range.first_block > _maxBlockLimit THEN
+      IF _maxBlockLimit != 0 and __next_block_range.first_block > _maxBlockLimit THEN
         __next_block_range.first_block  := _maxBlockLimit;
       END IF;
 
-      IF __next_block_range.last_block > _maxBlockLimit THEN
+      IF _maxBlockLimit != 0 and __next_block_range.last_block > _maxBlockLimit THEN
         __next_block_range.last_block  := _maxBlockLimit;
       END IF;
 
