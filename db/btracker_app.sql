@@ -153,6 +153,11 @@ LOOP
     (account, nai, source_op, source_op_block, balance)
   SELECT __balance_change.account, __balance_change.nai, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0)
   ;
+
+--	if __balance_change.source_op_block = 199701 then
+--	RAISE NOTICE 'Balance change data: account: %, amount change: %, source_op: %, source_block: %, current_balance: %', __balance_change.account, __balance_change.balance, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0);
+--	end if;
+
   IF __balance_change.source_op_block % _report_step = 0 AND __last_reported_block != __balance_change.source_op_block THEN
     RAISE NOTICE 'Processed data for block: %', __balance_change.source_op_block;
     __last_reported_block := __balance_change.source_op_block;
@@ -168,13 +173,14 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
+  RAISE NOTICE 'Entering massive processing of block range: <%, %>...', _from, _to;
   RAISE NOTICE 'Detaching HAF application context...';
   PERFORM hive.app_context_detach(_appContext);
 
   --- You can do here also other things to speedup your app, i.e. disable constrains, remove indexes etc.
 
   FOR b IN _from .. _to BY _step LOOP
-    _last_block := b + _step;
+    _last_block := b + _step - 1;
 
     IF _last_block > _to THEN --- in case the _step is larger than range length
       _last_block := _to;
@@ -193,7 +199,7 @@ BEGIN
   END LOOP;
 
   IF btracker_app.continueProcessing() AND _last_block < _to THEN
-    RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
+    RAISE NOTICE 'Attempting to process a block range (rest): <%, %>', b, _last_block;
     --- Supplement last part of range if anything left.
     PERFORM btracker_app.process_block_range_data_c(_last_block, _to);
     _last_block := _to;
@@ -207,6 +213,7 @@ BEGIN
 
  --- You should enable here all things previously disabled at begin of this function...
 
+ RAISE NOTICE 'Leaving massive processing of block range: <%, %>...', _from, _to;
 END
 $$
 ;
@@ -262,6 +269,14 @@ BEGIN
     IF __next_block_range IS NULL THEN
       RAISE WARNING 'Waiting for next block...';
     ELSE
+      IF __next_block_range.first_block > _maxBlockLimit THEN
+        __next_block_range.first_block  := _maxBlockLimit;
+      END IF;
+
+      IF __next_block_range.last_block > _maxBlockLimit THEN
+        __next_block_range.last_block  := _maxBlockLimit;
+      END IF;
+
       RAISE NOTICE 'Attempting to process block range: <%,%>', __next_block_range.first_block, __next_block_range.last_block;
 
       IF __next_block_range.first_block != __next_block_range.last_block THEN
