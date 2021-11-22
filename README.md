@@ -3,8 +3,8 @@ The balance_tracker app was mainly created as a simple example of how to make a 
 Current status: 
 
 At the moment, this application creates two tables:
-* accounts
-* account_balances
+* accounts 
+* account_balance_history
 
 Work to be done:
 - Add jsonrpc API calls required by new web app:
