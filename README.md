@@ -2,9 +2,9 @@ The balance_tracker app was mainly created as a simple example of how to make a 
 
 Current status: 
 
-At the moment, this application creates two tables:
-* accounts 
-* account_balance_history
+At the moment, this application will need to use two tables:
+* hive.accounts (created by hived sql_serializer plugin)
+* btracker_app.account_balance_history (created by sync process of balance tracker)
 
 Work to be done:
 - Add jsonrpc API calls required by new web app:
