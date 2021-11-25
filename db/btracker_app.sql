@@ -49,6 +49,19 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
 ) INHERITS (hive.btracker_app);
 
+--recreate role for reading data
+DROP ROLE IF EXISTS readonly;
+CREATE ROLE readonly;
+GRANT USAGE ON SCHEMA btracker_app to readonly;
+GRANT SELECT ON btracker_app.account_balance_history,btracker_app.current_account_balances TO readonly;
+
+-- recreate role for connecting to db
+DROP ROLE IF EXISTS admin;
+CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
+
+-- add ability for admin to switch to readonly role
+GRANT readonly TO admin;
+
 END
 $$
 ;
