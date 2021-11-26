@@ -310,3 +310,16 @@ BEGIN
 END
 $$
 ;
+
+CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(PARAM JSON)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+DECLARE 
+partial_account_name VARCHAR = (param->>'partial_account_name')::text || '%';
+BEGIN
+  RETURN json_agg(DISTINCT cab.account) FROM btracker_app.current_account_balances cab 
+  WHERE cab.account LIKE partial_account_name LIMIT 10;
+END 
+$$;
