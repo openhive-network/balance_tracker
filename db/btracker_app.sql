@@ -50,17 +50,17 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 ) INHERITS (hive.btracker_app);
 
 --recreate role for reading data
-DROP ROLE IF EXISTS readonly;
-CREATE ROLE readonly;
-GRANT USAGE ON SCHEMA btracker_app to readonly;
-GRANT SELECT ON btracker_app.account_balance_history,btracker_app.current_account_balances TO readonly;
+DROP ROLE IF EXISTS api_user;
+CREATE ROLE api_user;
+GRANT USAGE ON SCHEMA btracker_app to api_user;
+GRANT SELECT ON btracker_app.account_balance_history,btracker_app.current_account_balances TO api_user;
 
 -- recreate role for connecting to db
 DROP ROLE IF EXISTS admin;
 CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
 
--- add ability for admin to switch to readonly role
-GRANT readonly TO admin;
+-- add ability for admin to switch to api_user role
+GRANT api_user TO admin;
 
 END
 $$
@@ -311,15 +311,76 @@ END
 $$
 ;
 
+CREATE OR REPLACE FUNCTION raise_exception(TEXT)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  RAISE EXCEPTION '%', $1;
+END
+$$
+;
+
 CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(PARAM JSON)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE 
-partial_account_name VARCHAR = (param->>'partial_account_name')::text || '%';
+  partial_account_name VARCHAR = (PARAM->>'partial_account_name')::TEXT || '%';
 BEGIN
-  RETURN json_agg(DISTINCT cab.account) FROM btracker_app.current_account_balances cab 
-  WHERE cab.account LIKE partial_account_name LIMIT 10;
+  RETURN to_jsonb(result) FROM (
+    SELECT
+      json_agg(DISTINCT cab.account) AS accounts
+    FROM
+      btracker_app.current_account_balances cab 
+    WHERE
+      cab.account LIKE partial_account_name
+    LIMIT 10
+  ) result;
 END 
-$$;
+$$
+;
+
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(PARAM JSON)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+DECLARE
+  nai_code INT;
+  coin_type_arr TEXT[] = '{"steem", "hbd"}';
+
+  account_name VARCHAR = (PARAM->>'account_name')::TEXT;
+  coin_type VARCHAR = (PARAM->>'coin_type')::TEXT;
+  start_block INT = (PARAM->>'start_block')::INT;
+  end_block INT = (PARAM->>'end_block')::INT;
+  block_increment INT = (PARAM->>'block_increment')::INT;
+BEGIN
+  IF coin_type != ALL (coin_type_arr) THEN
+    SELECT raise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    ELSE
+      -- TODO: check if not opposite
+      nai_code = CASE
+      WHEN coin_type = 'steem' THEN 21
+      WHEN coin_type = 'hbd' THEN 37
+    END;
+  END IF;
+
+  RETURN to_jsonb(result)
+  FROM (
+    SELECT
+       array_agg(abh.source_op_block::BIGINT) as block_number,
+       array_agg(abh.balance::FLOAT) as account_balance
+    FROM
+      btracker_app.account_balance_history abh
+    WHERE 
+      abh.account LIKE account_name AND
+      abh.nai = nai_code AND
+      abh.source_op_block >= start_block AND
+      abh.source_op_block <= end_block
+  ) result;
+END
+$$
+;
