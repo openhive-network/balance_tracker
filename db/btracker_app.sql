@@ -331,15 +331,23 @@ DECLARE
   partial_account_name VARCHAR = (PARAM->>'partial_account_name')::TEXT || '%';
 BEGIN
   RETURN to_jsonb(result) FROM (
-    SELECT
-      json_agg(DISTINCT cab.account) AS accounts
-    FROM
-      btracker_app.current_account_balances cab 
-    WHERE
-      cab.account LIKE partial_account_name
-    LIMIT 10
+    SELECT json_agg(account_query.accounts ORDER BY 
+      account_query.name_lengths, 
+      account_query.accounts) FROM (
+      SELECT DISTINCT ON (cab.account)
+        cab.account AS accounts,
+        LENGTH(cab.account) AS name_lengths
+      FROM
+        btracker_app.current_account_balances cab 
+      WHERE
+        cab.account LIKE partial_account_name
+      ORDER BY
+        accounts,
+        name_lengths
+      LIMIT 10
+    ) account_query
   ) result;
-END 
+END
 $$
 ;
 
