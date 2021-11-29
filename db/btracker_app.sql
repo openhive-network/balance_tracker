@@ -333,7 +333,8 @@ BEGIN
   RETURN to_jsonb(result) FROM (
     SELECT json_agg(account_query.accounts ORDER BY 
       account_query.name_lengths, 
-      account_query.accounts) FROM (
+      account_query.accounts) 
+    FROM (
       SELECT DISTINCT ON (cab.account)
         cab.account AS accounts,
         LENGTH(cab.account) AS name_lengths
@@ -376,8 +377,7 @@ BEGIN
     END;
   END IF;
 
-  RETURN to_jsonb(result)
-  FROM (
+  RETURN to_jsonb(result) FROM (
     SELECT
        array_agg(abh.source_op_block::BIGINT) as block_number,
        array_agg(abh.balance::FLOAT) as account_balance
