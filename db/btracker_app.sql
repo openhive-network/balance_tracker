@@ -377,58 +377,38 @@ BEGIN
     END;
   END IF;
 
-  --DROP TABLE IF EXISTS query_result;
-  CREATE TEMP TABLE query_result AS (
-    SELECT
-      abh.source_op_block AS block_number,
-      abh.balance AS account_balance
-    FROM
-      btracker_app.account_balance_history abh
-    WHERE 
-      abh.account LIKE account_name AND
-      abh.nai = nai_code AND
-      abh.source_op_block >= start_block AND
-      abh.source_op_block <= end_block
-  );
-
-  /*
-  RETURN to_jsonb(result) FROM (
-      SELECT
-        json_agg(block_number) AS "block_number",
-        json_agg(account_balance) AS "account_balance"
-      FROM query_result
-    ) result;
-  */
-
   RETURN to_jsonb(result) FROM (
     SELECT
-      json_agg(incremental_r."block") AS "block",
       json_agg(incremental_r."balance") AS "balance"
       FROM (
       WITH RECURSIVE incremental AS (
           SELECT
-            (SELECT MIN(block_number) FROM query_result) AS "cur_block",
-            (SELECT MIN(block_number) + block_increment FROM query_result) AS "next_block",
-            0::BIGINT AS "block",
+            start_block AS "cur_block",
+            start_block + block_increment AS "next_block",
             0::FLOAT AS "balance"
         UNION ALL
           SELECT
             "cur_block" + block_increment,
             "next_block" + block_increment,
-            (SELECT block_number FROM query_result WHERE block_number BETWEEN "cur_block" AND "next_block" LIMIT 1),
-            (SELECT account_balance FROM query_result WHERE block_number BETWEEN "cur_block" AND "next_block" LIMIT 1)
+            (SELECT
+              abh.balance AS "balance"
+            FROM
+              btracker_app.account_balance_history abh
+            WHERE 
+              abh.account LIKE account_name AND
+              abh.nai = nai_code AND
+              abh.source_op_block BETWEEN "cur_block" AND "next_block" LIMIT 1)
           FROM
             incremental
       )
       SELECT
-        "block",
         "balance"
       FROM
         incremental
       OFFSET 1
       LIMIT 1000
       ) incremental_r
-      WHERE "block" IS NOT NULL 
+      WHERE "balance" IS NOT NULL 
   ) result;
 
 
