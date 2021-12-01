@@ -372,7 +372,7 @@ BEGIN
   END IF;
   IF coin_type != ALL (coin_type_arr) THEN
     SELECT raise_exception(
-      D'ERROR: coin_type must be "steem" or "hbd"!');
+      'ERROR: coin_type must be "steem" or "hbd"!');
     ELSE
       -- TODO: check if not opposite
       nai_code = CASE
@@ -381,38 +381,50 @@ BEGIN
     END;
   END IF;
 
-  RETURN json_agg(incremental_r."balance")
+  RETURN json_agg(filled_values."filled_balance")
   FROM (
-  WITH RECURSIVE incremental AS (
+    SELECT
+      first_value("balance") OVER (PARTITION BY "value_partition") AS "filled_balance"
+    FROM (
       SELECT
-        start_block AS "cur_block",
-        start_block + block_increment AS "next_block",
-        0::FLOAT AS "balance"
-    UNION ALL
+        "balance",
+        SUM(CASE WHEN "balance" IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY "id") AS "value_partition"
+      FROM (
+      WITH RECURSIVE incremental AS (
+          SELECT
+            0::BIGINT AS "id",
+            start_block AS "cur_block",
+            start_block + block_increment AS "next_block",
+            0::FLOAT AS "balance"
+        UNION ALL
+          SELECT
+            "id" + 1,
+            "cur_block" + block_increment,
+            "next_block" + block_increment,
+            (SELECT
+              abh.balance AS "balance"
+            FROM
+              btracker_app.account_balance_history abh
+            WHERE 
+              abh.account LIKE account_name AND
+              abh.nai = nai_code AND
+              abh.source_op_block > "cur_block" AND
+              abh.source_op_block <= "next_block"
+            ORDER BY abh.source_op_block DESC
+            LIMIT 1)
+          FROM
+            incremental
+      )
       SELECT
-        "cur_block" + block_increment,
-        "next_block" + block_increment,
-        (SELECT
-          abh.balance AS "balance"
-        FROM
-          btracker_app.account_balance_history abh
-        WHERE 
-          abh.account LIKE account_name AND
-          abh.nai = nai_code AND
-          abh.source_op_block > "cur_block" AND
-          abh.source_op_block <= "next_block"
-        ORDER BY abh.source_op_block DESC
-        LIMIT 1)
+        "id",
+        "balance"
       FROM
         incremental
-  )
-  SELECT
-    "balance"
-  FROM
-    incremental
-  OFFSET 1
-  LIMIT 1000
-  ) incremental_r
+      OFFSET 1
+      LIMIT 1000
+      ) incremental_query
+    ) value_partition
+  ) filled_values
   ;
 
 END
