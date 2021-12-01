@@ -330,24 +330,23 @@ $$
 DECLARE 
   partial_account_name VARCHAR = (PARAM->>'partial_account_name')::TEXT || '%';
 BEGIN
-  RETURN to_jsonb(result) FROM (
-    SELECT json_agg(account_query.accounts ORDER BY 
-      account_query.name_lengths, 
-      account_query.accounts) 
-    FROM (
-      SELECT DISTINCT ON (cab.account)
-        cab.account AS accounts,
-        LENGTH(cab.account) AS name_lengths
-      FROM
-        btracker_app.current_account_balances cab 
-      WHERE
-        cab.account LIKE partial_account_name
-      ORDER BY
-        accounts,
-        name_lengths
-      LIMIT 10
-    ) account_query
-  ) result;
+  RETURN json_agg(account_query.accounts
+    ORDER BY
+      account_query.name_lengths,
+      account_query.accounts)
+  FROM (
+    SELECT DISTINCT ON (cab.account)
+      cab.account AS accounts,
+      LENGTH(cab.account) AS name_lengths
+    FROM
+      btracker_app.current_account_balances cab
+    WHERE
+      cab.account LIKE partial_account_name
+    ORDER BY
+      accounts,
+      name_lengths
+    LIMIT 10
+  ) account_query;
 END
 $$
 ;
@@ -377,40 +376,38 @@ BEGIN
     END;
   END IF;
 
-  RETURN to_jsonb(result) FROM (
-    SELECT
-      json_agg(incremental_r."balance") AS "balance"
-      FROM (
-      WITH RECURSIVE incremental AS (
-          SELECT
-            start_block AS "cur_block",
-            start_block + block_increment AS "next_block",
-            0::FLOAT AS "balance"
-        UNION ALL
-          SELECT
-            "cur_block" + block_increment,
-            "next_block" + block_increment,
-            (SELECT
-              abh.balance AS "balance"
-            FROM
-              btracker_app.account_balance_history abh
-            WHERE 
-              abh.account LIKE account_name AND
-              abh.nai = nai_code AND
-              abh.source_op_block BETWEEN "cur_block" AND "next_block" LIMIT 1)
-          FROM
-            incremental
-      )
+  RETURN json_agg(incremental_r."balance")
+  FROM (
+  WITH RECURSIVE incremental AS (
       SELECT
-        "balance"
+        start_block AS "cur_block",
+        start_block + block_increment AS "next_block",
+        0::FLOAT AS "balance"
+    UNION ALL
+      SELECT
+        "cur_block" + block_increment,
+        "next_block" + block_increment,
+        (SELECT
+          abh.balance AS "balance"
+        FROM
+          btracker_app.account_balance_history abh
+        WHERE 
+          abh.account LIKE account_name AND
+          abh.nai = nai_code AND
+          abh.source_op_block BETWEEN "cur_block" AND "next_block" LIMIT 1)
       FROM
         incremental
-      OFFSET 1
-      LIMIT 1000
-      ) incremental_r
-      WHERE "balance" IS NOT NULL 
-  ) result;
-
+  )
+  SELECT
+    "balance"
+  FROM
+    incremental
+  OFFSET 1
+  LIMIT 1000
+  ) incremental_r
+  WHERE
+    "balance" IS NOT NULL
+  ;
 
 END
 $$
