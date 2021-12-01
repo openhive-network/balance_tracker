@@ -425,10 +425,10 @@ BEGIN
         "balance"
       FROM
         incremental
-      WHERE "block" IS NOT NULL
       OFFSET 1
-      LIMIT 5
+      LIMIT 1000
       ) incremental_r
+      WHERE "block" IS NOT NULL 
   ) result;
 
 
