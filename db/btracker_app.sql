@@ -394,7 +394,8 @@ BEGIN
         WHERE 
           abh.account LIKE account_name AND
           abh.nai = nai_code AND
-          abh.source_op_block BETWEEN "cur_block" AND "next_block"
+          abh.source_op_block > "cur_block" AND
+          abh.source_op_block <= "next_block"
         ORDER BY abh.source_op_block DESC
         LIMIT 1)
       FROM
@@ -407,8 +408,6 @@ BEGIN
   OFFSET 1
   LIMIT 1000
   ) incremental_r
-  WHERE
-    "balance" IS NOT NULL
   ;
 
 END
