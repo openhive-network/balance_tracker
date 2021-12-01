@@ -366,8 +366,13 @@ DECLARE
   end_block INT = (PARAM->>'end_block')::INT;
   block_increment INT = (PARAM->>'block_increment')::INT;
 BEGIN
+  IF block_increment < (end_block - start_block) / 1000 THEN
+    SELECT raise_exception(
+      'ERROR: query is limited to 1000! Use higher "block_increment" for this block range.');
+  END IF;
   IF coin_type != ALL (coin_type_arr) THEN
-    SELECT raise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    SELECT raise_exception(
+      D'ERROR: coin_type must be "steem" or "hbd"!');
     ELSE
       -- TODO: check if not opposite
       nai_code = CASE
