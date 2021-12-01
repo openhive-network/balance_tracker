@@ -351,6 +351,47 @@ END
 $$
 ;
 
+CREATE OR REPLACE FUNCTION btracker_app.get_first_block(account_name VARCHAR, nai_code INT, start_block BIGINT, end_block BIGINT)
+RETURNS BIGINT
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  RETURN
+    abh.source_op_block
+  FROM
+    btracker_app.account_balance_history abh
+  WHERE 
+    abh.account LIKE account_name AND
+    abh.nai = nai_code AND
+    abh.source_op_block >= start_block AND
+    abh.source_op_block <= end_block
+  LIMIT 1;
+END
+$$
+;
+
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_block_range(account_name VARCHAR, nai_code INT, "cur_block" BIGINT, "next_block" BIGINT)
+RETURNS FLOAT
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  RETURN
+    abh.balance AS "balance"
+  FROM
+    btracker_app.account_balance_history abh
+  WHERE 
+    abh.account LIKE account_name AND
+    abh.nai = nai_code AND
+    abh.source_op_block > "cur_block" AND
+    abh.source_op_block <= "next_block"
+  ORDER BY abh.source_op_block DESC
+  LIMIT 1;
+END
+$$
+;
+
 CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(PARAM JSON)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
@@ -362,8 +403,8 @@ DECLARE
 
   account_name VARCHAR = (PARAM->>'account_name')::TEXT;
   coin_type VARCHAR = (PARAM->>'coin_type')::TEXT;
-  start_block INT = (PARAM->>'start_block')::INT;
-  end_block INT = (PARAM->>'end_block')::INT;
+  start_block BIGINT = (PARAM->>'start_block')::BIGINT;
+  end_block BIGINT = (PARAM->>'end_block')::BIGINT;
   block_increment INT = (PARAM->>'block_increment')::INT;
 BEGIN
   IF block_increment < (end_block - start_block) / 1000 THEN
@@ -384,34 +425,26 @@ BEGIN
   RETURN json_agg(filled_values."filled_balance")
   FROM (
     SELECT
+      "id",
       first_value("balance") OVER (PARTITION BY "value_partition") AS "filled_balance"
     FROM (
       SELECT
+        "id",
         "balance",
         SUM(CASE WHEN "balance" IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY "id") AS "value_partition"
       FROM (
       WITH RECURSIVE incremental AS (
           SELECT
             0::BIGINT AS "id",
-            start_block AS "cur_block",
-            start_block + block_increment AS "next_block",
+            (SELECT get_first_block(account_name, nai_code, start_block, end_block)) - block_increment AS "cur_block",
+            (SELECT get_first_block(account_name, nai_code, start_block, end_block)) AS "next_block",
             0::FLOAT AS "balance"
         UNION ALL
           SELECT
             "id" + 1,
             "cur_block" + block_increment,
             "next_block" + block_increment,
-            (SELECT
-              abh.balance AS "balance"
-            FROM
-              btracker_app.account_balance_history abh
-            WHERE 
-              abh.account LIKE account_name AND
-              abh.nai = nai_code AND
-              abh.source_op_block > "cur_block" AND
-              abh.source_op_block <= "next_block"
-            ORDER BY abh.source_op_block DESC
-            LIMIT 1)
+            (SELECT get_balance_for_block_range(account_name, nai_code, "cur_block", "next_block"))
           FROM
             incremental
       )
