@@ -394,7 +394,9 @@ BEGIN
         WHERE 
           abh.account LIKE account_name AND
           abh.nai = nai_code AND
-          abh.source_op_block BETWEEN "cur_block" AND "next_block" LIMIT 1)
+          abh.source_op_block BETWEEN "cur_block" AND "next_block"
+        ORDER BY abh.source_op_block DESC
+        LIMIT 1)
       FROM
         incremental
   )
