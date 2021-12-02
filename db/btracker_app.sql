@@ -413,7 +413,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(PARAM JSON)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_single_query(PARAM JSON)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -476,6 +476,127 @@ BEGIN
     ) value_partition
   ) filled_values;
 
+END
+$$
+;
+
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_from_table(PARAM JSON)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+DECLARE
+  nai_code INT;
+  coin_type_arr TEXT[] = '{"steem", "hbd"}';
+
+  account_name VARCHAR = (PARAM->>'account_name')::TEXT;
+  coin_type VARCHAR = (PARAM->>'coin_type')::TEXT;
+  start_block INT = (PARAM->>'start_block')::INT;
+  end_block INT = (PARAM->>'end_block')::INT;
+  block_increment INT = (PARAM->>'block_increment')::INT;
+BEGIN
+  IF coin_type != ALL (coin_type_arr) THEN
+    SELECT raise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    ELSE
+      -- TODO: check if not opposite
+      nai_code = CASE
+      WHEN coin_type = 'steem' THEN 21
+      WHEN coin_type = 'hbd' THEN 37
+    END;
+  END IF;
+
+  CREATE TEMP TABLE query_result AS (
+    SELECT
+      abh.source_op_block AS block_number,
+      abh.balance AS account_balance
+    FROM
+      btracker_app.account_balance_history abh
+    WHERE 
+      abh.account LIKE account_name AND
+      abh.nai = nai_code AND
+      abh.source_op_block >= start_block AND
+      abh.source_op_block <= end_block
+  );
+
+  RETURN json_agg(filled_values."filled_balance")
+  FROM (
+    SELECT
+      "id",
+      first_value("balance") OVER (PARTITION BY "value_partition") AS "filled_balance"
+    FROM (
+      SELECT
+        "id",
+        "balance",
+        SUM(CASE WHEN "balance" IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY "id") AS "value_partition"
+      FROM (
+      WITH RECURSIVE incremental AS (
+          SELECT
+            0::BIGINT AS "id",
+            (SELECT MIN(block_number) - block_increment FROM query_result) AS "cur_block",
+            (SELECT MIN(block_number) FROM query_result) AS "next_block",
+            0::FLOAT AS "balance"
+        UNION ALL
+          SELECT
+            "id" + 1,
+            "cur_block" + block_increment,
+            "next_block" + block_increment,
+            (SELECT account_balance FROM query_result WHERE block_number > "cur_block" AND block_number <= "next_block" ORDER BY block_number DESC LIMIT 1)
+          FROM
+            incremental
+      )
+      SELECT
+        "id",
+        "balance"
+      FROM
+        incremental
+      OFFSET 1
+      LIMIT 1000
+      ) incremental_query
+    ) value_partition
+  ) filled_values
+  ;
+END
+$$
+;
+
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_truth_table(PARAM JSON)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+DECLARE
+  nai_code INT;
+  coin_type_arr TEXT[] = '{"steem", "hbd"}';
+
+  account_name VARCHAR = (PARAM->>'account_name')::TEXT;
+  coin_type VARCHAR = (PARAM->>'coin_type')::TEXT;
+  start_block INT = (PARAM->>'start_block')::INT;
+  end_block INT = (PARAM->>'end_block')::INT;
+  block_increment INT = (PARAM->>'block_increment')::INT;
+BEGIN
+  IF coin_type != ALL (coin_type_arr) THEN
+    SELECT raise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    ELSE
+      -- TODO: check if not opposite
+      nai_code = CASE
+      WHEN coin_type = 'steem' THEN 21
+      WHEN coin_type = 'hbd' THEN 37
+    END;
+  END IF;
+
+  RETURN to_jsonb(result)
+  FROM (
+    SELECT
+       array_agg(abh.source_op_block::BIGINT) as block_number,
+       array_agg(abh.balance::FLOAT) as account_balance
+    FROM
+      btracker_app.account_balance_history abh
+    WHERE 
+      abh.account LIKE account_name AND
+      abh.nai = nai_code AND
+      abh.source_op_block >= start_block AND
+      abh.source_op_block <= end_block
+  ) result;
 END
 $$
 ;
