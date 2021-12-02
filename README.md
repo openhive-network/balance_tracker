@@ -1,11 +1,18 @@
 This branch contains example balance_tracker api response data in json format.
 
-Examples of `POST /find_matching_accounts?fts.<search_string>` are in `find_matching_accounts*.json`
+Example how GUI would fetch data (share your ideas if you see what can be changed):
 
-Examples of `POST /get_balance_for_coin_by_block?account=<account_name>` are in `get_balance_for_coin_by_block*.json`
+When searching for account `dantheman` letters are typed into edit box one by one and `partial_account_name` parameter is formed (`d`, `da`, `dan`, `dant`, etc).
 
-To generate examples two `<search_string>`'s were used: `dan` and `lukas` for `find_matching_accounts`. 
+With every new letter a request is sent to `find_matching_accounts()` and it responds with a json array of account names. Query is limited to 2000. The account names are selected by rule: *if `account_name` starts with `partial_account_name`*
 
-The `<search_string>` would be typed by balance_tracker user. Then a single `<account_name>` would be chosen from given list and balance history would be fetched for desired currency and account to plot graphs. 
+Names would then be displayed as a list bellow edit box and GUI user would choose the one by clicking on it. Just like on google search bar.
 
-Currently, in examples, currencies are named as their nai (13, 21, 37)
+Example request with curl
+
+```
+curl -X POST http://localhost:3000/rpc/find_matching_accounts \
+	-H 'Content-Type: application/json' \
+	-H 'Prefer: params=single-object' \
+	-d '{ "partial_account_name": "dantheman" }' 
+```
