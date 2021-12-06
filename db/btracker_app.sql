@@ -328,7 +328,7 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE 
-  partial_account_name VARCHAR = (PARAM->>'partial_account_name')::TEXT || '%';
+  partial_account_name VARCHAR = LOWER((PARAM->>'partial_account_name')::TEXT || '%');
 BEGIN
   RETURN json_agg(account_query.accounts
     ORDER BY
