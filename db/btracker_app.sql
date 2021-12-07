@@ -322,13 +322,13 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(PARAM JSON)
+CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(_partial_account_name TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE 
-  __partial_account_name VARCHAR = LOWER((PARAM->>'_partial_account_name')::TEXT || '%');
+  __partial_account_name VARCHAR = LOWER(_partial_account_name || '%');
 BEGIN
   RETURN json_agg(account_query.accounts
     ORDER BY
@@ -414,7 +414,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(PARAM JSON)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type TEXT, _start_block BIGINT, _end_block BIGINT, _block_increment INT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -422,33 +422,26 @@ $$
 DECLARE
   __nai_code INT;
   __coin_type_arr TEXT[] = '{"steem", "hbd"}';
-
-  __account_name VARCHAR = (PARAM->>'_account_name')::TEXT;
-  __coin_type VARCHAR = (PARAM->>'_coin_type')::TEXT;
-  __start_block BIGINT = (PARAM->>'_start_block')::BIGINT;
-  __end_block BIGINT = (PARAM->>'_end_block')::BIGINT;
-  __block_increment INT = (PARAM->>'_block_increment')::INT;
-
   __first_block BIGINT;
   __last_block BIGINT;
 BEGIN
-  IF __block_increment < (__end_block - __start_block) / 1000 THEN
+  IF _block_increment < (_end_block - _start_block) / 1000 THEN
     SELECT raise_exception(
       "ERROR: query is limited to 1000! Use higher '_block_increment' for this block range.");
   END IF;
-  IF __coin_type != ALL (__coin_type_arr) THEN
+  IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
       "ERROR: _coin_type must be 'steem' or 'hbd'!");
     ELSE
       -- TODO: check if not opposite
       __nai_code = CASE
-      WHEN __coin_type = 'steem' THEN 21
-      WHEN __coin_type = 'hbd' THEN 37
+      WHEN _coin_type = 'steem' THEN 21
+      WHEN _coin_type = 'hbd' THEN 37
     END;
   END IF;
 
-  SELECT get_first_block(__account_name, __nai_code, __start_block, __end_block) INTO __first_block;
-  SELECT get_last_block(__account_name, __nai_code, __start_block, __end_block) INTO __last_block;
+  SELECT get_first_block(_account_name, __nai_code, _start_block, _end_block) INTO __first_block;
+  SELECT get_last_block(_account_name, __nai_code, _start_block, _end_block) INTO __last_block;
 
   RETURN json_agg(filled_values.filled_balance) FROM (
     SELECT
@@ -460,15 +453,15 @@ BEGIN
       FROM ( WITH RECURSIVE incremental AS (
         SELECT
           0::BIGINT AS id,
-          __first_block - __block_increment AS cur_block,
+          __first_block - _block_increment AS cur_block,
           __first_block AS next_block,
           0::FLOAT AS balance
         UNION ALL
         SELECT
           id + 1,
-          cur_block + __block_increment,
-          next_block + __block_increment,
-          (SELECT get_balance_for_block_range(__account_name, __nai_code, cur_block, next_block))
+          cur_block + _block_increment,
+          next_block + _block_increment,
+          (SELECT get_balance_for_block_range(_account_name, __nai_code, cur_block, next_block))
         FROM incremental
         WHERE cur_block < __last_block
       )
@@ -477,6 +470,16 @@ BEGIN
     ) value_partition
   ) filled_values;
 
+END
+$$
+;
+
+CREATE OR REPLACE FUNCTION btracker_app.add_them(in a integer, in b integer)RETURNS INT
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  RETURN a + b;
 END
 $$
 ;
