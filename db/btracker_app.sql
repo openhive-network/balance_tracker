@@ -362,7 +362,7 @@ BEGIN
   FROM
     btracker_app.account_balance_history abh
   WHERE 
-    abh.account LIKE _account_name AND
+    abh.account = _account_name AND
     abh.nai = _nai_code AND
     abh.source_op_block >= _start_block AND
     abh.source_op_block <= _end_block
@@ -382,7 +382,7 @@ BEGIN
   FROM
     btracker_app.account_balance_history abh
   WHERE 
-    abh.account LIKE _account_name AND
+    abh.account = _account_name AND
     abh.nai = _nai_code AND
     abh.source_op_block >= _start_block AND
     abh.source_op_block <= _end_block
