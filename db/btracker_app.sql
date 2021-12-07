@@ -328,7 +328,7 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE 
-  partial_account_name VARCHAR = LOWER((PARAM->>'partial_account_name')::TEXT || '%');
+  __partial_account_name VARCHAR = LOWER((PARAM->>'_partial_account_name')::TEXT || '%');
 BEGIN
   RETURN json_agg(account_query.accounts
     ORDER BY
@@ -341,7 +341,7 @@ BEGIN
     FROM
       btracker_app.current_account_balances cab
     WHERE
-      cab.account LIKE partial_account_name
+      cab.account LIKE __partial_account_name
     ORDER BY
       accounts,
       name_lengths
@@ -351,7 +351,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_first_block(account_name VARCHAR, nai_code INT, start_block BIGINT, end_block BIGINT)
+CREATE OR REPLACE FUNCTION btracker_app.get_first_block(_account_name VARCHAR, _nai_code INT, _start_block BIGINT, _end_block BIGINT)
 RETURNS BIGINT
 LANGUAGE 'plpgsql'
 AS
@@ -362,16 +362,16 @@ BEGIN
   FROM
     btracker_app.account_balance_history abh
   WHERE 
-    abh.account LIKE account_name AND
-    abh.nai = nai_code AND
-    abh.source_op_block >= start_block AND
-    abh.source_op_block <= end_block
+    abh.account LIKE _account_name AND
+    abh.nai = _nai_code AND
+    abh.source_op_block >= _start_block AND
+    abh.source_op_block <= _end_block
   LIMIT 1;
 END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_last_block(account_name VARCHAR, nai_code INT, start_block BIGINT, end_block BIGINT)
+CREATE OR REPLACE FUNCTION btracker_app.get_last_block(_account_name VARCHAR, _nai_code INT, _start_block BIGINT, _end_block BIGINT)
 RETURNS BIGINT
 LANGUAGE 'plpgsql'
 AS
@@ -382,17 +382,17 @@ BEGIN
   FROM
     btracker_app.account_balance_history abh
   WHERE 
-    abh.account LIKE account_name AND
-    abh.nai = nai_code AND
-    abh.source_op_block >= start_block AND
-    abh.source_op_block <= end_block
+    abh.account LIKE _account_name AND
+    abh.nai = _nai_code AND
+    abh.source_op_block >= _start_block AND
+    abh.source_op_block <= _end_block
   ORDER BY abh.source_op_block DESC
   LIMIT 1;
 END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_block_range(account_name VARCHAR, nai_code INT, "cur_block" BIGINT, "next_block" BIGINT)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_block_range(_account_name VARCHAR, _nai_code INT, _cur_block BIGINT, _next_block BIGINT)
 RETURNS FLOAT
 LANGUAGE 'plpgsql'
 AS
@@ -403,10 +403,10 @@ BEGIN
   FROM
     btracker_app.account_balance_history abh
   WHERE 
-    abh.account LIKE account_name AND
-    abh.nai = nai_code AND
-    abh.source_op_block > "cur_block" AND
-    abh.source_op_block <= "next_block"
+    abh.account LIKE _account_name AND
+    abh.nai = _nai_code AND
+    abh.source_op_block > _cur_block AND
+    abh.source_op_block <= _next_block
   ORDER BY abh.source_op_block DESC
   LIMIT 1;
 END
@@ -419,59 +419,59 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-  nai_code INT;
-  coin_type_arr TEXT[] = '{"steem", "hbd"}';
+  __nai_code INT;
+  __coin_type_arr TEXT[] = '{"steem", "hbd"}';
 
-  account_name VARCHAR = (PARAM->>'account_name')::TEXT;
-  coin_type VARCHAR = (PARAM->>'coin_type')::TEXT;
-  start_block BIGINT = (PARAM->>'start_block')::BIGINT;
-  end_block BIGINT = (PARAM->>'end_block')::BIGINT;
-  block_increment INT = (PARAM->>'block_increment')::INT;
+  __account_name VARCHAR = (PARAM->>'_account_name')::TEXT;
+  __coin_type VARCHAR = (PARAM->>'_coin_type')::TEXT;
+  __start_block BIGINT = (PARAM->>'_start_block')::BIGINT;
+  __end_block BIGINT = (PARAM->>'_end_block')::BIGINT;
+  __block_increment INT = (PARAM->>'_block_increment')::INT;
 
-  last_block BIGINT;
-  first_block BIGINT;
+  __first_block BIGINT;
+  __last_block BIGINT;
 BEGIN
-  IF block_increment < (end_block - start_block) / 1000 THEN
+  IF __block_increment < (__end_block - __start_block) / 1000 THEN
     SELECT raise_exception(
-      'ERROR: query is limited to 1000! Use higher "block_increment" for this block range.');
+      "ERROR: query is limited to 1000! Use higher '_block_increment' for this block range.");
   END IF;
-  IF coin_type != ALL (coin_type_arr) THEN
+  IF __coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
-      'ERROR: coin_type must be "steem" or "hbd"!');
+      "ERROR: _coin_type must be 'steem' or 'hbd'!");
     ELSE
       -- TODO: check if not opposite
-      nai_code = CASE
-      WHEN coin_type = 'steem' THEN 21
-      WHEN coin_type = 'hbd' THEN 37
+      __nai_code = CASE
+      WHEN __coin_type = 'steem' THEN 21
+      WHEN __coin_type = 'hbd' THEN 37
     END;
   END IF;
 
-  SELECT get_first_block(account_name, nai_code, start_block, end_block) INTO first_block;
-  SELECT get_last_block(account_name, nai_code, start_block, end_block) INTO last_block;
+  SELECT get_first_block(__account_name, __nai_code, __start_block, __end_block) INTO __first_block;
+  SELECT get_last_block(__account_name, __nai_code, __start_block, __end_block) INTO __last_block;
 
-  RETURN json_agg(filled_values."filled_balance") FROM (
+  RETURN json_agg(filled_values.filled_balance) FROM (
     SELECT
-      first_value("balance") OVER (PARTITION BY "value_partition") AS "filled_balance"
+      first_value(balance) OVER (PARTITION BY value_partition) AS filled_balance
     FROM ( SELECT
-      "id",
-      "balance",
-      SUM(CASE WHEN "balance" IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY "id") AS "value_partition"
+      id,
+      balance,
+      SUM(CASE WHEN balance IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY id) AS value_partition
       FROM ( WITH RECURSIVE incremental AS (
         SELECT
-          0::BIGINT AS "id",
-          first_block - block_increment AS "cur_block",
-          first_block AS "next_block",
-          0::FLOAT AS "balance"
+          0::BIGINT AS id,
+          __first_block - __block_increment AS cur_block,
+          __first_block AS next_block,
+          0::FLOAT AS balance
         UNION ALL
         SELECT
-          "id" + 1,
-          "cur_block" + block_increment,
-          "next_block" + block_increment,
-          (SELECT get_balance_for_block_range(account_name, nai_code, "cur_block", "next_block"))
+          id + 1,
+          cur_block + __block_increment,
+          next_block + __block_increment,
+          (SELECT get_balance_for_block_range(__account_name, __nai_code, cur_block, next_block))
         FROM incremental
-        WHERE "cur_block" < last_block
+        WHERE cur_block < __last_block
       )
-      SELECT "id", "balance" FROM incremental OFFSET 1
+      SELECT id, balance FROM incremental OFFSET 1
       ) incremental_query
     ) value_partition
   ) filled_values;
