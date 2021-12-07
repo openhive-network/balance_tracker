@@ -366,6 +366,7 @@ BEGIN
     abh.nai = _nai_code AND
     abh.source_op_block >= _start_block AND
     abh.source_op_block <= _end_block
+  ORDER BY abh.source_op_block ASC
   LIMIT 1;
 END
 $$
