@@ -128,7 +128,7 @@ AS
 $$
 DECLARE
   __nai_code INT;
-  __coin_type_arr TEXT[] = '{"steem", "hbd"}';
+  __coin_type_arr TEXT[] = '{"hive", "hbd"}';
   __first_block BIGINT;
   __last_block BIGINT;
 BEGIN
@@ -138,11 +138,11 @@ BEGIN
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
-      "ERROR: _coin_type must be 'steem' or 'hbd'!");
+      "ERROR: _coin_type must be 'hive' or 'hbd'!");
     ELSE
       -- TODO: check if not opposite
       __nai_code = CASE
-      WHEN _coin_type = 'steem' THEN 21
+      WHEN _coin_type = 'hive' THEN 21
       WHEN _coin_type = 'hbd' THEN 37
     END;
   END IF;
@@ -189,14 +189,14 @@ AS
 $$
 DECLARE
   __nai_code INT;
-  __coin_type_arr TEXT[] = '{"steem", "hbd"}';
+  __coin_type_arr TEXT[] = '{"hive", "hbd"}';
 BEGIN
   IF _coin_type != ALL (__coin_type_arr) THEN
-    SELECT btracker_appraise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    SELECT btracker_appraise_exception('ERROR: coin_type must be "hive" or "hbd"!');
     ELSE
       -- TODO: check if not opposite
       __nai_code = CASE
-      WHEN _coin_type = 'steem' THEN 21
+      WHEN _coin_type = 'hive' THEN 21
       WHEN _coin_type = 'hbd' THEN 37
     END;
   END IF;
