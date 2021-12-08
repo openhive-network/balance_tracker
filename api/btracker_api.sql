@@ -180,3 +180,73 @@ BEGIN
 END
 $$
 ;
+
+/*
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type TEXT, _start_block BIGINT, _end_block BIGINT, _block_increment INT)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+DECLARE
+  __nai_code INT;
+  __coin_type_arr TEXT[] = '{"steem", "hbd"}';
+BEGIN
+  IF _coin_type != ALL (__coin_type_arr) THEN
+    SELECT btracker_appraise_exception('ERROR: coin_type must be "steem" or "hbd"!');
+    ELSE
+      -- TODO: check if not opposite
+      __nai_code = CASE
+      WHEN _coin_type = 'steem' THEN 21
+      WHEN _coin_type = 'hbd' THEN 37
+    END;
+  END IF;
+
+  CREATE TEMP TABLE query_result AS (
+    SELECT
+      abh.source_op_block AS block_number,
+      abh.balance AS account_balance
+    FROM
+      btracker_app.account_balance_history abh
+    WHERE 
+      abh.account = _account_name AND
+      abh.nai = __nai_code AND
+      abh.source_op_block >= _start_block AND
+      abh.source_op_block <= _end_block
+    ORDER BY abh.source_op_block ASC
+  );
+
+  RETURN json_agg(filled_values.filled_balance)
+  FROM (
+    SELECT
+      id,
+      first_value(balance) OVER (PARTITION BY value_partition) AS filled_balance
+    FROM (
+      SELECT
+        id,
+        balance,
+        SUM(CASE WHEN balance IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY id) AS value_partition
+      FROM (
+      WITH RECURSIVE incremental AS (
+          SELECT
+            0::BIGINT AS id,
+            (SELECT MIN(block_number) - _block_increment FROM query_result) AS cur_block,
+            (SELECT MIN(block_number) FROM query_result) AS next_block,
+            0::FLOAT AS balance
+        UNION ALL
+          SELECT
+            id + 1,
+            cur_block + _block_increment,
+            next_block + _block_increment,
+            (SELECT account_balance FROM query_result WHERE block_number > cur_block AND block_number <= next_block ORDER BY block_number DESC LIMIT 1)
+          FROM incremental
+          WHERE cur_block < _end_block
+      )
+      SELECT id, balance FROM incremental OFFSET 1
+      ) incremental_query
+    ) value_partition
+  ) filled_values
+  ;
+END
+$$
+;
+*/
