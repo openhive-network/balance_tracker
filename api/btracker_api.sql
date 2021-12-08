@@ -136,6 +136,7 @@ BEGIN
     SELECT raise_exception(
       "ERROR: '_end_block' must be lower than '_start_block'!"
     );
+  END IF;
   IF _block_increment < (_end_block - _start_block) / 1000 THEN
     SELECT raise_exception(
       "ERROR: query is limited to 1000! Use higher '_block_increment' for this block range.");
