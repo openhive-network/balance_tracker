@@ -9,16 +9,14 @@ export default function App() {
   const [names, setNames] = useState("");
   const [submitMessage, setSubmitMessage] = useState("");
 
-  const data = JSON.stringify({ partial_account_name: value });
+  const data = JSON.stringify({ _partial_account_name: value });
 
   //fetch account names
   useEffect(() => {
     fetch("http://localhost:3000/rpc/find_matching_accounts", {
       method: "post",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "params=single-object",
-      },
+      headers: { "Content-Type": "application/json" },
+
       body: data,
     })
       .then((response) => response.json())
