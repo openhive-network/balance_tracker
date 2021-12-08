@@ -1,53 +1,49 @@
-import React,{useState,useEffect} from 'react'
+import React, { useState, useEffect } from "react";
+import { Button } from "@mui/material";
+import styles from "./App.module.css";
+import Input from "./components/Input/Input";
+import Dropdown from "./components/Dropdown/Dropdown";
 
 export default function App() {
-const [value,setValue] = useState('')
-const [names,setNames] = useState('')
+  const [value, setValue] = useState("");
+  const [names, setNames] = useState("");
+  const [submitMessage, setSubmitMessage] = useState("");
 
-const data = JSON.stringify({partial_account_name: value })
+  const data = JSON.stringify({ partial_account_name: value });
 
-
-
-useEffect(()=>{
+  //fetch account names
+  useEffect(() => {
     fetch("http://localhost:3000/rpc/find_matching_accounts", {
-        method:"post",
-        headers: {
-            "Content-Type" : "application/json",
-            "Prefer" : "params=single-object" 
-            },
-        body: data,
+      method: "post",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "params=single-object",
+      },
+      body: data,
     })
-    .then(response=>response.json())
-    .then(res=>setNames(JSON.parse(res)))
-},[data])
+      .then((response) => response.json())
+      .then((res) => setNames(JSON.parse(res)));
+  }, [data]);
 
-    return (
-        <div style={{display:'flex',justifyContent:'center'}}>
-            <div>
-            <input
-             value={value} 
-             onChange={(e)=>setValue(e.target.value)} 
-             style={{width:'500px', height:'60px'}} 
-             placeholder='search for account' 
-             type='text'  />
+  function handleSubmit(e) {
+    e.preventDefault();
+    names.filter(
+      (name) => name === value && setSubmitMessage(`Showing "${name}" balances`)
+    );
+    setValue("");
+  }
 
-            <div style={!value ?
-                 {display:'none'} :
-                {display:"flex",
-                flexDirection:'column',
-                overflow:'auto',
-                width:'500px',
-                maxHeight:'200px',
-                border:'1px solid black'}}>
-                   <ul style={{listStyle:'none'}}>
-                       {names && names.map((name,index)=>
-                       <li key={index}>
-                           {name}
-                        </li>
-                       )}
-                </ul>
-            </div>
-            </div>
-        </div>
-    )
+  return (
+    <div className={styles.container}>
+      <div className={styles.container__input}>
+        <Input handleSubmit={handleSubmit} value={value} setValue={setValue} />
+        <Dropdown value={value} setValue={setValue} names={names} />
+      </div>
+      <Button onClick={handleSubmit} color="secondary" variant="contained">
+        Show Balances
+      </Button>
+
+      <h1>{submitMessage}</h1>
+    </div>
+  );
 }
