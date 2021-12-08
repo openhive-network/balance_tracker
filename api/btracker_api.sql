@@ -132,18 +132,17 @@ DECLARE
   __first_block BIGINT;
   __last_block BIGINT;
 BEGIN
-  IF _start_block <= _end_block THEN
+  IF _start_block >= _end_block THEN
     SELECT raise_exception(
-      "ERROR: '_end_block' must be lower than '_start_block'!"
-    );
+      'ERROR: "_start_block" must be lower than "_end_block"!');
   END IF;
   IF _block_increment < (_end_block - _start_block) / 1000 THEN
     SELECT raise_exception(
-      "ERROR: query is limited to 1000! Use higher '_block_increment' for this block range.");
+      'ERROR: query is limited to 1000! Use higher "_block_increment" for this block range.');
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
-      "ERROR: '_coin_type' must be 'hive' or 'hbd'!");
+      'ERROR: "_coin_type" must be "hive" or "hbd"!');
     ELSE
       -- TODO: check if not opposite
       __nai_code = CASE
