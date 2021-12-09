@@ -109,7 +109,7 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-  __coin_type_arr INT[] = '{21, 37}';
+  __coin_type_arr INT[] = '{13, 21, 37}';
 BEGIN
   IF _start_block >= _end_block THEN
     SELECT raise_exception(
@@ -121,13 +121,13 @@ BEGIN
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
-      'ERROR: "_coin_type" must be "21" or "37"!');
+      FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
   END IF;
 
   RETURN to_jsonb(result) FROM (
     SELECT
       json_agg(next_block) AS block,
-      json_agg(filled_values.filled_balance) AS balance
+      json_agg(CASE WHEN filled_values.filled_balance IS NULL THEN 0 ELSE filled_values.filled_balance END) AS balance
     FROM (
       SELECT
         next_block,
