@@ -66,4 +66,6 @@ elif [ "$1" = "re-api-start" ]; then
     start_webserver
 elif [ "$1" = "install" ]; then
     install_postgrest
+elif [ "$1" = "start" ]; then
+    start_webserver
 fi
