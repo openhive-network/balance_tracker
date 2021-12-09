@@ -3,10 +3,13 @@ LANGUAGE 'plpgsql'
 AS $$
 BEGIN
   --recreate role for reading data
+  DROP OWNED BY api_user;
   DROP ROLE IF EXISTS api_user;
   CREATE ROLE api_user;
   GRANT USAGE ON SCHEMA btracker_app to api_user;
-  GRANT SELECT ON btracker_app.account_balance_history,btracker_app.current_account_balances TO api_user;
+  GRANT SELECT ON btracker_app.account_balance_history TO api_user;
+  GRANT USAGE ON SCHEMA hive to api_user;
+  GRANT SELECT ON hive.accounts TO api_user;
 
   -- recreate role for connecting to db
   DROP ROLE IF EXISTS admin;
@@ -42,13 +45,13 @@ BEGIN
       account_query.name_lengths,
       account_query.accounts)
   FROM (
-    SELECT DISTINCT ON (cab.account)
-      cab.account AS accounts,
-      LENGTH(cab.account) AS name_lengths
+    SELECT
+      ha.name AS accounts,
+      LENGTH(ha.name) AS name_lengths
     FROM
-      btracker_app.current_account_balances cab
+      hive.accounts ha
     WHERE
-      cab.account LIKE __partial_account_name
+      ha.name LIKE __partial_account_name
     ORDER BY
       accounts,
       name_lengths
