@@ -6,7 +6,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import styles from "./Input.module.css";
+import styles from "./parameters.module.css";
 
 export default function Input({
   value,

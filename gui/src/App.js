@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@mui/material";
 import styles from "./App.module.css";
-import Input from "./components/Input/Input";
+import Parameters from "./components/Parameters/Parameters";
 import Dropdown from "./components/Dropdown/Dropdown";
+import Graph from "./components/Graph";
 
 export default function App() {
   const [value, setValue] = useState("");
@@ -51,8 +52,8 @@ export default function App() {
   }, [account_Names_Data]);
 
   ///fetch balance for coin by block
-  useEffect(() => {
-    fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
+  const fetchBalances = async () => {
+    await fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
       method: "post",
       headers: { "Content-Type": "application/json" },
       body: balance_For_Coin_Data,
@@ -60,9 +61,10 @@ export default function App() {
       .then((response) => response.json())
       .then((res) => setBalance(JSON.parse(res)))
       .catch((err) => console.log(err));
-  }, [balance_For_Coin_Data]);
+  };
 
   const handleSubmit = (e) => {
+    fetchBalances();
     e.preventDefault();
     names.filter((name) => name === value && setAccountName(name));
     setcurrentCurrency(currency);
@@ -75,28 +77,44 @@ export default function App() {
     setEndBlock("");
     setBlockIncrement("");
   };
-  console.log(balance);
+
+  //// startc blcok, end block, blcok increment
+  // let xArr = [];
+  // for (let i = 100; i <= 10000; i = i + 100) {
+  //   xArr.push(i);
+  // }
+
+  // console.log(xArr);
+
   return (
-    <div className={styles.container}>
-      <div className={styles.container__input}>
-        <Input
-          startBlock={startBlock}
-          endBlock={endBlock}
-          blockIncrement={blockIncrement}
-          currency={currency}
-          handleSubmit={handleSubmit}
-          getCurrency={getCurrency}
-          getStartBlock={getStartBlock}
-          getEndBlock={getEndBlock}
-          getBlockIncrement={getBlockIncrement}
-          value={value}
-          setValue={setValue}
-        />
-        <Dropdown value={value} setValue={setValue} names={names} />
+    <div>
+      <div className={styles.container}>
+        <div className={styles.container__input}>
+          <Parameters
+            startBlock={startBlock}
+            endBlock={endBlock}
+            blockIncrement={blockIncrement}
+            currency={currency}
+            handleSubmit={handleSubmit}
+            getCurrency={getCurrency}
+            getStartBlock={getStartBlock}
+            getEndBlock={getEndBlock}
+            getBlockIncrement={getBlockIncrement}
+            value={value}
+            setValue={setValue}
+          />
+          <Dropdown value={value} setValue={setValue} names={names} />
+        </div>
+        <Button onClick={handleSubmit} color="secondary" variant="contained">
+          Show Balances
+        </Button>
       </div>
-      <Button onClick={handleSubmit} color="secondary" variant="contained">
-        Show Balances
-      </Button>
+      <Graph
+        currentStartBlock={currentStartBlock}
+        currentEndBlock={currentEndBlock}
+        currentIncrement={currentIncrement}
+        balance={balance}
+      />
     </div>
   );
 }
