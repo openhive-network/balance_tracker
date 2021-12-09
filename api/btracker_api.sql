@@ -124,14 +124,13 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type TEXT, _start_block BIGINT, _end_block BIGINT, _block_increment INT)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT, _block_increment INT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-  __nai_code INT;
-  __coin_type_arr TEXT[] = '{"hive", "hbd"}';
+  __coin_type_arr INT[] = '{21, 37}';
   __first_block BIGINT;
   __last_block BIGINT;
 BEGIN
@@ -145,17 +144,11 @@ BEGIN
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
-      'ERROR: "_coin_type" must be "hive" or "hbd"!');
-    ELSE
-      -- TODO: check if not opposite
-      __nai_code = CASE
-      WHEN _coin_type = 'hive' THEN 21
-      WHEN _coin_type = 'hbd' THEN 37
-    END;
+      'ERROR: "_coin_type" must be "21" or "37"!');
   END IF;
 
-  SELECT get_first_block(_account_name, __nai_code, _start_block, _end_block) INTO __first_block;
-  SELECT get_last_block(_account_name, __nai_code, _start_block, _end_block) INTO __last_block;
+  SELECT get_first_block(_account_name, _coin_type, _start_block, _end_block) INTO __first_block;
+  SELECT get_last_block(_account_name, _coin_type, _start_block, _end_block) INTO __last_block;
 
   RETURN json_agg(filled_values.filled_balance) FROM (
     SELECT
@@ -175,7 +168,7 @@ BEGIN
           id + 1,
           cur_block + _block_increment,
           next_block + _block_increment,
-          (SELECT get_balance_for_block_range(_account_name, __nai_code, cur_block, next_block))
+          (SELECT get_balance_for_block_range(_account_name, _coin_type, cur_block, next_block))
         FROM incremental
         WHERE cur_block < __last_block
       )
@@ -195,14 +188,14 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-  __nai_code INT;
+  _coin_type INT;
   __coin_type_arr TEXT[] = '{"hive", "hbd"}';
 BEGIN
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT btracker_appraise_exception('ERROR: coin_type must be "hive" or "hbd"!');
     ELSE
       -- TODO: check if not opposite
-      __nai_code = CASE
+      _coin_type = CASE
       WHEN _coin_type = 'hive' THEN 21
       WHEN _coin_type = 'hbd' THEN 37
     END;
@@ -216,7 +209,7 @@ BEGIN
       btracker_app.account_balance_history abh
     WHERE 
       abh.account = _account_name AND
-      abh.nai = __nai_code AND
+      abh.nai = _coin_type AND
       abh.source_op_block >= _start_block AND
       abh.source_op_block <= _end_block
     ORDER BY abh.source_op_block ASC
