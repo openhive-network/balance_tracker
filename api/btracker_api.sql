@@ -140,8 +140,8 @@ BEGIN
         FROM ( WITH RECURSIVE incremental AS (
           SELECT
             0::BIGINT AS id,
-            _start_block - _block_increment AS cur_block,
-            _start_block AS next_block,
+            _start_block - _block_increment * 2 AS cur_block,
+            _start_block - _block_increment AS next_block,
             (SELECT get_first_balance(_account_name, _coin_type, _start_block, _end_block))::FLOAT AS balance
           UNION ALL
           SELECT
@@ -150,7 +150,7 @@ BEGIN
             next_block + _block_increment,
             (SELECT get_balance_for_block_range(_account_name, _coin_type, cur_block, next_block))
           FROM incremental
-          WHERE cur_block < _end_block
+          WHERE next_block < _end_block
         )
         SELECT id, balance, next_block FROM incremental
         ) incremental_query
