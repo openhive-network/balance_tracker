@@ -53,14 +53,18 @@ export default function App() {
 
   ///fetch balance for coin by block
   const fetchBalances = async () => {
-    await fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: balance_For_Coin_Data,
-    })
-      .then((response) => response.json())
-      .then((res) => setBalance(JSON.parse(res)))
-      .catch((err) => console.log(err));
+    try {
+      fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
+        method: "post",
+        headers: { "Content-Type": "application/json" },
+        body: balance_For_Coin_Data,
+      })
+        .then((response) => response.json())
+        .then((res) => setBalance(JSON.parse(res)))
+        .catch((err) => console.log(err));
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const handleSubmit = (e) => {

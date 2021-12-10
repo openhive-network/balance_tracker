@@ -15,7 +15,7 @@ export default function Graph({
   // currentIncrement,
 }) {
   let yArr = [];
-  for (let i = 100; i <= 10000; i = i + 100) {
+  for (let i = 0; i <= 10000; i = i + 10) {
     yArr.push(i);
   }
 
@@ -32,11 +32,12 @@ export default function Graph({
 
   const data = generateData(balance.length);
   console.log(data);
+  console.log(balance);
   return (
     <div style={{ marginTop: "100px" }}>
       <Paper>
         <Chart data={data}>
-          <ArgumentAxis />
+          <ArgumentAxis showGrid={true} />
           <ValueAxis />
           <LineSeries valueField="y" argumentField="x" />
           <ZoomAndPan />
