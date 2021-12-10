@@ -126,39 +126,36 @@ BEGIN
 
   RETURN to_jsonb(result) FROM (
     SELECT
-      json_agg(next_block) AS block,
-      json_agg(CASE WHEN filled_values.filled_balance IS NULL THEN 0 ELSE filled_values.filled_balance END) AS balance
+      json_agg(block_step) AS block,
+      json_agg(filled_balance) AS balance
     FROM (
       SELECT
-        next_block,
-        first_value(balance) OVER (PARTITION BY value_partition) AS filled_balance
-      FROM ( SELECT
-        id,
-        balance,
-        next_block,
-        SUM(CASE WHEN balance IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY id) AS value_partition
-        FROM ( WITH RECURSIVE incremental AS (
+        block_step + 1 AS block_step,
+        first_value(balance) OVER (PARTITION BY block_step) AS filled_balance
+      FROM (
+        SELECT
+          id,
+          balance,
+          block_number,
+          (_block_increment * (block_number / _block_increment)::BIGINT - 1)::BIGINT AS block_step
+        FROM (
           SELECT
-            0::BIGINT AS id,
-            _start_block - _block_increment * 2 AS cur_block,
-            _start_block - _block_increment AS next_block,
-            (SELECT get_first_balance(_account_name, _coin_type, _start_block, _end_block))::FLOAT AS balance
-          UNION ALL
-          SELECT
-            id + 1,
-            cur_block + _block_increment,
-            next_block + _block_increment,
-            (SELECT get_balance_for_block_range(_account_name, _coin_type, cur_block, next_block))
-          FROM incremental
-          WHERE next_block < _end_block
-        )
-        SELECT id, balance, next_block FROM incremental
-        ) incremental_query
-      ) value_partition
-      OFFSET 1
-    ) filled_values
+            ROW_NUMBER() OVER (ORDER BY abh.source_op_block) AS id,
+            abh.source_op_block::BIGINT AS block_number,
+            abh.balance::BIGINT AS balance
+          FROM
+            btracker_app.account_balance_history abh
+          WHERE 
+            abh.account = _account_name AND
+            abh.nai = _coin_type AND
+            abh.source_op_block >= _start_block AND
+            abh.source_op_block <= _end_block
+          ORDER BY abh.source_op_block ASC
+          ) query
+        ORDER BY block_step, id DESC
+      ) make_block_step
+    ) last_block_values
   ) result;
-
 END
 $$
 ;
