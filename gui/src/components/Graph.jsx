@@ -7,42 +7,39 @@ import {
   LineSeries,
   ZoomAndPan,
 } from "@devexpress/dx-react-chart-material-ui";
+import Loader from "./Loader";
 
-export default function Graph({
-  balance,
-  // currentStartBlock,
-  // currentEndBlock,
-  // currentIncrement,
-}) {
-  let yArr = [];
-  for (let i = 0; i <= 10000; i = i + 10) {
-    yArr.push(i);
-  }
+export default function Graph({ balance }) {
+  let blocks = balance.block;
+  let balances = balance.balance;
 
   const generateData = (n) => {
     const result = [];
     for (let i = 0; i < n; i++) {
       result.push({
-        x: yArr[i],
-        y: balance[i],
+        x: blocks[i],
+        y: balances[i],
       });
     }
     return result;
   };
 
-  const data = generateData(balance.length);
-  console.log(data);
-  console.log(balance);
+  const data = generateData(balances?.length);
+  console.log(data.length);
   return (
     <div style={{ marginTop: "100px" }}>
-      <Paper>
-        <Chart data={data}>
-          <ArgumentAxis showGrid={true} />
-          <ValueAxis />
-          <LineSeries valueField="y" argumentField="x" />
-          <ZoomAndPan />
-        </Chart>
-      </Paper>
+      {data.length === 0 ? (
+        <Loader />
+      ) : (
+        <Paper>
+          <Chart data={data}>
+            <ArgumentAxis showGrid={true} />
+            <ValueAxis />
+            <LineSeries valueField="y" argumentField="x" />
+            <ZoomAndPan />
+          </Chart>
+        </Paper>
+      )}
     </div>
   );
 }

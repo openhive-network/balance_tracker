@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@mui/material";
 import styles from "./App.module.css";
-import Parameters from "./components/Parameters/Parameters";
+import Parameters from "./components/Parameters/Parameters"; // <==== HERE PAREMETERS = INPUT FIELDS
 import Dropdown from "./components/Dropdown/Dropdown";
 import Graph from "./components/Graph";
 
@@ -18,8 +18,6 @@ export default function App() {
   const [startBlock, setStartBlock] = useState("");
   const [endBlock, setEndBlock] = useState("");
   const [blockIncrement, setBlockIncrement] = useState("");
-
-  // const [error, setError] = useState("");
   const [balance, setBalance] = useState("");
 
   /// functions used for getting values from inputs
@@ -29,11 +27,11 @@ export default function App() {
   const getEndBlock = (e) => setEndBlock(e.target.value);
   const getBlockIncrement = (e) => setBlockIncrement(e.target.value);
 
-  // fetch functions bodies
+  // fetch functions data parameters
   const account_Names_Data = JSON.stringify({ _partial_account_name: value });
   const balance_For_Coin_Data = JSON.stringify({
     _account_name: accountName,
-    _coin_type: "steem",
+    _coin_type: currentCurrency,
     _start_block: currentStartBlock,
     _end_block: currentEndBlock,
     _block_increment: currentIncrement,
@@ -52,23 +50,19 @@ export default function App() {
   }, [account_Names_Data]);
 
   ///fetch balance for coin by block
-  const fetchBalances = async () => {
-    try {
-      fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
-        method: "post",
-        headers: { "Content-Type": "application/json" },
-        body: balance_For_Coin_Data,
-      })
-        .then((response) => response.json())
-        .then((res) => setBalance(JSON.parse(res)))
-        .catch((err) => console.log(err));
-    } catch (err) {
-      console.log(err);
-    }
-  };
+
+  if (accountName) {
+    fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
+      method: "post",
+      headers: { "Content-Type": "application/json" },
+      body: balance_For_Coin_Data,
+    })
+      .then((response) => response.json())
+      .then((res) => setBalance(JSON.parse(res)))
+      .catch((err) => console.log(err));
+  }
 
   const handleSubmit = (e) => {
-    fetchBalances();
     e.preventDefault();
     names.filter((name) => name === value && setAccountName(name));
     setcurrentCurrency(currency);
@@ -81,14 +75,6 @@ export default function App() {
     setEndBlock("");
     setBlockIncrement("");
   };
-
-  //// startc blcok, end block, blcok increment
-  // let xArr = [];
-  // for (let i = 100; i <= 10000; i = i + 100) {
-  //   xArr.push(i);
-  // }
-
-  // console.log(xArr);
 
   return (
     <div>
@@ -113,12 +99,8 @@ export default function App() {
           Show Balances
         </Button>
       </div>
-      <Graph
-        currentStartBlock={currentStartBlock}
-        currentEndBlock={currentEndBlock}
-        currentIncrement={currentIncrement}
-        balance={balance}
-      />
+
+      {!accountName ? "" : <Graph balance={balance} />}
     </div>
   );
 }
