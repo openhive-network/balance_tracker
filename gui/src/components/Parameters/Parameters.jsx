@@ -40,8 +40,9 @@ export default function Input({
               label="Crypto"
               onChange={getCurrency}
             >
-              <MenuItem value="Hive">Hive</MenuItem>
-              <MenuItem value="HBD">HBD</MenuItem>
+              <MenuItem value={13}>13</MenuItem>
+              <MenuItem value={21}>21</MenuItem>
+              <MenuItem value={37}>37</MenuItem>
             </Select>
           </FormControl>
           <TextField
