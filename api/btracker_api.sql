@@ -85,21 +85,19 @@ BEGIN
   RETURN to_jsonb(result) FROM (
     SELECT
       json_agg(block_step) AS block,
-      json_agg(filled_balance) AS balance
+      json_agg(balance) AS balance
     FROM (
-      SELECT
+      SELECT DISTINCT ON (block_step)
         block_step + 1 AS block_step,
-        first_value(balance) OVER (PARTITION BY block_step) AS filled_balance
+        balance
       FROM (
-        SELECT
-          id,
-          balance,
-          block_number,
-          (_block_increment * (block_number / _block_increment)::BIGINT - 1)::BIGINT AS block_step
+        SELECT 
+          block_step,
+          max(balance) OVER (ORDER BY block_step) AS balance
         FROM (
           SELECT
-            ROW_NUMBER() OVER (ORDER BY abh.source_op_block) AS id,
-            abh.source_op_block::BIGINT AS block_number,
+            row_number() OVER (ORDER BY abh.source_op_block) AS id,
+            (_block_increment * (abh.source_op_block / _block_increment)::BIGINT - 1)::BIGINT AS block_step,
             abh.balance::BIGINT AS balance
           FROM
             btracker_app.account_balance_history abh
@@ -109,10 +107,10 @@ BEGIN
             abh.source_op_block >= _start_block AND
             abh.source_op_block <= _end_block
           ORDER BY abh.source_op_block ASC
-          ) query
-        ORDER BY block_step, id DESC
-      ) make_block_step
-    ) last_block_values
+        ) query
+      ORDER BY block_step, id DESC
+      ) last_block_values
+    ) distinct_values
   ) result;
 END
 $$
