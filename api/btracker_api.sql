@@ -87,31 +87,46 @@ BEGIN
       json_agg(block_step) AS block,
       json_agg(balance) AS balance
     FROM (
-      SELECT DISTINCT ON (block_step)
-        block_step + 1 AS block_step,
-        balance
+      SELECT
+        steps.block_step AS block_step,
+        distinct_values.balance AS balance
       FROM (
-        SELECT 
-          block_step,
-          max(balance) OVER (ORDER BY block_step) AS balance
+        SELECT DISTINCT ON (block_step)
+          block_step + 1 AS block_step,
+          balance AS balance
+        FROM (
+          SELECT 
+            block_step,
+            max(balance) OVER (ORDER BY block_step) AS balance
+          FROM (
+            SELECT
+              row_number() OVER (ORDER BY abh.source_op_block) AS id,
+              (_block_increment * (abh.source_op_block / _block_increment)::BIGINT - 1)::BIGINT AS block_step,
+              abh.balance::BIGINT AS balance
+            FROM
+              btracker_app.account_balance_history abh
+            WHERE 
+              abh.account = _account_name AND
+              abh.nai = _coin_type AND
+              abh.source_op_block >= _start_block AND
+              abh.source_op_block <= _end_block
+            ORDER BY abh.source_op_block ASC
+          ) hive_query
+        ORDER BY block_step, id DESC
+        ) last_block_values 
+      ) distinct_values
+      RIGHT JOIN (
+        SELECT
+          block_step, balance
         FROM (
           SELECT
-            row_number() OVER (ORDER BY abh.source_op_block) AS id,
-            (_block_increment * (abh.source_op_block / _block_increment)::BIGINT - 1)::BIGINT AS block_step,
-            abh.balance::BIGINT AS balance
-          FROM
-            btracker_app.account_balance_history abh
-          WHERE 
-            abh.account = _account_name AND
-            abh.nai = _coin_type AND
-            abh.source_op_block >= _start_block AND
-            abh.source_op_block <= _end_block
-          ORDER BY abh.source_op_block ASC
-        ) query
-      ORDER BY block_step, id DESC
-      ) last_block_values
-    ) distinct_values
-  ) result;
+            generate_series(_start_block, _end_block, _block_increment) AS block_step,
+            null AS balance
+        ) generate_block_steps 
+      ) steps
+      ON distinct_values.block_step = steps.block_step
+    ) joined_tables
+  ) result ;
 END
 $$
 ;
