@@ -134,7 +134,7 @@ BEGIN
                 block_step, balance
               FROM (
                 SELECT
-                  generate_series(_start_block, _end_block, _block_increment) AS block_step,
+                  generate_series(_start_block, _end_block + _block_increment, _block_increment) AS block_step,
                   null AS balance
               ) generate_block_steps 
             ) steps
