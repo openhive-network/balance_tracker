@@ -106,8 +106,8 @@ BEGIN
               SUM(CASE WHEN distinct_values.balance IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY steps.block_step) AS value_partition
             FROM (
               SELECT DISTINCT ON (block_step)
-                block_step + 1 AS block_step,
-                balance AS balance
+                block_step,
+                balance
               FROM (
                 SELECT 
                   block_step,
@@ -115,7 +115,7 @@ BEGIN
                 FROM (
                   SELECT
                     row_number() OVER (ORDER BY abh.source_op_block) AS id,
-                    (_block_increment * (abh.source_op_block / _block_increment)::BIGINT - 1)::BIGINT AS block_step,
+                    ((((abh.source_op_block - 1 - _start_block) / _block_increment)::INT + 1) * _block_increment + _start_block)::BIGINT AS block_step,
                     abh.balance::BIGINT AS balance
                   FROM
                     btracker_app.account_balance_history abh
