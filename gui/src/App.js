@@ -9,16 +9,13 @@ export default function App() {
   const [value, setValue] = useState("");
   const [names, setNames] = useState("");
   const [accountName, setAccountName] = useState("");
-  const [currentCurrency, setcurrentCurrency] = useState("");
-  const [currentStartBlock, setcurrentStartBlock] = useState("");
-  const [currentEndBlock, setcurrentEndBlock] = useState("");
-  // const [currentIncrement, setCurrentIncrement] = useState("");
-
   const [currency, setCurrency] = useState("");
   const [startBlock, setStartBlock] = useState("");
   const [endBlock, setEndBlock] = useState("");
-  // const [blockIncrement, setBlockIncrement] = useState("");
   const [balance, setBalance] = useState("");
+  const [currentCurrency, setcurrentCurrency] = useState("");
+  const [currentStartBlock, setcurrentStartBlock] = useState("");
+  const [currentEndBlock, setcurrentEndBlock] = useState("");
 
   /// functions used for getting values from inputs
 
@@ -27,8 +24,11 @@ export default function App() {
   const getEndBlock = (e) => setEndBlock(e.target.value);
   // const getBlockIncrement = (e) => setBlockIncrement(e.target.value);
 
-  const roundNumber = Math.round((currentEndBlock - currentStartBlock) / 1000);
-  const result = roundNumber >= 1 ? roundNumber : 1;
+  const Block_Increment_Number = Math.round(
+    (currentEndBlock - currentStartBlock) / 1000
+  );
+  const currentBlockIncrement =
+    Block_Increment_Number >= 1 ? Block_Increment_Number : 1;
 
   // fetch functions data parameters
   const account_Names_Data = JSON.stringify({ _partial_account_name: value });
@@ -37,12 +37,12 @@ export default function App() {
     _coin_type: currentCurrency,
     _start_block: currentStartBlock,
     _end_block: currentEndBlock,
-    _block_increment: result,
+    _block_increment: currentBlockIncrement,
   });
 
-  console.log(result);
-  console.log(currentStartBlock);
-  console.log(currentEndBlock);
+  console.log(`Block increment : ${currentBlockIncrement}`);
+  console.log(`Start block :${currentStartBlock}`);
+  console.log(`End block: ${currentEndBlock}`);
   /// fetch account names
   useEffect(() => {
     fetch("http://localhost:3000/rpc/find_matching_accounts", {
@@ -75,12 +75,10 @@ export default function App() {
     setcurrentCurrency(currency);
     setcurrentStartBlock(startBlock);
     setcurrentEndBlock(endBlock);
-    // setCurrentIncrement(blockIncrement);
     setValue("");
     setCurrency("");
     setStartBlock("");
     setEndBlock("");
-    // setBlockIncrement("");
   };
 
   return (
@@ -90,13 +88,11 @@ export default function App() {
           <Parameters
             startBlock={startBlock}
             endBlock={endBlock}
-            // blockIncrement={blockIncrement}
             currency={currency}
             handleSubmit={handleSubmit}
             getCurrency={getCurrency}
             getStartBlock={getStartBlock}
             getEndBlock={getEndBlock}
-            // getBlockIncrement={getBlockIncrement}
             value={value}
             setValue={setValue}
           />

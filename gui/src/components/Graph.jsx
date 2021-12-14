@@ -26,7 +26,7 @@ export default function Graph({ balance, currentCurrency }) {
   };
 
   const data = generateData(balances?.length);
-  console.log(data.length);
+  console.log(`Graph data length : ${data.length}`);
   console.log(data);
   return (
     <div style={{ marginTop: "100px" }}>

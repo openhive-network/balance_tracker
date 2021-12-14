@@ -1,10 +1,14 @@
 import React from "react";
 import {
   FormControl,
+  FormControlLabel,
+  Checkbox,
   InputLabel,
   TextField,
   Select,
   MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import styles from "./parameters.module.css";
 
@@ -18,9 +22,8 @@ export default function Input({
   getStartBlock,
   endBlock,
   getEndBlock,
-  // blockIncrement,
-  // getBlockIncrement,
 }) {
+  const currencyNumber = [13, 21, 37];
   return (
     <>
       <form style={{ display: "flex" }} onSubmit={handleSubmit}>
@@ -40,9 +43,14 @@ export default function Input({
               label="Crypto"
               onChange={getCurrency}
             >
-              <MenuItem value={13}>13</MenuItem>
-              <MenuItem value={21}>21</MenuItem>
-              <MenuItem value={37}>37</MenuItem>
+              {currencyNumber.map((singleNumber) => (
+                <MenuItem value={singleNumber}>
+                  <ListItemIcon>
+                    <Checkbox />
+                  </ListItemIcon>
+                  <ListItemText primary={singleNumber} />
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <TextField
@@ -59,13 +67,6 @@ export default function Input({
             label="End Block"
             variant="outlined"
           />
-          {/* <TextField
-            value={blockIncrement}
-            onChange={getBlockIncrement}
-            id="outlined-basic"
-            label="Block Increment"
-            variant="outlined"
-          /> */}
         </div>
       </form>
     </>
