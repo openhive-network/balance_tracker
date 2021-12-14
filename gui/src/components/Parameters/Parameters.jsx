@@ -18,8 +18,8 @@ export default function Input({
   getStartBlock,
   endBlock,
   getEndBlock,
-  blockIncrement,
-  getBlockIncrement,
+  // blockIncrement,
+  // getBlockIncrement,
 }) {
   return (
     <>
@@ -59,13 +59,13 @@ export default function Input({
             label="End Block"
             variant="outlined"
           />
-          <TextField
+          {/* <TextField
             value={blockIncrement}
             onChange={getBlockIncrement}
             id="outlined-basic"
             label="Block Increment"
             variant="outlined"
-          />
+          /> */}
         </div>
       </form>
     </>

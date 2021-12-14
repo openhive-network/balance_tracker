@@ -12,12 +12,12 @@ export default function App() {
   const [currentCurrency, setcurrentCurrency] = useState("");
   const [currentStartBlock, setcurrentStartBlock] = useState("");
   const [currentEndBlock, setcurrentEndBlock] = useState("");
-  const [currentIncrement, setCurrentIncrement] = useState("");
+  // const [currentIncrement, setCurrentIncrement] = useState("");
 
   const [currency, setCurrency] = useState("");
   const [startBlock, setStartBlock] = useState("");
   const [endBlock, setEndBlock] = useState("");
-  const [blockIncrement, setBlockIncrement] = useState("");
+  // const [blockIncrement, setBlockIncrement] = useState("");
   const [balance, setBalance] = useState("");
 
   /// functions used for getting values from inputs
@@ -25,7 +25,10 @@ export default function App() {
   const getCurrency = (e) => setCurrency(e.target.value);
   const getStartBlock = (e) => setStartBlock(e.target.value);
   const getEndBlock = (e) => setEndBlock(e.target.value);
-  const getBlockIncrement = (e) => setBlockIncrement(e.target.value);
+  // const getBlockIncrement = (e) => setBlockIncrement(e.target.value);
+
+  const roundNumber = Math.round((currentEndBlock - currentStartBlock) / 1000);
+  const result = roundNumber >= 1 ? roundNumber : 1;
 
   // fetch functions data parameters
   const account_Names_Data = JSON.stringify({ _partial_account_name: value });
@@ -34,9 +37,12 @@ export default function App() {
     _coin_type: currentCurrency,
     _start_block: currentStartBlock,
     _end_block: currentEndBlock,
-    _block_increment: currentIncrement,
+    _block_increment: result,
   });
 
+  console.log(result);
+  console.log(currentStartBlock);
+  console.log(currentEndBlock);
   /// fetch account names
   useEffect(() => {
     fetch("http://localhost:3000/rpc/find_matching_accounts", {
@@ -50,17 +56,18 @@ export default function App() {
   }, [account_Names_Data]);
 
   ///fetch balance for coin by block
-
-  if (accountName) {
-    fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: balance_For_Coin_Data,
-    })
-      .then((response) => response.json())
-      .then((res) => setBalance(JSON.parse(res)))
-      .catch((err) => console.log(err));
-  }
+  useEffect(() => {
+    if (accountName) {
+      fetch("http://localhost:3000/rpc/get_balance_for_coin_by_block", {
+        method: "post",
+        headers: { "Content-Type": "application/json" },
+        body: balance_For_Coin_Data,
+      })
+        .then((response) => response.json())
+        .then((res) => setBalance(JSON.parse(res)))
+        .catch((err) => console.log(err));
+    }
+  }, [accountName, balance_For_Coin_Data]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -68,12 +75,12 @@ export default function App() {
     setcurrentCurrency(currency);
     setcurrentStartBlock(startBlock);
     setcurrentEndBlock(endBlock);
-    setCurrentIncrement(blockIncrement);
+    // setCurrentIncrement(blockIncrement);
     setValue("");
     setCurrency("");
     setStartBlock("");
     setEndBlock("");
-    setBlockIncrement("");
+    // setBlockIncrement("");
   };
 
   return (
@@ -83,13 +90,13 @@ export default function App() {
           <Parameters
             startBlock={startBlock}
             endBlock={endBlock}
-            blockIncrement={blockIncrement}
+            // blockIncrement={blockIncrement}
             currency={currency}
             handleSubmit={handleSubmit}
             getCurrency={getCurrency}
             getStartBlock={getStartBlock}
             getEndBlock={getEndBlock}
-            getBlockIncrement={getBlockIncrement}
+            // getBlockIncrement={getBlockIncrement}
             value={value}
             setValue={setValue}
           />
@@ -100,7 +107,11 @@ export default function App() {
         </Button>
       </div>
 
-      {!accountName ? "" : <Graph balance={balance} />}
+      {!accountName ? (
+        ""
+      ) : (
+        <Graph balance={balance} currentCurrency={currentCurrency} />
+      )}
     </div>
   );
 }

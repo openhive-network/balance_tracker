@@ -6,10 +6,11 @@ import {
   ValueAxis,
   LineSeries,
   ZoomAndPan,
+  Title,
 } from "@devexpress/dx-react-chart-material-ui";
 import Loader from "./Loader";
 
-export default function Graph({ balance }) {
+export default function Graph({ balance, currentCurrency }) {
   let blocks = balance.block;
   let balances = balance.balance;
 
@@ -26,6 +27,7 @@ export default function Graph({ balance }) {
 
   const data = generateData(balances?.length);
   console.log(data.length);
+  console.log(data);
   return (
     <div style={{ marginTop: "100px" }}>
       {data.length === 0 ? (
@@ -33,6 +35,7 @@ export default function Graph({ balance }) {
       ) : (
         <Paper>
           <Chart data={data}>
+            <Title text={currentCurrency} />
             <ArgumentAxis showGrid={true} />
             <ValueAxis />
             <LineSeries valueField="y" argumentField="x" />
