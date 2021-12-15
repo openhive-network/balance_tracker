@@ -5,7 +5,10 @@
 .dropdown__container-show {
   display: block;
   max-height: 200px;
-  width: 200px;
+  width: 198px;
+  position: absolute;
+  left: 386px;
+  top: 82px;
   overflow: auto;
   border-left: 1px solid rgba(0, 0, 0, 0.23);
   border-right: 1px solid rgba(0, 0, 0, 0.23);

@@ -4,6 +4,7 @@ import styles from "./App.module.css";
 import Parameters from "./components/Parameters/Parameters"; // <==== HERE PAREMETERS = INPUT FIELDS
 import Dropdown from "./components/Dropdown/Dropdown";
 import Graph from "./components/Graph";
+import LineChart from "./components/React_ChartJs2";
 
 export default function App() {
   const [value, setValue] = useState("");
@@ -72,7 +73,7 @@ export default function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     names.filter((name) => name === value && setAccountName(name));
-    setcurrentCurrency(currency);
+    setcurrentCurrency(currency[0]);
     setcurrentStartBlock(startBlock);
     setcurrentEndBlock(endBlock);
     setValue("");
@@ -89,24 +90,23 @@ export default function App() {
             startBlock={startBlock}
             endBlock={endBlock}
             currency={currency}
+            setCurrency={setCurrency}
             handleSubmit={handleSubmit}
             getCurrency={getCurrency}
             getStartBlock={getStartBlock}
             getEndBlock={getEndBlock}
             value={value}
             setValue={setValue}
+            names={names}
           />
           <Dropdown value={value} setValue={setValue} names={names} />
         </div>
-        <Button onClick={handleSubmit} color="secondary" variant="contained">
-          Show Balances
-        </Button>
       </div>
 
       {!accountName ? (
         ""
       ) : (
-        <Graph balance={balance} currentCurrency={currentCurrency} />
+        <LineChart balance={balance} currentCurrency={currentCurrency} />
       )}
     </div>
   );
