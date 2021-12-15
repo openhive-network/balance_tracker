@@ -61,7 +61,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT, _block_increment INT)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT, _block_increment BIGINT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -131,12 +131,8 @@ BEGIN
             ) distinct_values
             RIGHT JOIN (
               SELECT
-                block_step, balance
-              FROM (
-                SELECT
-                  generate_series(_start_block, _end_block + _block_increment, _block_increment) AS block_step,
-                  null AS balance
-              ) generate_block_steps 
+                generate_series(_start_block, _end_block + _block_increment, _block_increment) AS block_step,
+                null AS balance
             ) steps
             ON distinct_values.block_step = steps.block_step
           ) join_tables
