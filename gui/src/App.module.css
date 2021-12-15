@@ -8,3 +8,11 @@
 .container__input {
   margin-bottom: 50px;
 }
+
+.hide {
+  display: none;
+}
+
+.showChart {
+  display: block;
+}
