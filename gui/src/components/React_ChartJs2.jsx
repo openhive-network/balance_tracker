@@ -21,13 +21,13 @@ Chart.register(
   Title
 );
 
-export default function LineChart({ balance, currentCurrency }) {
+export default function LineChart({ accountData, currentCurrency }) {
   const chartData = {
-    labels: balance.block,
+    labels: accountData.block,
     datasets: [
       {
         label: "Balance",
-        data: balance.balance != 0 ? balance.balance : 0,
+        data: accountData.balance !== 0 ? accountData.balance : 0, // <==== if no balances, show 0 on chart
         fill: false,
         borderColor: "rgb(75, 192, 192)",
         tension: 0.1,
@@ -62,13 +62,14 @@ export default function LineChart({ balance, currentCurrency }) {
   return (
     <div
       style={{
-        height: "80vh",
+        // height: "1200px",
+        
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      <div style={{ width: "80%" }}>
+      <div style={{ width: "1200px" }}>
         <Line data={chartData} options={chartOptions} />
       </div>
     </div>
