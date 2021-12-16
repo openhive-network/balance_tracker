@@ -3,7 +3,7 @@ import { TextField, Button } from "@mui/material";
 import styles from "./parameters.module.css";
 import InputCheckbox from "./Input_Checkbox/Input_Checkbox";
 
-export default function Input({
+export default function Parameters({
   value,
   setValue,
   handleSubmit,

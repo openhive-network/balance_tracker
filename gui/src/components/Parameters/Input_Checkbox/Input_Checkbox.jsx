@@ -12,7 +12,7 @@ import styles from "../parameters.module.css";
 
 export default function App({ setCurrency }) {
   const [selected, setSelected] = useState([]);
-  const options = [13, 21, 37];
+  const options = [13, 21, 37];    // <======= crypto currencies nai number
 
   const isAllSelected =
     options.length > 0 && selected.length === options.length;

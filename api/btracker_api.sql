@@ -55,7 +55,7 @@ BEGIN
     ORDER BY
       accounts,
       name_lengths
-    LIMIT 100
+    LIMIT 50
   ) account_query;
 END
 $$
