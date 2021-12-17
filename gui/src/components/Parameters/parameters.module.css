@@ -10,3 +10,7 @@
 .hidden {
   display: "none";
 }
+
+.date-time--picker {
+  margin-top: 20px;
+}

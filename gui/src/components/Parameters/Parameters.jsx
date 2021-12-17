@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { TextField, Button } from "@mui/material";
 import styles from "./parameters.module.css";
 import InputCheckbox from "./Input_Checkbox/Input_Checkbox";
+import AdapterDateFns from "@mui/lab/AdapterDateFns";
+import LocalizationProvider from "@mui/lab/LocalizationProvider";
+import DateTimePicker from "@mui/lab/DateTimePicker";
 
 export default function Parameters({
   value,
@@ -28,6 +31,12 @@ export default function Parameters({
       showDatesBtnText === "Choose Dates" ? "Choose Blocks" : "Choose Dates"
     );
   };
+
+  // const [value1, setValue1] = useState(new Date());
+
+  // const handleChange = (newValue) => {
+  //   setValue1(newValue);
+  // };
   return (
     <>
       <form
@@ -68,30 +77,27 @@ export default function Parameters({
           />
         </div>
         <div
-          // className={
-          //   showDates !== false ? styles["dates_parameters"] : styles.hidden
-          // }
           className="dates__parameters"
           style={
             showDates === false ? { display: "none" } : { display: "flex" }
           }
         >
-          <TextField
-            className={styles.input}
-            value={startDate}
-            onChange={getStartDate}
-            id="outlined-basic"
-            label="Start Date"
-            variant="outlined"
-          />
-          <TextField
-            className={styles.input}
-            value={endDate}
-            onChange={getEndDate}
-            id="outlined-basic"
-            label="End Date"
-            variant="outlined"
-          />
+          <div className={styles["date-time--picker"]}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DateTimePicker
+                label="START DATE"
+                value={startDate}
+                onChange={getStartDate}
+                renderInput={(params) => <TextField {...params} />}
+              />
+              <DateTimePicker
+                label="END DATE"
+                value={endDate}
+                onChange={getEndDate}
+                renderInput={(params) => <TextField {...params} />}
+              />
+            </LocalizationProvider>
+          </div>
           <TextField
             className={styles.input}
             value={dateIncrement}
