@@ -145,7 +145,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(_account_name TEXT, _coin_type INT, _start_time TIMESTAMP, _end_time TIMESTAMP, _time_increment TIME)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(_account_name TEXT, _coin_type INT, _start_time TIMESTAMP, _end_time TIMESTAMP, _time_increment INTERVAL)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
