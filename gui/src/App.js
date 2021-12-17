@@ -14,8 +14,8 @@ export default function App() {
   const [endBlock, setEndBlock] = useState("");
   const [currentStartBlock, setcurrentStartBlock] = useState("");
   const [currentEndBlock, setcurrentEndBlock] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
   const [currentStartDate, setcurrentStartDate] = useState("");
   const [currentEndDate, setcurrentEndDate] = useState("");
   const [dateIncrement, setDateIncrement] = useState("");
@@ -25,8 +25,8 @@ export default function App() {
   const getCurrency = (e) => setCurrency(e.target.value);
   const getStartBlock = (e) => setStartBlock(e.target.value);
   const getEndBlock = (e) => setEndBlock(e.target.value);
-  const getStartDate = (e) => setStartDate(e.target.value);
-  const getEndDate = (e) => setEndDate(e.target.value);
+  const getStartDate = (newValue) => setStartDate(newValue);
+  const getEndDate = (newValue) => setEndDate(newValue);
   const getDateIncrement = (e) => setDateIncrement(e.target.value);
 
   // calculate block increment number
@@ -160,7 +160,6 @@ export default function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     names.filter((name) => name === value && setAccountName(name));
-    // setcurrentCurrency(currency);
     setcurrentStartBlock(startBlock);
     setcurrentEndBlock(endBlock);
     setcurrentStartDate(startDate);
@@ -176,7 +175,9 @@ export default function App() {
     // setEndBlock("");
   };
   console.log(
-    `Start Date ${currentStartDate} \n End Date : ${currentEndDate} \n Date Increment : ${currentDateIncrement}`
+    `Start Date ${startDate.toLocaleString(
+      "en-UK"
+    )} \n End Date : ${currentEndDate} \n Date Increment : ${currentDateIncrement}`
   );
   return (
     <div>
