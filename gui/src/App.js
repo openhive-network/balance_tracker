@@ -3,6 +3,7 @@ import styles from "./App.module.css";
 import Parameters from "./components/Parameters/Parameters"; // <==== HERE PAREMETERS = INPUT FIELDS
 import Dropdown from "./components/Dropdown/Dropdown";
 import LineChart from "./components/React_ChartJs2";
+import moment from "moment";
 import "./App.module.css";
 
 export default function App() {
@@ -162,8 +163,8 @@ export default function App() {
     names.filter((name) => name === value && setAccountName(name));
     setcurrentStartBlock(startBlock);
     setcurrentEndBlock(endBlock);
-    setcurrentStartDate(startDate);
-    setcurrentEndDate(endDate);
+    setcurrentStartDate(startDate.toLocaleString("en-UK"));
+    setcurrentEndDate(endDate.toLocaleString("en-UK"));
     setCurrentDateIncrement(dateIncrement);
     setFindCurrency13(() => currency.filter((num) => num === 13 && num));
     setFindCurrency21(() => currency.filter((num) => num === 21 && num));
@@ -174,11 +175,24 @@ export default function App() {
     // setStartBlock("");
     // setEndBlock("");
   };
-  console.log(
-    `Start Date ${startDate.toLocaleString(
-      "en-UK"
-    )} \n End Date : ${currentEndDate} \n Date Increment : ${currentDateIncrement}`
-  );
+
+  //// Date string refactoring
+  // const cutStartDateString =
+  //   currentStartDate.substring(0, 10) + currentStartDate.substring(11);
+  // const cutEndDateString =
+  //   currentEndDate.substring(0, 10) + currentEndDate.substring(11);
+
+  // const refactoredStartDate = moment
+  //   .utc(cutStartDateString)
+  //   .format("DD-MM-YYYY HH:mm:ss");
+  // const refactoredEndDate = moment
+  //   .utc(cutEndDateString)
+  //   .format("DD-MM-YYYY HH:mm:ss");
+
+  // console.log(
+  //   `Start date : ${refactoredStartDate} \nEndDate : ${refactoredEndDate}
+  //   ${cutStartDateString} and ${cutEndDateString}`
+  // );
   return (
     <div>
       <div className={styles.container}>
