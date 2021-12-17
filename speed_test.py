@@ -127,6 +127,7 @@ def post(data, method_name):
 if __name__ == "__main__":
     webserver_url = "http://localhost:3000"
     
+    '''
     method_name = "find_matching_accounts"
     n = 1000
     name = "dantheman"
@@ -145,18 +146,29 @@ if __name__ == "__main__":
     durations, res_lens = test_get_balance_for_coin_by_block(
         n, array_data, method_name)
     draw_graph(n, durations, res_lens, method_name)
-
-    '''
+   
     method_name = "get_balance_for_coin_by_time"
-    n = 1
+    n = 1000
     array_data = {
         "_account_name": ["dantheman", "dantheman", "dantheman", "dantheman", "dantheman", "dantheman"],
         "_coin_type": ["21", "21", "37", "13", "21", "21"],
-        "_start_time": ["2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "1250000"],
+        "_start_time": ["2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-03-24 16:05:00", "2016-05-07 21:16:12"],
         "_end_time": ["2016-09-15 19:47:21","2016-09-15 19:47:21","2016-09-15 19:47:21", "2016-09-15 19:47:21", "2016-06-20 10:35:45", "2016-08-03 04:28:18"],
-        "_time_increment": ["04:12:13.341", "50000", "04:12:13.341", "04:12:13.341", "04:12:13.341", "04:12:13.341"]
+        "_time_increment": ["04:12:13.341", "1 day 18:02:13.41", "04:12:13.341", "04:12:13.341", "04:12:13.341", "04:12:13.341"]
     }
     durations, res_lens = test_get_balance_for_coin_by_time(
         n, array_data, method_name)
     draw_graph(n, durations, res_lens, method_name)
     '''
+    method_name = "get_balance_for_coin_by_time"
+    n = 1000
+    array_data = {
+        "_account_name": ["dantheman", "dantheman"],
+        "_coin_type": ["21", "37"],
+        "_start_time": ["2016-03-24 16:05:00", "2016-03-24 16:05:00"],
+        "_end_time": ["2016-09-15 19:47:21","2016-09-15 19:47:21"],
+        "_time_increment": ["04:12:13.341", "00:25:13.3341"]
+    }
+    durations, res_lens = test_get_balance_for_coin_by_time(
+        n, array_data, method_name)
+    draw_graph(n, durations, res_lens, method_name)
