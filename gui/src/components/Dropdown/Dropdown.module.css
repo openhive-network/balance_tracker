@@ -1,0 +1,27 @@
+.dropdown__list {
+  padding: 0 !important;
+}
+
+.dropdown__container-show {
+  display: block;
+  max-height: 200px;
+  width: 198px;
+  position: absolute;
+  left: 386px;
+  top: 80px;
+  overflow: auto;
+  border-left: 1px solid rgba(0, 0, 0, 0.23);
+  border-right: 1px solid rgba(0, 0, 0, 0.23);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.23);
+  border-bottom-left-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
+}
+
+.dropdown__container-hide {
+  display: none;
+}
+
+.noNamesError {
+  color: red;
+  margin-left: 20px;
+}

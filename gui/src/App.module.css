@@ -1,0 +1,18 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.container__input {
+  margin-bottom: 50px;
+}
+
+.hide {
+  display: none;
+}
+
+.showChart {
+  display: block;
+}
