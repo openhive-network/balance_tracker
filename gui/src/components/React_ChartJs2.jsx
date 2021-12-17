@@ -63,7 +63,7 @@ export default function LineChart({ accountData, currentCurrency }) {
     <div
       style={{
         // height: "1200px",
-        
+
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
