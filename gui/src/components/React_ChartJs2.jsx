@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Chart,
   CategoryScale,
@@ -21,7 +21,12 @@ Chart.register(
   Title
 );
 
-export default function LineChart({ accountData, currentCurrency }) {
+export default function LineChart({
+  setChartXStartAfterZoom,
+  setChartXEndAfterZoom,
+  accountData,
+  currentCurrency,
+}) {
   const chartData = {
     labels: accountData.block,
     datasets: [
@@ -35,7 +40,7 @@ export default function LineChart({ accountData, currentCurrency }) {
     ],
   };
 
-  const chartOptions = {
+  let chartOptions = {
     plugins: {
       title: {
         display: true,
@@ -54,6 +59,15 @@ export default function LineChart({ accountData, currentCurrency }) {
             enabled: true,
           },
           mode: "xy",
+          onZoom: function (chart) {
+            const chartXaxis =
+              chart.chart.$context.chart._metasets[0].iScale._labelItems;
+
+            const xAxisFirstValue = chartXaxis[0].label;
+            const xAxisLastValue = chartXaxis.at(-1).label;
+            setChartXStartAfterZoom(xAxisFirstValue);
+            setChartXEndAfterZoom(xAxisLastValue);
+          },
         },
       },
     },
@@ -72,6 +86,7 @@ export default function LineChart({ accountData, currentCurrency }) {
       <div style={{ width: "1200px" }}>
         <Line data={chartData} options={chartOptions} />
       </div>
+      {/* <button onClick={() => console.log(zoomBtn)}>zoom</button> */}
     </div>
   );
 }
