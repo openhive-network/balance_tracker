@@ -61,26 +61,25 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT, _block_increment BIGINT)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
   __coin_type_arr INT[] = '{13, 21, 37}';
+  __block_increment BIGINT;
 BEGIN
   IF _start_block >= _end_block THEN
     SELECT raise_exception(
       'ERROR: "_start_block" must be lower than "_end_block"!');
   END IF;
-  IF _block_increment < (_end_block - _start_block) / 1000 THEN
-    SELECT raise_exception(
-      'ERROR: query is limited to 1000! Use higher "_block_increment" for this block range.');
-  END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
       FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
   END IF;
+
+  __block_increment = ((_end_block - _start_block) / 1000)::BIGINT;
 
   RETURN to_jsonb(result) FROM (
     SELECT
@@ -115,7 +114,7 @@ BEGIN
                 FROM (
                   SELECT
                     row_number() OVER (ORDER BY abh.source_op_block) AS id,
-                    ((((abh.source_op_block - 1 - _start_block) / _block_increment)::INT + 1) * _block_increment + _start_block)::BIGINT AS block_step,
+                    ((((abh.source_op_block - 1 - _start_block) / __block_increment)::INT + 1) * __block_increment + _start_block)::BIGINT AS block_step,
                     abh.balance::BIGINT AS balance
                   FROM
                     btracker_app.account_balance_history abh
@@ -131,7 +130,7 @@ BEGIN
             ) distinct_values
             RIGHT JOIN (
               SELECT
-                generate_series(_start_block, _end_block + _block_increment, _block_increment) AS block_step,
+                generate_series(_start_block, _end_block + __block_increment, __block_increment) AS block_step,
                 null AS balance
             ) steps
             ON distinct_values.block_step = steps.block_step
@@ -145,26 +144,25 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(_account_name TEXT, _coin_type INT, _start_time TIMESTAMP, _end_time TIMESTAMP, _time_increment INTERVAL)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(_account_name TEXT, _coin_type INT, _start_time TIMESTAMP, _end_time TIMESTAMP)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
   __coin_type_arr INT[] = '{13, 21, 37}';
+  __time_increment INTERVAL;
 BEGIN
   IF _start_time >= _end_time THEN
     SELECT raise_exception(
       'ERROR: "_start_time" must be lower than "_end_time"!');
   END IF;
-  IF _time_increment < (_end_time - _start_time) / 1000 THEN
-    SELECT raise_exception(
-      'ERROR: query is limited to 1000! Use higher "_time_increment" for this time range.');
-  END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
       FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
   END IF;
+
+  __time_increment = (_end_time - _start_time) / 1000;
 
   RETURN to_jsonb(result) FROM (
     SELECT
@@ -199,7 +197,7 @@ BEGIN
                 FROM (
                   SELECT
                     row_number() OVER (ORDER BY time_query.created_at) AS id,
-                    (( (SELECT extract( EPOCH FROM ((time_query.created_at - '00:00:01'::TIME - _start_time)::TIME / (SELECT extract(EPOCH FROM _time_increment))) ))::INT + 1 ) * _time_increment + _start_time) AS time_step,
+                    (( (SELECT extract( EPOCH FROM ((time_query.created_at - '00:00:01'::TIME - _start_time)::TIME / (SELECT extract(EPOCH FROM __time_increment))) ))::INT + 1 ) * __time_increment + _start_time) AS time_step,
                     hive_query.balance AS balance
                   FROM (
                     SELECT
@@ -226,7 +224,7 @@ BEGIN
             ) distinct_values
             RIGHT JOIN (
               SELECT
-                generate_series(_start_time, _end_time + _time_increment, _time_increment)::TIMESTAMP AS time_step,
+                generate_series(_start_time, _end_time + __time_increment, __time_increment)::TIMESTAMP AS time_step,
                 null AS balance
             ) steps
             ON distinct_values.time_step = steps.time_step
