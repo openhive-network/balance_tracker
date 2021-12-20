@@ -31,6 +31,7 @@ export default function Parameters({
       showDatesBtnText === "Choose Dates" ? "Choose Blocks" : "Choose Dates"
     );
   };
+  localStorage.setItem("Chart Value", showDatesBtnText);
 
   // const [value1, setValue1] = useState(new Date());
 
@@ -98,14 +99,6 @@ export default function Parameters({
               />
             </LocalizationProvider>
           </div>
-          <TextField
-            className={styles.input}
-            value={dateIncrement}
-            onChange={getDateIncrement}
-            id="outlined-basic"
-            label="Date increment"
-            variant="outlined"
-          />
         </div>
         <div
           style={{

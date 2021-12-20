@@ -8,7 +8,7 @@ import moment from "moment";
 import "./App.module.css";
 
 export default function App() {
-  const today = moment().format("YYYY MM DD hh:mm:ss");
+  const today = moment().format("YYYY MM DD HH:mm:ss");
   const [value, setValue] = useState("");
   const [names, setNames] = useState("");
   const [accountName, setAccountName] = useState("");
@@ -21,8 +21,8 @@ export default function App() {
   const [endDate, setEndDate] = useState(today);
   const [currentStartDate, setcurrentStartDate] = useState("");
   const [currentEndDate, setcurrentEndDate] = useState("");
-  const [dateIncrement, setDateIncrement] = useState("");
-  const [currentDateIncrement, setCurrentDateIncrement] = useState("");
+  // const [dateIncrement, setDateIncrement] = useState("");
+  // const [currentDateIncrement, setCurrentDateIncrement] = useState("");
   const [chartXStartAfterZoom, setChartXStartAfterZoom] = useState("");
   const [chartXEndAfterZoom, setChartXEndAfterZoom] = useState("");
 
@@ -32,14 +32,6 @@ export default function App() {
   const getEndBlock = (e) => setEndBlock(e.target.value);
   const getStartDate = (newValue) => setStartDate(newValue);
   const getEndDate = (newValue) => setEndDate(newValue);
-  const getDateIncrement = (e) => setDateIncrement(e.target.value);
-
-  // calculate block increment number
-  const Block_Increment_Number = Math.round(
-    (currentEndBlock - currentStartBlock) / 1000
-  );
-  const currentBlockIncrement =
-    Block_Increment_Number >= 1 ? Block_Increment_Number : 1;
 
   // ////////////////////////////////// Get data of all names
   const account_Names_Data = JSON.stringify({ _partial_account_name: value });
@@ -75,7 +67,6 @@ export default function App() {
       ? currentStartBlock
       : chartXStartAfterZoom,
     _end_block: !chartXEndAfterZoom ? currentEndBlock : chartXEndAfterZoom,
-    _block_increment: currentBlockIncrement,
   });
 
   const balance_For_Coin_Data21 = JSON.stringify({
@@ -85,7 +76,6 @@ export default function App() {
       ? currentStartBlock
       : chartXStartAfterZoom,
     _end_block: !chartXEndAfterZoom ? currentEndBlock : chartXEndAfterZoom,
-    _block_increment: currentBlockIncrement,
   });
 
   const balance_For_Coin_Data37 = JSON.stringify({
@@ -95,7 +85,6 @@ export default function App() {
       ? currentStartBlock
       : chartXStartAfterZoom,
     _end_block: !chartXEndAfterZoom ? currentEndBlock : chartXEndAfterZoom,
-    _block_increment: currentBlockIncrement,
   });
 
   ///fetch balance for coin by block
@@ -145,30 +134,74 @@ export default function App() {
   ]);
 
   // ////////////////////////////////// Accout data of dates and balances
-  const [datesData, setDatesData] = useState("");
+  const [datesData13, setDatesData13] = useState("");
+  const [datesData21, setDatesData21] = useState("");
+  const [datesData37, setDatesData37] = useState("");
 
-  const account_Dates_Data_Body = JSON.stringify({
-    _account_name: "dantheman",
-    _coin_type: 21,
+  const account_Dates_Data_Body21 = JSON.stringify({
+    _account_name: accountName,
+    _coin_type: findCurrency21[0],
     _start_time: currentStartDate,
     _end_time: currentEndDate,
-    _time_increment: "1 day 02:30:00",
+  });
+
+  const account_Dates_Data_Body13 = JSON.stringify({
+    _account_name: accountName,
+    _coin_type: findCurrency13[0],
+    _start_time: currentStartDate,
+    _end_time: currentEndDate,
+  });
+
+  const account_Dates_Data_Body37 = JSON.stringify({
+    _account_name: accountName,
+    _coin_type: findCurrency37[0],
+    _start_time: currentStartDate,
+    _end_time: currentEndDate,
   });
 
   useEffect(() => {
-    fetch("http://localhost:3000/rpc/get_balance_for_coin_by_time", {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: account_Dates_Data_Body,
-    })
-      .then((response) => response.json())
-      .then((res) => setDatesData(JSON.parse(res)))
-      .catch((err) => console.log(err));
-  }, [account_Dates_Data_Body]);
+    if (currentStartDate) {
+      if (findCurrency21) {
+        fetch("http://localhost:3000/rpc/get_balance_for_coin_by_time", {
+          method: "post",
+          headers: { "Content-Type": "application/json" },
+          body: account_Dates_Data_Body21,
+        })
+          .then((response) => response.json())
+          .then((res) => setDatesData21(JSON.parse(res)))
+          .catch((err) => console.log(err));
+      }
+      if (findCurrency13) {
+        fetch("http://localhost:3000/rpc/get_balance_for_coin_by_time", {
+          method: "post",
+          headers: { "Content-Type": "application/json" },
+          body: account_Dates_Data_Body13,
+        })
+          .then((response) => response.json())
+          .then((res) => setDatesData13(JSON.parse(res)))
+          .catch((err) => console.log(err));
+      }
+      if (findCurrency37) {
+        fetch("http://localhost:3000/rpc/get_balance_for_coin_by_time", {
+          method: "post",
+          headers: { "Content-Type": "application/json" },
+          body: account_Dates_Data_Body37,
+        })
+          .then((response) => response.json())
+          .then((res) => setDatesData37(JSON.parse(res)))
+          .catch((err) => console.log(err));
+      }
+    }
+  }, [
+    findCurrency13,
+    findCurrency21,
+    findCurrency37,
+    currentStartDate,
+    account_Dates_Data_Body13,
+    account_Dates_Data_Body21,
+    account_Dates_Data_Body37,
+  ]);
 
-  console.log(
-    ` ${new Date().getFullYear()} ${new Date().getMonth()} ${new Date().getDate()}`
-  );
   // ///// Submit for with "enter" or button
 
   const handleSubmit = (e) => {
@@ -178,29 +211,10 @@ export default function App() {
     setcurrentEndBlock(endBlock);
     setcurrentStartDate(moment(startDate).format("YYYY MM DD HH:mm:ss"));
     setcurrentEndDate(moment(endDate).format("YYYY MM DD HH:mm:ss"));
-    setCurrentDateIncrement(dateIncrement);
     setFindCurrency13(() => currency.filter((num) => num === 13 && num));
     setFindCurrency21(() => currency.filter((num) => num === 21 && num));
     setFindCurrency37(() => currency.filter((num) => num === 37 && num));
-
-    // setValue("");
-    // setCurrency("");
-    // setStartBlock("");
-    // setEndBlock("");
   };
-
-  //// Date string refactoring
-  // const cutStartDateString =
-  //   currentStartDate.substring(0, 10) + currentStartDate.substring(11);
-  // const cutEndDateString =
-  //   currentEndDate.substring(0, 10) + currentEndDate.substring(11);
-
-  // const refactoredStartDate = moment
-  //   .utc(cutStartDateString)
-  //   .format("DD-MM-YYYY HH:mm:ss");
-  // const refactoredEndDate = moment
-  //   .utc(cutEndDateString)
-  //   .format("DD-MM-YYYY HH:mm:ss");
 
   /////////////////////////////////
   const handleResetChart = () => {
@@ -217,7 +231,6 @@ export default function App() {
             endBlock={endBlock}
             startDate={startDate}
             endDate={endDate}
-            dateIncrement={dateIncrement}
             currency={currency}
             setCurrency={setCurrency}
             handleSubmit={handleSubmit}
@@ -226,15 +239,21 @@ export default function App() {
             getEndBlock={getEndBlock}
             getStartDate={getStartDate}
             getEndDate={getEndDate}
-            getDateIncrement={getDateIncrement}
             value={value}
             setValue={setValue}
           />
           <Dropdown value={value} setValue={setValue} names={names} />
         </div>
         {accountName && (
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            Showing balances for {accountName}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              textAlign: "center",
+            }}
+          >
+            <p>Showing balances for {accountName}</p>
+            <p>Lost in ZOOM ?</p>
             <Button onClick={handleResetChart}>Reset Chart</Button>
           </div>
         )}
@@ -248,6 +267,7 @@ export default function App() {
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data13}
             currentCurrency={findCurrency13}
+            datesData={datesData13}
           />
         </div>
         <div
@@ -258,6 +278,7 @@ export default function App() {
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data21}
             currentCurrency={findCurrency21}
+            datesData={datesData21}
           />
         </div>
         <div
@@ -268,10 +289,10 @@ export default function App() {
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data37}
             currentCurrency={findCurrency37}
+            datesData={datesData37}
           />
         </div>
       </div>
-      {/* <LineChart datesData={datesData} /> */}
     </div>
   );
 }

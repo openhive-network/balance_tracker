@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Chart,
   CategoryScale,
@@ -26,8 +26,9 @@ export default function LineChart({
   setChartXEndAfterZoom,
   accountData,
   currentCurrency,
+  datesData,
 }) {
-  const chartData = {
+  const chartAccountData = {
     labels: accountData.block,
     datasets: [
       {
@@ -39,6 +40,21 @@ export default function LineChart({
       },
     ],
   };
+  const chartDatesData = {
+    labels: datesData.time,
+    datasets: [
+      {
+        label: "Balance",
+        data: datesData.balance !== 0 ? datesData.balance : 0, // <==== if no balances, show 0 on chart
+        fill: false,
+        borderColor: "rgb(75, 192, 192)",
+        tension: 0.1,
+      },
+    ],
+  };
+
+  const showingBlocksChart =
+    localStorage.getItem("Chart Value") === "Choose Dates";
 
   let chartOptions = {
     plugins: {
@@ -84,7 +100,10 @@ export default function LineChart({
       }}
     >
       <div style={{ width: "1200px" }}>
-        <Line data={chartData} options={chartOptions} />
+        <Line
+          data={showingBlocksChart === true ? chartAccountData : chartDatesData}
+          options={chartOptions}
+        />
       </div>
       {/* <button onClick={() => console.log(zoomBtn)}>zoom</button> */}
     </div>
