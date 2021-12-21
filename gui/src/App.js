@@ -5,7 +5,7 @@ import Parameters from "./components/Parameters/Parameters"; // <==== HERE PAREM
 import Dropdown from "./components/Dropdown/Dropdown";
 import LineChart from "./components/React_ChartJs2";
 import moment from "moment";
-import "./App.module.css";
+// import "./App.module.css";
 
 export default function App() {
   const today = moment().format("YYYY MM DD HH:mm:ss");
@@ -21,10 +21,13 @@ export default function App() {
   const [endDate, setEndDate] = useState(today);
   const [currentStartDate, setcurrentStartDate] = useState("");
   const [currentEndDate, setcurrentEndDate] = useState("");
-  // const [dateIncrement, setDateIncrement] = useState("");
-  // const [currentDateIncrement, setCurrentDateIncrement] = useState("");
+
+  // setting charts values after zoom to show 1000 points after every zoom
   const [chartXStartAfterZoom, setChartXStartAfterZoom] = useState("");
   const [chartXEndAfterZoom, setChartXEndAfterZoom] = useState("");
+  const [datesChartXStartAfterZoom, setDatesChartXStartAfterZoom] =
+    useState("");
+  const [datesChartXEndAfterZoom, setDatesChartXEndAfterZoom] = useState("");
 
   /// functions used for getting values from inputs
   const getCurrency = (e) => setCurrency(e.target.value);
@@ -141,22 +144,34 @@ export default function App() {
   const account_Dates_Data_Body21 = JSON.stringify({
     _account_name: accountName,
     _coin_type: findCurrency21[0],
-    _start_time: currentStartDate,
-    _end_time: currentEndDate,
+    _start_time: !datesChartXStartAfterZoom
+      ? currentStartDate
+      : datesChartXStartAfterZoom,
+    _end_time: !datesChartXEndAfterZoom
+      ? currentEndDate
+      : datesChartXEndAfterZoom,
   });
 
   const account_Dates_Data_Body13 = JSON.stringify({
     _account_name: accountName,
     _coin_type: findCurrency13[0],
-    _start_time: currentStartDate,
-    _end_time: currentEndDate,
+    _start_time: !datesChartXStartAfterZoom
+      ? currentStartDate
+      : datesChartXStartAfterZoom,
+    _end_time: !datesChartXEndAfterZoom
+      ? currentEndDate
+      : datesChartXEndAfterZoom,
   });
 
   const account_Dates_Data_Body37 = JSON.stringify({
     _account_name: accountName,
     _coin_type: findCurrency37[0],
-    _start_time: currentStartDate,
-    _end_time: currentEndDate,
+    _start_time: !datesChartXStartAfterZoom
+      ? currentStartDate
+      : datesChartXStartAfterZoom,
+    _end_time: !datesChartXEndAfterZoom
+      ? currentEndDate
+      : datesChartXEndAfterZoom,
   });
 
   useEffect(() => {
@@ -201,7 +216,6 @@ export default function App() {
     account_Dates_Data_Body21,
     account_Dates_Data_Body37,
   ]);
-
   // ///// Submit for with "enter" or button
 
   const handleSubmit = (e) => {
@@ -220,6 +234,8 @@ export default function App() {
   const handleResetChart = () => {
     setChartXStartAfterZoom(currentStartBlock);
     setChartXEndAfterZoom(currentEndBlock);
+    setDatesChartXStartAfterZoom(currentStartDate);
+    setDatesChartXEndAfterZoom(currentEndDate);
   };
 
   return (
@@ -253,7 +269,7 @@ export default function App() {
             }}
           >
             <p>Showing balances for {accountName}</p>
-            <p>Lost in ZOOM ?</p>
+            <p>Restart chart if not showing correct values</p>
             <Button onClick={handleResetChart}>Reset Chart</Button>
           </div>
         )}
@@ -263,6 +279,8 @@ export default function App() {
           className={findCurrency13[0] === 13 ? styles.showChart : styles.hide}
         >
           <LineChart
+            setDatesChartXStartAfterZoom={setDatesChartXStartAfterZoom}
+            setDatesChartXEndAfterZoom={setDatesChartXEndAfterZoom}
             setChartXStartAfterZoom={setChartXStartAfterZoom}
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data13}
@@ -274,6 +292,8 @@ export default function App() {
           className={findCurrency21[0] === 21 ? styles.showChart : styles.hide}
         >
           <LineChart
+            setDatesChartXStartAfterZoom={setDatesChartXStartAfterZoom}
+            setDatesChartXEndAfterZoom={setDatesChartXEndAfterZoom}
             setChartXStartAfterZoom={setChartXStartAfterZoom}
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data21}
@@ -285,6 +305,8 @@ export default function App() {
           className={findCurrency37[0] === 37 ? styles.showChart : styles.hide}
         >
           <LineChart
+            setDatesChartXStartAfterZoom={setDatesChartXStartAfterZoom}
+            setDatesChartXEndAfterZoom={setDatesChartXEndAfterZoom}
             setChartXStartAfterZoom={setChartXStartAfterZoom}
             setChartXEndAfterZoom={setChartXEndAfterZoom}
             accountData={data37}
