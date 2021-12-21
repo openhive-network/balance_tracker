@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   Chart,
   CategoryScale,
@@ -24,6 +24,8 @@ Chart.register(
 export default function LineChart({
   setChartXStartAfterZoom,
   setChartXEndAfterZoom,
+  setDatesChartXStartAfterZoom,
+  setDatesChartXEndAfterZoom,
   accountData,
   currentCurrency,
   datesData,
@@ -56,6 +58,9 @@ export default function LineChart({
   const showingBlocksChart =
     localStorage.getItem("Chart Value") === "Choose Dates";
 
+  let xAxisFirstValue = "";
+  let xAxisLastValue = "";
+
   let chartOptions = {
     plugins: {
       title: {
@@ -76,17 +81,31 @@ export default function LineChart({
           },
           mode: "xy",
           onZoom: function (chart) {
-            const chartXaxis =
-              chart.chart.$context.chart._metasets[0].iScale._labelItems;
-
-            const xAxisFirstValue = chartXaxis[0].label;
-            const xAxisLastValue = chartXaxis.at(-1).label;
-            setChartXStartAfterZoom(xAxisFirstValue);
-            setChartXEndAfterZoom(xAxisLastValue);
+            try {
+              const chartXaxis =
+                chart.chart.$context.chart._metasets[0].iScale._labelItems;
+              xAxisFirstValue = chartXaxis[0].label;
+              xAxisLastValue = chartXaxis.at(-1).label;
+            } catch (error) {
+              console.log(error);
+            }
           },
         },
       },
     },
+  };
+  const chartRef = useRef("");
+
+  const handleZoomIn = (e) => {
+    chartRef.current.zoom(1.05); // <==== zoom 5%
+    setChartXStartAfterZoom(xAxisFirstValue);
+    setChartXEndAfterZoom(xAxisLastValue);
+    setDatesChartXStartAfterZoom(xAxisFirstValue);
+    setDatesChartXEndAfterZoom(xAxisLastValue);
+    e.target.disabled = true;
+    setTimeout(() => {
+      e.target.disabled = false;
+    }, 1500);
   };
 
   return (
@@ -103,9 +122,19 @@ export default function LineChart({
         <Line
           data={showingBlocksChart === true ? chartAccountData : chartDatesData}
           options={chartOptions}
+          ref={chartRef}
         />
       </div>
-      {/* <button onClick={() => console.log(zoomBtn)}>zoom</button> */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
+        <p>Zooming 10% and showing 1000 points every zoom</p>
+        <button onClick={handleZoomIn}>Zoom in</button>
+      </div>
     </div>
   );
 }
