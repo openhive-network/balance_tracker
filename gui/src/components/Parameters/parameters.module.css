@@ -3,14 +3,19 @@
   margin: 20px 20px 0px 20px !important;
 }
 
-.dates_parameters {
-  display: "block";
+.input--date {
+  width: 300px;
+  margin: 20px 20px 0px 20px !important;
 }
+
+/* .dates_parameters {
+  display: "block";
+} */
 
 .hidden {
   display: "none";
 }
 
-.date-time--picker {
+/* .date-time--picker {
   margin-top: 20px;
-}
+} */
