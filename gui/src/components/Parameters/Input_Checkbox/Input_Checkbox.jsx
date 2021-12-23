@@ -12,7 +12,7 @@ import styles from "../parameters.module.css";
 
 export default function App({ setCurrency }) {
   const [selected, setSelected] = useState([]);
-  const options = [13, 21, 37];    // <======= crypto currencies nai number
+  const options = [13, 21, 37]; // <======= crypto currencies nai number
 
   const isAllSelected =
     options.length > 0 && selected.length === options.length;
@@ -34,7 +34,7 @@ export default function App({ setCurrency }) {
         multiple
         value={selected}
         onChange={handleChange}
-        renderValue={(selected) => selected.join(", ")}
+        renderValue={(selected) => selected.join(",")}
         laber="Currency"
       >
         <MenuItem value="all">
