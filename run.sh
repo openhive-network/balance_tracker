@@ -58,6 +58,10 @@ install_jmeter() {
     sudo mv $jmeter "/usr/local/bin/${jmeter}"
 }
 
+run_tests() {
+    ./tests/performance/run_tests.sh 
+}
+
 restart_all() {
     re='^[0-9]+$'
     if ! [[ $1 =~ $re ]]; then
@@ -90,6 +94,8 @@ elif [ "$1" = "install-postgrest" ]; then
     install_postgrest
 elif [ "$1" = "install-jmeter" ]; then
     install_jmeter
+elif [ "$1" = "test" ]; then
+    run_tests
 elif [ "$1" = "start" ]; then
     start_webserver
 fi
