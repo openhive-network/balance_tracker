@@ -167,7 +167,7 @@ BEGIN
   RETURN to_jsonb(result) FROM (
     SELECT
       json_agg(time_step) AS time,
-      json_agg(balance) AS balance
+      json_agg(CASE WHEN balance IS NULL THEN 0 ELSE balance END) AS balance
     FROM (
       SELECT
         time_step,
