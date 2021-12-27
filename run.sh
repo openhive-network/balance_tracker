@@ -53,7 +53,7 @@ install_jmeter() {
     echo '#!/usr/bin/env bash' >> $jmeter
     echo '' >> $jmeter
     echo 'cd "/usr/local/src/apache-jmeter-5.3/bin"' >> $jmeter
-    echo './jmeter' >> $jmeter
+    echo './jmeter $@' >> $jmeter
     sudo chmod +x $jmeter
     sudo mv $jmeter "/usr/local/bin/${jmeter}"
 }
