@@ -59,7 +59,7 @@ install_jmeter() {
 }
 
 run_tests() {
-    ./tests/performance/run_tests.sh 
+    ./tests/run_tests.sh 
 }
 
 restart_all() {
