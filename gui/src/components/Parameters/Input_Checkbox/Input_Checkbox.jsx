@@ -27,7 +27,7 @@ export default function App({ setCurrency }) {
   };
   setCurrency(selected);
   return (
-    <FormControl className={styles.input}>
+    <FormControl required={true} className={styles.input}>
       <InputLabel id="mutiple-select-label">Currency</InputLabel>
       <Select
         labelId="mutiple-select-label"
@@ -35,7 +35,7 @@ export default function App({ setCurrency }) {
         value={selected}
         onChange={handleChange}
         renderValue={(selected) => selected.join(",")}
-        laber="Currency"
+        label="Currency"
       >
         <MenuItem value="all">
           <ListItemIcon>

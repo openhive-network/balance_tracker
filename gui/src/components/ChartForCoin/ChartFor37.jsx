@@ -95,7 +95,7 @@ export default function LineChart({
     datasets: [
       {
         label: "Balance",
-        data: blocksData37.balance !== 0 ? blocksData37.balance : 0, // <==== if no balances, show 0 on chart
+        data: blocksData37.balance,
         fill: false,
         borderColor: "rgb(75, 192, 192)",
         tension: 0.1,
@@ -107,7 +107,7 @@ export default function LineChart({
     datasets: [
       {
         label: "Balance",
-        data: datesData37.balance !== 0 ? datesData37.balance : 0, // <==== if no balances, show 0 on chart
+        data: datesData37.balance,
         fill: false,
         borderColor: "rgb(75, 192, 192)",
         tension: 0.1,
