@@ -88,13 +88,12 @@ export default function LineChart({
       }
     }
   }, [currentStartDate, findCurrency13, account_Dates_Data_Body13]);
-
   const chartData13 = {
     labels: blocksData13.block,
     datasets: [
       {
         label: "Balance",
-        data: blocksData13.balance !== 0 ? blocksData13.balance : 0, // <==== if no balances, show 0 on chart
+        data: blocksData13.balance,
         fill: false,
         borderColor: "rgb(75, 192, 192)",
         tension: 0.1,
@@ -106,7 +105,7 @@ export default function LineChart({
     datasets: [
       {
         label: "Balance",
-        data: datesData13.balance !== 0 ? datesData13.balance : 0, // <==== if no balances, show 0 on chart
+        data: datesData13.balance,
         fill: false,
         borderColor: "rgb(75, 192, 192)",
         tension: 0.1,

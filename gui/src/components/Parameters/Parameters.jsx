@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { TextField, Button, Autocomplete, Stack } from "@mui/material";
+import { TextField, Button, Stack } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import styles from "./parameters.module.css";
 import InputCheckbox from "./Input_Checkbox/Input_Checkbox";
 import AdapterDateFns from "@mui/lab/AdapterDateFns";
@@ -19,6 +20,11 @@ export default function Parameters({
   endDate,
   setEndDate,
   names,
+  value,
+  currentStartBlock,
+  currentEndBlock,
+  currentStartDate,
+  currentEndDate,
 }) {
   const [showDates, setShowDates] = useState(false);
   const [showDatesBtnText, setShowDatesBtnText] = useState("Choose Dates");
@@ -31,56 +37,77 @@ export default function Parameters({
   };
   localStorage.setItem("Chart Value", showDatesBtnText);
 
+  const re = /^[0-9\b]+$/; ///<==== type only numbers validation //
+
+  // const startBlockErrors = () => {
+  //   if (currentStartBlock > currentEndBlock) {
+  //     return true && "Start block must be lower than End block";
+  //   }
+  // };
+
+  // const endBlockErrors = () => {
+  //   if (currentStartBlock > currentEndBlock) {
+  //     return true && "End block must be higher than start block";
+  //   }
+  // };
+
   return (
     <>
-      <form onSubmit={handleSubmit}>
+      <form required onSubmit={handleSubmit}>
         <Stack direction={{ xs: "column", md: "row" }}>
           <Autocomplete
             className={styles.input}
-            freeSolo
-            disableClearable
-            options={names && names.map((name) => name)}
-            renderInput={(params) => {
-              setValue(params.inputProps.value);
-              return (
-                <TextField
-                  {...params}
-                  label="Search for account"
-                  InputProps={{
-                    ...params.InputProps,
-                    type: "search",
-                  }}
-                />
-              );
-            }}
+            inputValue={value}
+            onInputChange={(event, newInputValue) => setValue(newInputValue)}
+            id="controllable-states-demo"
+            options={names !== null ? names : [""]}
+            renderInput={(params) => (
+              <TextField
+                required={true}
+                {...params}
+                label="Search for account"
+              />
+            )}
           />
           <InputCheckbox
             handleSubmit={handleSubmit}
             setCurrency={setCurrency}
           />
-
           <div
             style={
               showDates === true ? { display: "none" } : { display: "block" }
             }
           >
             <TextField
+              // error={startBlockErrors()}
+              required={showDates === true ? false : true}
               className={styles.input}
               value={startBlock}
-              onChange={(e) => setStartBlock(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "" || re.test(e.target.value))
+                  setStartBlock(e.target.value);
+              }}
               id="outlined-basic"
               label="Start Block"
               variant="outlined"
+              // helperText={startBlockErrors()}
             />
             <TextField
+              // error={endBlockErrors()}
+              required={showDates === true ? false : true}
               className={styles.input}
               value={endBlock}
-              onChange={(e) => setEndBlock(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "" || re.test(e.target.value))
+                  setEndBlock(e.target.value);
+              }}
               id="outlined-basic"
               label="End Block"
               variant="outlined"
+              // helperText={endBlockErrors()}
             />
           </div>
+
           <div
             style={
               showDates === false ? { display: "none" } : { display: "block" }
@@ -92,7 +119,14 @@ export default function Parameters({
                 value={startDate}
                 onChange={(newValue) => setStartDate(newValue)}
                 renderInput={(params) => (
-                  <TextField className={styles["input--date"]} {...params} />
+                  <TextField
+                    helperText={
+                      currentStartDate > currentEndDate &&
+                      "Start date must be lower than end date"
+                    }
+                    className={styles["input--date"]}
+                    {...params}
+                  />
                 )}
               />
               <DateTimePicker
@@ -100,13 +134,19 @@ export default function Parameters({
                 value={endDate}
                 onChange={(newValue) => setEndDate(newValue)}
                 renderInput={(params) => (
-                  <TextField className={styles["input--date"]} {...params} />
+                  <TextField
+                    helperText={
+                      currentStartDate > currentEndDate &&
+                      "End date must be higher than start date"
+                    }
+                    className={styles["input--date"]}
+                    {...params}
+                  />
                 )}
               />
             </LocalizationProvider>
           </div>
         </Stack>
-
         <div
           style={{
             display: "flex",

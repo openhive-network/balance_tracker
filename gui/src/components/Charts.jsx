@@ -2,7 +2,7 @@ import React from "react";
 import ChartFor13 from "./ChartForCoin/ChartFor13";
 import ChartFor21 from "./ChartForCoin/ChartFor21";
 import ChartFor37 from "./ChartForCoin/ChartFor37";
-import styles from "../App.module.css";
+import styles from "./App/App.module.css";
 
 export default function AllChartsSecond({
   accountName,
