@@ -36,6 +36,28 @@ install_postgrest() {
     rm $POSTGREST
 }
 
+install_jmeter() {
+    sudo apt-get update -y
+    sudo apt-get install openjdk-8-jdk -y
+
+    jmeter_v=5.3
+    wget "https://downloads.apache.org//jmeter/binaries/apache-jmeter-${jmeter_v}.zip"
+
+    jmeter_src="apache-jmeter-${jmeter_v}"
+    unzip "${jmeter_src}.zip"
+    rm "${jmeter_src}.zip"
+    sudo mv $jmeter_src "/usr/local/src/${jmeter_src}"
+
+    jmeter='jmeter-5.3'
+    touch $jmeter
+    echo '#!/usr/bin/env bash' >> $jmeter
+    echo '' >> $jmeter
+    echo 'cd "/usr/local/src/apache-jmeter-5.3/bin"' >> $jmeter
+    echo './jmeter' >> $jmeter
+    sudo chmod +x $jmeter
+    sudo mv $jmeter "/usr/local/bin/${jmeter}"
+}
+
 restart_all() {
     re='^[0-9]+$'
     if ! [[ $1 =~ $re ]]; then
@@ -64,8 +86,10 @@ elif [ "$1" = "re-api-start" ]; then
     create_api
     echo 'SUCCESS: API recreated'
     start_webserver
-elif [ "$1" = "install" ]; then
+elif [ "$1" = "install-postgrest" ]; then
     install_postgrest
+elif [ "$1" = "install-jmeter" ]; then
+    install_jmeter
 elif [ "$1" = "start" ]; then
     start_webserver
 fi
