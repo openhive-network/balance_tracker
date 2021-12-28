@@ -21,10 +21,6 @@ export default function Parameters({
   setEndDate,
   names,
   value,
-  currentStartBlock,
-  currentEndBlock,
-  currentStartDate,
-  currentEndDate,
 }) {
   const [showDates, setShowDates] = useState(false);
   const [showDatesBtnText, setShowDatesBtnText] = useState("Choose Dates");
@@ -77,10 +73,6 @@ export default function Parameters({
               id="outlined-basic"
               label="Start Block"
               variant="outlined"
-              helperText={
-                currentStartBlock > currentEndBlock &&
-                "Start block must be lower than end block"
-              }
             />
             <TextField
               required={showDates === true ? false : true}
@@ -93,10 +85,6 @@ export default function Parameters({
               id="outlined-basic"
               label="End Block"
               variant="outlined"
-              helperText={
-                currentStartBlock > currentEndBlock &&
-                "End block must be higher than start block"
-              }
             />
           </div>
 
@@ -111,14 +99,7 @@ export default function Parameters({
                 value={startDate}
                 onChange={(newValue) => setStartDate(newValue)}
                 renderInput={(params) => (
-                  <TextField
-                    helperText={
-                      currentStartDate > currentEndDate &&
-                      "Start date must be lower than end date"
-                    }
-                    className={styles["input__date"]}
-                    {...params}
-                  />
+                  <TextField className={styles["input__date"]} {...params} />
                 )}
               />
               <DateTimePicker
@@ -126,14 +107,7 @@ export default function Parameters({
                 value={endDate}
                 onChange={(newValue) => setEndDate(newValue)}
                 renderInput={(params) => (
-                  <TextField
-                    helperText={
-                      currentStartDate > currentEndDate &&
-                      "End date must be higher than start date"
-                    }
-                    className={styles["input__date"]}
-                    {...params}
-                  />
+                  <TextField className={styles["input__date"]} {...params} />
                 )}
               />
             </LocalizationProvider>

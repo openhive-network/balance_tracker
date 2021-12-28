@@ -70,10 +70,6 @@ export default function App() {
             setValue={setValue}
             names={names}
             value={value}
-            currentStartBlock={currentStartBlock}
-            currentEndBlock={currentEndBlock}
-            currentStartDate={currentStartDate}
-            currentEndDate={currentEndDate}
           />
         </div>
         {accountName && (
@@ -83,10 +79,6 @@ export default function App() {
               <Alert severity="info">
                 <div className={styles.alert}>
                   <AlertTitle>Information</AlertTitle>
-                  <p className={styles.alert__paragraph}>
-                    IMPORTANT : When switching from blocks to dates , you may
-                    need to reset chart !
-                  </p>
                   <li>
                     RESET CHART button updates chart to values entered in
                     start/end block or start/end date , also it refreshes chart
