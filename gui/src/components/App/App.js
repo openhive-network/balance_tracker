@@ -56,9 +56,10 @@ export default function App() {
     if (accountName) {
       if (currentStartBlock < currentEndBlock) {
         return true;
-      }
-      if (currentStartDate < currentEndDate) {
+      } else if (currentStartDate < currentEndDate) {
         return true;
+      } else {
+        return false;
       }
     }
   };
@@ -141,7 +142,17 @@ export default function App() {
             </div>
           </>
         ) : (
-          ""
+          <Alert
+            style={
+              renderContent() === false
+                ? { display: "block" }
+                : { display: "none" }
+            }
+            severity="error"
+          >
+            Please check values of inputs. Start block/date can NOT be higher or
+            equal to end block/date !
+          </Alert>
         )}
       </div>
     </div>
