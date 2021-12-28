@@ -8,7 +8,7 @@
 ## Run
 
 1. Clone repository to your local machine .
-2. Start server . `./run.sh re-start-all 5000000` (starts 5000000 blocks)
+2. Start server . `./run.sh re-all-start 5000000` (starts 5000000 blocks)
 3. Open another tab in terminal, change directory to gui . `cd gui`
 4. Install node_modules . `npm install`
 5. Start application . `npm start`
