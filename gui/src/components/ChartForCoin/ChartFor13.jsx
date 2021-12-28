@@ -89,6 +89,7 @@ export default function LineChart({
       }
     }
   }, [currentStartDate, findCurrency13, account_Dates_Data_Body13]);
+
   const chartData13 = {
     labels: blocksData13.block,
     datasets: [

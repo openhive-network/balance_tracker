@@ -1,3 +1,5 @@
+# Intro
+
 Balance_tracker app was mainly created as a simple example of how to make a HAF app. This app can be used to graph the HBD and Hive balances of any Hive account as those balances changes each block.
 
 # Start UI
@@ -16,6 +18,10 @@ Balance_tracker app was mainly created as a simple example of how to make a HAF 
 5. Start application . `npm start`
 
 ## After Setup
+
+1. After blocks were added to btracker_app schema, web server can be started up quickly with `./run.sh start`
+
+# Task
 
 Current status:
 
