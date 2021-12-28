@@ -40,7 +40,7 @@ export default function Parameters({
   const re = /^[0-9\b]+$/; ///<==== type only numbers validation //
 
   // const startBlockErrors = () => {
-  //   if (currentStartBlock > currentEndBlock) {
+  //   if (startBlock > endBlock) {
   //     return true && "Start block must be lower than End block";
   //   }
   // };
@@ -48,6 +48,10 @@ export default function Parameters({
   // const endBlockErrors = () => {
   //   if (currentStartBlock > currentEndBlock) {
   //     return true && "End block must be higher than start block";
+  //   }
+
+  //   if (currentEndBlock !== "" && currentStartBlock === currentEndBlock) {
+  //     return true && "block can't be equal";
   //   }
   // };
 
@@ -79,7 +83,6 @@ export default function Parameters({
             }
           >
             <TextField
-              // error={startBlockErrors()}
               required={showDates === true ? false : true}
               className={styles.input}
               value={startBlock}
@@ -90,10 +93,12 @@ export default function Parameters({
               id="outlined-basic"
               label="Start Block"
               variant="outlined"
-              // helperText={startBlockErrors()}
+              helperText={
+                currentStartBlock > currentEndBlock &&
+                "Start block must be lower than end block"
+              }
             />
             <TextField
-              // error={endBlockErrors()}
               required={showDates === true ? false : true}
               className={styles.input}
               value={endBlock}
@@ -104,7 +109,10 @@ export default function Parameters({
               id="outlined-basic"
               label="End Block"
               variant="outlined"
-              // helperText={endBlockErrors()}
+              helperText={
+                currentStartBlock > currentEndBlock &&
+                "End block must be higher than start block"
+              }
             />
           </div>
 
