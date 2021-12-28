@@ -52,21 +52,6 @@ export default function App() {
     setFindCurrency37(() => currency.filter((num) => num === 37 && num));
   };
 
-  function renderContent() {
-    if (accountName) {
-      if (currentStartBlock < currentEndBlock) {
-        return true;
-      } else if (currentStartDate < currentEndDate) {
-        return true;
-      } else if (currentStartBlock >= currentEndBlock) {
-        return false;
-      } else if (currentStartDate >= currentEndDate) {
-        return false;
-      } else if (startBlock === "" || endBlock === "") {
-        return false;
-      }
-    }
-  }
   return (
     <div>
       <div className={styles.container}>
@@ -91,7 +76,7 @@ export default function App() {
             currentEndDate={currentEndDate}
           />
         </div>
-        {renderContent() === true ? (
+        {accountName && (
           <>
             <div className={styles.content}>
               <h1>Showing balances for {accountName}</h1>
@@ -129,18 +114,6 @@ export default function App() {
               />
             </div>
           </>
-        ) : (
-          <Alert
-            style={
-              renderContent() === false
-                ? { display: "block" }
-                : { display: "none" }
-            }
-            severity="error"
-          >
-            Please check values of inputs. Start block/date can NOT be higher or
-            equal to end block/date !
-          </Alert>
         )}
       </div>
     </div>
