@@ -1,3 +1,5 @@
+Balance_tracker app was mainly created as a simple example of how to make a HAF app. This app can be used to graph the HBD and Hive balances of any Hive account as those balances changes each block.
+
 # Start UI
 
 ## Requirements
@@ -5,15 +7,15 @@
 1. Tested on Ubuntu 20.04
 2. Node version higher or equal 14.0.0. Check version `node-v` or `node --version`
 
-## Run
+## Local Setup
 
-1. Clone repository to your local machine .
-2. Start server . `./run.sh re-all-start 5000000` (starts 5000000 blocks)
+1. Install postgREST to /usr/local/bin `./run.sh install-postgrest`
+2. Create btracker_app schema & api and will start web server with 5M blocks . `./run.sh re-all-start 5000000`
 3. Open another tab in terminal, change directory to gui . `cd gui`
 4. Install node_modules . `npm install`
 5. Start application . `npm start`
 
-Balance_tracker app was mainly created as a simple example of how to make a HAF app. This app can be used to graph the HBD and Hive balances of any Hive account as those balances changes each block.
+## After Setup
 
 Current status:
 
