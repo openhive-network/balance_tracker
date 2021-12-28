@@ -5,14 +5,28 @@
   align-items: center;
 }
 
-.container__input {
+.container__form {
   margin-bottom: 50px;
 }
 
-.hide {
-  display: none;
+.content {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
 }
 
-.showChart {
-  display: block;
+.alert {
+  text-align: left;
+}
+
+.alert__paragraph {
+  color: red;
+}
+
+.content__charts {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-top: 50px;
 }

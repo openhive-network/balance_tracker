@@ -1,0 +1,15 @@
+.charts--hidden {
+  display: none;
+}
+
+.charts--show {
+  display: block;
+}
+
+.charts {
+  width: 70vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}

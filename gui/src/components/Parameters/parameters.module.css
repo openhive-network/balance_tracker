@@ -3,19 +3,20 @@
   margin: 20px 20px 0px 20px !important;
 }
 
-.input--date {
+.input__date {
   width: 300px;
   margin: 20px 20px 0px 20px !important;
 }
+.form__buttons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
 
-/* .dates_parameters {
-  display: "block";
-} */
-
+.form__button--show-dates {
+  margin: 25px !important;
+}
 .hidden {
   display: "none";
 }
-
-/* .date-time--picker {
-  margin-top: 20px;
-} */
