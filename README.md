@@ -1,21 +1,17 @@
-///////////////////////////////////////////////////////////
+# Start UI
 
-HOW TO START UI :
+## Requirements
 
-1. Check node version in terminal, node version must be > 14.0.
-   In terminal write : node -v or node --version
-2. Run server.
-   In terminal write : ./run.sh re-all-start 10000 <===// this number is block count, if you don't write any number, function will run all blocks.
-3. Open another terminal window and change directory to /gui.
-   In terminal write : cd gui
-4. Install node_modules package:
-   In terminal write : npm install
-5. Start ui :
-   In terminal write : npm start
+1. Tested on Ubuntu 20.04
+2. Node version higher or equal 14.0.0. Check version `node-v` or `node --version`
 
-   Note : building still in progress.
+## Run
 
-///////////////////////////////////////////////////////////
+1. Clone repository to your local machine .
+2. Start server . `./run.sh re-start-all 5000000` (starts 5000000 blocks)
+3. Open another tab in terminal, change directory to gui . `cd gui`
+4. Install node_modules . `npm install`
+5. Start application . `npm start`
 
 Balance_tracker app was mainly created as a simple example of how to make a HAF app. This app can be used to graph the HBD and Hive balances of any Hive account as those balances changes each block.
 
