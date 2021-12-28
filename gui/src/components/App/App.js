@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import styles from "./App.module.css";
 import Parameters from "../Parameters/Parameters"; // <==== HERE PAREMETERS = INPUT FIELDS
 import moment from "moment";
-import Charts from "../Charts";
+import Charts from "../Charts/Charts";
 import { Alert, AlertTitle } from "@mui/material";
 
 export default function App() {
@@ -22,7 +22,7 @@ export default function App() {
 
   // ////////////////////////////////// Get data of all names
   const accountNamesData = JSON.stringify({ _partial_account_name: value });
-
+  console.log(currentStartBlock, currentEndBlock);
   // fetch account names
   useEffect(() => {
     fetch("http://localhost:3000/rpc/find_matching_accounts", {
@@ -52,22 +52,25 @@ export default function App() {
     setFindCurrency37(() => currency.filter((num) => num === 37 && num));
   };
 
-  const renderContent = () => {
+  function renderContent() {
     if (accountName) {
       if (currentStartBlock < currentEndBlock) {
         return true;
       } else if (currentStartDate < currentEndDate) {
         return true;
-      } else {
+      } else if (currentStartBlock >= currentEndBlock) {
+        return false;
+      } else if (currentStartDate >= currentEndDate) {
+        return false;
+      } else if (startBlock === "" || endBlock === "") {
         return false;
       }
     }
-  };
-
+  }
   return (
     <div>
       <div className={styles.container}>
-        <div className={styles.container__input}>
+        <div className={styles.container__form}>
           <Parameters
             startBlock={startBlock}
             endBlock={endBlock}
@@ -90,18 +93,12 @@ export default function App() {
         </div>
         {renderContent() === true ? (
           <>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                textAlign: "center",
-              }}
-            >
+            <div className={styles.content}>
               <h1>Showing balances for {accountName}</h1>
               <Alert severity="info">
-                <div style={{ textAlign: "left" }}>
+                <div className={styles.alert}>
                   <AlertTitle>Information</AlertTitle>
-                  <p style={{ color: "red" }}>
+                  <p className={styles.alert__paragraph}>
                     IMPORTANT : When switching from blocks to dates , you may
                     need to reset chart !
                   </p>
@@ -111,24 +108,15 @@ export default function App() {
                     in case no values is shown
                   </li>
                   <li>
-                    ZOOM IN button zooms chart 5% on every click and always
-                    showing 1000 points on chart X axis. If you want to zoom in
-                    any exact point, use your mouse wheel, or pinch
+                    ZOOM IN button zooms chart on every click and always showing
+                    1000 points on chart X axis. If you want to zoom in any
+                    exact point, use your mouse wheel, or pinch
                   </li>
                 </div>
               </Alert>
             </div>
 
-            <div
-              className="charts-container"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",
-                marginTop: "50px",
-              }}
-            >
+            <div className={styles.content__charts}>
               <Charts
                 accountName={accountName}
                 currentStartBlock={currentStartBlock}

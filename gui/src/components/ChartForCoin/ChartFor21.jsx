@@ -11,6 +11,7 @@ import {
 import zoomPlugin from "chartjs-plugin-zoom";
 import { Line } from "react-chartjs-2";
 import { Button, Stack } from "@mui/material";
+import styles from "./chartForCoin.module.css";
 
 Chart.register(
   CategoryScale,
@@ -177,22 +178,15 @@ export default function LineChart({
   };
 
   return (
-    <div
-      style={{
-        width: "70vw",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+    <div className={styles.chartFor21}>
       <Line
         data={showingBlocksChart === true ? chartData21 : chartDatesData21}
         options={chartOptions21}
         ref={chartRef21}
       />
-      <Stack style={{ marginLeft: "50px" }} spacing={2}>
+      <Stack className={styles.chartFor21__stack} spacing={2}>
         <Button
-          style={{ marinBottom: "25px" }}
+          className={styles["stack__button--reset"]}
           variant="outlined"
           onClick={handleResetChartFor21}
         >

@@ -39,22 +39,6 @@ export default function Parameters({
 
   const re = /^[0-9\b]+$/; ///<==== type only numbers validation //
 
-  // const startBlockErrors = () => {
-  //   if (startBlock > endBlock) {
-  //     return true && "Start block must be lower than End block";
-  //   }
-  // };
-
-  // const endBlockErrors = () => {
-  //   if (currentStartBlock > currentEndBlock) {
-  //     return true && "End block must be higher than start block";
-  //   }
-
-  //   if (currentEndBlock !== "" && currentStartBlock === currentEndBlock) {
-  //     return true && "block can't be equal";
-  //   }
-  // };
-
   return (
     <>
       <form required onSubmit={handleSubmit}>
@@ -132,7 +116,7 @@ export default function Parameters({
                       currentStartDate > currentEndDate &&
                       "Start date must be lower than end date"
                     }
-                    className={styles["input--date"]}
+                    className={styles["input__date"]}
                     {...params}
                   />
                 )}
@@ -147,7 +131,7 @@ export default function Parameters({
                       currentStartDate > currentEndDate &&
                       "End date must be higher than start date"
                     }
-                    className={styles["input--date"]}
+                    className={styles["input__date"]}
                     {...params}
                   />
                 )}
@@ -155,17 +139,10 @@ export default function Parameters({
             </LocalizationProvider>
           </div>
         </Stack>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <div className={styles.form__buttons}>
           <Button
             size="small"
-            style={{ margin: "25px" }}
+            className={styles["form__button--show-dates"]}
             onClick={handleDatesButton}
             type="button"
             color="warning"

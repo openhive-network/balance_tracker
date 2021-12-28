@@ -1,8 +1,8 @@
 import React from "react";
-import ChartFor13 from "./ChartForCoin/ChartFor13";
-import ChartFor21 from "./ChartForCoin/ChartFor21";
-import ChartFor37 from "./ChartForCoin/ChartFor37";
-import styles from "./App/App.module.css";
+import ChartFor13 from "../ChartForCoin/ChartFor13";
+import ChartFor21 from "../ChartForCoin/ChartFor21";
+import ChartFor37 from "../ChartForCoin/ChartFor37";
+import styles from "./charts.module.css";
 
 export default function AllChartsSecond({
   accountName,
@@ -15,17 +15,13 @@ export default function AllChartsSecond({
   currentEndDate,
 }) {
   return (
-    <div
-      style={{
-        width: "70vw",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+    <div className={styles.charts}>
       <div
-        className={findCurrency13[0] === 13 ? styles.showChart : styles.hide}
+        className={
+          findCurrency13[0] === 13
+            ? styles["charts--show"]
+            : styles["charts--hidden"]
+        }
       >
         <ChartFor13
           accountName={accountName}
@@ -37,7 +33,11 @@ export default function AllChartsSecond({
         />
       </div>
       <div
-        className={findCurrency21[0] === 21 ? styles.showChart : styles.hide}
+        className={
+          findCurrency21[0] === 21
+            ? styles["charts--show"]
+            : styles["charts--hidden"]
+        }
       >
         <ChartFor21
           accountName={accountName}
@@ -49,7 +49,11 @@ export default function AllChartsSecond({
         />
       </div>
       <div
-        className={findCurrency37[0] === 37 ? styles.showChart : styles.hide}
+        className={
+          findCurrency37[0] === 37
+            ? styles["charts--show"]
+            : styles["charts--hidden"]
+        }
       >
         <ChartFor37
           accountName={accountName}
