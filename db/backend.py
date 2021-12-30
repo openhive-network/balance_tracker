@@ -31,7 +31,7 @@ class BalanceTracker:
             ) account_query
             """.format(_partial_account_name=_partial_account_name)
 
-        self.Db.query(psql_cmd)
+        return self.Db.query(psql_cmd)
 
     def get_balance_for_coin_by_block(self, _account_name, _coin_type, _start_block, _end_block):
         __block_increment = int((_end_block - _start_block) / 1000)
@@ -98,7 +98,7 @@ class BalanceTracker:
         ) result;
         """.format(_account_name=_account_name, _coin_type=_coin_type, _start_block=_start_block, _end_block=_end_block, __block_increment=__block_increment)
 
-        self.Db.query(psql_cmd)
+        return self.Db.query(psql_cmd)
 
     def get_balance_for_coin_by_time(self, _account_name, _coin_type, _start_time, _end_time):
         _start_time = self.insert_space(_start_time)
@@ -180,4 +180,4 @@ class BalanceTracker:
         ) result;
         """.format(_account_name=_account_name, _coin_type=_coin_type, _start_time=_start_time, _end_time=_end_time, __time_increment=__time_increment)
 
-        self.Db.query(psql_cmd)
+        return self.Db.query(psql_cmd)

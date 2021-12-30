@@ -5,10 +5,11 @@ from server.adapter import Db
 from db.backend import BalanceTracker
 
 class DBHandler(BaseHTTPRequestHandler):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         db, user, password, host, port = self.read_config()
         db = Db(db, user, password, host, port)
         self.balance_tracker = BalanceTracker(db)
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def read_config():
