@@ -62,6 +62,12 @@ run_tests() {
     ./tests/run_tests.sh 
 }
 
+recreate_db() {
+    clean_data ${@:2}
+    create_db ${@:2}
+    run_indexer $@
+}
+
 restart_all() {
     re='^[0-9]+$'
     if ! [[ $1 =~ $re ]]; then
@@ -69,9 +75,7 @@ restart_all() {
         exit 1
     fi
 
-    clean_data ${@:2}
-    create_db ${@:2}
-    run_indexer $@
+    recreate_db $@
     create_api
     create_user
 }
@@ -82,6 +86,13 @@ if [ "$1" = "re-all" ]; then
 elif [ "$1" = "re-all-start" ]; then
     restart_all ${@:2}
     echo 'SUCCESS: DB and API recreated'
+    start_webserver
+elif [ "$1" = "re-db" ]; then
+    recreate_db ${@:2}
+    echo 'SUCCESS: DB recreated'
+elif [ "$1" = "re-db-start" ]; then
+    recreate_db ${@:2}
+    echo 'SUCCESS: DB recreated'
     start_webserver
 elif [ "$1" = "re-api" ]; then
     create_api
