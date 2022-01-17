@@ -19,7 +19,7 @@ class DBHandler(BaseHTTPRequestHandler):
         return config["database"], config["user"], config["password"], config["host"], config["port"]
 
     def parse_params(self, required_params, param_types):
-        params = dict(param.split("=")
+        params = dict(param.replace("%20", " ").split("=")
                       for param in urlparse(self.path).query.split("&"))
         param_names = list(params.keys())
         for p, type in zip(required_params, param_types):
