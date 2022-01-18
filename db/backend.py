@@ -141,7 +141,7 @@ class BalanceTracker:
                         FROM (
                         SELECT
                             row_number() OVER (ORDER BY time_query.created_at) AS id,
-                            (( (SELECT extract( EPOCH FROM ((time_query.created_at - '00:00:01'::TIME - '{_start_time}'::TIMESTAMP)::TIME / (SELECT extract(EPOCH FROM '{__time_increment}'::TIME))) ))::INT + 1 ) * '{__time_increment}'::TIME + '{_start_time}'::TIMESTAMP) AS time_step,
+                            (( (SELECT extract( EPOCH FROM ((time_query.created_at - '00:00:01'::TIME - '{_start_time}'::TIMESTAMP)::TIME / (SELECT extract(EPOCH FROM ('{__time_increment}'::INTERVAL)::TIME))) ))::INT + 1 ) * ('{__time_increment}'::INTERVAL)::TIME + '{_start_time}'::TIMESTAMP) AS time_step,
                             hive_query.balance AS balance
                         FROM (
                             SELECT
@@ -168,7 +168,7 @@ class BalanceTracker:
                     ) distinct_values
                     RIGHT JOIN (
                     SELECT
-                        generate_series('{_start_time}'::TIMESTAMP, '{_end_time}'::TIMESTAMP + '{__time_increment}'::TIME, '{__time_increment}'::TIME)::TIMESTAMP AS time_step,
+                        generate_series('{_start_time}'::TIMESTAMP, '{_end_time}'::TIMESTAMP + ('{__time_increment}'::INTERVAL)::TIME, ('{__time_increment}'::INTERVAL)::TIME)::TIMESTAMP AS time_step,
                         null AS balance
                     ) steps
                     ON distinct_values.time_step = steps.time_step
