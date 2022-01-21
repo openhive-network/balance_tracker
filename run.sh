@@ -15,6 +15,11 @@ run_indexer() {
     psql -a -v "ON_ERROR_STOP=1" "${@:2}" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $1);"
 }
 
+create_indexes() {
+    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "create index idx_btracker_app_account_balance_history_account on btracker_app.account_balance_history(account);"
+    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "create index idx_btracker_app_account_balance_history_nai on btracker_app.account_balance_history(nai);"
+}
+
 create_api() {
     psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
 }
@@ -66,6 +71,7 @@ recreate_db() {
     clean_data ${@:2}
     create_db ${@:2}
     run_indexer $@
+    create_indexes ${@:2}
 }
 
 restart_all() {
@@ -109,4 +115,6 @@ elif [ "$1" = "test" ]; then
     run_tests
 elif [ "$1" = "start" ]; then
     start_webserver
+elif [ "$1" = "test_func" ]; then
+    create_indexes ${@:2}
 fi
