@@ -115,6 +115,4 @@ elif [ "$1" = "test" ]; then
     run_tests
 elif [ "$1" = "start" ]; then
     start_webserver
-elif [ "$1" = "test_func" ]; then
-    create_indexes ${@:2}
 fi
