@@ -24,7 +24,7 @@ class DBHandler(BaseHTTPRequestHandler):
         logs_dir = os.path.join(os.getcwd(), "logs")
         log_ns = [int(name.strip(".csv").split("_")[-1]) for name in os.listdir(logs_dir)]
         if len(log_ns) > 0:
-            log_n = max(log_ns) + 1
+            log_n = max(log_ns)
         else:
             log_n = 0
         self.durations_path = os.path.join(logs_dir, "durations_log_%d.csv" %log_n)
