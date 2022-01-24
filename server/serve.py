@@ -14,10 +14,14 @@ class ForkHTTPServer(ForkingMixIn, HTTPServer):
 
 class DBHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
+        self.logging_setup()
+
+        start = time()
         db, user, password, host, port = self.read_config()
         db = Db(db, user, password, host, port)
         self.balance_tracker = BalanceTracker(db)
-        self.logging_setup()
+        self.log("connect", start)
+        
         super().__init__(*args, **kwargs)
 
     def logging_setup(self):

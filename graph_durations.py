@@ -1,9 +1,17 @@
 import os
 import matplotlib.pyplot as plt
+from argparse import ArgumentParser
 
-durations_path = os.path.join(os.getcwd(), "logs", "durations_log.csv")
+argument_parser = ArgumentParser()
+argument_parser.add_argument('--log_n', type=int, default=0)
+args = argument_parser.parse_args()
+log_n = args.log_n
+
+durations_path = os.path.join(os.getcwd(), "logs", "durations_log_%d.csv" %log_n)
 with open(durations_path, "r") as f:
     data = f.read()[1:].split("\n")
+
+plots_dir = os.path.join(os.getcwd(), "plots")
 
 f, ax = plt.subplots(4, 3)
 f.set_size_inches(25, 15)
@@ -15,7 +23,10 @@ for i, endpoint in enumerate(["find_matching_accounts", "get_balance_for_coin_by
         ax[j, i].set_title(server_func)
         ax[j, i].grid()
 
-plots_dir = os.path.join(os.getcwd(), "plots")
-plot_n = len(os.listdir(plots_dir))
-durations_path = os.path.join(plots_dir, "durations_%d.png" %plot_n)
+durations_path = os.path.join(plots_dir, "durations_%d.png" %log_n)
 plt.savefig(durations_path, bbox_inches='tight')
+
+plt.figure(figsize=(10, 5))
+plt.plot([float(entry.split(", ")[1]) for entry in data if "connect" in entry])
+connect_durations_path = os.path.join(plots_dir, "connect_durations_%d.png" %log_n)
+plt.savefig(connect_durations_path, bbox_inches='tight')
