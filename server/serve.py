@@ -17,15 +17,21 @@ class DBHandler(BaseHTTPRequestHandler):
         db, user, password, host, port = self.read_config()
         db = Db(db, user, password, host, port)
         self.balance_tracker = BalanceTracker(db)
+        self.logging_setup()
+        super().__init__(*args, **kwargs)
 
-        self.durations_path = os.path.join(
-            os.getcwd(), "logs", "durations_log.csv")
+    def logging_setup(self):
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        log_ns = [int(name.strip(".csv").split("_")[-1]) for name in os.listdir(logs_dir)]
+        if len(log_ns) > 0:
+            log_n = max(log_ns) + 1
+        else:
+            log_n = 0
+        self.durations_path = os.path.join(logs_dir, "durations_log_%d.csv" %log_n)
         if os.path.isfile(self.durations_path):
             self.do_log = True
         else:
             self.do_log = False
-
-        super().__init__(*args, **kwargs)
 
     def log(self, name, start):
         if self.do_log:
