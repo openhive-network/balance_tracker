@@ -1,8 +1,12 @@
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 import configparser
 from server.adapter import Db
 from db.backend import BalanceTracker
+from socketserver import ForkingMixIn
+
+class ForkHTTPServer(ForkingMixIn, HTTPServer):
+    pass
 
 class DBHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
