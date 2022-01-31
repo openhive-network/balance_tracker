@@ -20,9 +20,9 @@ class DBHandler(BaseHTTPRequestHandler):
         db, user, password, host, port = self.read_config()
         db = Db(db, user, password, host, port)
         self.balance_tracker = BalanceTracker(db)
-        self.log("connect", start)
         
         super().__init__(*args, **kwargs)
+        self.log("connect", start)
 
     def logging_setup(self):
         logs_dir = os.path.join(os.getcwd(), "logs")
