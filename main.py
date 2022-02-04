@@ -1,4 +1,6 @@
-from socketserver import ThreadingTCPServer
+#!/usr/bin/python3
+
+
 from argparse import ArgumentParser
 from server.serve import DBHandler
 
@@ -8,6 +10,7 @@ if __name__ == "__main__":
     argument_parser.add_argument('--port', type=int, help='Port for server listening. Default is "3000"', default=3000)
     args = argument_parser.parse_args()
 
-    httpd = ThreadingTCPServer((args.host, args.port), DBHandler)
+    handler = partial(DBHandler)
+    httpd = ForkHTTPServer((args.host, args.port), handler)
     print("serving at port %d" %args.port)
     httpd.serve_forever()

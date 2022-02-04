@@ -27,6 +27,10 @@ start_webserver() {
     postgrest postgrest.conf
 }
 
+start_py_webserver() {
+    ./main.py $@
+}
+
 install_dependancies() {
     install_postgrest
     install_jmeter
@@ -36,6 +40,13 @@ install_postgrest() {
     wget https://github.com/PostgREST/postgrest/releases/download/v$postgrest_v/postgrest-v$postgrest_v-linux-static-x64.tar.xz
 
     POSTGREST=$(find . -name "postgrest-v${postgrest_v}*")
+    postgrest webserver.conf
+}
+
+install_postgrest() {
+    wget https://github.com/PostgREST/postgrest/releases/download/v8.0.0/postgrest-v8.0.0-linux-x64-static.tar.xz
+
+    POSTGREST=$(find . -name 'postgrest*')
     tar xJf $POSTGREST
     sudo mv 'postgrest' '/usr/local/bin/postgrest'
     rm $POSTGREST
@@ -118,4 +129,6 @@ elif [ "$1" = "test" ]; then
     run_tests
 elif [ "$1" = "start" ]; then
     start_webserver
+elif [ "$1" = "start-py" ]; then
+    start_py_webserver ${@:2}
 fi
