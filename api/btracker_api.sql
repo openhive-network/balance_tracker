@@ -1,26 +1,3 @@
-CREATE OR REPLACE PROCEDURE btracker_app.create_api_user()
-LANGUAGE 'plpgsql'
-AS $$
-BEGIN
-  --recreate role for reading data
-  DROP OWNED BY api_user;
-  DROP ROLE IF EXISTS api_user;
-  CREATE ROLE api_user;
-  GRANT USAGE ON SCHEMA btracker_app to api_user;
-  GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO api_user;
-  GRANT USAGE ON SCHEMA hive to api_user;
-  GRANT SELECT ON hive.accounts TO api_user;
-
-  -- recreate role for connecting to db
-  DROP ROLE IF EXISTS admin;
-  CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
-
-  -- add ability for admin to switch to api_user role
-  GRANT api_user TO admin;
-END
-$$
-;
-
 CREATE OR REPLACE FUNCTION btracker_app.raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
