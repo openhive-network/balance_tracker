@@ -1,9 +1,11 @@
 #!/bin/bash
 
-#set -e
-#set -o pipefail
+if [ "$1" = "py" ]; then
+    TEST_SCENARIO_PATH="$(pwd)/tests/performance/test_scenarios_py.jmx"
+else
+    TEST_SCENARIO_PATH="$(pwd)/tests/performance/test_scenarios.jmx"
+fi
 
-TEST_SCENARIO_PATH="$(pwd)/tests/performance/test_scenarios.jmx"
 TEST_RESULT_PATH="$(pwd)/tests/performance/result.jtl"
 TEST_REPORT_DIR="$(pwd)/tests/performance/result_report"
 TEST_REPORT_PATH="$(pwd)/tests/performance/result_report/index.html"
