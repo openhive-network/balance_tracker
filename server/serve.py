@@ -13,7 +13,7 @@ class DBHandler(BaseHTTPRequestHandler):
     @staticmethod
     def read_config():
         config = configparser.ConfigParser()
-        config.read("config.ini")
+        config.read("py_config.ini")
         config = config["POSTGRES"]
         return config["database"], config["user"], config["password"], config["host"], config["port"]
 
