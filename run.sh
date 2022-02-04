@@ -16,16 +16,11 @@ run_indexer() {
 }
 
 create_indexes() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "create index idx_btracker_app_account_balance_history_account on btracker_app.account_balance_history(account);"
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "create index idx_btracker_app_account_balance_history_nai on btracker_app.account_balance_history(nai);"
+    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "call btracker_app.create_indexes();"
 }
 
 create_api() {
     psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
-}
-
-create_user() {
-    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -c '\timing' -c "call btracker_app.create_api_user();"
 }
 
 start_webserver() {
@@ -83,7 +78,6 @@ restart_all() {
 
     recreate_db $@
     create_api
-    create_user
 }
 
 if [ "$1" = "re-all" ]; then
