@@ -24,11 +24,11 @@ create_api() {
 }
 
 start_webserver() {
-    postgrest postgrest.conf
-}
-
-start_py_webserver() {
-    ./main.py $@
+    if [ "$1" = "py" ]; then
+        ./main.py ${@:2}
+    else
+        postgrest webserver.conf
+    fi
 }
 
 install_dependancies() {
@@ -74,7 +74,7 @@ install_jmeter() {
 }
 
 run_tests() {
-    ./tests/run_tests.sh 
+    ./tests/run_tests.sh $1
 }
 
 recreate_db() {
@@ -127,8 +127,10 @@ elif [ "$1" = "install-jmeter" ]; then
     install_jmeter
 elif [ "$1" = "test" ]; then
     run_tests
+elif [ "$1" = "test-py" ]; then
+    run_tests "py"
 elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
-    start_py_webserver ${@:2}
+    start_webserver "py" ${@:2}
 fi
