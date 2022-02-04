@@ -1,4 +1,6 @@
-from socketserver import ThreadingTCPServer
+#!/usr/bin/python3
+
+
 from argparse import ArgumentParser
 from server.serve import DBHandler, ForkHTTPServer
 from functools import partial
@@ -11,6 +13,5 @@ if __name__ == "__main__":
 
     handler = partial(DBHandler)
     httpd = ForkHTTPServer((args.host, args.port), handler)
-    #httpd = ThreadingTCPServer((args.host, args.port), DBHandler)
     print("serving at port %d" %args.port)
     httpd.serve_forever()
