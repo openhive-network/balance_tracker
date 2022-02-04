@@ -24,7 +24,7 @@ create_api() {
 }
 
 start_webserver() {
-    postgrest webserver.conf
+    postgrest postgrest.conf
 }
 
 install_postgrest() {
