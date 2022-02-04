@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 --recreate role for reading data
 DROP OWNED BY haf_app;
 DROP ROLE IF EXISTS haf_app;
-CREATE ROLE haf_app;
+CREATE ROLE haf_app LOGIN PASSWORD 'haf_app';
 GRANT hive_applications_group TO haf_app;
 GRANT USAGE ON SCHEMA btracker_app to haf_app;
 GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO haf_app;
