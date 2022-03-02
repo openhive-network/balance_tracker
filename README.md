@@ -1,14 +1,35 @@
-The balance_tracker app was mainly created as a simple example of how to make a HAF app. This app can be used to graph the HBD and Hive balances of any Hive account as those balances changes each block.
+Simple python server for balance tracker to compare performance with postgREST
 
-Current status: 
+First, add 5M blocks to `btracker_app` schema by checking out to develop branch and running 
+```
+./run.sh re-start-all 5000000
+```
 
-At the moment, this application will need to use two tables:
-* hive.accounts (created by hived sql_serializer plugin)
-* btracker_app.account_balance_history (created by sync process of balance tracker)
+Then stop the server and checkout this branch (`4-create-python-backend-2`)
 
-Work to be done:
-- Add jsonrpc API calls required by new web app:
- `find_matching_accounts(partial_account_name)` returns a list of all accounts that match against partial_account name. May want to limit max amount of names returned.
- `get_balance_for_coin(account_name, coin_type, starting_block, count`) return the balance values for account_name for the required coin_type starting with starting_block and returning count number of balances.
+To startup the server password to `api_user` must be added
+```
+psql -d haf_block_log -c "ALTER USER api_user WITH PASSWORD 'api_user';"
+psql -d haf_block_log -c "ALTER USER api_user WITH LOGIN;"
+```
 
-- Create web UI that has an edit box where user can type name of account to graph. After some number of characters have been typed, dropdown should appear below edit box with possible account names that match partially typed name (dropdown filled using find_matching_accounts). Pressing enter or button beside the edit box (called "show balances") with a valid account name should call get_balance_for_coin twice (with hbd and with hive passed). These two tuples of (block_number, balance) should then be graphed for each coin.
+If you are logging in with other user/password, change `config.ini`
+
+Start the server with:
+```
+python3 main.py
+```
+
+Default address is localhost:8080 which can be changed by providing arguments `--port`, `--host`
+
+Example requests:
+
+```
+curl http://localhost:8080/rpc/find_matching_accounts/?_partial_account_name=d
+```
+```
+curl http://localhost:8080/rpc/get_balance_for_coin_by_block/?_account_name=dantheman&_coin_type=21&_start_block=0&_end_block=10000
+```
+```
+curl http://localhost:8080/rpc/get_balance_for_coin_by_time/?_account_name=dantheman&_coin_type=21&_start_time=2016-03-24%2016:05:00&_end_time=2016-03-25%2000:34:48
+```

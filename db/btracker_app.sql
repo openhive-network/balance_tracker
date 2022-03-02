@@ -49,6 +49,27 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
 ) INHERITS (hive.btracker_app);
 
+--recreate role for reading data
+DROP OWNED BY haf_app;
+DROP ROLE IF EXISTS haf_app;
+CREATE ROLE haf_app LOGIN PASSWORD 'haf_app';
+GRANT hive_applications_group TO haf_app;
+GRANT USAGE ON SCHEMA btracker_app to haf_app;
+GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO haf_app;
+
+-- recreate role for connecting to db
+DROP OWNED BY admin;
+DROP ROLE IF EXISTS admin;
+CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
+
+-- add ability for admin to switch to haf_app role
+GRANT haf_app TO admin;
+
+-- add btracker_app schema owner
+DROP ROLE IF EXISTS owner;
+CREATE ROLE owner;
+ALTER SCHEMA btracker_app OWNER TO owner;
+
 END
 $$
 ;
@@ -294,6 +315,17 @@ BEGIN
   PERFORM btracker_app.storeLastProcessedBlock(__last_block);
 
   COMMIT;
+END
+$$
+;
+
+CREATE OR REPLACE PROCEDURE btracker_app.create_indexes()
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  CREATE INDEX idx_btracker_app_account_balance_history_account ON btracker_app.account_balance_history(account);
+  CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
 END
 $$
 ;
