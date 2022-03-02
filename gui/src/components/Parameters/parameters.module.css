@@ -1,0 +1,22 @@
+.input {
+  width: 200px;
+  margin: 20px 20px 0px 20px !important;
+}
+
+.input__date {
+  width: 300px;
+  margin: 20px 20px 0px 20px !important;
+}
+.form__buttons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.form__button--show-dates {
+  margin: 25px !important;
+}
+.hidden {
+  display: "none";
+}
