@@ -27,10 +27,15 @@ start_webserver() {
     postgrest postgrest.conf
 }
 
-install_postgrest() {
-    wget https://github.com/PostgREST/postgrest/releases/download/v8.0.0/postgrest-v8.0.0-linux-x64-static.tar.xz
+install_dependancies() {
+    install_postgrest
+    install_jmeter
+}
 
-    POSTGREST=$(find . -name 'postgrest*')
+install_postgrest() {
+    wget https://github.com/PostgREST/postgrest/releases/download/v$postgrest_v/postgrest-v$postgrest_v-linux-static-x64.tar.xz
+
+    POSTGREST=$(find . -name "postgrest-v${postgrest_v}*")
     tar xJf $POSTGREST
     sudo mv 'postgrest' '/usr/local/bin/postgrest'
     rm $POSTGREST
@@ -40,7 +45,6 @@ install_jmeter() {
     sudo apt-get update -y
     sudo apt-get install openjdk-8-jdk -y
 
-    jmeter_v=5.3
     wget "https://downloads.apache.org//jmeter/binaries/apache-jmeter-${jmeter_v}.zip"
 
     jmeter_src="apache-jmeter-${jmeter_v}"
@@ -48,11 +52,11 @@ install_jmeter() {
     rm "${jmeter_src}.zip"
     sudo mv $jmeter_src "/usr/local/src/${jmeter_src}"
 
-    jmeter='jmeter-5.3'
+    jmeter="jmeter-${jmeter_v}"
     touch $jmeter
     echo '#!/usr/bin/env bash' >> $jmeter
     echo '' >> $jmeter
-    echo 'cd "/usr/local/src/apache-jmeter-5.3/bin"' >> $jmeter
+    echo "cd '/usr/local/src/apache-jmeter-${jmeter_v}/bin'" >> $jmeter
     echo './jmeter $@' >> $jmeter
     sudo chmod +x $jmeter
     sudo mv $jmeter "/usr/local/bin/${jmeter}"
@@ -80,6 +84,9 @@ restart_all() {
     create_api
 }
 
+postgrest_v=9.0.0
+jmeter_v=5.4.3
+
 if [ "$1" = "re-all" ]; then
     restart_all ${@:2}
     echo 'SUCCESS: DB and API recreated'
@@ -101,6 +108,8 @@ elif [ "$1" = "re-api-start" ]; then
     create_api
     echo 'SUCCESS: API recreated'
     start_webserver
+elif [ "$1" =  "install-dependancies" ]; then
+    install_dependancies
 elif [ "$1" = "install-postgrest" ]; then
     install_postgrest
 elif [ "$1" = "install-jmeter" ]; then

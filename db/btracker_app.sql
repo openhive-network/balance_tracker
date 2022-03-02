@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 ) INHERITS (hive.btracker_app);
 
 --recreate role for reading data
-DROP OWNED BY haf_app;
+IF (SELECT 1 FROM pg_roles WHERE rolname='haf_app') IS NOT NULL THEN
+  DROP OWNED BY haf_app;
+END IF;
 DROP ROLE IF EXISTS haf_app;
 CREATE ROLE haf_app LOGIN PASSWORD 'haf_app';
 GRANT hive_applications_group TO haf_app;
