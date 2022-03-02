@@ -74,7 +74,7 @@ install_jmeter() {
 }
 
 run_tests() {
-    ./tests/run_tests.sh $1
+    ./tests/run_tests.sh $jmeter_v $1
 }
 
 recreate_db() {
@@ -126,9 +126,9 @@ elif [ "$1" = "install-postgrest" ]; then
 elif [ "$1" = "install-jmeter" ]; then
     install_jmeter
 elif [ "$1" = "test" ]; then
-    run_tests
+    run_tests $jmeter_v
 elif [ "$1" = "test-py" ]; then
-    run_tests "py"
+    run_tests $jmeter_v "py"
 elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
