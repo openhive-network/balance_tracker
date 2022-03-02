@@ -2,7 +2,8 @@
 
 
 from argparse import ArgumentParser
-from server.serve import DBHandler
+from server.serve import DBHandler, ForkHTTPServer
+from functools import partial
 
 if __name__ == "__main__":
     argument_parser = ArgumentParser()
