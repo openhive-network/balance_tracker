@@ -8,6 +8,8 @@ else
     TEST_SCENARIO_PATH="$(pwd)/tests/performance/test_scenarios.jmx"
 fi
 
+echo $TEST_SCENARIO_PATH
+
 TEST_RESULT_PATH="$(pwd)/tests/performance/result.jtl"
 TEST_REPORT_DIR="$(pwd)/tests/performance/result_report"
 TEST_REPORT_PATH="$(pwd)/tests/performance/result_report/index.html"

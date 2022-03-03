@@ -60,7 +60,9 @@ GRANT USAGE ON SCHEMA btracker_app to haf_app;
 GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO haf_app;
 
 -- recreate role for connecting to db
-DROP OWNED BY admin;
+IF (SELECT 1 FROM pg_roles WHERE rolname='admin') IS NOT NULL THEN
+  DROP OWNED BY admin;
+END IF;
 DROP ROLE IF EXISTS admin;
 CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
 

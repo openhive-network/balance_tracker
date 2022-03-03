@@ -27,20 +27,13 @@ start_webserver() {
     if [ "$1" = "py" ]; then
         ./main.py ${@:2}
     else
-        postgrest webserver.conf
+        postgrest postgrest.conf
     fi
 }
 
 install_dependancies() {
     install_postgrest
     install_jmeter
-}
-
-install_postgrest() {
-    wget https://github.com/PostgREST/postgrest/releases/download/v$postgrest_v/postgrest-v$postgrest_v-linux-static-x64.tar.xz
-
-    POSTGREST=$(find . -name "postgrest-v${postgrest_v}*")
-    postgrest webserver.conf
 }
 
 install_postgrest() {
@@ -74,7 +67,7 @@ install_jmeter() {
 }
 
 run_tests() {
-    ./tests/run_tests.sh $jmeter_v $1
+    ./tests/run_tests.sh $jmeter_v $2
 }
 
 recreate_db() {
@@ -133,4 +126,6 @@ elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
     start_webserver "py" ${@:2}
+else
+    echo "job not found"
 fi

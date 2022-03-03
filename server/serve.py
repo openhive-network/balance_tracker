@@ -1,14 +1,19 @@
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 import configparser
 from server.adapter import Db
 from db.backend import BalanceTracker
+from socketserver import ForkingMixIn
+
+class ForkHTTPServer(ForkingMixIn, HTTPServer):
+    pass
 
 class DBHandler(BaseHTTPRequestHandler):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         db, user, password, host, port = self.read_config()
         db = Db(db, user, password, host, port)
         self.balance_tracker = BalanceTracker(db)
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def read_config():
@@ -18,7 +23,7 @@ class DBHandler(BaseHTTPRequestHandler):
         return config["database"], config["user"], config["password"], config["host"], config["port"]
 
     def parse_params(self, required_params, param_types):
-        params = dict(param.replace("%20", " ").split("=")
+        params = dict(param.split("=")
                       for param in urlparse(self.path).query.split("&"))
         param_names = list(params.keys())
         for p, type in zip(required_params, param_types):
