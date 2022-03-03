@@ -88,6 +88,10 @@ restart_all() {
     create_api
 }
 
+start_ui() {
+    cd gui ; npm start
+}
+
 postgrest_v=9.0.0
 jmeter_v=5.4.3
 
@@ -126,6 +130,8 @@ elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
     start_webserver "py" ${@:2}
+elif [ "$1" = "start-ui" ]; then
+    start_ui
 else
     echo "job not found"
 fi
