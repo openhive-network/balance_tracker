@@ -50,30 +50,22 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 ) INHERITS (hive.btracker_app);
 
 --recreate role for reading data
-IF (SELECT 1 FROM pg_roles WHERE rolname='haf_app') IS NOT NULL THEN
-  DROP OWNED BY haf_app;
+IF (SELECT 1 FROM pg_roles WHERE rolname='btracker_user') IS NOT NULL THEN
+  DROP OWNED BY btracker_user;
 END IF;
-DROP ROLE IF EXISTS haf_app;
-CREATE ROLE haf_app LOGIN PASSWORD 'haf_app';
-GRANT hive_applications_group TO haf_app;
-GRANT USAGE ON SCHEMA btracker_app to haf_app;
-GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO haf_app;
+DROP ROLE IF EXISTS btracker_user;
+CREATE ROLE btracker_user LOGIN PASSWORD 'btracker_user';
+GRANT hive_applications_group TO btracker_user;
+GRANT USAGE ON SCHEMA btracker_app to btracker_user;
+GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO btracker_user;
 
--- recreate role for connecting to db
-IF (SELECT 1 FROM pg_roles WHERE rolname='admin') IS NOT NULL THEN
-  DROP OWNED BY admin;
-END IF;
-DROP ROLE IF EXISTS admin;
-CREATE ROLE admin NOINHERIT LOGIN PASSWORD 'admin';
-
--- add ability for admin to switch to haf_app role
-GRANT haf_app TO admin;
+-- add ability for haf_admin to switch to btracker_user role
+GRANT btracker_user TO haf_admin;
 
 -- add btracker_app schema owner
-DROP ROLE IF EXISTS owner;
-CREATE ROLE owner;
-ALTER SCHEMA btracker_app OWNER TO owner;
-
+DROP ROLE IF EXISTS btracker_owner;
+CREATE ROLE btracker_owner;
+ALTER SCHEMA btracker_app OWNER TO btracker_owner;
 END
 $$
 ;
