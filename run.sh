@@ -12,7 +12,21 @@ create_db() {
 }
 
 run_indexer() {
-    psql -a -v "ON_ERROR_STOP=1" "${@:2}" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $1);"
+    args=("$@")
+    re='^[0-9]+$'
+    if ! [[ ${args[0]} =~ $re ]]; then
+        block_num=$((10**9))
+        
+        echo 'Running indexer for existing blocks and expecting new blocks...'
+        echo 'NOTE: indexes will not be created, balance_tracker server will not be started!'
+        echo 'Use ./run.sh create-indexes and ./run.sh start.'
+        sleep 3
+    else
+        block_num=$1
+        args=("${@:2}")
+    fi
+    
+    psql -a -v "ON_ERROR_STOP=1" "$args" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
 }
 
 create_indexes() {
@@ -78,12 +92,6 @@ recreate_db() {
 }
 
 restart_all() {
-    re='^[0-9]+$'
-    if ! [[ $1 =~ $re ]]; then
-        echo 'ERROR: Second argument must be block number'
-        exit 1
-    fi
-
     recreate_db $@
     create_api
 }
@@ -132,6 +140,8 @@ elif [ "$1" = "start-py" ]; then
     start_webserver "py" ${@:2}
 elif [ "$1" = "start-ui" ]; then
     start_ui
+elif [ "$1" = "create-indexes" ]; then
+    create_indexes ${@:2}
 else
     echo "job not found"
 fi
