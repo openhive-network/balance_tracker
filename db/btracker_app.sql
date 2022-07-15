@@ -152,7 +152,11 @@ FOR __balance_change IN
   JOIN balance_impacting_ops b ON ho.op_type_id = b.id
   JOIN LATERAL
   (
-    SELECT * FROM hive.get_impacted_balances(ho.body)
+    /*
+      There was in the block 905693 a HF1 that generated bunch of virtual operations `vesting_shares_split_operation`( above 5000 ).
+      This operation multiplied VESTS by milion for every account.
+    */
+    SELECT * FROM hive.get_impacted_balances(ho.body, ho.block_num > 905693)
   ) bio ON true
   WHERE ho.block_num BETWEEN _from AND _to
   ORDER BY ho.block_num, ho.id
