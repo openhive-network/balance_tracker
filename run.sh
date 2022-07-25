@@ -87,8 +87,8 @@ run_tests() {
 recreate_db() {
     clean_data ${@:2}
     create_db ${@:2}
-    run_indexer $@
     create_indexes ${@:2}
+    run_indexer $@
 }
 
 restart_all() {
@@ -142,6 +142,8 @@ elif [ "$1" = "start-ui" ]; then
     start_ui
 elif [ "$1" = "create-indexes" ]; then
     create_indexes ${@:2}
+elif [ "$1" = "continue-processing" ]; then
+    run_indexer ${@:2}
 else
     echo "job not found"
 fi
