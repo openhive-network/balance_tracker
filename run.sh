@@ -3,12 +3,70 @@
 set -e
 set -o pipefail
 
+
+
+# Script reponsible for execution of all actions required to finish configuration of the database holding a HAF database to work correctly with HAfAH.
+
+print_help () {
+    echo "Usage: $0 [OPTION[=VALUE]]..."
+    echo
+    echo "Allows to setup a database already filled by HAF instance, to work with haf_be application."
+    echo "OPTIONS:"
+    echo "  --c=VALUE            Allows to specify a script command"
+    echo "  --host=VALUE         Allows to specify a PostgreSQL host location (defaults to /var/run/postgresql)"
+    echo "  --port=NUMBER        Allows to specify a PostgreSQL operating port (defaults to 5432)"
+    echo "  --user=VALUE         Allows to specify a PostgreSQL user (defaults to haf_admin)"
+    echo "  --help               Display this help screen and exit"
+    echo
+}
+
+POSTGRES_HOST="/var/run/postgresql"
+POSTGRES_PORT=5432
+POSTGRES_USER="haf_admin"
+COMMAND=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host=*)
+        POSTGRES_HOST="${1#*=}"
+        ;;
+    --port=*)
+        POSTGRES_PORT="${1#*=}"
+        ;;
+    --user=*)
+        POSTGRES_USER="${1#*=}"
+        ;;
+    --c=*)
+        COMMAND="${1#*=}"
+        ;;
+    --help)
+        print_help
+        exit 0
+        ;;
+    -*)
+        echo "ERROR: '$1' is not a valid option"
+        echo
+        print_help
+        exit 1
+        ;;
+    *)
+        echo "ERROR: '$1' is not a valid argument"
+        echo
+        print_help
+        exit 2
+        ;;
+    esac
+    shift
+done
+
+POSTGRES_ACCESS="--host $POSTGRES_HOST --port $POSTGRES_PORT"
+
 clean_data() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('btracker_app') THEN perform hive.app_remove_context('btracker_app'); end if; END \$\$"
+    psql -w $POSTGRES_ACCESS -a -v "ON_ERROR_STOP=1" "$@" -d $DB_NAME -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('btracker_app') THEN perform hive.app_remove_context('btracker_app'); end if; END \$\$"
 }
 
 create_db() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -f $PWD/db/btracker_app.sql
+    psql -w $POSTGRES_ACCESS -a -v "ON_ERROR_STOP=1" "$@" -d $DB_NAME -f $PWD/db/btracker_app.sql
 }
 
 run_indexer() {
@@ -26,15 +84,15 @@ run_indexer() {
         args=("${@:2}")
     fi
     
-    psql -a -v "ON_ERROR_STOP=1" "$args" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
+    psql -w $POSTGRES_ACCESS -a -v "ON_ERROR_STOP=1" "$args" -d $DB_NAME -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
 }
 
 create_indexes() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "call btracker_app.create_indexes();"
+    psql -w $POSTGRES_ACCESS -a -v "ON_ERROR_STOP=1" "$@" -d $DB_NAME -c '\timing' -c "call btracker_app.create_indexes();"
 }
 
 create_api() {
-    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
+    psql -w $POSTGRES_ACCESS -a -v "ON_ERROR_STOP=1" -d $DB_NAME -f $PWD/api/btracker_api.sql
 }
 
 start_webserver() {
@@ -87,8 +145,6 @@ run_tests() {
 recreate_db() {
     clean_data ${@:2}
     create_db ${@:2}
-    create_indexes ${@:2}
-    run_indexer $@
 }
 
 restart_all() {
@@ -100,49 +156,53 @@ start_ui() {
     cd gui ; npm start
 }
 
+DB_NAME=haf_block_log
+admin_role=haf_admin
 postgrest_v=9.0.0
 jmeter_v=5.4.3
 
-if [ "$1" = "re-all" ]; then
+if [ "$COMMAND" = "re-all" ]; then
     restart_all ${@:2}
     echo 'SUCCESS: DB and API recreated'
-elif [ "$1" = "re-all-start" ]; then
+elif [ "$COMMAND" = "start-processing" ]; then
+    run_indexer $@
+elif [ "$COMMAND" = "re-all-start" ]; then
     restart_all ${@:2}
     echo 'SUCCESS: DB and API recreated'
     start_webserver
-elif [ "$1" = "re-db" ]; then
+elif [ "$COMMAND" = "re-db" ]; then
     recreate_db ${@:2}
     echo 'SUCCESS: DB recreated'
-elif [ "$1" = "re-db-start" ]; then
+elif [ "$COMMAND" = "re-db-start" ]; then
     recreate_db ${@:2}
     echo 'SUCCESS: DB recreated'
     start_webserver
-elif [ "$1" = "re-api" ]; then
+elif [ "$COMMAND" = "re-api" ]; then
     create_api
     echo 'SUCCESS: API recreated'
-elif [ "$1" = "re-api-start" ]; then
+elif [ "$COMMAND" = "re-api-start" ]; then
     create_api
     echo 'SUCCESS: API recreated'
     start_webserver
-elif [ "$1" =  "install-dependancies" ]; then
+elif [ "$COMMAND" =  "install-dependancies" ]; then
     install_dependancies
-elif [ "$1" = "install-postgrest" ]; then
+elif [ "$COMMAND" = "install-postgrest" ]; then
     install_postgrest
-elif [ "$1" = "install-jmeter" ]; then
+elif [ "$COMMAND" = "install-jmeter" ]; then
     install_jmeter
-elif [ "$1" = "test" ]; then
+elif [ "$COMMAND" = "test" ]; then
     run_tests $jmeter_v
-elif [ "$1" = "test-py" ]; then
+elif [ "$COMMAND" = "test-py" ]; then
     run_tests $jmeter_v "py"
-elif [ "$1" = "start" ]; then
+elif [ "$COMMAND" = "start" ]; then
     start_webserver
-elif [ "$1" = "start-py" ]; then
+elif [ "$COMMAND" = "start-py" ]; then
     start_webserver "py" ${@:2}
-elif [ "$1" = "start-ui" ]; then
+elif [ "$COMMAND" = "start-ui" ]; then
     start_ui
-elif [ "$1" = "create-indexes" ]; then
+elif [ "$COMMAND" = "create-indexes" ]; then
     create_indexes ${@:2}
-elif [ "$1" = "continue-processing" ]; then
+elif [ "$COMMAND" = "continue-processing" ]; then
     run_indexer ${@:2}
 else
     echo "job not found"
