@@ -7,18 +7,6 @@ set -o pipefail
 
 # Script reponsible for execution of all actions required to finish configuration of the database holding a HAF database to work correctly with HAfAH.
 
-print_help () {
-    echo "Usage: $0 [OPTION[=VALUE]]..."
-    echo
-    echo "Allows to setup a database already filled by HAF instance, to work with haf_be application."
-    echo "OPTIONS:"
-    echo "  --c=VALUE            Allows to specify a script command"
-    echo "  --host=VALUE         Allows to specify a PostgreSQL host location (defaults to /var/run/postgresql)"
-    echo "  --port=NUMBER        Allows to specify a PostgreSQL operating port (defaults to 5432)"
-    echo "  --user=VALUE         Allows to specify a PostgreSQL user (defaults to haf_admin)"
-    echo "  --help               Display this help screen and exit"
-    echo
-}
 
 POSTGRES_HOST="/var/run/postgresql"
 POSTGRES_PORT=5432
@@ -40,19 +28,16 @@ while [ $# -gt 0 ]; do
         COMMAND="${1#*=}"
         ;;
     --help)
-        print_help
         exit 0
         ;;
     -*)
         echo "ERROR: '$1' is not a valid option"
         echo
-        print_help
         exit 1
         ;;
     *)
         echo "ERROR: '$1' is not a valid argument"
         echo
-        print_help
         exit 2
         ;;
     esac
