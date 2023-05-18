@@ -100,6 +100,16 @@ start_ui() {
     cd gui ; npm start
 }
 
+setup() {
+    bash $SCRIPTS_DIR/setup_db.sh 
+}
+
+process_blocks() {
+    run_indexer $@
+}
+
+SCRIPTS_DIR=$PWD/scripts
+
 postgrest_v=9.0.0
 jmeter_v=5.4.3
 
@@ -110,6 +120,10 @@ elif [ "$1" = "re-all-start" ]; then
     restart_all ${@:2}
     echo 'SUCCESS: DB and API recreated'
     start_webserver
+elif [ "$1" = "setup" ]; then
+    setup 
+elif [ "$1" = "process-blocks" ]; then
+    process_blocks ${@:2}
 elif [ "$1" = "re-db" ]; then
     recreate_db ${@:2}
     echo 'SUCCESS: DB recreated'
