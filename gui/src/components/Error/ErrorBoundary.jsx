@@ -1,5 +1,5 @@
 import React from "react";
-import ErrorUI from "./ErrorUI /ErrorUI";
+import ErrorUI from "./ErrorUI/ErrorUI";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
