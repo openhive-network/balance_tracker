@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   source_op_block INT NOT NULL, -- Block containing the source operation
 
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
-) INHERITS (hive.hafbe_app);
+) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 (
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
   source_op_block INT NOT NULL, 
 
   CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
-) INHERITS (hive.hafbe_app);
+) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
 (
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
   tmp BIGINT,     
 
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
-) INHERITS (hive.hafbe_app);
+) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 (
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
       That's why constraint has been eliminated.
   */
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
-) INHERITS (hive.hafbe_app);
+) INHERITS (hive.btracker_app);
 
 --recreate role for reading data
 IF (SELECT 1 FROM pg_roles WHERE rolname='btracker_user') IS NOT NULL THEN
@@ -181,7 +181,7 @@ FOR __balance_change IN
     WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
   )
   SELECT bio.account_name AS account, bio.asset_symbol_nai AS nai, bio.amount as balance, ho.id AS source_op, ho.block_num AS source_op_block
-  FROM hive.hafbe_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
+  FROM hive.btracker_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
   JOIN balance_impacting_ops b ON ho.op_type_id = b.id
   JOIN LATERAL
   (
@@ -227,7 +227,7 @@ FOR ___balance_change IN
            ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
            ov.id AS source_op,
            ov.block_num as source_op_block
-    FROM hive.hafbe_app_operations_view ov
+    FROM hive.btracker_app_operations_view ov
     WHERE ov.op_type_id = 40 AND ov.block_num BETWEEN _from AND _to
     ORDER BY ov.block_num, ov.id
   )
@@ -383,7 +383,7 @@ END LOOP;
            ((ov.body::jsonb)->'value'->'delegation'->>'amount')::BIGINT AS balance,
            ov.id AS source_op,
            ov.block_num as source_op_block
-    FROM hive.hafbe_app_operations_view ov
+    FROM hive.btracker_app_operations_view ov
     WHERE ov.op_type_id = 41 AND ov.block_num BETWEEN _from AND _to
   )
   SELECT delegator, delegatee, balance, source_op, source_op_block
@@ -442,7 +442,7 @@ END LOOP;
            ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
            ov.id AS source_op,
            ov.block_num as source_op_block
-    FROM hive.hafbe_app_operations_view ov
+    FROM hive.btracker_app_operations_view ov
     WHERE ov.op_type_id = 62 AND ov.block_num BETWEEN _from AND _to
   )
   SELECT account, balance
@@ -599,8 +599,8 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
-  CREATE INDEX idx_hafbe_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
-  CREATE INDEX idx_hafbe_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
+  CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
+  CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
 END
 $$
 ;
