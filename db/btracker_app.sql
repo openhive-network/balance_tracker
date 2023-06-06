@@ -34,6 +34,27 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
 ) INHERITS (hive.hafbe_app);
 
+CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
+(
+  delegator VARCHAR NOT NULL,
+  delegatee VARCHAR NOT NULL,     
+  balance BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL, 
+
+  CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
+) INHERITS (hive.hafbe_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
+(
+  account VARCHAR NOT NULL,
+  received_vests BIGINT,     
+  delegated_vests BIGINT,     
+  tmp BIGINT,     
+
+  CONSTRAINT pk_temp_vests PRIMARY KEY (account)
+) INHERITS (hive.hafbe_app);
+
 CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 (
   account VARCHAR NOT NULL, -- Balance owner account
@@ -127,6 +148,13 @@ END
 $$
 ;
 
+DROP TYPE IF EXISTS btracker_app.btracker_vests_balance CASCADE;
+CREATE TYPE btracker_app.btracker_vests_balance AS
+(
+  delegated_vests BIGINT,
+  received_vests BIGINT
+);
+
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_c(in _from INT, in _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql'
@@ -137,7 +165,12 @@ AS
 $$
 DECLARE
   __balance_change RECORD;
+  ___balance_change RECORD;
+  ____balance_change RECORD;
+  _____balance_change RECORD;
+  _balance BIGINT;
   __current_balance BIGINT;
+  ___current_blocked_balance BIGINT;
   __last_reported_block INT := 0;
 BEGIN
 FOR __balance_change IN
@@ -184,6 +217,247 @@ LOOP
     __last_reported_block := __balance_change.source_op_block;
   END IF;
 END LOOP;
+
+FOR ___balance_change IN
+-- delegate_vesting_shares_operation
+ WITH raw_ops_delegations AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->>'delegator' AS delegator,
+           (ov.body::jsonb)->'value'->>'delegatee' AS delegatee,
+           ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.hafbe_app_operations_view ov
+    WHERE ov.op_type_id = 40 AND ov.block_num BETWEEN _from AND _to
+    ORDER BY ov.block_num, ov.id
+  )
+  SELECT delegator, delegatee, balance, source_op, source_op_block
+  FROM raw_ops_delegations
+
+LOOP
+
+    SELECT cad.balance INTO _balance
+    FROM btracker_app.current_accounts_delegations cad 
+    WHERE cad.delegator= ___balance_change.delegator AND cad.delegatee= ___balance_change.delegatee;
+    
+  IF _balance IS NULL THEN
+
+  --IF DELEGATION BETWEEN THIS PAIR NEVER HAPPENED BEFORE
+
+  --UPDATE CURRENT_ACCOUNTS_DELEGATIONS
+    INSERT INTO btracker_app.current_accounts_delegations 
+    (
+      delegator,
+      delegatee,
+      balance,
+      source_op,
+      source_op_block
+      )
+      SELECT 
+        ___balance_change.delegator,
+        ___balance_change.delegatee,
+        ___balance_change.balance,
+        ___balance_change.source_op,
+        ___balance_change.source_op_block;
+
+  --ADD DELEGATED VESTS TO DELEGATOR
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      delegated_vests
+      ) 
+      SELECT
+        ___balance_change.delegator,
+        ___balance_change.balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
+
+  --ADD RECEIVED VESTS TO DELEGATEE
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      received_vests     
+      ) 
+      SELECT
+        ___balance_change.delegatee,
+        ___balance_change.balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
+
+    ELSE
+
+    UPDATE btracker_app.current_accounts_delegations SET 
+      balance = ___balance_change.balance,
+      source_op = ___balance_change.source_op,
+      source_op_block = ___balance_change.source_op_block
+    WHERE delegator = ___balance_change.delegator AND delegatee = ___balance_change.delegatee;
+
+  IF _balance > ___balance_change.balance THEN
+
+  --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS LOWER THAN PREVIOUS DELEGATION
+
+  ___current_blocked_balance = GREATEST(_balance - ___balance_change.balance , 0);
+
+  --DELEGATOR'S DELAGATION BALANCE DOESN'T CHANGE, BLOCKED VESTS SAVED IN TMP
+
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      tmp
+      ) 
+      SELECT
+        ___balance_change.delegator,
+        ___current_blocked_balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          tmp = btracker_app.current_account_vests.tmp + EXCLUDED.tmp;
+  
+  --DELEGATEE'S RECEIVED VESTS ARE BEING LOWERED INSTANTLY
+
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      received_vests     
+      ) 
+      SELECT
+        ___balance_change.delegatee,
+        ___current_blocked_balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          received_vests = btracker_app.current_account_vests.received_vests - EXCLUDED.received_vests;
+  ELSE
+
+  --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS HIGHER
+
+    ___current_blocked_balance = GREATEST(___balance_change.balance - _balance, 0);
+
+  --ADD THE DIFFERENCE TO BOTH ACCOUNTS DELEGATED AND RECEIVED
+
+          INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      delegated_vests
+      ) 
+      SELECT
+        ___balance_change.delegator,
+        ___current_blocked_balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
+  
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      received_vests     
+      ) 
+      SELECT
+        ___balance_change.delegatee,
+        ___current_blocked_balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
+    
+  END IF;
+
+  END IF;
+
+  --IF DELEGATION IS BEING CANCELED BETWEEN ACCOUNTS REMOVE IT FROM CURRENT_ACCOUNT_DELEGATION
+
+  IF ___balance_change.balance = 0 THEN
+    DELETE FROM btracker_app.current_accounts_delegations
+    WHERE delegator = ___balance_change.delegator AND delegatee = ___balance_change.delegatee;
+  END IF;
+
+END LOOP;
+
+  --IF ACCOUNT IS BEING CREATED WITH A DELEGATION
+
+  FOR _____balance_change IN
+  -- account_create_with_delegation_operation
+    WITH raw_ops_create_account AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->> 'creator' AS delegator,
+           (ov.body::jsonb)->'value'->> 'new_account_name' AS delegatee,
+           ((ov.body::jsonb)->'value'->'delegation'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.hafbe_app_operations_view ov
+    WHERE ov.op_type_id = 41 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT delegator, delegatee, balance, source_op, source_op_block
+  FROM raw_ops_create_account
+
+  LOOP
+
+    INSERT INTO btracker_app.current_accounts_delegations 
+    (
+      delegator,
+      delegatee,
+      balance,
+      source_op,
+      source_op_block
+      )
+      SELECT 
+        _____balance_change.delegator,
+        _____balance_change.delegatee,
+        _____balance_change.balance,
+        _____balance_change.source_op,
+        _____balance_change.source_op_block;
+
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      delegated_vests
+      ) 
+      SELECT
+        _____balance_change.delegator,
+        _____balance_change.balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
+
+      INSERT INTO btracker_app.current_account_vests
+      (
+      account,
+      received_vests     
+      ) 
+      SELECT
+        _____balance_change.delegatee,
+        _____balance_change.balance
+      ON CONFLICT ON CONSTRAINT pk_temp_vests
+      DO UPDATE SET
+          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
+
+  END LOOP;
+
+  --RETURNING OPERATION THAT LOWERS DELEGATOR'S DELEGATED BALANCE
+
+  FOR ____balance_change IN
+  -- return_vesting_delegation_operation
+    WITH raw_ops_return AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->>'account' AS account,
+           ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.hafbe_app_operations_view ov
+    WHERE ov.op_type_id = 62 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT account, balance
+  FROM raw_ops_return
+
+  LOOP
+
+  INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
+  SELECT ____balance_change.account, ____balance_change.balance, ____balance_change.balance
+  ON CONFLICT ON CONSTRAINT pk_temp_vests DO UPDATE SET
+    delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests,
+    tmp = btracker_app.current_account_vests.tmp - EXCLUDED.tmp
+    ;
+
+  END LOOP;
 
 END
 $$
