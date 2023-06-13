@@ -51,12 +51,35 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
 (
   account VARCHAR NOT NULL,
-  received_vests BIGINT,     
-  delegated_vests BIGINT,     
+  received_vests BIGINT DEFAULT 0,     
+  delegated_vests BIGINT DEFAULT 0,     
   tmp BIGINT,     
 
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
+(
+  account VARCHAR NOT NULL,
+  nai     INT NOT NULL, 
+  saving_balance BIGINT DEFAULT 0,         
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+  savings_withdraw_requests INT DEFAULT 0,
+
+  CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
+) INHERITS (hive.btracker_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
+(
+  account VARCHAR NOT NULL,
+  nai     INT NOT NULL, 
+  balance BIGINT NOT NULL,
+  request_id  INT NOT NULL, 
+
+  CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
+) INHERITS (hive.btracker_app);
+
 
 CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 (
@@ -152,10 +175,16 @@ SET jit = OFF
 AS
 $$
 DECLARE
+  __balance_change_savings RECORD;
+  ___balance_change_savings RECORD;
+  ____balance_change_savings RECORD;
+  _____balance_change_savings RECORD;
   __balance_change RECORD;
   ___balance_change RECORD;
   ____balance_change RECORD;
   _____balance_change RECORD;
+  __balance_change_saving_interest RECORD;
+  _savings_withdraw_requests INT := 1;
   _balance BIGINT;
   __current_balance BIGINT;
   ___current_blocked_balance BIGINT;
@@ -205,6 +234,8 @@ LOOP
     __last_reported_block := __balance_change.source_op_block;
   END IF;
 END LOOP;
+
+--  DELEGATIONS TRACKING
 
 FOR ___balance_change IN
 -- delegate_vesting_shares_operation
@@ -444,8 +475,229 @@ END LOOP;
     delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests,
     tmp = btracker_app.current_account_vests.tmp - EXCLUDED.tmp
     ;
-
+    
   END LOOP;
+
+--  SAVINGS TRACKING
+
+--  transfer_to_savings_operation 
+  FOR __balance_change_savings IN
+  WITH raw_ops_to_savings AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->>'to' AS account,
+           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
+           ((ov.body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.btracker_app_operations_view ov
+    WHERE ov.op_type_id = 32 AND ov.block_num BETWEEN _from AND _to
+    ORDER BY ov.block_num, ov.id
+  )
+  SELECT account, nai, balance, source_op, source_op_block
+  FROM raw_ops_to_savings
+LOOP
+
+      INSERT INTO btracker_app.current_account_savings
+      (
+      account,
+      nai,
+      saving_balance,
+      source_op,
+      source_op_block
+      ) 
+      SELECT
+        __balance_change_savings.account,
+        __balance_change_savings.nai,
+        __balance_change_savings.balance,
+        __balance_change_savings.source_op,
+        __balance_change_savings.source_op_block
+
+      ON CONFLICT ON CONSTRAINT pk_account_savings
+      DO UPDATE SET
+          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          source_op = EXCLUDED.source_op,
+          source_op_block = EXCLUDED.source_op_block;
+END LOOP;
+
+--  transfer_from_savings_operation 
+  FOR ___balance_change_savings IN
+  WITH raw_ops_from_savings AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
+           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
+           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
+           ((ov.body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.btracker_app_operations_view ov
+    WHERE ov.op_type_id = 33 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT account, request_id, nai, balance, source_op, source_op_block
+  FROM raw_ops_from_savings
+LOOP
+
+    INSERT INTO btracker_app.current_account_savings 
+    (
+      account,
+      nai,
+      saving_balance,
+      source_op,
+      source_op_block,
+      savings_withdraw_requests
+      )
+      SELECT 
+        ___balance_change_savings.account,
+        ___balance_change_savings.nai,
+        ___balance_change_savings.balance,
+        ___balance_change_savings.source_op,
+        ___balance_change_savings.source_op_block,
+        _savings_withdraw_requests
+
+      ON CONFLICT ON CONSTRAINT pk_account_savings
+      DO UPDATE SET
+          saving_balance = btracker_app.current_account_savings.saving_balance - EXCLUDED.saving_balance,
+          source_op = EXCLUDED.source_op,
+          source_op_block = EXCLUDED.source_op_block,
+          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests + EXCLUDED.savings_withdraw_requests;
+
+      INSERT INTO btracker_app.transfer_saving_id
+      (
+      account,
+      nai,
+      balance,
+      request_id
+      ) 
+      SELECT
+        ___balance_change_savings.account,
+        ___balance_change_savings.nai,
+        ___balance_change_savings.balance,
+        ___balance_change_savings.request_id;
+END LOOP;
+
+--  cancel_transfer_from_savings_operation 
+  FOR ____balance_change_savings IN
+  WITH raw_ops_cancel_transfer AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
+           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.btracker_app_operations_view ov
+    WHERE ov.op_type_id = 34 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT ct.account, ct.request_id, tsi.nai, tsi.balance, ct.source_op, ct.source_op_block
+  FROM raw_ops_cancel_transfer ct
+  JOIN btracker_app.transfer_saving_id tsi
+  ON ct.request_id = tsi.request_id
+LOOP
+
+    INSERT INTO btracker_app.current_account_savings 
+    (
+      account,
+      nai,
+      saving_balance,
+      source_op,
+      source_op_block,
+      savings_withdraw_requests
+      )
+      SELECT 
+        ____balance_change_savings.account,
+        ____balance_change_savings.nai,
+        ____balance_change_savings.balance,
+        ____balance_change_savings.source_op,
+        ____balance_change_savings.source_op_block,
+        _savings_withdraw_requests
+
+      ON CONFLICT ON CONSTRAINT pk_account_savings
+      DO UPDATE SET
+          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          source_op = EXCLUDED.source_op,
+          source_op_block = EXCLUDED.source_op_block,
+          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
+
+
+  DELETE FROM btracker_app.transfer_saving_id
+  WHERE request_id = ____balance_change_savings.request_id AND account = ____balance_change_savings.account;
+END LOOP;
+
+--  fill_transfer_from_savings 
+  FOR _____balance_change_savings IN
+  WITH raw_ops_saving_interest AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
+           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
+           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.btracker_app_operations_view ov
+    WHERE ov.op_type_id = 59 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT account, request_id, nai, source_op, source_op_block
+  FROM raw_ops_saving_interest
+LOOP
+
+    INSERT INTO btracker_app.current_account_savings 
+    (
+      account,
+      nai,
+      source_op,
+      source_op_block,
+      savings_withdraw_requests
+      )
+      SELECT 
+        _____balance_change_savings.account,
+        _____balance_change_savings.nai,
+        _____balance_change_savings.source_op,
+        _____balance_change_savings.source_op_block,
+        _savings_withdraw_requests
+      ON CONFLICT ON CONSTRAINT pk_account_savings
+      DO UPDATE SET
+          source_op = EXCLUDED.source_op,
+          source_op_block = EXCLUDED.source_op_block,
+          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
+
+  DELETE FROM btracker_app.transfer_saving_id
+  WHERE request_id = _____balance_change_savings.request_id AND account = _____balance_change_savings.account;
+END LOOP;
+
+--  interest_operation
+  FOR __balance_change_saving_interest IN
+  WITH raw_ops_fill_savings AS MATERIALIZED 
+  (
+    SELECT (ov.body::jsonb)->'value'->> 'owner' AS account,
+           ((ov.body::jsonb)->'value'->> 'is_saved_into_hbd_balance')::BOOLEAN AS is_false,
+           substring((ov.body::jsonb)->'value'->'interest'->>'nai', '[0-9]+')::INT AS nai,
+           ((ov.body::jsonb)->'value'->'interest'->>'amount')::BIGINT AS balance,
+           ov.id AS source_op,
+           ov.block_num as source_op_block
+    FROM hive.btracker_app_operations_view ov
+    WHERE ov.op_type_id = 55 AND ov.block_num BETWEEN _from AND _to
+  )
+  SELECT account, nai, balance, source_op, source_op_block
+  FROM raw_ops_fill_savings
+  WHERE is_false = FALSE
+LOOP
+
+    INSERT INTO btracker_app.current_account_savings 
+    (
+      account,
+      nai,
+      saving_balance,
+      source_op,
+      source_op_block
+      )
+      SELECT 
+        __balance_change_saving_interest.account,
+        __balance_change_saving_interest.nai,
+        __balance_change_saving_interest.balance,
+        __balance_change_saving_interest.source_op,
+        __balance_change_saving_interest.source_op_block
+      ON CONFLICT ON CONSTRAINT pk_account_savings
+      DO UPDATE SET
+          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          source_op = EXCLUDED.source_op,
+          source_op_block = EXCLUDED.source_op_block;
+END LOOP;
 
 END
 $$
