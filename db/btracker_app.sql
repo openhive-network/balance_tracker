@@ -1,6 +1,8 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
-CREATE SCHEMA IF NOT EXISTS btracker_app;
+CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
+
+SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.define_schema()
 RETURNS VOID
@@ -70,23 +72,6 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
 ) INHERITS (hive.btracker_app);
 
---recreate role for reading data
-IF (SELECT 1 FROM pg_roles WHERE rolname='btracker_user') IS NOT NULL THEN
-  DROP OWNED BY btracker_user;
-END IF;
-DROP ROLE IF EXISTS btracker_user;
-CREATE ROLE btracker_user LOGIN PASSWORD 'btracker_user';
-GRANT hive_applications_group TO btracker_user;
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
-GRANT SELECT ON btracker_app.account_balance_history, hive.blocks TO btracker_user;
-
--- add ability for haf_admin to switch to btracker_user role
-GRANT btracker_user TO haf_admin;
-
--- add btracker_app schema owner
-DROP ROLE IF EXISTS btracker_owner;
-CREATE ROLE btracker_owner;
-ALTER SCHEMA btracker_app OWNER TO btracker_owner;
 END
 $$
 ;
@@ -604,3 +589,6 @@ BEGIN
 END
 $$
 ;
+
+RESET ROLE;
+
