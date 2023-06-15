@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
 ) INHERITS (hive.btracker_app);
 
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
+(
+  account VARCHAR NOT NULL, -- Balance owner account
+  nai     INT NOT NULL,     -- Balance type (currency)
+  balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
+  source_op BIGINT NOT NULL,-- The operation triggered last balance change
+  source_op_block INT NOT NULL, -- Block containing the source operation
+
+  CONSTRAINT pk_current_account_rewards PRIMARY KEY (account, nai)
+) INHERITS (hive.btracker_app);
+
 CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 (
   delegator VARCHAR NOT NULL,
@@ -173,6 +184,7 @@ AS
 $$
 DECLARE
   __balance_change RECORD;
+  ___balance_change RECORD;
   __current_balance BIGINT;
   __last_reported_block INT := 0;
 BEGIN
@@ -221,7 +233,7 @@ LOOP
   END IF;
 END LOOP;
 
-  FOR ___balance_change IN
+FOR ___balance_change IN
   WITH raw_ops AS MATERIALIZED 
   (
     SELECT ov.body AS body,
@@ -229,7 +241,7 @@ END LOOP;
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55) 
+    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55,39,51,52,53,54,63,64,76) 
     AND ov.block_num BETWEEN _from AND _to
 
     --delegations (40,41,62)
@@ -242,28 +254,52 @@ LOOP
 
 CASE ___balance_change.op_type
   WHEN 40 THEN
-  SELECT btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 41 THEN
-  SELECT btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 62 THEN
-  SELECT btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 32 THEN
-  SELECT btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 33 THEN
-  SELECT btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 34 THEN
-  SELECT btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 59 THEN
-  SELECT btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 55 THEN
-  SELECT btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 39 THEN
+  PERFORM btracker_app.process_claim_reward_balance_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 51 THEN
+  PERFORM btracker_app.process_author_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 52 THEN
+  PERFORM btracker_app.process_curation_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 53 THEN
+  PERFORM btracker_app.process_comment_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 54 THEN
+  PERFORM btracker_app.process_liquidity_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 63 THEN
+  PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 64 THEN
+  PERFORM btracker_app.process_producer_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 76 THEN
+  PERFORM btracker_app.process_pow_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   ELSE
 END CASE;

@@ -11,9 +11,9 @@ DECLARE
     ___current_blocked_balance BIGINT;
 BEGIN
 
-SELECT body->'value'->>'delegator',
-       body->'value'->>'delegatee',
-       (body->'value'->'vesting_shares'->>'amount')::BIGINT
+SELECT (body::jsonb)->'value'->>'delegator',
+       (body::jsonb)->'value'->>'delegatee',
+       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT
 INTO _delegator, _delegatee, _balance;
 
 --  DELEGATIONS TRACKING
@@ -166,9 +166,9 @@ DECLARE
     _balance BIGINT;
 BEGIN
 
-SELECT body->'value'->>'creator',
-       body->'value'->>'new_account_name',
-       (body->'value'->'delegation'->>'amount')::BIGINT
+SELECT (body::jsonb)->'value'->>'creator',
+       (body::jsonb)->'value'->>'new_account_name',
+       ((body::jsonb)->'value'->'delegation'->>'amount')::BIGINT
 INTO _delegator, _delegatee, _balance;
 
     INSERT INTO btracker_app.current_accounts_delegations 
@@ -224,8 +224,8 @@ DECLARE
     _balance BIGINT;
 BEGIN
 
-SELECT body->'value'->>'account',
-       (body->'value'->'vesting_shares'->>'amount')::BIGINT
+SELECT (body::jsonb)->'value'->>'account',
+       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT
 INTO _account, _balance;
 
   INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
