@@ -172,19 +172,9 @@ SET jit = OFF
 AS
 $$
 DECLARE
-  __balance_change_savings RECORD;
-  ___balance_change_savings RECORD;
-  ____balance_change_savings RECORD;
-  _____balance_change_savings RECORD;
   __balance_change RECORD;
   ___balance_change RECORD;
-  ____balance_change RECORD;
-  _____balance_change RECORD;
-  __balance_change_saving_interest RECORD;
-  _savings_withdraw_requests INT := 1;
-  _balance BIGINT;
   __current_balance BIGINT;
-  ___current_blocked_balance BIGINT;
   __last_reported_block INT := 0;
 BEGIN
 FOR __balance_change IN
@@ -232,473 +222,59 @@ LOOP
   END IF;
 END LOOP;
 
---  DELEGATIONS TRACKING
-
 FOR ___balance_change IN
--- delegate_vesting_shares_operation
- WITH raw_ops_delegations AS MATERIALIZED 
+  WITH raw_ops AS MATERIALIZED 
   (
-    SELECT (ov.body::jsonb)->'value'->>'delegator' AS delegator,
-           (ov.body::jsonb)->'value'->>'delegatee' AS delegatee,
-           ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
+    SELECT ov.body AS body,
            ov.id AS source_op,
-           ov.block_num as source_op_block
+           ov.block_num as source_op_block,
+           ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 40 AND ov.block_num BETWEEN _from AND _to
-    ORDER BY ov.block_num, ov.id
-  )
-  SELECT delegator, delegatee, balance, source_op, source_op_block
-  FROM raw_ops_delegations
+    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55) 
+    AND ov.block_num BETWEEN _from AND _to
 
+    --delegations (40,41,62)
+    --savings (32,33,34,59,55)
+    --rewards (39,51,52,53,54,63,64,78)
+  )
+  SELECT body, source_op, source_op_block, op_type
+  FROM raw_ops
 LOOP
 
-    SELECT cad.balance INTO _balance
-    FROM btracker_app.current_accounts_delegations cad 
-    WHERE cad.delegator= ___balance_change.delegator AND cad.delegatee= ___balance_change.delegatee;
-    
-  IF _balance IS NULL THEN
+CASE ___balance_change.op_type
+  WHEN 40 THEN
+  PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  --IF DELEGATION BETWEEN THIS PAIR NEVER HAPPENED BEFORE
+  WHEN 41 THEN
+  PERFORM btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  --UPDATE CURRENT_ACCOUNTS_DELEGATIONS
-    INSERT INTO btracker_app.current_accounts_delegations 
-    (
-      delegator,
-      delegatee,
-      balance,
-      source_op,
-      source_op_block
-      )
-      SELECT 
-        ___balance_change.delegator,
-        ___balance_change.delegatee,
-        ___balance_change.balance,
-        ___balance_change.source_op,
-        ___balance_change.source_op_block;
+  WHEN 62 THEN
+  PERFORM btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  --ADD DELEGATED VESTS TO DELEGATOR
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      delegated_vests
-      ) 
-      SELECT
-        ___balance_change.delegator,
-        ___balance_change.balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
+  WHEN 32 THEN
+  PERFORM btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  --ADD RECEIVED VESTS TO DELEGATEE
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      received_vests     
-      ) 
-      SELECT
-        ___balance_change.delegatee,
-        ___balance_change.balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
+  WHEN 33 THEN
+  PERFORM btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    ELSE
+  WHEN 34 THEN
+  PERFORM btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    UPDATE btracker_app.current_accounts_delegations SET 
-      balance = ___balance_change.balance,
-      source_op = ___balance_change.source_op,
-      source_op_block = ___balance_change.source_op_block
-    WHERE delegator = ___balance_change.delegator AND delegatee = ___balance_change.delegatee;
+  WHEN 59 THEN
+  PERFORM btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  IF _balance > ___balance_change.balance THEN
+  WHEN 55 THEN
+  PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-  --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS LOWER THAN PREVIOUS DELEGATION
-
-  ___current_blocked_balance = GREATEST(_balance - ___balance_change.balance , 0);
-
-  --DELEGATOR'S DELAGATION BALANCE DOESN'T CHANGE, BLOCKED VESTS SAVED IN TMP
-
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      tmp
-      ) 
-      SELECT
-        ___balance_change.delegator,
-        ___current_blocked_balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          tmp = btracker_app.current_account_vests.tmp + EXCLUDED.tmp;
-  
-  --DELEGATEE'S RECEIVED VESTS ARE BEING LOWERED INSTANTLY
-
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      received_vests     
-      ) 
-      SELECT
-        ___balance_change.delegatee,
-        ___current_blocked_balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          received_vests = btracker_app.current_account_vests.received_vests - EXCLUDED.received_vests;
   ELSE
+END CASE;
 
-  --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS HIGHER
-
-    ___current_blocked_balance = GREATEST(___balance_change.balance - _balance, 0);
-
-  --ADD THE DIFFERENCE TO BOTH ACCOUNTS DELEGATED AND RECEIVED
-
-          INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      delegated_vests
-      ) 
-      SELECT
-        ___balance_change.delegator,
-        ___current_blocked_balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
-  
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      received_vests     
-      ) 
-      SELECT
-        ___balance_change.delegatee,
-        ___current_blocked_balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
-    
-  END IF;
-
-  END IF;
-
-  --IF DELEGATION IS BEING CANCELED BETWEEN ACCOUNTS REMOVE IT FROM CURRENT_ACCOUNT_DELEGATION
-
-  IF ___balance_change.balance = 0 THEN
-    DELETE FROM btracker_app.current_accounts_delegations
-    WHERE delegator = ___balance_change.delegator AND delegatee = ___balance_change.delegatee;
-  END IF;
-
-END LOOP;
-
-  --IF ACCOUNT IS BEING CREATED WITH A DELEGATION
-
-  FOR _____balance_change IN
-  -- account_create_with_delegation_operation
-    WITH raw_ops_create_account AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->> 'creator' AS delegator,
-           (ov.body::jsonb)->'value'->> 'new_account_name' AS delegatee,
-           ((ov.body::jsonb)->'value'->'delegation'->>'amount')::BIGINT AS balance,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 41 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT delegator, delegatee, balance, source_op, source_op_block
-  FROM raw_ops_create_account
-
-  LOOP
-
-    INSERT INTO btracker_app.current_accounts_delegations 
-    (
-      delegator,
-      delegatee,
-      balance,
-      source_op,
-      source_op_block
-      )
-      SELECT 
-        _____balance_change.delegator,
-        _____balance_change.delegatee,
-        _____balance_change.balance,
-        _____balance_change.source_op,
-        _____balance_change.source_op_block;
-
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      delegated_vests
-      ) 
-      SELECT
-        _____balance_change.delegator,
-        _____balance_change.balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
-
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      received_vests     
-      ) 
-      SELECT
-        _____balance_change.delegatee,
-        _____balance_change.balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
-
-  END LOOP;
-
-  --RETURNING OPERATION THAT LOWERS DELEGATOR'S DELEGATED BALANCE
-
-  FOR ____balance_change IN
-  -- return_vesting_delegation_operation
-    WITH raw_ops_return AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->>'account' AS account,
-           ((ov.body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS balance,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 62 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT account, balance
-  FROM raw_ops_return
-
-  LOOP
-
-  INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
-  SELECT ____balance_change.account, ____balance_change.balance, ____balance_change.balance
-  ON CONFLICT ON CONSTRAINT pk_temp_vests DO UPDATE SET
-    delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests,
-    tmp = btracker_app.current_account_vests.tmp - EXCLUDED.tmp
-    ;
-    
-  END LOOP;
-
---  SAVINGS TRACKING
-
---  transfer_to_savings_operation 
-  FOR __balance_change_savings IN
-  WITH raw_ops_to_savings AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->>'to' AS account,
-           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
-           ((ov.body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS balance,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 32 AND ov.block_num BETWEEN _from AND _to
-    ORDER BY ov.block_num, ov.id
-  )
-  SELECT account, nai, balance, source_op, source_op_block
-  FROM raw_ops_to_savings
-LOOP
-
-      INSERT INTO btracker_app.current_account_savings
-      (
-      account,
-      nai,
-      saving_balance,
-      source_op,
-      source_op_block
-      ) 
-      SELECT
-        __balance_change_savings.account,
-        __balance_change_savings.nai,
-        __balance_change_savings.balance,
-        __balance_change_savings.source_op,
-        __balance_change_savings.source_op_block
-
-      ON CONFLICT ON CONSTRAINT pk_account_savings
-      DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
-          source_op = EXCLUDED.source_op,
-          source_op_block = EXCLUDED.source_op_block;
-END LOOP;
-
---  transfer_from_savings_operation 
-  FOR ___balance_change_savings IN
-  WITH raw_ops_from_savings AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
-           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
-           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
-           ((ov.body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS balance,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 33 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT account, request_id, nai, balance, source_op, source_op_block
-  FROM raw_ops_from_savings
-LOOP
-
-    INSERT INTO btracker_app.current_account_savings 
-    (
-      account,
-      nai,
-      saving_balance,
-      source_op,
-      source_op_block,
-      savings_withdraw_requests
-      )
-      SELECT 
-        ___balance_change_savings.account,
-        ___balance_change_savings.nai,
-        ___balance_change_savings.balance,
-        ___balance_change_savings.source_op,
-        ___balance_change_savings.source_op_block,
-        _savings_withdraw_requests
-
-      ON CONFLICT ON CONSTRAINT pk_account_savings
-      DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance - EXCLUDED.saving_balance,
-          source_op = EXCLUDED.source_op,
-          source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests + EXCLUDED.savings_withdraw_requests;
-
-      INSERT INTO btracker_app.transfer_saving_id
-      (
-      account,
-      nai,
-      balance,
-      request_id
-      ) 
-      SELECT
-        ___balance_change_savings.account,
-        ___balance_change_savings.nai,
-        ___balance_change_savings.balance,
-        ___balance_change_savings.request_id;
-END LOOP;
-
---  cancel_transfer_from_savings_operation 
-  FOR ____balance_change_savings IN
-  WITH raw_ops_cancel_transfer AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
-           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 34 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT ct.account, ct.request_id, tsi.nai, tsi.balance, ct.source_op, ct.source_op_block
-  FROM raw_ops_cancel_transfer ct
-  JOIN btracker_app.transfer_saving_id tsi
-  ON ct.request_id = tsi.request_id
-LOOP
-
-    INSERT INTO btracker_app.current_account_savings 
-    (
-      account,
-      nai,
-      saving_balance,
-      source_op,
-      source_op_block,
-      savings_withdraw_requests
-      )
-      SELECT 
-        ____balance_change_savings.account,
-        ____balance_change_savings.nai,
-        ____balance_change_savings.balance,
-        ____balance_change_savings.source_op,
-        ____balance_change_savings.source_op_block,
-        _savings_withdraw_requests
-
-      ON CONFLICT ON CONSTRAINT pk_account_savings
-      DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
-          source_op = EXCLUDED.source_op,
-          source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
-
-
-  DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = ____balance_change_savings.request_id AND account = ____balance_change_savings.account;
-END LOOP;
-
---  fill_transfer_from_savings 
-  FOR _____balance_change_savings IN
-  WITH raw_ops_saving_interest AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->> 'from' AS account,
-           ((ov.body::jsonb)->'value'->> 'request_id')::INT AS request_id,
-           substring((ov.body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS nai,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 59 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT account, request_id, nai, source_op, source_op_block
-  FROM raw_ops_saving_interest
-LOOP
-
-    INSERT INTO btracker_app.current_account_savings 
-    (
-      account,
-      nai,
-      source_op,
-      source_op_block,
-      savings_withdraw_requests
-      )
-      SELECT 
-        _____balance_change_savings.account,
-        _____balance_change_savings.nai,
-        _____balance_change_savings.source_op,
-        _____balance_change_savings.source_op_block,
-        _savings_withdraw_requests
-      ON CONFLICT ON CONSTRAINT pk_account_savings
-      DO UPDATE SET
-          source_op = EXCLUDED.source_op,
-          source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
-
-  DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = _____balance_change_savings.request_id AND account = _____balance_change_savings.account;
-END LOOP;
-
---  interest_operation
-  FOR __balance_change_saving_interest IN
-  WITH raw_ops_fill_savings AS MATERIALIZED 
-  (
-    SELECT (ov.body::jsonb)->'value'->> 'owner' AS account,
-           ((ov.body::jsonb)->'value'->> 'is_saved_into_hbd_balance')::BOOLEAN AS is_false,
-           substring((ov.body::jsonb)->'value'->'interest'->>'nai', '[0-9]+')::INT AS nai,
-           ((ov.body::jsonb)->'value'->'interest'->>'amount')::BIGINT AS balance,
-           ov.id AS source_op,
-           ov.block_num as source_op_block
-    FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id = 55 AND ov.block_num BETWEEN _from AND _to
-  )
-  SELECT account, nai, balance, source_op, source_op_block
-  FROM raw_ops_fill_savings
-  WHERE is_false = FALSE
-LOOP
-
-    INSERT INTO btracker_app.current_account_savings 
-    (
-      account,
-      nai,
-      saving_balance,
-      source_op,
-      source_op_block
-      )
-      SELECT 
-        __balance_change_saving_interest.account,
-        __balance_change_saving_interest.nai,
-        __balance_change_saving_interest.balance,
-        __balance_change_saving_interest.source_op,
-        __balance_change_saving_interest.source_op_block
-      ON CONFLICT ON CONSTRAINT pk_account_savings
-      DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
-          source_op = EXCLUDED.source_op,
-          source_op_block = EXCLUDED.source_op_block;
 END LOOP;
 
 END
 $$
 ;
+
 
 CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(IN _appContext VARCHAR, in _from INT, in _to INT, IN _step INT, INOUT _last_block INT)
 LANGUAGE 'plpgsql'
