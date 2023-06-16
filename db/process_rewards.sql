@@ -48,7 +48,7 @@ INTO _account, _hive_payout, _hbd_payout, _vesting_payout;
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance - EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -111,7 +111,7 @@ IF _is_false = FALSE THEN
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -121,7 +121,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(body hive.operation, _source_op BIGINT, source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -158,7 +158,7 @@ IF _is_false = FALSE THEN
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -194,13 +194,13 @@ INTO _account, _hive_payout;
   SELECT
     _account,
     _nai_hive,
-    _reward,
+    _hive_payout,
     _source_op,
     _source_op_block
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -241,7 +241,7 @@ INTO _account, _reward, _nai;
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -303,7 +303,7 @@ IF _is_false = FALSE THEN
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -346,7 +346,7 @@ INTO _account, _reward, _nai;
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -387,7 +387,7 @@ INTO _account, _reward, _nai;
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.pk_current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
