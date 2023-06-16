@@ -241,7 +241,7 @@ FOR ___balance_change IN
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55,39,51,52,53,54,63,64,78) 
+    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55) 
     AND ov.block_num BETWEEN _from AND _to
 
     --delegations (40,41,62)
@@ -276,28 +276,6 @@ CASE ___balance_change.op_type
 
   WHEN 55 THEN
   PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 39 THEN
-  PERFORM btracker_app.process_claim_reward_balance_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 51 THEN
-  PERFORM btracker_app.process_author_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 52 THEN
-  PERFORM btracker_app.process_curation_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 53 THEN
-  PERFORM btracker_app.process_comment_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 54 THEN
-  PERFORM btracker_app.process_liquidity_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 63 THEN
-  PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
-  WHEN 78 THEN
-  PERFORM btracker_app.process_pow_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
-
   ELSE
 END CASE;
 
