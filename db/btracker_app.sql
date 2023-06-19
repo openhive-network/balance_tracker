@@ -172,6 +172,7 @@ LANGUAGE 'plpgsql'
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
+SET cursor_tuple_fraction='0.9'
 AS
 $$
 DECLARE
