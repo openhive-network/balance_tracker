@@ -242,6 +242,7 @@ FOR ___balance_change IN
   )
   SELECT body, source_op, source_op_block, op_type
   FROM raw_ops
+  ORDER BY source_op_block, source_op
 LOOP
 
 CASE ___balance_change.op_type
