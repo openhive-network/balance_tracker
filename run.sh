@@ -4,14 +4,20 @@ set -e
 set -o pipefail
 
 clean_data() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('btracker_app') THEN perform hive.app_remove_context('btracker_app'); end if; END \$\$"
+    echo "Cleaning data..."
+    echo "Arguments: $*"
+    psql -a -v "ON_ERROR_STOP=1" -d "$@" -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('btracker_app') THEN perform hive.app_remove_context('btracker_app'); end if; END \$\$"
 }
 
 create_db() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -f $PWD/db/btracker_app.sql
+    echo "Creating database..."
+    echo "Arguments: $*"
+    psql -a -v "ON_ERROR_STOP=1" "$@" -f "$PWD/db/btracker_app.sql"
 }
 
 run_indexer() {
+    echo "Running indexer..."
+    echo "Arguments: $*"
     args=("$@")
     re='^[0-9]+$'
     if ! [[ ${args[0]} =~ $re ]]; then
@@ -26,116 +32,137 @@ run_indexer() {
         args=("${@:2}")
     fi
     
-    psql -a -v "ON_ERROR_STOP=1" "$args" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
+    psql -a -v "ON_ERROR_STOP=1" "${args[@]}" -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
 }
 
 create_indexes() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "call btracker_app.create_indexes();"
+    echo "Creating indexes..."
+    echo "Arguments: $*"
+    psql -a -v "ON_ERROR_STOP=1" "$@" -c '\timing' -c "call btracker_app.create_indexes();"
 }
 
 create_api() {
-    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
+    echo "Creating API..."
+    echo "Arguments: $*"
+    psql -a -v "ON_ERROR_STOP=1" "$@" -f "$PWD/api/btracker_api.sql"
 }
 
 start_webserver() {
     if [ "$1" = "py" ]; then
-        ./main.py ${@:2}
+        echo "Starting Python webserver..."
+        echo "Arguments: $*"
+        ./main.py "${@:2}"
     else
+        echo "Starting PostgREST webserver..."
+        echo "Arguments: $*"
         postgrest postgrest.conf
     fi
 }
 
 install_dependancies() {
+    echo "Installing dependencies..."
     install_postgrest
     install_jmeter
 }
 
 install_postgrest() {
-    wget https://github.com/PostgREST/postgrest/releases/download/v8.0.0/postgrest-v8.0.0-linux-x64-static.tar.xz
+    echo "Installing PostgREST..."
+    wget https://github.com/PostgREST/postgrest/releases/download/v11.1.0/postgrest-v11.1.0-linux-static-x64.tar.xz -O postgrest.tar.xz
 
-    POSTGREST=$(find . -name 'postgrest*')
-    tar xJf $POSTGREST
+    tar -xJf postgrest.tar.xz
     sudo mv 'postgrest' '/usr/local/bin/postgrest'
-    rm $POSTGREST
+    rm postgrest.tar.xz
 }
 
 install_jmeter() {
+    echo "Installing Jmeter..."
     sudo apt-get update -y
-    sudo apt-get install openjdk-8-jdk -y
+    sudo apt-get install unzip openjdk-8-jdk-headless -y
 
-    wget "https://downloads.apache.org//jmeter/binaries/apache-jmeter-${jmeter_v}.zip"
+    wget "https://downloads.apache.org//jmeter/binaries/apache-jmeter-${jmeter_v}.zip" -O jmeter.zip
 
-    jmeter_src="apache-jmeter-${jmeter_v}"
-    unzip "${jmeter_src}.zip"
-    rm "${jmeter_src}.zip"
-    sudo mv $jmeter_src "/usr/local/src/${jmeter_src}"
+    unzip "jmeter.zip"
+    rm "jmeter.zip"
+    sudo mv "apache-jmeter-${jmeter_v}" "/usr/local/src/jmeter-${jmeter_v}"
 
     jmeter="jmeter-${jmeter_v}"
-    touch $jmeter
-    echo '#!/usr/bin/env bash' >> $jmeter
-    echo '' >> $jmeter
-    echo "cd '/usr/local/src/apache-jmeter-${jmeter_v}/bin'" >> $jmeter
-    echo './jmeter $@' >> $jmeter
+    {
+        echo '#!/usr/bin/env bash'
+        echo ''
+        echo "cd '/usr/local/src/jmeter-${jmeter_v}/bin'"
+        echo './jmeter $@'
+    } > $jmeter
     sudo chmod +x $jmeter
     sudo mv $jmeter "/usr/local/bin/${jmeter}"
+    sudo ln -sf "/usr/local/bin/${jmeter}" "/usr/local/bin/jmeter"
 }
 
 run_tests() {
-    ./tests/run_tests.sh $jmeter_v $2
+    echo "Running tests..."
+    echo "Arguments: $*"
+    ./tests/run_tests.sh $jmeter_v "$2"
 }
 
 recreate_db() {
-    clean_data ${@:2}
-    create_db ${@:2}
-    create_indexes ${@:2}
-    run_indexer $@
+    echo "Recreating database..."
+    echo "Arguments: $*"
+    clean_data "${@:2}"
+    create_db "${@:2}"
+    create_indexes "${@:2}"
+    run_indexer "$@"
 }
 
 restart_all() {
-    recreate_db $@
-    create_api
+    echo "Restarting everything..."
+    echo "Arguments: $*"
+    recreate_db "$@"
+    create_api "$@"
 }
 
 start_ui() {
+    echo "Starting GUI..."
     cd gui ; npm start
 }
 
-setup() {
-    bash $SCRIPTS_DIR/setup_db.sh 
+setup_db() {
+    echo "Setting up the database..."
+    bash "$SCRIPTS_DIR/setup_db.sh" "$@"
 }
 
 process_blocks() {
-    run_indexer $@
+    echo "Processing blocks..."
+    echo "Arguments: $*"
+    run_indexer "$@"
 }
 
 SCRIPTS_DIR=$PWD/scripts
 
-postgrest_v=9.0.0
+# postgrest_v=9.0.0
 jmeter_v=5.4.3
 
 if [ "$1" = "re-all" ]; then
-    restart_all ${@:2}
+    restart_all "${@:2}"
     echo 'SUCCESS: DB and API recreated'
 elif [ "$1" = "re-all-start" ]; then
-    restart_all ${@:2}
+    restart_all "${@:2}"
     echo 'SUCCESS: DB and API recreated'
     start_webserver
-elif [ "$1" = "setup" ]; then
-    setup 
+elif [ "$1" = "setup-db" ]; then
+    setup_db "${@:2}"
 elif [ "$1" = "process-blocks" ]; then
-    process_blocks ${@:2}
+    process_blocks "${@:2}"
 elif [ "$1" = "re-db" ]; then
-    recreate_db ${@:2}
+    recreate_db "${@:2}"
     echo 'SUCCESS: DB recreated'
 elif [ "$1" = "re-db-start" ]; then
-    recreate_db ${@:2}
+    recreate_db "${@:2}"
     echo 'SUCCESS: DB recreated'
     start_webserver
 elif [ "$1" = "re-api" ]; then
-    create_api
+    create_api "${@:2}"
     echo 'SUCCESS: API recreated'
 elif [ "$1" = "re-api-start" ]; then
-    create_api
+    create_api "${@:2}"
     echo 'SUCCESS: API recreated'
     start_webserver
 elif [ "$1" =  "install-dependancies" ]; then
@@ -151,13 +178,13 @@ elif [ "$1" = "test-py" ]; then
 elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
-    start_webserver "py" ${@:2}
+    start_webserver "py" "${@:2}"
 elif [ "$1" = "start-ui" ]; then
     start_ui
 elif [ "$1" = "create-indexes" ]; then
-    create_indexes ${@:2}
+    create_indexes "${@:2}"
 elif [ "$1" = "continue-processing" ]; then
-    run_indexer ${@:2}
+    run_indexer "${@:2}"
 else
     echo "job not found"
 fi
