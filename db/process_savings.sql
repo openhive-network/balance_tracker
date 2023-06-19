@@ -46,7 +46,7 @@ AS
 $$
 DECLARE
     _account TEXT;
-    _request_id INT;
+    _request_id BIGINT;
     _nai INT;
     _balance BIGINT;
     _savings_withdraw_requests INT := 1;
@@ -155,7 +155,7 @@ AS
 $$
 DECLARE
     _account TEXT;
-    _request_id INT;
+    _request_id BIGINT;
     _nai INT;
     _balance BIGINT;
     _savings_withdraw_requests INT := 1;
