@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
   account VARCHAR NOT NULL,
   nai     INT NOT NULL, 
   balance BIGINT NOT NULL,
-  request_id  INT NOT NULL, 
+  request_id  BIGINT NOT NULL, 
 
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
 ) INHERITS (hive.btracker_app);
