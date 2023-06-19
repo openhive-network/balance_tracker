@@ -53,7 +53,7 @@ DECLARE
 BEGIN
 
 SELECT (body::jsonb)->'value'->>'from',
-       ((body::jsonb)->'value'->>'request_id')::INT,
+       ((body::jsonb)->'value'->>'request_id')::BIGINT,
        substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT,
        ((body::jsonb)->'value'->'amount'->>'amount')::BIGINT
 INTO _account, _request_id, _nai, _balance;
@@ -114,7 +114,7 @@ BEGIN
 SELECT account, nai, balance 
 INTO _account, _nai, _balance
 FROM btracker_app.transfer_saving_id
-WHERE request_id = ((body::jsonb)->'value'->>'request_id')::INT;
+WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT;
 
     INSERT INTO btracker_app.current_account_savings 
     (
@@ -142,7 +142,7 @@ WHERE request_id = ((body::jsonb)->'value'->>'request_id')::INT;
 
 
   DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::INT AND account = _account;
+  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = _account;
 
 END
 $$
@@ -162,7 +162,7 @@ DECLARE
 BEGIN
 
 SELECT (body::jsonb)->'value'->>'from',
-       ((body::jsonb)->'value'->>'request_id')::INT,
+       ((body::jsonb)->'value'->>'request_id')::BIGINT,
        substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT
 INTO _account, _request_id, _nai;
 
@@ -187,7 +187,7 @@ INTO _account, _request_id, _nai;
           savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
 
   DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::INT AND account = _account;
+  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = _account;
 
 END
 $$
