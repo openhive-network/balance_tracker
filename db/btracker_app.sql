@@ -177,6 +177,8 @@ DECLARE
   __current_balance BIGINT;
   __last_reported_block INT := 0;
 BEGIN
+  RAISE NOTICE 'Attempting to process balances';
+
 FOR __balance_change IN
   WITH balance_impacting_ops AS
   (
@@ -222,6 +224,9 @@ LOOP
   END IF;
 END LOOP;
 
+  RAISE NOTICE 'Attempting to process delegations and savings';
+
+
 FOR ___balance_change IN
   WITH raw_ops AS MATERIALIZED 
   (
@@ -244,28 +249,45 @@ LOOP
 
 CASE ___balance_change.op_type
   WHEN 40 THEN
+  
   PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  RAISE NOTICE 'Attempting to process_delegate_vesting_shares_operation';
 
   WHEN 41 THEN
   PERFORM btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
+  RAISE NOTICE 'Attempting to process_account_create_with_delegation_operation';
+
   WHEN 62 THEN
   PERFORM btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  RAISE NOTICE 'Attempting to process_return_vesting_delegation_operation';
 
   WHEN 32 THEN
   PERFORM btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
+  RAISE NOTICE 'Attempting to process_transfer_to_savings_operation';
+
   WHEN 33 THEN
   PERFORM btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  RAISE NOTICE 'Attempting to process_transfer_from_savings_operation';
 
   WHEN 34 THEN
   PERFORM btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
+  RAISE NOTICE 'Attempting to process_cancel_transfer_from_savings_operation';
+
   WHEN 59 THEN
   PERFORM btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
+  RAISE NOTICE 'Attempting to process_fill_transfer_from_savings_operation';
+
   WHEN 55 THEN
   PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  RAISE NOTICE 'Attempting to process_interest_operation';
 
   ELSE
 END CASE;
