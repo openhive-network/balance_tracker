@@ -1,6 +1,7 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
+GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
 SET ROLE btracker_owner;
 
@@ -71,6 +72,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
   */
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
 ) INHERITS (hive.btracker_app);
+
+GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
 
 END
 $$
@@ -591,4 +594,3 @@ $$
 ;
 
 RESET ROLE;
-
