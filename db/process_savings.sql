@@ -114,7 +114,7 @@ BEGIN
 SELECT account, nai, balance 
 INTO _account, _nai, _balance
 FROM btracker_app.transfer_saving_id
-WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT;
+WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account= ((body::jsonb)->'value'->>'from');
 
     INSERT INTO btracker_app.current_account_savings 
     (
