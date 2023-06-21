@@ -237,6 +237,9 @@ LOOP
   END IF;
 END LOOP;
 
+--1st pass 55.67 minutes
+--2nd pass after optimalization 
+
 FOR ___balance_change IN
   WITH raw_ops AS MATERIALIZED 
   (
@@ -245,12 +248,28 @@ FOR ___balance_change IN
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55) 
+    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55,39) 
     AND ov.block_num BETWEEN _from AND _to
+    UNION ALL
+    SELECT oc.body AS body,
+           oc.id AS source_op,
+           oc.block_num as source_op_block,
+           oc.op_type_id as op_type
+    FROM hive.btracker_app_operations_view oc
+    WHERE oc.op_type_id IN (51,52,63) and ((oc.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true
+    AND oc.block_num BETWEEN _from AND _to
+    UNION ALL
+    SELECT ob.body AS body,
+           ob.id AS source_op,
+           ob.block_num as source_op_block,
+           ob.op_type_id as op_type
+    FROM hive.btracker_app_operations_view ob
+    WHERE ob.op_type_id = 55 and ((ob.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false
+    AND ob.block_num BETWEEN _from AND _to
 
     --delegations (40,41,62)
     --savings (32,33,34,59,55)
-    --rewards (39,51,52,53,54,63,64,78)
+    --rewards (39,51,52,63)
   )
   SELECT body, source_op, source_op_block, op_type
   FROM raw_ops

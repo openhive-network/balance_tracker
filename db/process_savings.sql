@@ -200,18 +200,15 @@ AS
 $$
 DECLARE
     _account TEXT;
-    _is_false BOOLEAN;
     _nai INT;
     _balance BIGINT;
 BEGIN
 
 SELECT (body::jsonb)->'value'->>'owner',
-       ((body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN,
        substring((body::jsonb)->'value'->'interest'->>'nai', '[0-9]+')::INT,
        ((body::jsonb)->'value'->'interest'->>'amount')::BIGINT
-INTO _account, _is_false, _nai, _balance;
+INTO _account, _nai, _balance;
 
-IF _is_false= FALSE THEN
     INSERT INTO btracker_app.current_account_savings 
     (
       account,
@@ -231,7 +228,6 @@ IF _is_false= FALSE THEN
           saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block;
-END IF;
 
 END
 $$
