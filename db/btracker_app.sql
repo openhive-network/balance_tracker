@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
 ) INHERITS (hive.btracker_app);
 
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
+(
+  account VARCHAR NOT NULL, -- Balance owner account
+  nai     INT NOT NULL,     -- Balance type (currency)
+  balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
+  source_op BIGINT NOT NULL,-- The operation triggered last balance change
+  source_op_block INT NOT NULL, -- Block containing the source operation
+
+  CONSTRAINT pk_current_account_rewards PRIMARY KEY (account, nai)
+) INHERITS (hive.btracker_app);
+
 CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 (
   delegator VARCHAR NOT NULL,
@@ -270,6 +281,18 @@ CASE ___balance_change.op_type
 
   WHEN 55 THEN
   PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 39 THEN
+  PERFORM btracker_app.process_claim_reward_balance_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 51 THEN
+  PERFORM btracker_app.process_author_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 52 THEN
+  PERFORM btracker_app.process_curation_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+
+  WHEN 63 THEN
+  PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   ELSE
 END CASE;
