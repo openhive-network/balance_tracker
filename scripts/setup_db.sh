@@ -57,4 +57,6 @@ psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_delegatio
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_savings.sql
 
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_rewards.sql
+
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../api/btracker_api.sql
