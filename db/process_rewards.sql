@@ -8,9 +8,6 @@ DECLARE
   _hbd_payout BIGINT;
   _hive_payout BIGINT;
   _vesting_payout numeric;
-  _nai_hbd INT := 13;
-  _nai_hive INT := 21;
-  _nai_vest INT := 37;
   _vesting_diff BIGINT;
 BEGIN
 
@@ -32,7 +29,7 @@ IF _hbd_payout > 0 THEN
   ) 
   SELECT
     _account,
-    _nai_hbd,
+    13,
     _hbd_payout,
     _source_op,
     _source_op_block
@@ -57,7 +54,7 @@ IF _hbd_payout > 0 THEN
   ) 
   SELECT
     _account,
-    _nai_hive,
+    21,
     _hive_payout,
     _source_op,
     _source_op_block
@@ -87,7 +84,7 @@ IF _hbd_payout > 0 THEN
   ) 
   VALUES
     (_account,
-    _nai_vest,
+    37,
     _vesting_payout,
     _source_op,
     _source_op_block),
@@ -95,7 +92,7 @@ IF _hbd_payout > 0 THEN
     (_account,
     38,
     _vesting_diff,
-    _source_op,
+   _source_op,
     _source_op_block)
 
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
@@ -119,9 +116,6 @@ DECLARE
   _hbd_payout BIGINT;
   _hive_payout BIGINT;
   _vesting_payout BIGINT;
-  _nai_hbd INT := 13;
-  _nai_hive INT := 21;
-  _nai_vest INT := 37;
   _reward_vesting_hive BIGINT;
 
 BEGIN
@@ -144,7 +138,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   SELECT
     _account,
-    _nai_hbd,
+    13,
     _hbd_payout,
     _source_op,
     _source_op_block
@@ -169,7 +163,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   SELECT
     _account,
-    _nai_hive,
+    21,
     _hive_payout,
     _source_op,
     _source_op_block
@@ -197,7 +191,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   VALUES
     (_account,
-    _nai_vest,
+    37,
     _vesting_payout,
     _source_op,
     _source_op_block),
@@ -282,9 +276,6 @@ DECLARE
   _hbd_payout BIGINT;
   _hive_payout BIGINT;
   _vesting_payout BIGINT;
-  _nai_hbd INT := 13;
-  _nai_hive INT := 21;
-  _nai_vest INT := 37;
   _reward_vesting_hive BIGINT;
 BEGIN
 
@@ -306,7 +297,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   SELECT
     _account,
-    _nai_hbd,
+    13,
     _hbd_payout,
     _source_op,
     _source_op_block
@@ -331,7 +322,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   SELECT
     _account,
-    _nai_hive,
+    21,
     _hive_payout,
     _source_op,
     _source_op_block
@@ -359,7 +350,7 @@ INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
   ) 
   VALUES
     (_account,
-    _nai_vest,
+    37,
     _vesting_payout,
     _source_op,
     _source_op_block),
