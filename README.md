@@ -10,6 +10,8 @@
     1. [Python version](#python-version)
     1. [PostgREST version](#postgrest-version)
 1. [Tests](#tests)
+    1. [PostgREST backend](#postgrest-backend)
+    1. [Python backend](#postgrest-backend)
 
 ## Intro
 
@@ -18,22 +20,26 @@ Balance Tracker uses JavaScript's REACT for web app style UI, python's BaseHTTPR
 
 ## Starting
 
-Tested on Ubuntu 20.04
+Tested on Ubuntu 20.04 and 22.04
 
 ### Requirements
 
 1. Built haf as submodule of [HAfAH](https://gitlab.syncad.com/hive/HAfAH/-/tree/develop)
 1. Node version higher or equal 14.0.0. Check version `node-v` or `node --version`.
 
-### Setup with postgREST backend
+### Setup with PostgREST backend
 
-1. Install postgREST to /usr/local/bin `./run.sh install-postgrest`
-1. Create btracker_app schema, process blocks, create api, start server. `./run.sh re-all-start ${n_blocks} postgresql://haf_admin@localhost:5432/haf_block_log` (assuming HAF is running on localhost).  
-`n_blocks` is the number of blocks you have in `haf_block_log` db.
-1. Install node_modules . `cd gui ; npm install ; cd ..`
-1. Start application . `./run.sh start-ui`
+1. Install backend runtime dependencies: `./balance-tracker.sh install backend-runtime-dependencies`
+1. Install PostgREST: `./balance-tracker.sh install postgrest`
+1. Set up the database: `./balance-tracker.sh set-up-database` (assuming HAF database runs on localhost on port 5432)
+1. Process blocks: `./balance-tracker.sh process-blocks --number-of-blocks=5000000` (assuming HAF database runs on localhost on port 5432 and contains 5'000'000 blocks)  
+  If you skip `--number-of-blocks` parameter balance tracker will process all blocks in the database and then wait for more. You can keep this running in the background.
+1. Start backend server: `./balance-tracker.sh serve postgrest-backend`
+1. Install frontend runtime dependencies . `./balance-tracker.sh install frontend-runtime-dependencies`
+1. Set up `$PATH`: `export VOLTA_HOME="$HOME/.volta"; export PATH="$VOLTA_HOME/bin:$PATH"` - or you can simply reopen the terminal
+1. Start frontend server: `./balance-tracker.sh serve frontend`
 
-### Setup with python backend
+### Setup with Python backend
 
 Note: python backend is not configured to be used with web UI!
 
@@ -43,15 +49,11 @@ Note: python backend is not configured to be used with web UI!
 1. Call server with `curl` GET requests as in examples:
 
 ```bash
-curl http://localhost:3000/rpc/find_matching_accounts/?_partial_account_name=d
-```
+curl "http://localhost:3000/rpc/find_matching_accounts/?_partial_account_name=d"
 
-```bash
-curl http://localhost:3000/rpc/get_balance_for_coin_by_block/?_account_name=dantheman&_coin_type=21&_start_block=0&_end_block=10000
-```
+curl "http://localhost:3000/rpc/get_balance_for_coin_by_block/?_account_name=dantheman&_coin_type=21&_start_block=0&_end_block=10000"
 
-```bash
-curl http://localhost:3000/rpc/get_balance_for_coin_by_time/?_account_name=dantheman&_coin_type=21&_start_time=2016-03-24%2016:05:00&_end_time=2016-03-25%2000:34:48
+curl "http://localhost:3000/rpc/get_balance_for_coin_by_time/?_account_name=dantheman&_coin_type=21&_start_time=2016-03-24%2016:05:00&_end_time=2016-03-25%2000:34:48"
 ```
 
 ### After Setup
@@ -60,22 +62,26 @@ curl http://localhost:3000/rpc/get_balance_for_coin_by_time/?_account_name=danth
 - If you have added more blocks to `haf_block_log` db, or you are running live sync, you can run:
 
 ```bash
-psql -v "ON_ERROR_STOP=1" -d haf_block_log -c "call btracker_app.main('btracker_app', 0);"
+./balance-tracker.sh process-blocks --number-of-blocks=0
 ```
 
 This will keep indexer waiting for new blocks and process them as backend is running.
 
 ### Run with Docker
 
-Running *Balance tracker* with Docker is described in Docker-specific [README](docker/README.md)
+Running *Balance tracker* with Docker is described in Docker-specific [README](docker/README.md).
 
 ## Architecture
 
 `db/btracker_app.sql` contains code for processing raw block data into separate db, to be used by app.
 
-`py_config.ini` and `postgrest.conf` are configs for python and postgREST versions of backend. They contain parameters for postgres access.
+`db/builtin_roles.sql` contains database role setup.
 
-`run.sh` can be used to start up both backend versions and ui, or run tests.
+`py_config.ini` and `postgrest.conf` are configs for Python and PostgREST versions of backend. They contain parameters for PostgreSQL access.
+
+`balance-tracker.sh` can be used to start up PostgREST backend versions and UI, or run tests. Execute `./balance-tracker.sh help` for detailed list of parameters.
+
+`run.sh` is a legacy script for starting both backend versions, UI and running tests.
 
 ### Python version
 
@@ -92,8 +98,22 @@ Running *Balance tracker* with Docker is described in Docker-specific [README](d
 
 JMeter performance tests are configured for different backends. To run tests:
 
-1. Start one of backend servers on port 3000
-1. Install JMeter `./run.sh install-postgres`
-1. Run tests for python `./run.sh test-py` or postgREST `./run.sh test`
+### PostgREST backend
 
-Result report dashboard (Apache) will be generated at `tests/performance/result_report/index.html`
+1. Start PostgREST backend server on port 3000
+1. Install test dependencies: `./balance-tracker.sh install test-dependencies`
+1. Install jmeter: `./balance-tracker.sh install jmeter`
+1. Run tests: `./balance-tracker.sh run-tests`
+
+**Note:** If you already have jmeter installed and on `$PATH` you can skip straight to the last point.
+
+If you want to serve the HTTP report on port 8000 run `./balance-tracker.sh serve test-results`.  
+You can also simply open *tests/performance/result_report/index.html* in your browser.
+
+### Python backend
+
+1. Start Python backend server on port 3000
+1. Install JMeter `./run.sh install-jmeter`
+1. Run tests for python `./run.sh test-py`
+
+Result report dashboard (HTML) will be generated at `tests/performance/result_report/index.html`
