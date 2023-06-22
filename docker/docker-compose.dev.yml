@@ -1,0 +1,15 @@
+services:
+  haf:
+    networks:
+      haf-network:
+        ipv4_address: 172.19.0.2
+    ports:
+      - 5432:5432
+
+networks:
+  haf-network:
+    attachable: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.19.0.0/24
