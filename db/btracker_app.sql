@@ -236,9 +236,11 @@ LOOP
     __last_reported_block := __balance_change.source_op_block;
   END IF;
 END LOOP;
-
+--0 pre changes around 38 minutes
 --1st pass 55.67 minutes
---2nd pass after optimalization 
+--2nd pass after optimalization 53.45 minutes
+--3rd pass without rewards, with optimalizations 33.65 minutes
+--4th pass without hive_vesting_balance 44.95 minutes
 
 FOR ___balance_change IN
   WITH raw_ops AS MATERIALIZED 
@@ -248,7 +250,7 @@ FOR ___balance_change IN
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,55,39) 
+    WHERE ov.op_type_id IN (40,41,62,32,33,34,59,39) 
     AND ov.block_num BETWEEN _from AND _to
     UNION ALL
     SELECT oc.body AS body,
@@ -258,7 +260,7 @@ FOR ___balance_change IN
     FROM hive.btracker_app_operations_view oc
     WHERE oc.op_type_id IN (51,52,63) and ((oc.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true
     AND oc.block_num BETWEEN _from AND _to
-    UNION ALL
+   UNION ALL
     SELECT ob.body AS body,
            ob.id AS source_op,
            ob.block_num as source_op_block,
