@@ -1,7 +1,6 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
 SET ROLE btracker_owner;
 
@@ -16,13 +15,14 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
 CREATE TABLE IF NOT EXISTS btracker_app.app_status
 (
   continue_processing BOOLEAN NOT NULL,
-  last_processed_block INT NOT NULL
+  last_processed_block INT NOT NULL,
+  withdraw_rate INT NOT NULL
 );
 
 INSERT INTO btracker_app.app_status
-(continue_processing, last_processed_block)
+(continue_processing, last_processed_block, withdraw_rate)
 VALUES
-(True, 0)
+(True, 0, 104)
 ;
 
 
@@ -67,6 +67,26 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
   tmp BIGINT,     
 
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
+) INHERITS (hive.btracker_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
+(
+  account VARCHAR NOT NULL,
+  vesting_withdraw_rate BIGINT DEFAULT 0,     
+  to_withdraw BIGINT DEFAULT 0,
+  withdrawn BIGINT DEFAULT 0,          
+  withdraw_routes BIGINT DEFAULT 0,     
+
+  CONSTRAINT pk_current_account_withdraws PRIMARY KEY (account)
+) INHERITS (hive.btracker_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws_routes
+(
+  account VARCHAR NOT NULL,
+  to_account VARCHAR NOT NULL,     
+  percent INT NOT NULL,
+    
+  CONSTRAINT pk_current_account_withdraws_routes PRIMARY KEY (account, to_account)
 ) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
@@ -170,12 +190,6 @@ END
 $$
 ;
 
-DROP TYPE IF EXISTS btracker_app.btracker_vests_balance CASCADE;
-CREATE TYPE btracker_app.btracker_vests_balance AS
-(
-  delegated_vests BIGINT,
-  received_vests BIGINT
-);
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_c(in _from INT, in _to INT, IN _report_step INT = 1000)
 RETURNS VOID
@@ -191,7 +205,12 @@ DECLARE
   ___balance_change RECORD;
   __current_balance BIGINT;
   __last_reported_block INT := 0;
+  ___last_reported_block INT := 0;
+  _vesting_multiplication RECORD;
+  _to_withdraw BIGINT;
+  _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
 BEGIN
+RAISE NOTICE 'Processing balances';
 FOR __balance_change IN
   WITH balance_impacting_ops AS
   (
@@ -242,15 +261,23 @@ END LOOP;
 --3rd pass without rewards, with optimalizations 33.65 minutes
 --4th pass without hive_vesting_balance 44.95 minutes
 
+--withdraws 86.44m
+--2nd pass after optimalizations 61m
+--3rd pass more opt 59.80m
+--4rd pass changing to CTE only on rewards 59.63m
+--5rd pass changing to CTE where its possible 59.67m
+
+RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
+
 FOR ___balance_change IN
-  WITH raw_ops AS MATERIALIZED 
+  WITH raw_ops AS  
   (
     SELECT ov.body AS body,
            ov.id AS source_op,
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39) or
+    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60) or
           (ov.op_type_id = 55 and ((ov.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
           (ov.op_type_id IN (51,52,63) and ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
           AND ov.block_num BETWEEN _from AND _to
@@ -258,6 +285,8 @@ FOR ___balance_change IN
     --delegations (40,41,62)
     --savings (32,33,34,59,55)
     --rewards (39,51,52,63)
+    --withdraws (4,20,56)
+    --hardforks (60)
   )
   SELECT body, source_op, source_op_block, op_type
   FROM raw_ops
@@ -301,11 +330,47 @@ CASE ___balance_change.op_type
   WHEN 63 THEN
   PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
+  WHEN 4 THEN
+  PERFORM btracker_app.process_withdraw_vesting_operation(___balance_change.body, _withdraw_rate);
+
+  WHEN 20 THEN
+  PERFORM btracker_app.process_set_withdraw_vesting_route_operation(___balance_change.body);
+
+  WHEN 56 THEN
+  PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body);
+
+  WHEN 60 THEN
+    CASE ((___balance_change.body::jsonb)->'value'->>'hardfork_id')::INT
+    -- HARDFORK 1
+    WHEN 1 THEN
+      FOR _vesting_multiplication IN
+      SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn 
+      FROM btracker_app.current_account_withdraws
+      LOOP
+      SELECT _vesting_multiplication.to_withdraw * 1000000 INTO _to_withdraw;
+      UPDATE btracker_app.current_account_withdraws SET 
+        vesting_withdraw_rate = _to_withdraw / _withdraw_rate,
+        to_withdraw = _to_withdraw,
+        withdrawn = _vesting_multiplication.withdrawn * 1000000
+      WHERE account = _vesting_multiplication.account;
+      END LOOP;
+    -- HARDFORK 16
+    WHEN 16 THEN
+      UPDATE btracker_app.app_status SET withdraw_rate = 13;
+      _withdraw_rate = 13;
+  
+    ELSE
+    END CASE;
+
   ELSE
 END CASE;
 
-END LOOP;
+  IF ___balance_change.source_op_block % _report_step = 0 AND ___last_reported_block != ___balance_change.source_op_block THEN
+    RAISE NOTICE 'Processed data for block: %', ___balance_change.source_op_block;
+    ___last_reported_block := ___balance_change.source_op_block;
+  END IF;
 
+END LOOP;
 END
 $$
 ;
@@ -449,8 +514,14 @@ $$
 BEGIN
   CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
   CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
+  CREATE INDEX idx_btracker_app_current_account_rewards_nai ON btracker_app.current_account_rewards(nai);
+  CREATE INDEX idx_btracker_app_current_account_rewards_nai_account ON btracker_app.current_account_rewards(account, nai);
+  CREATE INDEX idx_btracker_app_current_account_withdraws_account ON btracker_app.current_account_withdraws(account);
+
+
 END
 $$
 ;
 
 RESET ROLE;
+
