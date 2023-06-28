@@ -219,17 +219,16 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-    _account TEXT;
-    _balance BIGINT;
 BEGIN
-
-SELECT (body::jsonb)->'value'->>'account',
-       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT
-INTO _account, _balance;
-
+WITH return_vesting_delegation_operation AS 
+(
+SELECT (body::jsonb)->'value'->>'account' AS _account,
+       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
+)
   INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
   SELECT _account, _balance, _balance
+  FROM return_vesting_delegation_operation
+
   ON CONFLICT ON CONSTRAINT pk_temp_vests DO UPDATE SET
     delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests,
     tmp = btracker_app.current_account_vests.tmp - EXCLUDED.tmp

@@ -3,22 +3,14 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-  _account TEXT;
-  _hbd_payout BIGINT;
-  _hive_payout BIGINT;
-  _vesting_payout numeric;
-  _vesting_diff BIGINT;
 BEGIN
-
-SELECT (body::jsonb)->'value'->>'account',
-       ((body::jsonb)->'value'->'reward_hive'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'reward_hbd'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'reward_vests'->>'amount')::BIGINT
-INTO _account, _hive_payout, _hbd_payout, _vesting_payout;
-
-IF _hbd_payout > 0 THEN
-
+WITH claim_reward_balance_operation AS MATERIALIZED
+(
+SELECT (body::jsonb)->'value'->>'account' AS _account,
+       ((body::jsonb)->'value'->'reward_hive'->>'amount')::BIGINT AS _hive_payout,
+       ((body::jsonb)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
+       ((body::jsonb)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
+)
   INSERT INTO btracker_app.current_account_rewards
   (
   account,
@@ -33,229 +25,155 @@ IF _hbd_payout > 0 THEN
     _hbd_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _hive_payout > 0 THEN
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
+  FROM claim_reward_balance_operation
+  WHERE _hbd_payout > 0
+  UNION ALL
   SELECT
     _account,
     21,
     _hive_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _vesting_payout > 0 THEN
-
-  SELECT ROUND(_vesting_payout / car.balance, 3) * caar.balance INTO _vesting_diff
+  FROM claim_reward_balance_operation
+  WHERE _hive_payout > 0
+  UNION ALL
+  SELECT
+    _account,
+    37,
+    _vesting_payout,
+    _source_op,
+    _source_op_block
+  FROM claim_reward_balance_operation
+  WHERE _vesting_payout > 0
+  UNION ALL
+  SELECT
+  crbo._account,
+  38,
+  (SELECT ROUND(caar.balance * crbo._vesting_payout / car.balance, 3)
   FROM btracker_app.current_account_rewards car
-  JOIN btracker_app.current_account_rewards caar ON caar.nai = 38 AND caar.account = _account 
-  WHERE car.nai = 37 and car.account = _account;
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
-  VALUES
-    (_account,
-    37,
-    _vesting_payout,
-    _source_op,
-    _source_op_block),
-
-    (_account,
-    38,
-    _vesting_diff,
-   _source_op,
-    _source_op_block)
-
+  JOIN btracker_app.current_account_rewards caar ON caar.nai = 38 AND caar.account = car.account 
+  WHERE car.nai = 37 and car.account = crbo._account),
+  _source_op,
+  _source_op_block
+  FROM claim_reward_balance_operation crbo
+  WHERE crbo._vesting_payout > 0   
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
       balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
-  END IF;
-
 END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_author_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+
+CREATE OR REPLACE FUNCTION btracker_app.process_author_reward_operation(
+  body hive.operation,
+  _source_op BIGINT,
+  _source_op_block INT
+)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-  _account TEXT;
-  _hbd_payout BIGINT;
-  _hive_payout BIGINT;
-  _vesting_payout BIGINT;
-  _reward_vesting_hive BIGINT;
-
 BEGIN
-
-SELECT (body::jsonb)->'value'->>'author',
-       ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT
-INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
-
-  IF _hbd_payout > 0 THEN
-
-  INSERT INTO btracker_app.current_account_rewards
+  WITH author_reward_operation AS MATERIALIZED
   (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
+    SELECT
+      (body::jsonb)->'value'->>'author' AS _account,
+      ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
+      ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
+      ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
+  )
+  INSERT INTO btracker_app.current_account_rewards (
+    account,
+    nai,
+    balance,
+    source_op,
+    source_op_block
+  )
   SELECT
     _account,
     13,
     _hbd_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _hive_payout > 0 THEN
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
+  FROM author_reward_operation
+  WHERE _hbd_payout > 0
+  UNION ALL
   SELECT
     _account,
     21,
     _hive_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _vesting_payout > 0 THEN
-
-  SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout) 
-  INTO _reward_vesting_hive;
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
-  VALUES
-    (_account,
+  FROM author_reward_operation
+  WHERE _hive_payout > 0
+  UNION ALL
+  SELECT
+    _account,
     37,
     _vesting_payout,
     _source_op,
-    _source_op_block),
-
-    (_account,
+    _source_op_block
+  FROM author_reward_operation
+  WHERE _vesting_payout > 0
+  UNION ALL
+  SELECT
+    _account,
     38,
-    _reward_vesting_hive,
+    (SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout)),
     _source_op,
-    _source_op_block)
-
-
+    _source_op_block
+  FROM author_reward_operation
+  WHERE _vesting_payout > 0
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
+    balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block;
 
 END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(
+  body hive.operation, 
+  _source_op BIGINT, 
+  _source_op_block INT
+)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-  _account TEXT;
-  _reward BIGINT;
-  _nai INT;
-  _reward_vesting_hive BIGINT;
 BEGIN
-
-SELECT (body::jsonb)->'value'->>'curator',
-       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT,
-       substring((body::jsonb)->'value'->'reward'->>'nai', '[0-9]+')::INT
-INTO _account, _reward, _nai;
-
-  SELECT hive.get_vesting_balance(_source_op_block, _reward) 
-  INTO _reward_vesting_hive;
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
-  VALUES
-    (_account,
-    _nai,
+WITH curation_reward_operation AS MATERIALIZED
+(
+SELECT (body::jsonb)->'value'->>'curator' AS _account,
+       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT AS _reward
+)
+INSERT INTO btracker_app.current_account_rewards (
+    account,
+    nai,
+    balance,
+    source_op,
+    source_op_block
+  )
+  SELECT
+    _account,
+    37,
     _reward,
     _source_op,
-    _source_op_block),
-
-    (_account,
+    _source_op_block
+  FROM curation_reward_operation
+  UNION ALL
+  SELECT
+    _account,
     38,
-    _reward_vesting_hive,
+    (SELECT hive.get_vesting_balance(_source_op_block, _reward)),
     _source_op,
-    _source_op_block)
-
+    _source_op_block
+  FROM curation_reward_operation
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
       balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
@@ -271,104 +189,61 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-  _account TEXT;
-  _hbd_payout BIGINT;
-  _hive_payout BIGINT;
-  _vesting_payout BIGINT;
-  _reward_vesting_hive BIGINT;
 BEGIN
-
-SELECT (body::jsonb)->'value'->>'benefactor',
-       ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT,
-       ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT
-INTO _account, _hbd_payout, _hive_payout, _vesting_payout;
-
-  IF _hbd_payout > 0 THEN
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
+WITH comment_benefactor_reward_operation AS MATERIALIZED
+(
+SELECT (body::jsonb)->'value'->>'benefactor' AS _account,
+       ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
+       ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
+       ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
+)
+INSERT INTO btracker_app.current_account_rewards (
+    account,
+    nai,
+    balance,
+    source_op,
+    source_op_block
+  )
   SELECT
     _account,
     13,
     _hbd_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _hive_payout > 0 THEN
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
+  FROM comment_benefactor_reward_operation
+  WHERE _hbd_payout > 0
+  UNION ALL
   SELECT
     _account,
     21,
     _hive_payout,
     _source_op,
     _source_op_block
-
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
-  DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
-  IF _vesting_payout > 0 THEN
-
-  SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout) 
-  INTO _reward_vesting_hive;
-
-  INSERT INTO btracker_app.current_account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
-  VALUES
-    (_account,
+  FROM comment_benefactor_reward_operation
+  WHERE _hive_payout > 0
+  UNION ALL
+  SELECT
+    _account,
     37,
     _vesting_payout,
     _source_op,
-    _source_op_block),
-
-    (_account,
+    _source_op_block
+  FROM comment_benefactor_reward_operation
+  WHERE _vesting_payout > 0
+  UNION ALL
+  SELECT
+    _account,
     38,
-    _reward_vesting_hive,
+    (SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout)),
     _source_op,
-    _source_op_block)
-
+    _source_op_block
+  FROM comment_benefactor_reward_operation
+  WHERE _vesting_payout > 0
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
-  END IF;
-
+    balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block;
 END
 $$
 ;
