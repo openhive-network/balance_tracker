@@ -1,6 +1,7 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
+GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
 SET ROLE btracker_owner;
 
@@ -359,4 +360,3 @@ $$
 ;
 
 RESET ROLE;
-
