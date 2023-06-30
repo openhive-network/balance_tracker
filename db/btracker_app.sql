@@ -399,7 +399,7 @@ BEGIN
 
     PERFORM btracker_app.process_block_range_data_c(b, _last_block);
 
-    PERFORM btracker_app.storeLastProcessedBlock(__last_block);
+    PERFORM btracker_app.storeLastProcessedBlock(_last_block);
 
     COMMIT;
 
@@ -415,7 +415,7 @@ BEGIN
     PERFORM btracker_app.process_block_range_data_c(_last_block, _to);
     _last_block := _to;
 
-    PERFORM btracker_app.storeLastProcessedBlock(__last_block);
+    PERFORM btracker_app.storeLastProcessedBlock(_last_block);
 
     COMMIT;
     RAISE NOTICE 'Block range: <%, %> processed successfully.', b, _last_block;
