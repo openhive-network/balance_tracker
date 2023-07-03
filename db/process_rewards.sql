@@ -6,7 +6,7 @@ $$
 BEGIN
 WITH claim_reward_balance_operation AS MATERIALIZED
 (
-SELECT (body::jsonb)->'value'->>'account' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
        ((body::jsonb)->'value'->'reward_hive'->>'amount')::BIGINT AS _hive_payout,
        ((body::jsonb)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
        ((body::jsonb)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
@@ -80,7 +80,7 @@ BEGIN
   WITH author_reward_operation AS MATERIALIZED
   (
     SELECT
-      (body::jsonb)->'value'->>'author' AS _account,
+      (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'author') AS _account,
       ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
       ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
       ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
@@ -149,7 +149,7 @@ $$
 BEGIN
 WITH curation_reward_operation AS MATERIALIZED
 (
-SELECT (body::jsonb)->'value'->>'curator' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator') AS _account,
        ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT AS _reward
 )
 INSERT INTO btracker_app.current_account_rewards (
@@ -192,7 +192,7 @@ $$
 BEGIN
 WITH comment_benefactor_reward_operation AS MATERIALIZED
 (
-SELECT (body::jsonb)->'value'->>'benefactor' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'benefactor') AS _account,
        ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
        ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
        ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
