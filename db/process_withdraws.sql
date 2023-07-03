@@ -6,7 +6,7 @@ $$
 BEGIN
 WITH withdraw_vesting_operation AS
 (
-SELECT (body::jsonb)->'value'->>'account' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
        ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _vesting_withdraw
 )
  INSERT INTO btracker_app.current_account_withdraws 
@@ -37,15 +37,15 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-  _account TEXT;
-  _to_account TEXT;
+  _account INT;
+  _to_account INT;
   _percent INT;
   _routes INT := 1;
   _current_balance INT;
 BEGIN
 
-SELECT (body::jsonb)->'value'->>'from_account',
-       (body::jsonb)->'value'->>'to_account',
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account'),
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'to_account'),
        ((body::jsonb)->'value'->>'percent')::INT
 INTO _account, _to_account, _percent;
 
@@ -118,11 +118,11 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-_account TEXT;
+_account INT;
 _vesting_withdraw BIGINT;
 BEGIN
 
-SELECT (body::jsonb)->'value'->>'from_account',
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account'),
        ((body::jsonb)->'value'->'withdrawn'->>'amount')::BIGINT
 INTO _account, _vesting_withdraw;
 

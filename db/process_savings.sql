@@ -6,7 +6,7 @@ $$
 BEGIN
 WITH transfer_to_savings_operation AS  
 (
-SELECT (body::jsonb)->'value'->>'to' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'to') AS _account,
        substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
        ((body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS _balance
 )
@@ -42,13 +42,13 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-    _account TEXT;
+    _account INT;
     _request_id BIGINT;
     _nai INT;
     _balance BIGINT;
 BEGIN
 
-SELECT (body::jsonb)->'value'->>'from',
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from'),
        ((body::jsonb)->'value'->>'request_id')::BIGINT,
        substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT,
        ((body::jsonb)->'value'->'amount'->>'amount')::BIGINT
@@ -105,7 +105,7 @@ WITH cancel_transfer_from_savings_operation AS
 (
 SELECT account AS _account , nai AS _nai, balance AS _balance
 FROM btracker_app.transfer_saving_id
-WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account= ((body::jsonb)->'value'->>'from')
+WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account= (SELECT id FROM hive.btracker_app_accounts_view WHERE name = ((body::jsonb)->'value'->>'from'))
 )
     INSERT INTO btracker_app.current_account_savings 
     (
@@ -133,7 +133,7 @@ WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account= 
           savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
 
   DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = ((body::jsonb)->'value'->>'from');
+  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = (SELECT id FROM hive.btracker_app_accounts_view WHERE name = ((body::jsonb)->'value'->>'from'));
 
 END
 $$
@@ -147,7 +147,7 @@ $$
 BEGIN
 WITH fill_transfer_from_savings_operation AS 
 (
-SELECT (body::jsonb)->'value'->>'from' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from') AS _account,
        substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai
 )
     INSERT INTO btracker_app.current_account_savings 
@@ -173,7 +173,7 @@ SELECT (body::jsonb)->'value'->>'from' AS _account,
           savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests;
 
   DELETE FROM btracker_app.transfer_saving_id
-  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = ((body::jsonb)->'value'->>'from');
+  WHERE request_id = ((body::jsonb)->'value'->>'request_id')::BIGINT AND account = (SELECT id FROM hive.btracker_app_accounts_view WHERE name = ((body::jsonb)->'value'->>'from'));
 
 END
 $$
@@ -187,7 +187,7 @@ $$
 BEGIN
 WITH interest_operation AS 
 (
-SELECT (body::jsonb)->'value'->>'owner' AS _account, 
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'owner') AS _account, 
        substring((body::jsonb)->'value'->'interest'->>'nai', '[0-9]+')::INT AS _nai,
        ((body::jsonb)->'value'->'interest'->>'amount')::BIGINT AS _balance
 )

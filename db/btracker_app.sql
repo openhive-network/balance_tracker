@@ -1,7 +1,6 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
 SET ROLE btracker_owner;
 
@@ -29,7 +28,7 @@ VALUES
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
 (
-  account VARCHAR NOT NULL, -- Balance owner account
+  account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
   source_op BIGINT NOT NULL,-- The operation triggered last balance change
@@ -40,7 +39,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
 (
-  account VARCHAR NOT NULL, -- Balance owner account
+  account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
   source_op BIGINT NOT NULL,-- The operation triggered last balance change
@@ -51,8 +50,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 (
-  delegator VARCHAR NOT NULL,
-  delegatee VARCHAR NOT NULL,     
+  delegator INT NOT NULL,
+  delegatee INT NOT NULL,     
   balance BIGINT NOT NULL,
   source_op BIGINT NOT NULL,
   source_op_block INT NOT NULL, 
@@ -62,7 +61,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
 (
-  account VARCHAR NOT NULL,
+  account INT NOT NULL,
   received_vests BIGINT DEFAULT 0,     
   delegated_vests BIGINT DEFAULT 0,     
   tmp BIGINT,     
@@ -72,7 +71,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
 (
-  account VARCHAR NOT NULL,
+  account INT NOT NULL,
   vesting_withdraw_rate BIGINT DEFAULT 0,     
   to_withdraw BIGINT DEFAULT 0,
   withdrawn BIGINT DEFAULT 0,          
@@ -83,8 +82,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws_routes
 (
-  account VARCHAR NOT NULL,
-  to_account VARCHAR NOT NULL,     
+  account INT NOT NULL,
+  to_account INT NOT NULL,     
   percent INT NOT NULL,
     
   CONSTRAINT pk_current_account_withdraws_routes PRIMARY KEY (account, to_account)
@@ -92,7 +91,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws_routes
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
 (
-  account VARCHAR NOT NULL,
+  account INT NOT NULL,
   nai     INT NOT NULL, 
   saving_balance BIGINT DEFAULT 0,         
   source_op BIGINT NOT NULL,
@@ -104,7 +103,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
 
 CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
 (
-  account VARCHAR NOT NULL,
+  account INT NOT NULL,
   nai     INT NOT NULL, 
   balance BIGINT NOT NULL,
   request_id  BIGINT NOT NULL, 
@@ -112,10 +111,18 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
 ) INHERITS (hive.btracker_app);
 
+CREATE TABLE IF NOT EXISTS btracker_app.account_posting_curation_rewards
+(
+  account INT NOT NULL, 
+  posting_rewards BIGINT NOT NULL,
+  curation_rewards  BIGINT NOT NULL, 
+
+  CONSTRAINT pk_account_posting_curation_rewards PRIMARY KEY (account)
+) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
 (
-  account VARCHAR NOT NULL, -- Balance owner account
+  account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value after a change
   source_op BIGINT NOT NULL,-- The operation triggered given balance change
@@ -219,7 +226,7 @@ FOR __balance_change IN
     FROM hive.operation_types ot
     WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
   )
-  SELECT bio.account_name AS account, bio.asset_symbol_nai AS nai, bio.amount as balance, ho.id AS source_op, ho.block_num AS source_op_block
+  SELECT av.id AS account, bio.asset_symbol_nai AS nai, bio.amount as balance, ho.id AS source_op, ho.block_num AS source_op_block
   FROM hive.btracker_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
   JOIN balance_impacting_ops b ON ho.op_type_id = b.id
   JOIN LATERAL
@@ -230,6 +237,7 @@ FOR __balance_change IN
     */
     SELECT * FROM hive.get_impacted_balances(ho.body, ho.block_num > 905693)
   ) bio ON true
+  JOIN hive.btracker_app_accounts_view av ON av.name = bio.account_name
   WHERE ho.block_num BETWEEN _from AND _to
   ORDER BY ho.block_num, ho.id
 LOOP
@@ -525,3 +533,4 @@ $$
 ;
 
 RESET ROLE;
+
