@@ -114,8 +114,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
 CREATE TABLE IF NOT EXISTS btracker_app.account_posting_curation_rewards
 (
   account INT NOT NULL, 
-  posting_rewards BIGINT NOT NULL,
-  curation_rewards  BIGINT NOT NULL, 
+  posting_rewards BIGINT DEFAULT 0,
+  curation_rewards  BIGINT DEFAULT 0, 
 
   CONSTRAINT pk_account_posting_curation_rewards PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
@@ -276,6 +276,8 @@ END LOOP;
 --4rd pass changing to CTE only on rewards 59.63m
 --5rd pass changing to CTE where its possible 59.67m
 
+--changing account string into account_id 49.24m
+
 RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 
 FOR ___balance_change IN
@@ -286,7 +288,7 @@ FOR ___balance_change IN
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60) or
+    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,53) or
           (ov.op_type_id = 55 and ((ov.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
           (ov.op_type_id IN (51,52,63) and ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
           AND ov.block_num BETWEEN _from AND _to
@@ -347,6 +349,9 @@ CASE ___balance_change.op_type
 
   WHEN 56 THEN
   PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body);
+
+  WHEN 53 THEN
+  PERFORM btracker_app.process_comment_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
   WHEN 60 THEN
     CASE ((___balance_change.body::jsonb)->'value'->>'hardfork_id')::INT
