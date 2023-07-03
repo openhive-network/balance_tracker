@@ -4,15 +4,15 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-    _delegator TEXT;
-    _delegatee TEXT;
+    _delegator INT;
+    _delegatee INT;
     _balance BIGINT;
     _current_balance BIGINT;
     ___current_blocked_balance BIGINT;
 BEGIN
 
-SELECT (body::jsonb)->'value'->>'delegator',
-       (body::jsonb)->'value'->>'delegatee',
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'delegator'),
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'delegatee'),
        ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT
 INTO _delegator, _delegatee, _balance;
 
@@ -161,13 +161,13 @@ LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
-    _delegator TEXT;
-    _delegatee TEXT;
+    _delegator INT;
+    _delegatee INT;
     _balance BIGINT;
 BEGIN
 
-SELECT (body::jsonb)->'value'->>'creator',
-       (body::jsonb)->'value'->>'new_account_name',
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'creator'),
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'new_account_name'),
        ((body::jsonb)->'value'->'delegation'->>'amount')::BIGINT
 INTO _delegator, _delegatee, _balance;
 
@@ -222,7 +222,7 @@ $$
 BEGIN
 WITH return_vesting_delegation_operation AS 
 (
-SELECT (body::jsonb)->'value'->>'account' AS _account,
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
        ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
 )
   INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
