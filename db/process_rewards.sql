@@ -146,12 +146,15 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
+DECLARE
+_account INT;
+_reward BIGINT;
 BEGIN
-WITH curation_reward_operation AS MATERIALIZED
-(
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator') AS _account,
-       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT AS _reward
-)
+
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator'),
+       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT
+INTO _account, _reward;
+
 INSERT INTO btracker_app.current_account_rewards (
     account,
     nai,
@@ -179,6 +182,18 @@ INSERT INTO btracker_app.current_account_rewards (
       balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
+
+INSERT INTO btracker_app.account_posting_curation_rewards (
+    account,
+    curation_rewards
+  )
+  SELECT
+    _account,
+    (SELECT hive.get_vesting_balance(_source_op_block, _reward))
+
+  ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
+  DO UPDATE SET
+    curation_rewards = btracker_app.account_posting_curation_rewards.curation_rewards + EXCLUDED.curation_rewards;
 
 END
 $$
@@ -244,6 +259,35 @@ INSERT INTO btracker_app.current_account_rewards (
     balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block;
+END
+$$
+;
+
+
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+RETURNS VOID
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+WITH comment_reward_operation AS MATERIALIZED
+(
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'author') AS _account,
+       ((body::jsonb)->'value'->>'author_rewards')::BIGINT AS _author_rewards
+)
+
+INSERT INTO btracker_app.account_posting_curation_rewards (
+    account,
+    posting_rewards
+  )
+  SELECT
+    _account,
+    _author_rewards
+
+  ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
+  DO UPDATE SET
+    posting_rewards = btracker_app.account_posting_curation_rewards.posting_rewards + EXCLUDED.posting_rewards;
+
 END
 $$
 ;
