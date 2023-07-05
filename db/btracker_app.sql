@@ -63,8 +63,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
 (
   account INT NOT NULL,
   received_vests BIGINT DEFAULT 0,     
-  delegated_vests BIGINT DEFAULT 0,     
-  tmp BIGINT,     
+  delegated_vests BIGINT DEFAULT 0,         
 
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
@@ -288,9 +287,9 @@ FOR ___balance_change IN
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
     FROM hive.btracker_app_operations_view ov
-    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,53) or
+    WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53) or
           (ov.op_type_id = 55 and ((ov.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
-          (ov.op_type_id IN (51,52,63) and ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
+          (ov.op_type_id IN (51,63) and ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
           AND ov.block_num BETWEEN _from AND _to
 
     --delegations (40,41,62)
@@ -351,7 +350,7 @@ CASE ___balance_change.op_type
   PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body);
 
   WHEN 53 THEN
-  PERFORM btracker_app.process_comment_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  PERFORM btracker_app.process_comment_reward_operation(___balance_change.body);
 
   WHEN 60 THEN
     CASE ((___balance_change.body::jsonb)->'value'->>'hardfork_id')::INT
