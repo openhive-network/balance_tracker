@@ -62,6 +62,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb
       balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
+
 END
 $$
 ;
@@ -132,7 +133,7 @@ BEGIN
     balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block;
-
+  
 END
 $$
 ;
@@ -146,15 +147,15 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-_account INT;
-_reward BIGINT;
 BEGIN
-
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator'),
-       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT
-INTO _account, _reward;
-
+  WITH curation_reward_operation AS MATERIALIZED
+  (
+    SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator') AS _account,
+       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT AS _reward,
+       ((body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN AS _payout_must_be_claimed
+  ),
+  insert_balance AS
+  (
 INSERT INTO btracker_app.current_account_rewards (
     account,
     nai,
@@ -168,7 +169,9 @@ INSERT INTO btracker_app.current_account_rewards (
     _reward,
     _source_op,
     _source_op_block
-  FROM curation_reward_operation
+    FROM curation_reward_operation
+    WHERE _payout_must_be_claimed = TRUE
+
   UNION ALL
   SELECT
     _account,
@@ -176,25 +179,29 @@ INSERT INTO btracker_app.current_account_rewards (
     (SELECT hive.get_vesting_balance(_source_op_block, _reward)),
     _source_op,
     _source_op_block
-  FROM curation_reward_operation
+    FROM curation_reward_operation
+    WHERE _payout_must_be_claimed = TRUE
+
   ON CONFLICT ON CONSTRAINT pk_current_account_rewards
   DO UPDATE SET
       balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
+      source_op_block = EXCLUDED.source_op_block
+  )
 
-INSERT INTO btracker_app.account_posting_curation_rewards (
+  INSERT INTO btracker_app.account_posting_curation_rewards (
     account,
     curation_rewards
   )
   SELECT
     _account,
     (SELECT hive.get_vesting_balance(_source_op_block, _reward))
+    FROM curation_reward_operation
 
   ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
   DO UPDATE SET
     curation_rewards = btracker_app.account_posting_curation_rewards.curation_rewards + EXCLUDED.curation_rewards;
-
+  
 END
 $$
 ;
@@ -264,7 +271,7 @@ $$
 ;
 
 
-CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body hive.operation)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -275,7 +282,6 @@ WITH comment_reward_operation AS MATERIALIZED
 SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'author') AS _account,
        ((body::jsonb)->'value'->>'author_rewards')::BIGINT AS _author_rewards
 )
-
 INSERT INTO btracker_app.account_posting_curation_rewards (
     account,
     posting_rewards
@@ -283,6 +289,7 @@ INSERT INTO btracker_app.account_posting_curation_rewards (
   SELECT
     _account,
     _author_rewards
+  FROM comment_reward_operation
 
   ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
   DO UPDATE SET

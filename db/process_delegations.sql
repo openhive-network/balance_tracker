@@ -81,19 +81,6 @@ INTO _delegator, _delegatee, _balance;
 
   ___current_blocked_balance = GREATEST(_current_balance - _balance , 0);
 
-  --DELEGATOR'S DELAGATION BALANCE DOESN'T CHANGE, BLOCKED VESTS SAVED IN TMP
-
-      INSERT INTO btracker_app.current_account_vests
-      (
-      account,
-      tmp
-      ) 
-      SELECT
-        _delegator,
-        ___current_blocked_balance
-      ON CONFLICT ON CONSTRAINT pk_temp_vests
-      DO UPDATE SET
-          tmp = btracker_app.current_account_vests.tmp + EXCLUDED.tmp;
   
   --DELEGATEE'S RECEIVED VESTS ARE BEING LOWERED INSTANTLY
 
@@ -111,12 +98,12 @@ INTO _delegator, _delegatee, _balance;
   ELSE
 
   --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS HIGHER
-
+      
     ___current_blocked_balance = GREATEST(_balance - _current_balance, 0);
-
+    
   --ADD THE DIFFERENCE TO BOTH ACCOUNTS DELEGATED AND RECEIVED
 
-          INSERT INTO btracker_app.current_account_vests
+      INSERT INTO btracker_app.current_account_vests
       (
       account,
       delegated_vests
@@ -160,17 +147,15 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-    _delegator INT;
-    _delegatee INT;
-    _balance BIGINT;
 BEGIN
-
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'creator'),
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'new_account_name'),
-       ((body::jsonb)->'value'->'delegation'->>'amount')::BIGINT
-INTO _delegator, _delegatee, _balance;
-
+WITH account_create_with_delegation_operation AS 
+(
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'creator') AS _delegator,
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'new_account_name')AS _delegatee,
+       ((body::jsonb)->'value'->'delegation'->>'amount')::BIGINT AS _balance
+),
+create_delegation AS 
+(
     INSERT INTO btracker_app.current_accounts_delegations 
     (
       delegator,
@@ -184,8 +169,11 @@ INTO _delegator, _delegatee, _balance;
         _delegatee,
         _balance,
         _source_op,
-        _source_op_block;
-
+        _source_op_block
+      FROM account_create_with_delegation_operation
+),
+increase_delegations AS 
+(
       INSERT INTO btracker_app.current_account_vests
       (
       account,
@@ -194,10 +182,11 @@ INTO _delegator, _delegatee, _balance;
       SELECT
         _delegator,
         _balance
+      FROM account_create_with_delegation_operation
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests;
-
+          delegated_vests = btracker_app.current_account_vests.delegated_vests + EXCLUDED.delegated_vests
+)
       INSERT INTO btracker_app.current_account_vests
       (
       account,
@@ -206,6 +195,7 @@ INTO _delegator, _delegatee, _balance;
       SELECT
         _delegatee,
         _balance
+      FROM account_create_with_delegation_operation
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
           received_vests = btracker_app.current_account_vests.received_vests + EXCLUDED.received_vests;
@@ -225,15 +215,14 @@ WITH return_vesting_delegation_operation AS
 SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
        ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
 )
-  INSERT INTO btracker_app.current_account_vests (account, delegated_vests, tmp)
-  SELECT _account, _balance, _balance
+
+  INSERT INTO btracker_app.current_account_vests (account, delegated_vests)
+  SELECT _account, _balance
   FROM return_vesting_delegation_operation
 
   ON CONFLICT ON CONSTRAINT pk_temp_vests DO UPDATE SET
-    delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests,
-    tmp = btracker_app.current_account_vests.tmp - EXCLUDED.tmp
-    ;
-    
+    delegated_vests = btracker_app.current_account_vests.delegated_vests - EXCLUDED.delegated_vests;
+
 END
 $$
 ;
