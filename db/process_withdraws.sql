@@ -48,13 +48,13 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb
 INTO _account, _to_account, _percent;
 
   SELECT cawr.percent INTO _current_balance
-  FROM btracker_app.current_account_withdraws_routes cawr 
+  FROM btracker_app.current_account_routes cawr 
   WHERE cawr.account=  _account
   AND cawr.to_account=  _to_account;
   
 IF _current_balance IS NULL THEN
 
- INSERT INTO btracker_app.current_account_withdraws_routes 
+ INSERT INTO btracker_app.current_account_routes 
     (
       account,
       to_account,
@@ -93,13 +93,13 @@ ELSE
       DO UPDATE SET
           withdraw_routes = btracker_app.current_account_withdraws.withdraw_routes - EXCLUDED.withdraw_routes;
 
-  DELETE FROM btracker_app.current_account_withdraws_routes
+  DELETE FROM btracker_app.current_account_routes
   WHERE account = _account
   AND to_account = _to_account;
 
   ELSE
 
-  UPDATE btracker_app.current_account_withdraws_routes SET 
+  UPDATE btracker_app.current_account_routes SET 
     percent = _percent
   WHERE account = _account 
   AND to_account = _to_account;
