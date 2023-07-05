@@ -79,13 +79,13 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
   CONSTRAINT pk_current_account_withdraws PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws_routes
+CREATE TABLE IF NOT EXISTS btracker_app.current_account_routes
 (
   account INT NOT NULL,
   to_account INT NOT NULL,     
   percent INT NOT NULL,
     
-  CONSTRAINT pk_current_account_withdraws_routes PRIMARY KEY (account, to_account)
+  CONSTRAINT pk_current_account_routes PRIMARY KEY (account, to_account)
 ) INHERITS (hive.btracker_app);
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
