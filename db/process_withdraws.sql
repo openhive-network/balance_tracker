@@ -26,12 +26,11 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb
           withdrawn = 0,
           vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
           to_withdraw = EXCLUDED.to_withdraw;
-
 END
 $$
 ;
 
- CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body hive.operation)
+CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body hive.operation)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -40,7 +39,6 @@ DECLARE
   _account INT;
   _to_account INT;
   _percent INT;
-  _routes INT := 1;
   _current_balance INT;
 BEGIN
 
@@ -74,7 +72,7 @@ IF _current_balance IS NULL THEN
       )
       SELECT 
         _account,
-        _routes
+        1
 
       ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
       DO UPDATE SET
@@ -89,7 +87,7 @@ ELSE
       )
       SELECT 
         _account,
-        _routes
+        1
 
       ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
       DO UPDATE SET
@@ -117,15 +115,14 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
-DECLARE
-_account INT;
-_vesting_withdraw BIGINT;
 BEGIN
-
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account'),
-       ((body::jsonb)->'value'->'withdrawn'->>'amount')::BIGINT
-INTO _account, _vesting_withdraw;
-
+WITH fill_vesting_withdraw_operation AS
+(
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account') AS _account,
+       ((body::jsonb)->'value'->'withdrawn'->>'amount')::BIGINT AS _vesting_withdraw
+),
+insert_balance AS
+(
  INSERT INTO btracker_app.current_account_withdraws 
     (
       account,
@@ -134,17 +131,20 @@ INTO _account, _vesting_withdraw;
       SELECT 
         _account,
         _vesting_withdraw
+      FROM fill_vesting_withdraw_operation
 
       ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
       DO UPDATE SET
-          withdrawn = btracker_app.current_account_withdraws.withdrawn + EXCLUDED.withdrawn;
-
+          withdrawn = btracker_app.current_account_withdraws.withdrawn + EXCLUDED.withdrawn
+      RETURNING account
+)
     UPDATE btracker_app.current_account_withdraws SET 
       vesting_withdraw_rate = 0,
       to_withdraw = 0,
       withdrawn = 0
-    WHERE account = _account AND to_withdraw <= withdrawn + 1;
-
+    FROM insert_balance
+    WHERE btracker_app.current_account_withdraws.account = insert_balance.account 
+    AND btracker_app.current_account_withdraws.to_withdraw <= btracker_app.current_account_withdraws.withdrawn + 1;
 END
 $$
 ;
