@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_delegate_vesting_shares_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_delegate_vesting_shares_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -11,9 +11,9 @@ DECLARE
     ___current_blocked_balance BIGINT;
 BEGIN
 
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'delegator'),
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'delegatee'),
-       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'delegator'),
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'delegatee'),
+       ((body)->'value'->'vesting_shares'->>'amount')::BIGINT
 INTO _delegator, _delegatee, _balance;
 
 --  DELEGATIONS TRACKING
@@ -142,7 +142,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_account_create_with_delegation_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_account_create_with_delegation_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -150,9 +150,9 @@ $$
 BEGIN
 WITH account_create_with_delegation_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'creator') AS _delegator,
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'new_account_name')AS _delegatee,
-       ((body::jsonb)->'value'->'delegation'->>'amount')::BIGINT AS _balance
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'creator') AS _delegator,
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'new_account_name')AS _delegatee,
+       ((body)->'value'->'delegation'->>'amount')::BIGINT AS _balance
 ),
 create_delegation AS 
 (
@@ -204,7 +204,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_return_vesting_delegation_operation(body hive.operation, source_op BIGINT, source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_return_vesting_delegation_operation(body jsonb, source_op BIGINT, source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -212,8 +212,8 @@ $$
 BEGIN
 WITH return_vesting_delegation_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
-       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
+       ((body)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
 )
 
   INSERT INTO btracker_app.current_account_vests (account, delegated_vests)

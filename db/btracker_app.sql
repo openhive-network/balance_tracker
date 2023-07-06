@@ -282,7 +282,7 @@ RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 FOR ___balance_change IN
   WITH raw_ops AS  
   (
-    SELECT ov.body AS body,
+    SELECT (ov.body::jsonb) AS body,
            ov.id AS source_op,
            ov.block_num as source_op_block,
            ov.op_type_id as op_type
@@ -353,7 +353,7 @@ CASE ___balance_change.op_type
   PERFORM btracker_app.process_comment_reward_operation(___balance_change.body);
 
   WHEN 60 THEN
-    CASE ((___balance_change.body::jsonb)->'value'->>'hardfork_id')::INT
+    CASE ((___balance_change.body)->'value'->>'hardfork_id')::INT
     -- HARDFORK 1
     WHEN 1 THEN
       FOR _vesting_multiplication IN

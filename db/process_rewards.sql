@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -6,10 +6,10 @@ $$
 BEGIN
 WITH claim_reward_balance_operation AS MATERIALIZED
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
-       ((body::jsonb)->'value'->'reward_hive'->>'amount')::BIGINT AS _hive_payout,
-       ((body::jsonb)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
-       ((body::jsonb)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
+       ((body)->'value'->'reward_hive'->>'amount')::BIGINT AS _hive_payout,
+       ((body)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
+       ((body)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
 )
   INSERT INTO btracker_app.current_account_rewards
   (
@@ -69,7 +69,7 @@ $$
 
 
 CREATE OR REPLACE FUNCTION btracker_app.process_author_reward_operation(
-  body hive.operation,
+  body jsonb,
   _source_op BIGINT,
   _source_op_block INT
 )
@@ -81,10 +81,10 @@ BEGIN
   WITH author_reward_operation AS MATERIALIZED
   (
     SELECT
-      (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'author') AS _account,
-      ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
-      ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
-      ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
+      (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'author') AS _account,
+      ((body)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
+      ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
+      ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
   )
   INSERT INTO btracker_app.current_account_rewards (
     account,
@@ -139,7 +139,7 @@ $$
 ;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(
-  body hive.operation, 
+  body jsonb, 
   _source_op BIGINT, 
   _source_op_block INT
 )
@@ -150,9 +150,10 @@ $$
 BEGIN
   WITH curation_reward_operation AS MATERIALIZED
   (
-    SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'curator') AS _account,
-       ((body::jsonb)->'value'->'reward'->>'amount')::BIGINT AS _reward,
-       ((body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN AS _payout_must_be_claimed
+    SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'curator') AS _account,
+       ((body)->'value'->'reward'->>'amount')::BIGINT AS _reward,
+       (SELECT hive.get_vesting_balance(_source_op_block, ((body)->'value'->'reward'->>'amount')::BIGINT)) AS _reward_hive,
+       ((body)->'value'->>'payout_must_be_claimed')::BOOLEAN AS _payout_must_be_claimed
   ),
   insert_balance AS
   (
@@ -176,7 +177,7 @@ INSERT INTO btracker_app.current_account_rewards (
   SELECT
     _account,
     38,
-    (SELECT hive.get_vesting_balance(_source_op_block, _reward)),
+    _reward_hive,
     _source_op,
     _source_op_block
     FROM curation_reward_operation
@@ -195,7 +196,7 @@ INSERT INTO btracker_app.current_account_rewards (
   )
   SELECT
     _account,
-    (SELECT hive.get_vesting_balance(_source_op_block, _reward))
+    _reward_hive
     FROM curation_reward_operation
 
   ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
@@ -206,7 +207,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_comment_benefactor_reward_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_benefactor_reward_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -214,10 +215,10 @@ $$
 BEGIN
 WITH comment_benefactor_reward_operation AS MATERIALIZED
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'benefactor') AS _account,
-       ((body::jsonb)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
-       ((body::jsonb)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
-       ((body::jsonb)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'benefactor') AS _account,
+       ((body)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
+       ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
+       ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
 )
 INSERT INTO btracker_app.current_account_rewards (
     account,
@@ -271,7 +272,7 @@ $$
 ;
 
 
-CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body hive.operation)
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body jsonb)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -279,8 +280,8 @@ $$
 BEGIN
 WITH comment_reward_operation AS MATERIALIZED
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'author') AS _account,
-       ((body::jsonb)->'value'->>'author_rewards')::BIGINT AS _author_rewards
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'author') AS _account,
+       ((body)->'value'->>'author_rewards')::BIGINT AS _author_rewards
 )
 INSERT INTO btracker_app.account_posting_curation_rewards (
     account,
