@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(body hive.operation, _withdraw_rate INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(body jsonb, _withdraw_rate INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -6,8 +6,8 @@ $$
 BEGIN
 WITH withdraw_vesting_operation AS
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'account') AS _account,
-       ((body::jsonb)->'value'->'vesting_shares'->>'amount')::BIGINT AS _vesting_withdraw
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
+       ((body)->'value'->'vesting_shares'->>'amount')::BIGINT AS _vesting_withdraw
 )
  INSERT INTO btracker_app.current_account_withdraws 
     (
@@ -30,7 +30,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body hive.operation)
+CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body jsonb)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -42,9 +42,9 @@ DECLARE
   _current_balance INT;
 BEGIN
 
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account'),
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'to_account'),
-       ((body::jsonb)->'value'->>'percent')::INT
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account'),
+       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'to_account'),
+       ((body)->'value'->>'percent')::INT
 INTO _account, _to_account, _percent;
 
   SELECT cawr.percent INTO _current_balance
@@ -110,7 +110,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body hive.operation)
+CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body jsonb)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -118,8 +118,8 @@ $$
 BEGIN
 WITH fill_vesting_withdraw_operation AS
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from_account') AS _account,
-       ((body::jsonb)->'value'->'withdrawn'->>'amount')::BIGINT AS _vesting_withdraw
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account') AS _account,
+       ((body)->'value'->'withdrawn'->>'amount')::BIGINT AS _vesting_withdraw
 ),
 insert_balance AS
 (

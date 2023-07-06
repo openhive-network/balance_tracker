@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_savings_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -6,9 +6,9 @@ $$
 BEGIN
 WITH transfer_to_savings_operation AS  
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'to') AS _account,
-       substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
-       ((body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS _balance
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'to') AS _account,
+       substring((body)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
+       ((body)->'value'->'amount'->>'amount')::BIGINT AS _balance
 )
       INSERT INTO btracker_app.current_account_savings
       (
@@ -36,7 +36,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_transfer_from_savings_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -44,10 +44,10 @@ $$
 BEGIN
 WITH transfer_from_savings_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from') AS _account,
-       ((body::jsonb)->'value'->>'request_id')::BIGINT AS _request_id,
-       substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
-       ((body::jsonb)->'value'->'amount'->>'amount')::BIGINT AS _balance
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from') AS _account,
+       ((body)->'value'->>'request_id')::BIGINT AS _request_id,
+       substring((body)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
+       ((body)->'value'->'amount'->>'amount')::BIGINT AS _balance
 ),
 insert_balance AS 
 (
@@ -94,7 +94,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_cancel_transfer_from_savings_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_cancel_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -102,8 +102,8 @@ $$
 BEGIN
 WITH cancel_transfer_from_savings_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = ((body::jsonb)->'value'->>'from')) AS __account,
-       ((body::jsonb)->'value'->>'request_id')::BIGINT AS __request_id
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = ((body)->'value'->>'from')) AS __account,
+       ((body)->'value'->>'request_id')::BIGINT AS __request_id
 ),
 joined_tables AS 
 (
@@ -147,7 +147,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_fill_transfer_from_savings_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_fill_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -155,9 +155,9 @@ $$
 BEGIN
 WITH fill_transfer_from_savings_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'from') AS _account,
-       ((body::jsonb)->'value'->>'request_id')::BIGINT AS _request_id,
-       substring((body::jsonb)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from') AS _account,
+       ((body)->'value'->>'request_id')::BIGINT AS _request_id,
+       substring((body)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai
 ),
 insert_balance AS 
 (
@@ -191,7 +191,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_interest_operation(body hive.operation, _source_op BIGINT, _source_op_block INT)
+CREATE OR REPLACE FUNCTION btracker_app.process_interest_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -199,9 +199,9 @@ $$
 BEGIN
 WITH interest_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body::jsonb)->'value'->>'owner') AS _account, 
-       substring((body::jsonb)->'value'->'interest'->>'nai', '[0-9]+')::INT AS _nai,
-       ((body::jsonb)->'value'->'interest'->>'amount')::BIGINT AS _balance
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'owner') AS _account, 
+       substring((body)->'value'->'interest'->>'nai', '[0-9]+')::INT AS _nai,
+       ((body)->'value'->'interest'->>'amount')::BIGINT AS _balance
 )
     INSERT INTO btracker_app.current_account_savings 
     (
