@@ -1,5 +1,12 @@
 # Balance tracker Docker deployment
 
+1. [Quickstart](#quickstart)
+1. [Profiles](#profiles)
+1. [Configuration](#configuration)
+    1. [Environment variables](#environment-variables)
+    1. [Configuring HAF](#configuring-haf)
+    1. [Configuring containers by using override files](#configuring-containers-by-using-override-files)
+
 ## Quickstart
 
 Commands below will start a demo environment consisting of balance tracker and HAF with 5 million blocks.
@@ -12,6 +19,14 @@ docker compose up -d
 ```
 
 You can stop the app with `docker compose stop` or `docker compose down` (the latter removes the containers) and remove all the application data with `docker compose down -v`.
+
+## Profiles
+
+The Composefile contains profiles that add additional containers to the setup:
+
+- *swagger* - adds the Swagger UI running on port 8080
+
+You can enable the profiles by adding the profile option to `docker compose` command, eg. `docker compose --profile swagger up -d`.
 
 ## Configuration
 
@@ -27,6 +42,8 @@ The variables below are can be used to configure the Compose files.
 | BACKEND_VERSION    | Backend version to use                                                                                              | latest                                                  |
 | POSTGREST_REGISTRY | Registry containing PostgREST image                                                                                 | postgrest/postgrest                                     |
 | POSTGREST_VERSION  | PostgREST version to use                                                                                            | latest                                                  |
+| SWAGGER_REGISTRY   | Registry containing Swagger UI image                                                                                | swaggerapi/swagger-ui                                   |
+| SWAGGER_VERSION    | Swagger UI version to use                                                                                           | latest                                                  |
 | HAF_DATA_DIRECTORY | HAF data directory path on host (used by [docker-compose.bind-mounts.yml](docker-compose.bind-mounts.yml))          | none                                                    |
 | HAF_SHM_DIRECTORY  | HAF shared memory directory path on host (used by [docker-compose.bind-mounts.yml](docker-compose.bind-mounts.yml)) | none                                                    |
 | HIVED_UID          | UID to be used by HAF service                                                                                       | 0                                                       |

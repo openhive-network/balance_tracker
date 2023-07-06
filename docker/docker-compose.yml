@@ -53,6 +53,17 @@ services:
         condition: service_healthy
       backend-block-processing:
         condition: service_healthy
+  swagger:
+    image: ${SWAGGER_REGISTRY:-swaggerapi/swagger-ui}:${SWAGGER_VERSION:-latest}
+    ports:
+      - "8080:8080"
+    profiles:
+      - swagger
+    environment:
+      API_URL: http://localhost:3000/
+    depends_on:
+      backend-postgrest:
+        condition: service_started
 networks:
   haf-network:
 
