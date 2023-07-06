@@ -6,7 +6,8 @@ server/__pycache__
 
 # Docker deployment
 docker/blockchain/block_log*
-.env.local
+.env.*
+docker-compose.override.yml
 
 # IDEs
 .vscode/

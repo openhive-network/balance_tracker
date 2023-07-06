@@ -10,7 +10,6 @@ services:
       PG_ACCESS: "
         host    haf_block_log    haf_app_admin    all    trust\n
         host    haf_block_log    haf_admin        all    trust\n
-        host    postgres    haf_admin        all    trust\n
         "
     volumes:
       - haf_datadir:/home/hived/datadir
@@ -22,10 +21,38 @@ services:
     healthcheck:
       test: ["CMD-SHELL","curl -f localhost:8090"]
       interval: 60s
-      timeout: 60s
-      retries: 15
-      start_period: 30s
-
+      timeout: 10s
+      retries: 3
+      start_period: 48h #time for replay to finish
+  backend-block-processing:
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/backend}:${BACKEND_VERSION:-latest}
+    environment:
+      POSTGRES_HOST: haf
+    networks:
+      haf-network:
+    depends_on:
+      haf:
+        condition: service_healthy
+  backend-postgrest:
+    image: ${POSTGREST_REGISTRY:-postgrest/postgrest}:${POSTGREST_VERSION:-latest}
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_DB_URI: postgresql://haf_app_admin@haf:5432/haf_block_log
+      PGRST_DB_SCHEMA: btracker_app
+      PGRST_DB_ANON_ROLE: btracker_user
+      PGRST_DB_POOL: 20
+      PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://host.docker.internal:3000
+    networks:
+      haf-network:
+    depends_on:
+      haf:
+        condition: service_healthy
+      backend-block-processing:
+        condition: service_healthy
 networks:
   haf-network:
 

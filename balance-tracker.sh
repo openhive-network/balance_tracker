@@ -33,6 +33,8 @@ cat <<-END
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
     --remove-context=true|false           When set to true, remove the balance tracker app context from database before setup (default: false)
     --remove-context                      The same as '--remove-context=true'
+    --skip-if-db-exists=true|false        When set to true, skip database setup if database already exists (default: false)
+    --skip-if-db-exists                   The same as '--skip-if-db-exists=true'
 
   Block processing (process-blocks) options:
     --number-of-blocks=INTEGER            Number of blocks to process (default: 10^9), if set to value greater than number of blocks in the database (or 0),
@@ -227,12 +229,12 @@ process-blocks() {
 
   if [[ -z "$log_dir" ]]; then
     echo "Running indexer in the foreground"
-    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c '\timing' -c "call btracker_app.main('btracker_app', $block_number);"
+    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "call btracker_app.main('btracker_app', $block_number);"
     echo "Finished running indexer"
   else
     echo "Running indexer in the background"
     mkdir -p "$log_dir"
-    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c '\timing' -c "call btracker_app.main('btracker_app', $block_number);" 2>&1 | /usr/bin/rotatelogs "$log_dir/process-blocks.%Y-%m-%d-%H_%M_%S.log" 5M &
+    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "call btracker_app.main('btracker_app', $block_number);" 2>&1 | /usr/bin/rotatelogs "$log_dir/process-blocks.%Y-%m-%d-%H_%M_%S.log" 5M &
   fi
 }
 

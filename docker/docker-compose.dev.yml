@@ -1,10 +1,33 @@
 services:
   haf:
+    environment:
+      PG_ACCESS: "
+        host    haf_block_log    haf_app_admin    all    trust\n
+        host    haf_block_log    haf_admin        all    trust\n
+        host    postgres         haf_admin        all    trust\n
+        "
     networks:
       haf-network:
         ipv4_address: 172.19.0.2
     ports:
       - 5432:5432
+
+  backend-postgrest:
+    image: postgrest-with-curl:latest
+    build:
+      context: .
+      args: 
+        POSTGREST_VERSION: $POSTGREST_VERSION
+      dockerfile_inline: |
+        ARG POSTGREST_VERSION
+        FROM bitnami/postgrest:${POSTGREST_VERSION:-latest}
+        USER root
+        RUN apt update && \
+            apt install -y curl && \
+            apt-get clean && \
+            rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
+        USER postgrest
+        HEALTHCHECK --interval=20s --timeout=5s CMD curl -f localhost:3001/ready
 
 networks:
   haf-network:

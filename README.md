@@ -6,6 +6,7 @@
     1. [Setup with postgREST backend](#setup-with-postgrest-backend)
     1. [Setup with python backend](#setup-with-python-backend)
     1. [After Setup](#after-setup)
+    1. [Dockerized setup](#run-with-docker)
 1. [Architecture](#architecture)
     1. [Python version](#python-version)
     1. [PostgREST version](#postgrest-version)
@@ -58,14 +59,14 @@ curl "http://localhost:3000/rpc/get_balance_for_coin_by_time/?_account_name=dant
 
 ### After Setup
 
-- After blocks were added to btracker_app schema, postgREST backend server can be started up quickly with `./run.sh start`
-- If you have added more blocks to `haf_block_log` db, or you are running live sync, you can run:
+- After blocks were added to *btracker_app* schema, PostgREST backend server can be started up quickly with `./balance-tracker.sh serve postgrest-backend`.
+- If you have added more blocks to `haf_block_log` db, or you want to run live sync, you can run:
 
 ```bash
 ./balance-tracker.sh process-blocks --number-of-blocks=0
 ```
 
-This will keep indexer waiting for new blocks and process them as backend is running.
+This will keep indexer waiting for new blocks and process them while the backend is running.
 
 ### Run with Docker
 
