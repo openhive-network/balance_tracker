@@ -25,8 +25,9 @@ You can stop the app with `docker compose stop` or `docker compose down` (the la
 The Composefile contains profiles that add additional containers to the setup:
 
 - *swagger* - adds the Swagger UI running on port 8080
+- *db-tools* - adds PgHero running on port 2080
 
-You can enable the profiles by adding the profile option to `docker compose` command, eg. `docker compose --profile swagger up -d`.
+You can enable the profiles by adding the profile option to `docker compose` command, eg. `docker compose --profile swagger up -d`. To enable multiple profiles specify the option multiple times (like with `--file` option in [Configuring containers by using override files](#configuring-containers-by-using-override-files) section).
 
 ## Configuration
 
@@ -42,16 +43,20 @@ The variables below are can be used to configure the Compose files.
 | BACKEND_VERSION    | Backend version to use                                                                                              | latest                                                  |
 | POSTGREST_REGISTRY | Registry containing PostgREST image                                                                                 | postgrest/postgrest                                     |
 | POSTGREST_VERSION  | PostgREST version to use                                                                                            | latest                                                  |
-| SWAGGER_REGISTRY   | Registry containing Swagger UI image                                                                                | swaggerapi/swagger-ui                                   |
-| SWAGGER_VERSION    | Swagger UI version to use                                                                                           | latest                                                  |
+| SWAGGER_REGISTRY   | Registry containing Swagger UI image (*swagger* profile only)                                                       | swaggerapi/swagger-ui                                   |
+| SWAGGER_VERSION    | Swagger UI version to use (*swagger* profile only)                                                                  | latest                                                  |
+| PGHERO_REGISTRY    | Registry containing PgHero image (*db-tools* profile only)                                                          | ankane/pghero                                           |
+| PGHERO_VERSION     | PgHero version to use (*db-tools* profile only)                                                                     | latest                                                  |
 | HAF_DATA_DIRECTORY | HAF data directory path on host (used by [docker-compose.bind-mounts.yml](docker-compose.bind-mounts.yml))          | none                                                    |
 | HAF_SHM_DIRECTORY  | HAF shared memory directory path on host (used by [docker-compose.bind-mounts.yml](docker-compose.bind-mounts.yml)) | none                                                    |
 | HIVED_UID          | UID to be used by HAF service                                                                                       | 0                                                       |
+| PGHERO_USERNAME    | PgHero username (*db-tools* profile only)                                                                           | link                                                    |
+| PGHERO_PASSWORD    | PgHero password (*db-tools* profile only)                                                                           | hyrule                                                  |
 
 You can override them by editing the [.env](.env) file or by creating your own env file and instructing Docker Compose to use it instead of the default, eg.
 
 ```bash
-# Create a .env.local file which overrides registries used to pull HAF and PostgREST images
+# Create a .env.local file which overrides registries used to pull HAF and PostgREST images and HAF version
 {
   echo "HAF_REGISTRY=registry.gitlab.syncad.com/hive/haf/instance"
   echo "HAF_VERSION=instance-v1.27.4.0"
