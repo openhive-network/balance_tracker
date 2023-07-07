@@ -2,9 +2,7 @@ services:
   haf:
     environment:
       PG_ACCESS: "
-        host    haf_block_log    haf_app_admin    all    trust\n
-        host    haf_block_log    haf_admin        all    trust\n
-        host    postgres         haf_admin        all    trust\n
+        host    all    all    all    trust\n
         "
     networks:
       haf-network:

@@ -10,6 +10,9 @@ services:
       PG_ACCESS: "
         host    haf_block_log    haf_app_admin    all    trust\n
         host    haf_block_log    haf_admin        all    trust\n
+        host    postgres         haf_admin        all    trust\n
+        host    haf_block_log    pghero           all    trust\n
+        host    postgres         pghero           all    trust\n
         "
     volumes:
       - haf_datadir:/home/hived/datadir
@@ -45,7 +48,7 @@ services:
       PGRST_DB_ANON_ROLE: btracker_user
       PGRST_DB_POOL: 20
       PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
-      PGRST_OPENAPI_SERVER_PROXY_URI: http://host.docker.internal:3000
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
     networks:
       haf-network:
     depends_on:
@@ -73,13 +76,32 @@ services:
     profiles:
       - db-tools
     environment:
-      DATABASE_URL: postgresql://haf_admin@haf:5432/haf_block_log
+      DATABASE_URL: postgresql://pghero@haf:5432/haf_block_log
       PGHERO_USERNAME:
       PGHERO_PASSWORD:
     networks:
       haf-network:
     healthcheck:
       test: ["CMD-SHELL","wget --no-verbose --tries=1 --spider --spider http://$PGHERO_USERNAME:$PGHERO_PASSWORD@localhost:8080/ || exit 1"]
+    depends_on:
+      haf:
+        condition: service_healthy
+  pgadmin:
+    image: ${PGADMIN_REGISTRY:-dpage/pgadmin4}:${PGADMIN_VERSION:-latest}
+    ports:
+      - "1080:80"
+    profiles:
+      - db-tools
+    environment:
+      PGADMIN_DEFAULT_EMAIL:
+      PGADMIN_DEFAULT_PASSWORD:
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin4/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      haf-network:
+    healthcheck:
+      test: ["CMD-SHELL","wget --no-verbose --tries=1 --spider --spider http://localhost/ || exit 1"]
     depends_on:
       haf:
         condition: service_healthy
@@ -91,4 +113,6 @@ volumes:
   haf_datadir:
     driver: local
   haf_shmdir:
+    driver: local
+  pgadmin_data:
     driver: local

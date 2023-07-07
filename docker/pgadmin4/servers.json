@@ -1,0 +1,13 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "HAF",
+            "Group": "HAF",
+            "Port": 5432,
+            "Username": "haf_admin",
+            "Host": "haf",
+            "SSLMode": "prefer",
+            "MaintenanceDB": "haf_block_log"
+        }
+    }
+}
