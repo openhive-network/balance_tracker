@@ -37,10 +37,9 @@ ELSE
 
       ON CONFLICT ON CONSTRAINT pk_account_posts
       DO UPDATE SET
-          last_post = EXCLUDED.last_post,
-          last_root_post = EXCLUDED.last_root_post;
-END IF;
+          last_post = EXCLUDED.last_post;
 
+END IF;
 END
 $$
 ;
