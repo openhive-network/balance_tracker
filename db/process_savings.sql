@@ -10,7 +10,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
        substring((body)->'value'->'amount'->>'nai', '[0-9]+')::INT AS _nai,
        ((body)->'value'->'amount'->>'amount')::BIGINT AS _balance
 )
-      INSERT INTO btracker_app.current_account_savings
+      INSERT INTO btracker_app.account_savings
       (
       account,
       nai,
@@ -28,7 +28,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 
       ON CONFLICT ON CONSTRAINT pk_account_savings
       DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          saving_balance = btracker_app.account_savings.saving_balance + EXCLUDED.saving_balance,
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block;
 
@@ -51,7 +51,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 ),
 insert_balance AS 
 (
-    INSERT INTO btracker_app.current_account_savings 
+    INSERT INTO btracker_app.account_savings 
     (
       account,
       nai,
@@ -71,10 +71,10 @@ insert_balance AS
 
       ON CONFLICT ON CONSTRAINT pk_account_savings
       DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance - EXCLUDED.saving_balance,
+          saving_balance = btracker_app.account_savings.saving_balance - EXCLUDED.saving_balance,
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests + EXCLUDED.savings_withdraw_requests
+          savings_withdraw_requests = btracker_app.account_savings.savings_withdraw_requests + EXCLUDED.savings_withdraw_requests
 )
       INSERT INTO btracker_app.transfer_saving_id
       (
@@ -114,7 +114,7 @@ request_id = b.__request_id AND account= b.__account
 ),
 insert_balance AS 
 (
-    INSERT INTO btracker_app.current_account_savings 
+    INSERT INTO btracker_app.account_savings 
     (
       account,
       nai,
@@ -134,10 +134,10 @@ insert_balance AS
 
       ON CONFLICT ON CONSTRAINT pk_account_savings
       DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          saving_balance = btracker_app.account_savings.saving_balance + EXCLUDED.saving_balance,
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests
+          savings_withdraw_requests = btracker_app.account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests
 )
   DELETE FROM btracker_app.transfer_saving_id
   USING cancel_transfer_from_savings_operation b
@@ -161,7 +161,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 ),
 insert_balance AS 
 (
-    INSERT INTO btracker_app.current_account_savings 
+    INSERT INTO btracker_app.account_savings 
     (
       account,
       nai,
@@ -181,7 +181,7 @@ insert_balance AS
       DO UPDATE SET
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block,
-          savings_withdraw_requests = btracker_app.current_account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests
+          savings_withdraw_requests = btracker_app.account_savings.savings_withdraw_requests - EXCLUDED.savings_withdraw_requests
 )
   DELETE FROM btracker_app.transfer_saving_id
   USING fill_transfer_from_savings_operation b
@@ -203,7 +203,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
        substring((body)->'value'->'interest'->>'nai', '[0-9]+')::INT AS _nai,
        ((body)->'value'->'interest'->>'amount')::BIGINT AS _balance
 )
-    INSERT INTO btracker_app.current_account_savings 
+    INSERT INTO btracker_app.account_savings 
     (
       account,
       nai,
@@ -221,7 +221,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 
       ON CONFLICT ON CONSTRAINT pk_account_savings
       DO UPDATE SET
-          saving_balance = btracker_app.current_account_savings.saving_balance + EXCLUDED.saving_balance,
+          saving_balance = btracker_app.account_savings.saving_balance + EXCLUDED.saving_balance,
           source_op = EXCLUDED.source_op,
           source_op_block = EXCLUDED.source_op_block;
 

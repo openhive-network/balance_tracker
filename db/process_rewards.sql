@@ -11,7 +11,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
        ((body)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
        ((body)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
 )
-  INSERT INTO btracker_app.current_account_rewards
+  INSERT INTO btracker_app.account_rewards
   (
   account,
   nai,
@@ -47,19 +47,19 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
   WHERE _vesting_payout > 0
   UNION ALL
   SELECT
-  crbo._account,
-  38,
+    crbo._account,
+    38,
   (SELECT ROUND(caar.balance * crbo._vesting_payout / car.balance, 3)
   FROM btracker_app.current_account_rewards car
   JOIN btracker_app.current_account_rewards caar ON caar.nai = 38 AND caar.account = car.account 
   WHERE car.nai = 37 and car.account = crbo._account),
-  _source_op,
-  _source_op_block
+    _source_op,
+    _source_op_block
   FROM claim_reward_balance_operation crbo
-  WHERE crbo._vesting_payout > 0   
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
+  WHERE crbo._vesting_payout > 0
+  ON CONFLICT ON CONSTRAINT pk_account_rewards
   DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance - EXCLUDED.balance,
+      balance = btracker_app.account_rewards.balance - EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block;
 
@@ -86,7 +86,7 @@ BEGIN
       ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
       ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
   )
-  INSERT INTO btracker_app.current_account_rewards (
+  INSERT INTO btracker_app.account_rewards (
     account,
     nai,
     balance,
@@ -128,9 +128,9 @@ BEGIN
     _source_op_block
   FROM author_reward_operation
   WHERE _vesting_payout > 0
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
+  ON CONFLICT ON CONSTRAINT pk_account_rewards
   DO UPDATE SET
-    balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
+    balance = btracker_app.account_rewards.balance + EXCLUDED.balance,
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block;
   
@@ -157,7 +157,7 @@ BEGIN
   ),
   insert_balance AS
   (
-INSERT INTO btracker_app.current_account_rewards (
+INSERT INTO btracker_app.account_rewards (
     account,
     nai,
     balance,
@@ -183,14 +183,14 @@ INSERT INTO btracker_app.current_account_rewards (
     FROM curation_reward_operation
     WHERE _payout_must_be_claimed = TRUE
 
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
+  ON CONFLICT ON CONSTRAINT pk_account_rewards
   DO UPDATE SET
-      balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
+      balance = btracker_app.account_rewards.balance + EXCLUDED.balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block
   )
 
-  INSERT INTO btracker_app.account_posting_curation_rewards (
+  INSERT INTO btracker_app.account_info_rewards (
     account,
     curation_rewards
   )
@@ -199,9 +199,9 @@ INSERT INTO btracker_app.current_account_rewards (
     _reward_hive
     FROM curation_reward_operation
 
-  ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
+  ON CONFLICT ON CONSTRAINT pk_account_info_rewards
   DO UPDATE SET
-    curation_rewards = btracker_app.account_posting_curation_rewards.curation_rewards + EXCLUDED.curation_rewards;
+    curation_rewards = btracker_app.account_info_rewards.curation_rewards + EXCLUDED.curation_rewards;
   
 END
 $$
@@ -220,7 +220,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
        ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
        ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
 )
-INSERT INTO btracker_app.current_account_rewards (
+INSERT INTO btracker_app.account_rewards (
     account,
     nai,
     balance,
@@ -262,9 +262,9 @@ INSERT INTO btracker_app.current_account_rewards (
     _source_op_block
   FROM comment_benefactor_reward_operation
   WHERE _vesting_payout > 0
-  ON CONFLICT ON CONSTRAINT pk_current_account_rewards
+  ON CONFLICT ON CONSTRAINT pk_account_rewards
   DO UPDATE SET
-    balance = btracker_app.current_account_rewards.balance + EXCLUDED.balance,
+    balance = btracker_app.account_rewards.balance + EXCLUDED.balance,
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block;
 END
@@ -283,7 +283,7 @@ WITH comment_reward_operation AS MATERIALIZED
 SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'author') AS _account,
        ((body)->'value'->>'author_rewards')::BIGINT AS _author_rewards
 )
-INSERT INTO btracker_app.account_posting_curation_rewards (
+INSERT INTO btracker_app.account_info_rewards (
     account,
     posting_rewards
   )
@@ -292,9 +292,9 @@ INSERT INTO btracker_app.account_posting_curation_rewards (
     _author_rewards
   FROM comment_reward_operation
 
-  ON CONFLICT ON CONSTRAINT pk_account_posting_curation_rewards
+  ON CONFLICT ON CONSTRAINT pk_account_info_rewards
   DO UPDATE SET
-    posting_rewards = btracker_app.account_posting_curation_rewards.posting_rewards + EXCLUDED.posting_rewards;
+    posting_rewards = btracker_app.account_info_rewards.posting_rewards + EXCLUDED.posting_rewards;
 
 END
 $$

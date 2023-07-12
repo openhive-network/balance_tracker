@@ -25,6 +25,7 @@ VALUES
 (True, 0, 104)
 ;
 
+--ACCOUNT BALANCES
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
 (
@@ -37,7 +38,24 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
+CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
+(
+  account INT NOT NULL, -- Balance owner account
+  nai     INT NOT NULL,     -- Balance type (currency)
+  balance BIGINT NOT NULL,  -- Balance value after a change
+  source_op BIGINT NOT NULL,-- The operation triggered given balance change
+  source_op_block INT NOT NULL -- Block containing the source operation
+  
+  /** Because of bugs in blockchain at very begin, it was possible to make a transfer to self. See summon transfer in block 118570,
+      like also `register` transfer in block 818601
+      That's why constraint has been eliminated.
+  */
+  --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
+) INHERITS (hive.btracker_app);
+
+--ACCOUNT REWARDS
+
+CREATE TABLE IF NOT EXISTS btracker_app.account_rewards
 (
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
@@ -45,8 +63,19 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_rewards
   source_op BIGINT NOT NULL,-- The operation triggered last balance change
   source_op_block INT NOT NULL, -- Block containing the source operation
 
-  CONSTRAINT pk_current_account_rewards PRIMARY KEY (account, nai)
+  CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai)
 ) INHERITS (hive.btracker_app);
+
+CREATE TABLE IF NOT EXISTS btracker_app.account_info_rewards
+(
+  account INT NOT NULL, 
+  posting_rewards BIGINT DEFAULT 0,
+  curation_rewards  BIGINT DEFAULT 0, 
+
+  CONSTRAINT pk_account_info_rewards PRIMARY KEY (account)
+) INHERITS (hive.btracker_app);
+
+--ACCOUNT DELEGATIONS
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
 (
@@ -59,7 +88,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
   CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
+CREATE TABLE IF NOT EXISTS btracker_app.account_delegations
 (
   account INT NOT NULL,
   received_vests BIGINT DEFAULT 0,     
@@ -68,7 +97,9 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_vests
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
+--ACCOUNT WITHDRAWS
+
+CREATE TABLE IF NOT EXISTS btracker_app.account_withdraws
 (
   account INT NOT NULL,
   vesting_withdraw_rate BIGINT DEFAULT 0,     
@@ -76,19 +107,21 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_withdraws
   withdrawn BIGINT DEFAULT 0,          
   withdraw_routes BIGINT DEFAULT 0,     
 
-  CONSTRAINT pk_current_account_withdraws PRIMARY KEY (account)
+  CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_routes
+CREATE TABLE IF NOT EXISTS btracker_app.account_routes
 (
   account INT NOT NULL,
   to_account INT NOT NULL,     
   percent INT NOT NULL,
     
-  CONSTRAINT pk_current_account_routes PRIMARY KEY (account, to_account)
+  CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_savings
+--ACCOUNT SAVINGS
+
+CREATE TABLE IF NOT EXISTS btracker_app.account_savings
 (
   account INT NOT NULL,
   nai     INT NOT NULL, 
@@ -110,14 +143,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
 ) INHERITS (hive.btracker_app);
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_posting_curation_rewards
-(
-  account INT NOT NULL, 
-  posting_rewards BIGINT DEFAULT 0,
-  curation_rewards  BIGINT DEFAULT 0, 
-
-  CONSTRAINT pk_account_posting_curation_rewards PRIMARY KEY (account)
-) INHERITS (hive.btracker_app);
+--ACCOUNT POSTS
 
 CREATE TABLE IF NOT EXISTS btracker_app.account_posts
 (
@@ -127,21 +153,6 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_posts
   last_vote_time TIMESTAMP DEFAULT '1970-01-01T00:00:00', 
 
   CONSTRAINT pk_account_posts PRIMARY KEY (account)
-) INHERITS (hive.btracker_app);
-
-CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
-(
-  account INT NOT NULL, -- Balance owner account
-  nai     INT NOT NULL,     -- Balance type (currency)
-  balance BIGINT NOT NULL,  -- Balance value after a change
-  source_op BIGINT NOT NULL,-- The operation triggered given balance change
-  source_op_block INT NOT NULL -- Block containing the source operation
-  
-  /** Because of bugs in blockchain at very begin, it was possible to make a transfer to self. See summon transfer in block 118570,
-      like also `register` transfer in block 818601
-      That's why constraint has been eliminated.
-  */
-  --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
 ) INHERITS (hive.btracker_app);
 
 GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
@@ -345,9 +356,9 @@ $$
 BEGIN
   CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
   CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
-  CREATE INDEX idx_btracker_app_current_account_rewards_nai ON btracker_app.current_account_rewards(nai);
-  CREATE INDEX idx_btracker_app_current_account_rewards_nai_account ON btracker_app.current_account_rewards(account, nai);
-  CREATE INDEX idx_btracker_app_current_account_withdraws_account ON btracker_app.current_account_withdraws(account);
+  CREATE INDEX idx_btracker_app_account_rewards_nai ON btracker_app.account_rewards(nai);
+  CREATE INDEX idx_btracker_app_account_rewards_nai_account ON btracker_app.account_rewards(account, nai);
+  CREATE INDEX idx_btracker_app_account_withdraws_account ON btracker_app.account_withdraws(account);
 
 
 END

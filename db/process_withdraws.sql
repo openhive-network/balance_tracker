@@ -9,7 +9,7 @@ WITH withdraw_vesting_operation AS
 SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
        ((body)->'value'->'vesting_shares'->>'amount')::BIGINT AS _vesting_withdraw
 )
- INSERT INTO btracker_app.current_account_withdraws 
+ INSERT INTO btracker_app.account_withdraws 
     (
       account,
       vesting_withdraw_rate,
@@ -21,7 +21,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
         _vesting_withdraw
       FROM withdraw_vesting_operation
 
-      ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
           withdrawn = 0,
           vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
@@ -48,13 +48,13 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 INTO _account, _to_account, _percent;
 
   SELECT cawr.percent INTO _current_balance
-  FROM btracker_app.current_account_routes cawr 
+  FROM btracker_app.account_routes cawr 
   WHERE cawr.account=  _account
   AND cawr.to_account=  _to_account;
   
 IF _current_balance IS NULL THEN
 
- INSERT INTO btracker_app.current_account_routes 
+ INSERT INTO btracker_app.account_routes 
     (
       account,
       to_account,
@@ -65,7 +65,7 @@ IF _current_balance IS NULL THEN
         _to_account,
         _percent;
 
- INSERT INTO btracker_app.current_account_withdraws 
+ INSERT INTO btracker_app.account_withdraws 
     (
       account,
       withdraw_routes
@@ -74,13 +74,13 @@ IF _current_balance IS NULL THEN
         _account,
         1
 
-      ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdraw_routes = btracker_app.current_account_withdraws.withdraw_routes + EXCLUDED.withdraw_routes;
+          withdraw_routes = btracker_app.account_withdraws.withdraw_routes + EXCLUDED.withdraw_routes;
 ELSE
   IF _percent = 0 THEN
 
-  INSERT INTO btracker_app.current_account_withdraws 
+  INSERT INTO btracker_app.account_withdraws 
     (
       account,
       withdraw_routes
@@ -89,17 +89,17 @@ ELSE
         _account,
         1
 
-      ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdraw_routes = btracker_app.current_account_withdraws.withdraw_routes - EXCLUDED.withdraw_routes;
+          withdraw_routes = btracker_app.account_withdraws.withdraw_routes - EXCLUDED.withdraw_routes;
 
-  DELETE FROM btracker_app.current_account_routes
+  DELETE FROM btracker_app.account_routes
   WHERE account = _account
   AND to_account = _to_account;
 
   ELSE
 
-  UPDATE btracker_app.current_account_routes SET 
+  UPDATE btracker_app.account_routes SET 
     percent = _percent
   WHERE account = _account 
   AND to_account = _to_account;
@@ -123,7 +123,7 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 ),
 insert_balance AS
 (
- INSERT INTO btracker_app.current_account_withdraws 
+ INSERT INTO btracker_app.account_withdraws 
     (
       account,
       withdrawn
@@ -133,18 +133,18 @@ insert_balance AS
         _vesting_withdraw
       FROM fill_vesting_withdraw_operation
 
-      ON CONFLICT ON CONSTRAINT pk_current_account_withdraws
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdrawn = btracker_app.current_account_withdraws.withdrawn + EXCLUDED.withdrawn
+          withdrawn = btracker_app.account_withdraws.withdrawn + EXCLUDED.withdrawn
       RETURNING account
 )
-    UPDATE btracker_app.current_account_withdraws SET 
+    UPDATE btracker_app.account_withdraws SET 
       vesting_withdraw_rate = 0,
       to_withdraw = 0,
       withdrawn = 0
     FROM insert_balance
-    WHERE btracker_app.current_account_withdraws.account = insert_balance.account 
-    AND btracker_app.current_account_withdraws.to_withdraw <= btracker_app.current_account_withdraws.withdrawn + 1;
+    WHERE btracker_app.account_withdraws.account = insert_balance.account 
+    AND btracker_app.account_withdraws.to_withdraw <= btracker_app.account_withdraws.withdrawn + 1;
 END
 $$
 ;

@@ -193,10 +193,10 @@ CASE ___balance_change.op_type
     WHEN 1 THEN
       FOR _vesting_multiplication IN
       SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn 
-      FROM btracker_app.current_account_withdraws
+      FROM btracker_app.account_withdraws
       LOOP
       SELECT _vesting_multiplication.to_withdraw * 1000000 INTO _to_withdraw;
-      UPDATE btracker_app.current_account_withdraws SET 
+      UPDATE btracker_app.account_withdraws SET 
         vesting_withdraw_rate = _to_withdraw / _withdraw_rate,
         to_withdraw = _to_withdraw,
         withdrawn = _vesting_multiplication.withdrawn * 1000000
