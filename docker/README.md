@@ -20,6 +20,19 @@ docker compose up -d
 
 You can stop the app with `docker compose stop` or `docker compose down` (the latter removes the containers) and remove all the application data with `docker compose down -v`.
 
+## Building images
+
+There are several targets defined in the Bakefile
+
+- *default* - groups together targets *frontend* and *backend*
+- *base* - groups together targets *frontend-base* and *backend-base*
+- *backend-base* - builds backend base image
+- *backend* - builds backend image
+- *frontend-base* - builds frontend image
+- *frontend* - builds frontend image
+
+To build a given target run `docker buildx bake [target-name]`. If no target name is provided the *default* target will be built.
+
 ## Profiles
 
 The Composefile contains profiles that add additional containers to the setup:

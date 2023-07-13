@@ -36,9 +36,22 @@ Tested on Ubuntu 20.04 and 22.04
 1. Process blocks: `./balance-tracker.sh process-blocks --number-of-blocks=5000000` (assuming HAF database runs on localhost on port 5432 and contains 5'000'000 blocks)  
   If you skip `--number-of-blocks` parameter balance tracker will process all blocks in the database and then wait for more. You can keep this running in the background.
 1. Start backend server: `./balance-tracker.sh serve postgrest-backend`
-1. Install frontend runtime dependencies . `./balance-tracker.sh install frontend-runtime-dependencies`
+1. Install frontend runtime dependencies: `./balance-tracker.sh install frontend-runtime-dependencies`
 1. Set up `$PATH`: `export VOLTA_HOME="$HOME/.volta"; export PATH="$VOLTA_HOME/bin:$PATH"` - or you can simply reopen the terminal
 1. Start frontend server: `./balance-tracker.sh serve frontend`
+
+#### Building the frontend
+
+Command `./balance-tracker.sh serve frontend` will build and serve the frontend in development mode. It can be used in production, but it is recommended to build and deploy the app in production mode.
+
+To do so, follow the instructions below:
+
+1. Set the public URL of the frontend in the [gui/.env](gui/.env) file.
+1. Adjust the values of the other environment variables in the same file.
+1. Build the frontend in production mode: `./balance-tracker.sh build frontend`
+1. Deploy the built frontend (located in [gui/build](gui/build) directory) using one of the methods described in the [official React documentation](https://create-react-app.dev/docs/deployment/).
+
+**Note**: Do not set the *homepage* field in [gui/package.json](gui/package.json) - it's currently [buggy](https://github.com/facebook/create-react-app/issues/8813).
 
 ### Setup with Python backend
 

@@ -7,12 +7,16 @@ cat <<-END
   Usage: $0 <command> [subcommand] [option(s)]
 
   Commands:
+    build                                 Build the project
     help                                  Show this help screen and exit
     install                               Perform installation steps
     process-blocks                        Process blocks
     run-tests                             Runs tests
     serve                                 Start server
     set-up-database                       Set up the database
+
+  Build subcommands:
+    frontend                              Builds the frontend
 
   Install subcommands:
     jmeter                                Installs Apache Jmeter
@@ -68,6 +72,28 @@ cat <<-END
     --test-report-dir=PATH                Directory where HTML test report is located             
       
 END
+}
+
+build() {
+  subcommand=$1
+  shift
+
+  case "$subcommand" in
+    frontend)
+      echo "Building frontend"
+      cd gui
+      export NODE_ENV=production
+      npm install
+      npm run build
+      npx react-inject-env set
+      cd ..
+      echo "Finished building frontend"
+      ;;
+    *)
+      echo "Unknown subcommand: $subcommand"
+      print_help
+      exit 1
+  esac
 }
 
 install-jmeter() {
@@ -458,6 +484,9 @@ command=$1
 shift
 
 case "$command" in
+  build)
+    build "$@"
+    ;;
   install)
     install "$@"
     ;;
