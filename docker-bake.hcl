@@ -7,7 +7,7 @@ variable "CI_COMMIT_TAG" {}
 variable "TAG" {
   default = "latest"
 }
-variable "BASE-TAG" {
+variable "BASE_TAG" {
   default = "ubuntu-22.04-1"
 }
 
@@ -36,7 +36,10 @@ target "backend-base" {
   dockerfile = "Dockerfile.backend"
   target = "base"
   tags = [
-    "${registry-name("backend", "base")}:${BASE-TAG}"
+    "${registry-name("backend", "base")}:${BASE_TAG}"
+  ]
+  platforms = [
+    "linux/amd64"
   ]
 }
 
@@ -47,12 +50,15 @@ target "backend" {
     notempty(CI_COMMIT_SHA) ? "${registry-name("backend", "")}:${CI_COMMIT_SHA}": "",
     notempty(CI_COMMIT_TAG) ? "${registry-name("backend", "")}:${CI_COMMIT_TAG}": ""
   ]
+  platforms = [
+    "linux/amd64"
+  ]
 }
 
 target "backend-ci" {
   inherits = ["backend"]
   contexts = {
-    base = "${registry-name("backend", "base")}:${BASE-TAG}"
+    base = "docker-image://${registry-name("backend", "base")}:${BASE_TAG}"
   }
   cache-from = [
     "type=registry,ref=${registry-name("backend", "cache")}:${TAG}"
