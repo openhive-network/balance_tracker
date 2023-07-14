@@ -80,7 +80,7 @@ END LOOP;
 RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 
 FOR ___balance_change IN
-  WITH raw_ops AS  
+  WITH raw_ops AS MATERIALIZED
   (	  
     SELECT ov.body::jsonb AS body,
           ov.id AS source_op,

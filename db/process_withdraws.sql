@@ -115,15 +115,16 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
 $$
+DECLARE
+_vesting_withdraw BIGINT;
+_account INT;
 BEGIN
-WITH fill_vesting_withdraw_operation AS
-(
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account') AS _account,
-       ((body)->'value'->'withdrawn'->>'amount')::BIGINT AS _vesting_withdraw
-),
-insert_balance AS
-(
- INSERT INTO btracker_app.account_withdraws 
+
+SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account'),
+       ((body)->'value'->'withdrawn'->>'amount')::BIGINT
+INTO _account, _vesting_withdraw;
+
+    INSERT INTO btracker_app.account_withdraws 
     (
       account,
       withdrawn
@@ -131,20 +132,17 @@ insert_balance AS
       SELECT 
         _account,
         _vesting_withdraw
-      FROM fill_vesting_withdraw_operation
 
       ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdrawn = btracker_app.account_withdraws.withdrawn + EXCLUDED.withdrawn
-      RETURNING account
-)
+          withdrawn = btracker_app.account_withdraws.withdrawn + EXCLUDED.withdrawn;
+
     UPDATE btracker_app.account_withdraws SET 
       vesting_withdraw_rate = 0,
       to_withdraw = 0,
       withdrawn = 0
-    FROM insert_balance
-    WHERE btracker_app.account_withdraws.account = insert_balance.account 
-    AND btracker_app.account_withdraws.to_withdraw <= btracker_app.account_withdraws.withdrawn + 1;
+    WHERE btracker_app.account_withdraws.account = _account 
+    AND btracker_app.account_withdraws.to_withdraw = btracker_app.account_withdraws.withdrawn;
 END
 $$
 ;
