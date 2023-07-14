@@ -50,8 +50,8 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
     crbo._account,
     38,
   (SELECT ROUND(caar.balance * crbo._vesting_payout / car.balance, 3)
-  FROM btracker_app.current_account_rewards car
-  JOIN btracker_app.current_account_rewards caar ON caar.nai = 38 AND caar.account = car.account 
+  FROM btracker_app.account_rewards car
+  JOIN btracker_app.account_rewards caar ON caar.nai = 38 AND caar.account = car.account 
   WHERE car.nai = 37 and car.account = crbo._account),
     _source_op,
     _source_op_block
