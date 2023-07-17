@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_posts
   account INT NOT NULL, 
   last_post TIMESTAMP DEFAULT '1970-01-01T00:00:00',
   last_root_post TIMESTAMP DEFAULT '1970-01-01T00:00:00',
-  last_vote_time TIMESTAMP DEFAULT '1970-01-01T00:00:00', 
+  last_vote_time TIMESTAMP DEFAULT '1970-01-01T00:00:00',
+  post_count INT DEFAULT 0, 
 
   CONSTRAINT pk_account_posts PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);

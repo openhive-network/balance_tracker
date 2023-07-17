@@ -97,15 +97,6 @@ FOR ___balance_change IN
 		ORDER BY (up.body::jsonb)->'value'->>'permlink', up.block_num, up.id DESC
     ) AS distinct_up ON ov.id = distinct_up.source_op
     LEFT JOIN (
-		SELECT DISTINCT ON ((ovc.body::jsonb)->'value'->>'author') body AS author,
-		ovc.id AS source_op
-		FROM hive.operations_view ovc
-		WHERE ovc.op_type_id = 1
-		AND (ovc.body::jsonb)->'value'->>'parent_author'=''
-		AND ovc.block_num BETWEEN _from AND _to
-		ORDER BY (ovc.body::jsonb)->'value'->>'author', ovc.id DESC
-    ) AS distinct_ovc ON ov.id = distinct_ovc.source_op
-    LEFT JOIN (
 		SELECT DISTINCT ON ((lvt.body::jsonb)->'value'->>'voter') body AS voter,
 		lvt.id AS source_op
 		FROM hive.operations_view lvt
@@ -116,7 +107,7 @@ FOR ___balance_change IN
     WHERE (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53)
             OR (ov.op_type_id = 55 AND ((ov.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)
             OR (ov.op_type_id IN (51,63) AND ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
-            OR (ov.op_type_id IN (0,1) AND (distinct_up.source_op IS NOT NULL OR distinct_ovc.source_op IS NOT NULL OR distinct_lvt.source_op IS NOT NULL)))
+            OR (ov.op_type_id IN (0,1) AND (distinct_up.source_op IS NOT NULL OR distinct_lvt.source_op IS NOT NULL)))
         AND ov.block_num BETWEEN _from AND _to
 
     --delegations (40,41,62)
@@ -136,7 +127,7 @@ CASE ___balance_change.op_type
   PERFORM btracker_app.process_vote_operation(___balance_change.body, ___balance_change.timestamp);
 
   WHEN 1 THEN
-  PERFORM btracker_app.process_comment_operation(___balance_change.body, ___balance_change.timestamp, ___balance_change.body->'value'->>'parent_author' = '');
+  PERFORM btracker_app.process_comment_operation(___balance_change.body, ___balance_change.timestamp);
 
   WHEN 40 THEN
   PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
