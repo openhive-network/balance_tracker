@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_c(in _from INT, in _to INT, IN _report_step INT = 1000)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
@@ -36,7 +36,7 @@ FOR __balance_change IN
     */
     SELECT * FROM hive.get_impacted_balances(ho.body, ho.block_num > 905693)
   ) bio ON true
-  JOIN hive.btracker_app_accounts_view av ON av.name = bio.account_name
+  JOIN hive.accounts_view av ON av.name = bio.account_name
   WHERE ho.block_num BETWEEN _from AND _to
   ORDER BY ho.block_num, ho.id
 LOOP
@@ -63,19 +63,6 @@ LOOP
     __last_reported_block := __balance_change.source_op_block;
   END IF;
 END LOOP;
---0 pre changes around 38 minutes
---1st pass 55.67 minutes
---2nd pass after optimalization 53.45 minutes
---3rd pass without rewards, with optimalizations 33.65 minutes
---4th pass without hive_vesting_balance 44.95 minutes
-
---withdraws 86.44m
---2nd pass after optimalizations 61m
---3rd pass more opt 59.80m
---4rd pass changing to CTE only on rewards 59.63m
---5rd pass changing to CTE where its possible 59.67m
-
---changing account string into account_id 49.24m
 
 RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 
@@ -95,10 +82,9 @@ FOR ___balance_change IN
 
 --delegations (40,41,62)
 --savings (32,33,34,59,55)
---rewards (39,51,52,63)
+--rewards (39,51,52,63,53)
 --withdraws (4,20,56)
 --hardforks (60)
---posts (0,1)
 
 LOOP
 
