@@ -97,12 +97,12 @@ build() {
 }
 
 install-jmeter() {
-  version="5.4.3"
+  version="5.6.2"
   bin_path="/usr/local/bin/jmeter"
-  src_path="/usr/local/src/jmeter-version"
+  src_path="/usr/local/src/jmeter-$version"
   echo "Installing Jmeter $version to $bin_path..."
 
-  wget "https://downloads.apache.org//jmeter/binaries/apache-jmeter-${version}.zip" -O jmeter.zip
+  wget "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${version}.zip" -O jmeter.zip
 
   unzip "jmeter.zip"
   rm "jmeter.zip"
@@ -114,7 +114,7 @@ cat <<-_jmeter | sudo tee "$jmeter"
 #!/usr/bin/env bash
 
 cd "$src_path/bin"
-./jmeter "\$@"
+./jmeter.sh "\$@"
 _jmeter
   
   sudo chmod +x "$jmeter"

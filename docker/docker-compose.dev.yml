@@ -17,8 +17,8 @@ services:
       args: 
         POSTGREST_VERSION: $POSTGREST_VERSION
       dockerfile_inline: |
-        ARG POSTGREST_VERSION
-        FROM bitnami/postgrest:${POSTGREST_VERSION:-latest}
+        ARG POSTGREST_VERSION=latest
+        FROM bitnami/postgrest:$${POSTGREST_VERSION}
         USER root
         RUN apt update && \
             apt install -y curl && \

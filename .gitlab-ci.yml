@@ -19,8 +19,10 @@ include:
   extends: .docker_image_builder_job_template
   stage: build
   variables:
+    BASE_REPO_NAME: base
     BASE_TAG: ubuntu-22.04-1
     NAME: ""
+    TARGET: "$NAME-base"
   before_script:
     - !reference [.docker_image_builder_job_template, before_script]
     - |
@@ -30,20 +32,18 @@ include:
   script:
     - |
       echo -e "\e[0Ksection_end:$(date +%s):tag\r\e[0K"
-      echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking $NAME base image..."
+      echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME} image..."
       function image-exists() {
         local image=$1
         docker manifest inspect "$1" > /dev/null
         return $?
       }
-      if image-exists "$CI_REGISTRY_IMAGE/$NAME/base:$BASE_TAG"; then
-        echo "${NAME^} base already image exists. Skipping..."
+      if image-exists "$CI_REGISTRY_IMAGE/$NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
+        echo "Image $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping..."
       else
-        echo "Baking $NAME base image..."
+        echo "Baking $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
         git config --global --add safe.directory $(pwd)
-        # Using --push instead of --load triggers a bug in GitLab UI
-        docker buildx bake --progress=plain --load "$NAME-base"
-        docker push --quiet "$CI_REGISTRY_IMAGE/$NAME/base:$BASE_TAG"
+        docker buildx bake --progress=plain --provenance=false --push "$TARGET"
       fi
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
@@ -58,6 +58,13 @@ docker-frontend-base-build:
   extends: .docker-base-build-template
   variables:
     NAME: "frontend"
+
+docker-ci-runner-build:
+  extends: .docker-base-build-template
+  variables:
+    BASE_REPO_NAME: ""
+    NAME: "ci-runner"
+    TARGET: "ci-runner-ci"
 
 docker-build:
   extends: .docker_image_builder_job_template
@@ -84,14 +91,7 @@ docker-build:
       echo -e "\e[0Ksection_end:$(date +%s):tag\r\e[0K"
       echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking frontend and backend images..."
       git config --global --add safe.directory $(pwd)
-      # Using --push instead of --load triggers a bug in GitLab UI
-      docker buildx bake --progress=plain --load ci
-      docker push --quiet "$CI_REGISTRY_IMAGE/backend:$TAG"
-      docker push --quiet "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA"
-      [[ -n $CI_COMMIT_TAG ]] && docker push --quiet "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_TAG"
-      docker push --quiet "$CI_REGISTRY_IMAGE/frontend:$TAG"
-      docker push --quiet "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA"
-      [[ -n $CI_COMMIT_TAG ]] && docker push --quiet "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_TAG"
+      docker buildx bake --progress=plain --provenance=false --push ci
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
     - public-runner-docker
