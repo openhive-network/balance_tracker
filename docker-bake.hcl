@@ -8,13 +8,10 @@ variable "TAG" {
   default = "latest"
 }
 variable "TAG_CI" {
-  default = "docker-24.0.1-1"
+  default = "docker-24.0.1-2"
 }
 variable "BASE_TAG" {
   default = "ubuntu-22.04-1"
-}
-variable "BLOCK_LOG_TAG" {
-  default = "1"
 }
 
 # Functions
@@ -74,5 +71,26 @@ target "backend-ci" {
   ]
   output = [
     "type=registry"
+  ]
+}
+
+target "ci-runner" {
+  dockerfile = "Dockerfile"
+  context = "docker/ci"
+  tags = [
+    "${registry-name("ci-runner", "")}:${TAG_CI}"
+  ]
+}
+
+target "ci-runner-ci" {
+  inherits = ["ci-runner"]
+  cache-from = [
+    "type=registry,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
+  ]
+  cache-to = [
+    "type=registry,mode=max,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
+  ]
+  tags = [
+    "${registry-name("ci-runner", "")}:${TAG_CI}"
   ]
 }

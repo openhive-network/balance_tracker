@@ -95,3 +95,87 @@ docker-build:
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
     - public-runner-docker
+
+test:
+  extends: .docker_image_builder_job_template
+  stage: test
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-2
+  needs:
+    - docker-build
+    - docker-ci-runner-build
+  variables:
+    POSTGRESS_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
+    COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
+    MESSAGE: Waiting for Balance Tracker to finish processing blocks...
+  timeout: 2 hours
+  before_script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
+
+      cp /blockchain/block_log_5m/block_log docker/blockchain/block_log
+      chmod a+w docker/blockchain/block_log
+
+      pushd docker
+      {
+        echo "HAF_REGISTRY=registry.gitlab.syncad.com/hive/haf/instance"
+        echo "HAF_VERSION=instance-v1.27.4.0"
+        echo "BACKEND_VERSION=$CI_COMMIT_SHA"
+        echo "FRONTEND_VERSION=$CI_COMMIT_SHA"
+        echo "HIVED_UID=0"
+        echo "PGHERO_USERNAME=unused"
+        echo "PGHERO_PASSWORD=unused"
+      } > .env.local
+      cat .env.local
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never up --detach #--exit-code-from haf
+      popd
+
+      echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
+
+      until psql "$POSTGRESS_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
+      do 
+        echo "$MESSAGE"
+        sleep 3
+      done
+
+      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+
+      ./balance-tracker.sh run-tests --backend-host=docker
+      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
+      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
+      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
+
+      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  after_script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
+
+      pushd docker
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs haf > haf.log
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs backend-block-processing > backend-block-processing.log
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs backend-postgrest > backend-postgrest.log
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs frontend > frontend.log
+      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never down -v
+      popd
+
+      tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+
+      echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
+  artifacts:
+    paths:
+      - docker/container-logs.tar.gz
+      - tests/performance/result_report/
+      - tests/performance/results.tar.gz
+      - jmeter.log
+    reports:
+      junit: tests/performance/junit-result.xml
+    expire_in: 1 week
+    when: always
+  tags:
+    - data-cache-storage

@@ -1,11 +1,15 @@
 tests/performance/result_report
 tests/performance/result.jtl
+tests/performance/result.xml
+tests/performance/junit-result.xml
+tests/performance/*.tar.gz
 tests/performance/.~lock.log.jtl#
 db/__pycache__
 server/__pycache__
 
 # Docker deployment
 docker/blockchain/block_log*
+docker/*.tar.gz
 .env.*
 docker-compose.override.yml
 

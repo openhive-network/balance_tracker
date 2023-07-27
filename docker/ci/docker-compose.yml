@@ -1,0 +1,8 @@
+services:
+  haf:
+    environment:
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+    ports:
+      - 5432:5432
