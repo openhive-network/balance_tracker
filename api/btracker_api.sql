@@ -94,9 +94,10 @@ BEGIN
                     ((((abh.source_op_block - 1 - _start_block) / __block_increment)::INT + 1) * __block_increment + _start_block)::BIGINT AS block_step,
                     abh.balance::BIGINT AS balance
                   FROM
-                    btracker_app.account_balance_history abh
+                    btracker_app.account_balance_history abh JOIN
+                    hive.accounts ha ON abh.account = ha.id
                   WHERE 
-                    abh.account = _account_name AND
+                    ha.name = _account_name AND
                     abh.nai = _coin_type AND
                     abh.source_op_block >= _start_block AND
                     abh.source_op_block <= _end_block
@@ -181,9 +182,10 @@ BEGIN
                       abh.source_op_block::BIGINT AS block,
                       abh.balance::BIGINT AS balance
                     FROM
-                      btracker_app.account_balance_history abh
+                      btracker_app.account_balance_history abh JOIN
+                      hive.accounts ha ON abh.account = ha.id
                     WHERE
-                      abh.account = _account_name AND
+                      ha.name = _account_name AND
                       abh.nai = _coin_type
                     ORDER BY abh.source_op_block ASC
                   ) hive_query
