@@ -3,6 +3,7 @@
 1. [Intro](#intro)
 1. [Starting](#starting)
     1. [Requirements](#requirements)
+    1. [Cloning](#cloning)
     1. [Setup with postgREST backend](#setup-with-postgrest-backend)
     1. [Setup with python backend](#setup-with-python-backend)
     1. [After Setup](#after-setup)
@@ -25,8 +26,30 @@ Tested on Ubuntu 20.04 and 22.04
 
 ### Requirements
 
-1. Built haf as submodule of [HAfAH](https://gitlab.syncad.com/hive/HAfAH/-/tree/develop)
+1. HAF instance
 1. Node version higher or equal 14.0.0. Check version `node-v` or `node --version`.
+
+### Cloning
+
+To clone the repository run the following command
+
+```bash
+git clone https://gitlab.syncad.com/hive/balance_tracker.git # or git@gitlab.syncad.com:hive/balance_tracker.git
+cd balance_tracker
+git submodule update --init --recursive
+```
+
+#### Note on HAF submodule
+
+HAF submodule is not necessary to build or run the balance_tracker.
+
+If you already have an instance of HAF running or are planning to set it up separately (for example using a prebuilt Docker image), you can safely disable it by running:
+
+```bash
+git config --local submodule.haf.update none
+```
+
+before checking out the submodules (that is running `git submodule update --init --recursive`).
 
 ### Setup with PostgREST backend
 
