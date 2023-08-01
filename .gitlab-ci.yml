@@ -107,6 +107,7 @@ test:
     POSTGRESS_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
+    COMPOSE_OPTIONS_STRING: --project-name balance-tracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
   timeout: 2 hours
   before_script:
     - |
@@ -131,13 +132,7 @@ test:
         echo "PGHERO_PASSWORD=unused"
       } > .env.local
       cat .env.local
-      export COMPOSE_OPTIONS=(
-        "--project-name" "balance-tracker" 
-        "--env-file" ".env.local" 
-        "--file" "docker-compose.yml" 
-        "--file" "ci/docker-compose.yml" 
-        "--ansi" "never"
-      )
+      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
       docker compose "${COMPOSE_OPTIONS[@]}" up --detach #--exit-code-from haf
       popd
 
@@ -164,6 +159,7 @@ test:
       echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
       pushd docker
+      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
       docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
       docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
       docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
