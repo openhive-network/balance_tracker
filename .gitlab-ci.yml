@@ -123,7 +123,7 @@ test:
       pushd docker
       {
         echo "HAF_REGISTRY=registry.gitlab.syncad.com/hive/haf/instance"
-        echo "HAF_VERSION=instance-v1.27.4.0"
+        echo "HAF_VERSION=instance-d3fc2e24303b4d392715d56350444dc478732979"
         echo "BACKEND_VERSION=$CI_COMMIT_SHA"
         echo "FRONTEND_VERSION=$CI_COMMIT_SHA"
         echo "HIVED_UID=0"
@@ -131,7 +131,14 @@ test:
         echo "PGHERO_PASSWORD=unused"
       } > .env.local
       cat .env.local
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never up --detach #--exit-code-from haf
+      export COMPOSE_OPTIONS=(
+        "--project-name" "balance-tracker" 
+        "--env-file" ".env.local" 
+        "--file" "docker-compose.yml" 
+        "--file" "ci/docker-compose.yml" 
+        "--ansi" "never"
+      )
+      docker compose "${COMPOSE_OPTIONS[@]}" up --detach #--exit-code-from haf
       popd
 
       echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
@@ -157,11 +164,11 @@ test:
       echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
       pushd docker
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs haf > haf.log
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs backend-block-processing > backend-block-processing.log
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs backend-postgrest > backend-postgrest.log
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never logs frontend > frontend.log
-      docker compose --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never down -v
+      docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs frontend > frontend.log
+      docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
       popd
 
       tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
