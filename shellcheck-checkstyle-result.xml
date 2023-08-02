@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<checkstyle version='4.3'>
+<file name='balance&#45;tracker.sh' >
+</file>
+<file name='run.sh' >
+</file>
+<file name='scripts/setup&#95;db.sh' >
+</file>
+<file name='tests/run&#95;tests.sh' >
+</file>
+</checkstyle>
