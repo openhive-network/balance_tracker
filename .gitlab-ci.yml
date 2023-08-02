@@ -2,6 +2,7 @@ stages:
  - lint
  - build
  - test
+ - cleanup
 
 variables:
   # Variables required by Common CI jobs
@@ -12,6 +13,10 @@ variables:
   # Git configuration
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: recursive
+  # HAF configuration
+  DATA_CACHE_HAF_TEMPLATE: /cache/replay_data_balance_tracker_haf
+  DATA_CACHE_HAF: "/cache/replay_data_balance_tracker_haf_${CI_PIPELINE_ID}"
+  BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
 
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
@@ -68,6 +73,19 @@ prepare_haf_image:
     - git config --global --add safe.directory $CI_PROJECT_DIR/haf
   tags:
     - public-runner-docker
+
+prepare_haf_data:
+  extends: .prepare_haf_data_5m
+  needs:
+    - job: prepare_haf_image
+      artifacts: true
+  stage: build
+  variables:
+    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
+    BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
+    CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/docker/haf/config_5M.ini"
+  tags:
+    - data-cache-storage
 
 .docker-base-build-template:
   extends: .docker_image_builder_job_template
@@ -242,5 +260,14 @@ test:
       junit: tests/performance/junit-result.xml
     expire_in: 1 week
     when: always
+  tags:
+    - data-cache-storage
+
+cleanup_haf_cache_manual:
+  extends: .cleanup_cache_manual
+  stage: cleanup
+  variables:
+    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_TEMPLATE}_*"
+  resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
