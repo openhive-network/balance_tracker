@@ -6,10 +6,11 @@ $$
 BEGIN
   RAISE EXCEPTION '%', $1;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(_partial_account_name TEXT)
+CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(
+    _partial_account_name TEXT
+)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -35,10 +36,11 @@ BEGIN
     LIMIT 50
   ) account_query;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(_account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(
+    _account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT
+)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -119,10 +121,14 @@ BEGIN
     ) fill_balance_top
   ) result;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(_account_name TEXT, _coin_type INT, _start_time TIMESTAMP, _end_time TIMESTAMP)
+CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(
+    _account_name TEXT,
+    _coin_type INT,
+    _start_time TIMESTAMP,
+    _end_time TIMESTAMP
+)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -214,5 +220,4 @@ BEGIN
     ) fill_balance_top
   ) result;
 END
-$$
-;
+$$;

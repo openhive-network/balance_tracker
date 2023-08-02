@@ -41,10 +41,21 @@ lint_bash_scripts:
     - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
   artifacts:
     paths: 
-     - shellcheck-checkstyle-result.xml
-     - shellcheck-junit-result.xml
+      - shellcheck-checkstyle-result.xml
+      - shellcheck-junit-result.xml
     reports:
       junit: shellcheck-junit-result.xml
+
+lint_sql_scripts:
+  extends: .lint_job
+  image: 
+    name: sqlfluff/sqlfluff:2.1.4
+    entrypoint: [""]
+  script:
+    - sqlfluff lint --format yaml --write-output sql-lint.yaml
+  artifacts:
+    paths:
+      - sql-lint.yaml
 
 prepare_haf_image:
   stage: build

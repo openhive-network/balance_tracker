@@ -1,7 +1,7 @@
 DROP SCHEMA IF EXISTS btracker_app CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
+GRANT USAGE ON SCHEMA btracker_app TO btracker_user;
 
 SET ROLE btracker_owner;
 
@@ -147,8 +147,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
 GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
 
 END
-$$
-;
+$$;
 
 --- Helper function telling application main-loop to continue execution.
 CREATE OR REPLACE FUNCTION btracker_app.continueProcessing()
@@ -159,8 +158,7 @@ $$
 BEGIN
   RETURN continue_processing FROM btracker_app.app_status LIMIT 1;
 END
-$$
-;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_app.allowProcessing()
 RETURNS VOID
@@ -170,10 +168,11 @@ $$
 BEGIN
   UPDATE btracker_app.app_status SET continue_processing = True;
 END
-$$
-;
+$$;
 
---- Helper function to be called from separate transaction (must be committed) to safely stop execution of the application.
+/** Helper function to be called from separate transaction (must be committed)
+    to safely stop execution of the application.
+**/
 CREATE OR REPLACE FUNCTION btracker_app.stopProcessing()
 RETURNS VOID
 LANGUAGE 'plpgsql'
@@ -182,10 +181,11 @@ $$
 BEGIN
   UPDATE btracker_app.app_status SET continue_processing = False;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.storeLastProcessedBlock(IN _lastBlock INT)
+CREATE OR REPLACE FUNCTION btracker_app.storeLastProcessedBlock(
+    IN _lastBlock INT
+)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -193,8 +193,7 @@ $$
 BEGIN
   UPDATE btracker_app.app_status SET last_processed_block = _lastBlock;
 END
-$$
-;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_app.lastProcessedBlock()
 RETURNS INT
@@ -204,10 +203,15 @@ $$
 BEGIN
   RETURN last_processed_block FROM btracker_app.app_status LIMIT 1;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(IN _appContext VARCHAR, in _from INT, in _to INT, IN _step INT, INOUT _last_block INT)
+CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(
+    IN _appContext VARCHAR,
+    IN _from INT,
+    IN _to INT,
+    IN _step INT,
+    INOUT _last_block INT
+)
 LANGUAGE 'plpgsql'
 AS
 $$
@@ -258,10 +262,9 @@ BEGIN
 
  RAISE NOTICE 'Leaving massive processing of block range: <%, %>...', _from, _to;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE PROCEDURE btracker_app.processBlock(in _block INT)
+CREATE OR REPLACE PROCEDURE btracker_app.processBlock(IN _block INT)
 LANGUAGE 'plpgsql'
 AS
 $$
@@ -269,15 +272,18 @@ BEGIN
   PERFORM btracker_app.process_block_range_data_c(_block, _block);
   COMMIT; -- For single block processing we want to commit all changes for each one.
 END
-$$
-;
+$$;
 
 /** Application entry point, which:
   - defines its data schema,
   - creates HAF application context,
-  - starts application main-loop (which iterates infinitely). To stop it call `btracker_app.stopProcessing();` from another session and commit its trasaction.
+  - starts application main-loop (which iterates infinitely).
+    To stop it call `btracker_app.stopProcessing();`
+    from another session and commit its trasaction.
 */
-CREATE OR REPLACE PROCEDURE btracker_app.main(IN _appContext VARCHAR, IN _maxBlockLimit INT = 0)
+CREATE OR REPLACE PROCEDURE btracker_app.main(
+    IN _appContext VARCHAR, IN _maxBlockLimit INT = 0
+)
 LANGUAGE 'plpgsql'
 AS
 $$
@@ -339,8 +345,7 @@ BEGIN
 
   COMMIT;
 END
-$$
-;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_app.create_btracker_indexes()
 RETURNS VOID
@@ -356,7 +361,6 @@ BEGIN
 
 
 END
-$$
-;
+$$;
 
 RESET ROLE;
