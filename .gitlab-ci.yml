@@ -174,9 +174,17 @@ test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-2
   needs:
     - prepare_haf_image
+    - prepare_haf_data
     - docker-build
     - docker-ci-runner-build
   variables:
+    HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
+    HAF_DATA_DIRECTORY: $DATA_CACHE_HAF/datadir
+    HAF_SHM_DIRECTORY: $DATA_CACHE_HAF/shm_dir
+    BACKEND_VERSION: $CI_COMMIT_SHA
+    FRONTEND_VERSION: $CI_COMMIT_SHA
+    PGHERO_USERNAME: unused
+    PGHERO_PASSWORD: unused
     POSTGRESS_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
@@ -202,18 +210,16 @@ test:
       HAF_COMMIT=$(git rev-parse HEAD)
       popd
       pushd docker
+      # Put all the variables that can be predefined in the "variables"
+      # block and all the variables that have to be dynamically set by the script below
       {
-        echo "HAF_REGISTRY=registry.gitlab.syncad.com/hive/haf/instance"
         echo "HAF_VERSION=instance-$HAF_COMMIT"
-        echo "BACKEND_VERSION=$CI_COMMIT_SHA"
-        echo "FRONTEND_VERSION=$CI_COMMIT_SHA"
-        echo "HIVED_UID=0"
-        echo "PGHERO_USERNAME=unused"
-        echo "PGHERO_PASSWORD=unused"
+        echo "HIVED_UID=$HIVED_UID"
       } > .env.local
       cat .env.local
       IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      docker compose "${COMPOSE_OPTIONS[@]}" up --detach #--exit-code-from haf
+      docker compose "${COMPOSE_OPTIONS[@]}" up --detach --wait --wait-timeout 3600
+      # docker compose "${COMPOSE_OPTIONS[@]}" up --exit-code-from haf
       popd
 
       echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
@@ -267,6 +273,7 @@ cleanup_haf_cache_manual:
   extends: .cleanup_cache_manual
   stage: cleanup
   variables:
+    GIT_STRATEGY: none
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_TEMPLATE}_*"
   resource_group: ${CI_COMMIT_SHA}
   tags:
