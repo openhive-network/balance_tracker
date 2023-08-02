@@ -14,9 +14,22 @@ variables:
 
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
-  - project: 'hive/common-ci-configuration'
-    ref: 27bf7a315f3cacdf45336501112e6ac414d39006 # develop
-    file: '/templates/docker_image_jobs.gitlab-ci.yml'
+  - project: hive/haf
+    ref: d3fc2e24303b4d392715d56350444dc478732979 # develop
+    file: /scripts/ci-helpers/prepare_data_image_job.yml
+
+
+prepare_haf_image:
+  stage: build
+  extends: .prepare_haf_image
+  variables:
+    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
+    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
+    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
+  before_script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR/haf
+  tags:
+    - public-runner-docker
 
 .docker-base-build-template:
   extends: .docker_image_builder_job_template
@@ -104,6 +117,7 @@ test:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-2
   needs:
+    - prepare_haf_image
     - docker-build
     - docker-ci-runner-build
   variables:
