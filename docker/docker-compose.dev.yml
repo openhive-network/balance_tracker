@@ -15,7 +15,7 @@ services:
     build:
       context: .
       args: 
-        POSTGREST_VERSION: $POSTGREST_VERSION
+        POSTGREST_VERSION: ${POSTGREST_VERSION:-latest}
       dockerfile_inline: |
         ARG POSTGREST_VERSION=latest
         FROM bitnami/postgrest:$${POSTGREST_VERSION}
@@ -29,8 +29,11 @@ services:
 
 networks:
   haf-network:
+    name: haf-network
     attachable: true
     ipam:
       driver: default
       config:
-        - subnet: 172.19.0.0/24
+        - subnet: 172.19.0.0/23
+          ip_range: 172.19.1.0/24
+          gateway: 172.19.0.1

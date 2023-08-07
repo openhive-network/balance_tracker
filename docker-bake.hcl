@@ -27,47 +27,90 @@ function "registry-name" {
 
 # Target groups
 group "default" {
-  targets = ["backend"]
+  targets = ["backend-block-processing", "backend-setup"]
+}
+
+group "base" {
+  targets = ["backend-block-processing-base", "backend-setup-base"]
 }
 
 group "ci" {
-  targets = ["backend-ci"]
+  targets = ["backend-block-processing-ci", "backend-setup-ci"]
 }
 
 # Targets
-target "backend-base" {
-  dockerfile = "Dockerfile.backend"
+target "backend-block-processing-base" {
+  dockerfile = "Dockerfile.backend-block-processing"
   target = "base"
   tags = [
-    "${registry-name("backend", "base")}:${BASE_TAG}"
+    "${registry-name("backend-block-processing", "base")}:${BASE_TAG}"
   ]
   platforms = [
     "linux/amd64"
   ]
 }
 
-target "backend" {
-  dockerfile = "Dockerfile.backend"
+target "backend-block-processing" {
+  dockerfile = "Dockerfile.backend-block-processing"
   tags = [
-    "${registry-name("backend", "")}:${TAG}",
-    notempty(CI_COMMIT_SHA) ? "${registry-name("backend", "")}:${CI_COMMIT_SHA}": "",
-    notempty(CI_COMMIT_TAG) ? "${registry-name("backend", "")}:${CI_COMMIT_TAG}": ""
+    "${registry-name("backend-block-processing", "")}:${TAG}",
+    notempty(CI_COMMIT_SHA) ? "${registry-name("backend-block-processing", "")}:${CI_COMMIT_SHA}": "",
+    notempty(CI_COMMIT_TAG) ? "${registry-name("backend-block-processing", "")}:${CI_COMMIT_TAG}": ""
   ]
   platforms = [
     "linux/amd64"
   ]
 }
 
-target "backend-ci" {
-  inherits = ["backend"]
+target "backend-block-processing-ci" {
+  inherits = ["backend-block-processing"]
   contexts = {
-    base = "docker-image://${registry-name("backend", "base")}:${BASE_TAG}"
+    base = "docker-image://${registry-name("backend-block-processing", "base")}:${BASE_TAG}"
   }
   cache-from = [
-    "type=registry,ref=${registry-name("backend", "cache")}:${TAG}"
+    "type=registry,ref=${registry-name("backend-block-processing", "cache")}:${TAG}"
   ]
   cache-to = [
-    "type=registry,mode=max,ref=${registry-name("backend", "cache")}:${TAG}"
+    "type=registry,mode=max,ref=${registry-name("backend-block-processing", "cache")}:${TAG}"
+  ]
+  output = [
+    "type=registry"
+  ]
+}
+
+target "backend-setup-base" {
+  dockerfile = "Dockerfile.backend-setup"
+  target = "base"
+  tags = [
+    "${registry-name("backend-setup", "base")}:${BASE_TAG}"
+  ]
+  platforms = [
+    "linux/amd64"
+  ]
+}
+
+target "backend-setup" {
+  dockerfile = "Dockerfile.backend-setup"
+  tags = [
+    "${registry-name("backend-setup", "")}:${TAG}",
+    notempty(CI_COMMIT_SHA) ? "${registry-name("backend-setup", "")}:${CI_COMMIT_SHA}": "",
+    notempty(CI_COMMIT_TAG) ? "${registry-name("backend-setup", "")}:${CI_COMMIT_TAG}": ""
+  ]
+  platforms = [
+    "linux/amd64"
+  ]
+}
+
+target "backend-setup-ci" {
+  inherits = ["backend-setup"]
+  contexts = {
+    base = "docker-image://${registry-name("backend-setup", "base")}:${BASE_TAG}"
+  }
+  cache-from = [
+    "type=registry,ref=${registry-name("backend-setup", "cache")}:${TAG}"
+  ]
+  cache-to = [
+    "type=registry,mode=max,ref=${registry-name("backend-setup", "cache")}:${TAG}"
   ]
   output = [
     "type=registry"

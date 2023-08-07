@@ -27,8 +27,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 48h #time for replay to finish
-  backend-block-processing:
-    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/backend}:${BACKEND_VERSION:-latest}
+  backend-setup:
+    image: ${BACKEND_SETUP_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/backend-setup}:${BACKEND_SETUP_VERSION:-latest}
     environment:
       POSTGRES_HOST: haf
     networks:
@@ -36,6 +36,16 @@ services:
     depends_on:
       haf:
         condition: service_healthy
+  backend-block-processing:
+    image: ${BACKEND_BLOCK_PROCESSING_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/backend-block-processing}:${BACKEND_BLOCK_PROCESSING_VERSION:-latest}
+    environment:
+      POSTGRES_HOST: haf
+      POSTGRES_USER: haf_app_admin
+    networks:
+      haf-network:
+    depends_on:
+      backend-setup:
+        condition: service_completed_successfully
   backend-postgrest:
     image: ${POSTGREST_REGISTRY:-postgrest/postgrest}:${POSTGREST_VERSION:-latest}
     ports:
@@ -108,6 +118,7 @@ services:
 
 networks:
   haf-network:
+    name: haf-network
 
 volumes:
   haf_datadir:

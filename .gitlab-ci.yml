@@ -121,15 +121,15 @@ prepare_haf_data:
   tags:
     - public-runner-docker
 
-docker-backend-base-build:
+docker-backend-block-processing-base-build:
   extends: .docker-base-build-template
   variables:
-    NAME: "backend"
+    NAME: "backend-block-processing"
 
-docker-frontend-base-build:
+docker-backend-setup-base-build:
   extends: .docker-base-build-template
   variables:
-    NAME: "frontend"
+    NAME: "backend-setup"
 
 docker-ci-runner-build:
   extends: .docker-base-build-template
@@ -142,8 +142,8 @@ docker-build:
   extends: .docker_image_builder_job_template
   stage: build
   needs:
-   - docker-backend-base-build
-   - docker-frontend-base-build
+   - docker-backend-block-processing-base-build
+   - docker-backend-setup-base-build
   before_script:
     - !reference [.docker_image_builder_job_template, before_script]
     - |
@@ -161,7 +161,7 @@ docker-build:
         export TAG="$CI_COMMIT_REF_SLUG"
       fi
       echo -e "\e[0Ksection_end:$(date +%s):tag\r\e[0K"
-      echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking frontend and backend images..."
+      echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking backend images..."
       git config --global --add safe.directory $(pwd)
       docker buildx bake --progress=plain --provenance=false --push ci
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
@@ -181,14 +181,14 @@ test:
     HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
     HAF_DATA_DIRECTORY: $DATA_CACHE_HAF/datadir
     HAF_SHM_DIRECTORY: $DATA_CACHE_HAF/shm_dir
-    BACKEND_VERSION: $CI_COMMIT_SHA
-    FRONTEND_VERSION: $CI_COMMIT_SHA
+    BACKEND_SETUP_VERSION: $CI_COMMIT_SHA
+    BACKEND_BLOCK_PROCESSING_VERSION: $CI_COMMIT_SHA
     PGHERO_USERNAME: unused
     PGHERO_PASSWORD: unused
-    POSTGRESS_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
+    POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
-    COMPOSE_OPTIONS_STRING: --project-name balance-tracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
+    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
   timeout: 2 hours
   before_script:
     - |
@@ -225,11 +225,12 @@ test:
       echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
       echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
 
-      until psql "$POSTGRESS_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
+      until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
       do 
         echo "$MESSAGE"
         sleep 3
       done
+      echo "Block processing is finished."
 
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
       echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
@@ -247,9 +248,9 @@ test:
       pushd docker
       IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
       docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
       docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
       docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
-      docker compose "${COMPOSE_OPTIONS[@]}" logs frontend > frontend.log
       docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
       popd
 

@@ -1,0 +1,14 @@
+.git/
+.vscode/
+gui/
+server/
+tests/
+.gitattributes
+.gitignore
+docker-bake.hcl
+Dockerfile.*
+main.py
+postgrest.conf
+py_config.ini
+README.md
+run.sh
