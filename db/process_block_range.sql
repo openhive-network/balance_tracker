@@ -36,7 +36,7 @@ FOR __balance_change IN
       There was in the block 905693 a HF1 that generated bunch of virtual operations `vesting_shares_split_operation`( above 5000 ).
       This operation multiplied VESTS by milion for every account.
     */
-    SELECT * FROM hive.get_impacted_balances(ho.body, ho.block_num > 905693)
+    SELECT * FROM hive.get_impacted_balances(ho.body::text, ho.block_num > 905693)
   ) bio ON true
   JOIN hive.accounts_view av ON av.name = bio.account_name
   WHERE ho.block_num BETWEEN _from AND _to
