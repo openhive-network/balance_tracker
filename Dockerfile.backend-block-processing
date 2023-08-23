@@ -22,14 +22,15 @@ EOF
 COPY <<EOF /app/healthcheck.sh
 #!/usr/bin/bash
 set -e
+#Setup a trap to kill potentially pending healthcheck SQL query at script exit
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
 source /etc/container_environment.sh
 postgres_user=\${POSTGRES_USER:-"haf_admin"}
 postgres_host=\${POSTGRES_HOST:-"localhost"}
 postgres_port=\${POSTGRES_PORT:-5432}
 postgres_url=\${POSTGRES_URL:-""}
 POSTGRES_ACCESS=\${postgres_url:-"postgresql://\$postgres_user@\$postgres_host:\$postgres_port/haf_block_log"}
-BLOCK_COUNT=\$(psql "\$POSTGRES_ACCESS" --quiet --tuples-only --command="SELECT COUNT(*) FROM hive.blocks;")
-COMMAND="SELECT CASE WHEN last_processed_block = \$BLOCK_COUNT THEN 0 ELSE 1 END FROM btracker_app.app_status LIMIT 1;"
+COMMAND="SELECT CASE WHEN last_processed_block = (SELECT COUNT(*) FROM hive.blocks) THEN 0 ELSE 1 END FROM btracker_app.app_status LIMIT 1;"
 psql "\$POSTGRES_ACCESS" --quiet --tuples-only --command="\$COMMAND" | grep 0 &>/dev/null
 EOF
 RUN <<EOF
@@ -37,8 +38,9 @@ RUN <<EOF
   chmod +x /app/healthcheck.sh
 EOF
 
-# Processing of the blocks takes a long time, so there's no need to start running the healthcheck early
-HEALTHCHECK --interval=60s --timeout=5s --start-period=1500s --retries=20 CMD [ "/app/healthcheck.sh" ]
+# Processing of the blocks takes a long time (especially if haf is replaying), so
+# set start-period to 3 days to avoid health check fail prior to that
+HEALTHCHECK --interval=60s --timeout=5s --start-period=72h --retries=20 CMD [ "/app/healthcheck.sh" ]
 
 # Process all the blocks and wait for new ones
 ENV BLOCK_NUMBER 0
