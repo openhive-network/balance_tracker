@@ -22,8 +22,8 @@ EOF
 COPY <<EOF /app/healthcheck.sh
 #!/usr/bin/bash
 set -e
-#Setup a trap to kill potentially pending healthcheck SQL query at script exit
-#trap "trap - SIGTERM && kill -- -\$\$" SIGINT SIGTERM EXIT
+Setup a trap to kill potentially pending healthcheck SQL query at script exit
+trap "trap - SIGTERM && kill -- -\$\$" SIGINT SIGTERM EXIT
 source /etc/container_environment.sh
 postgres_user=\${POSTGRES_USER:-"haf_admin"}
 postgres_host=\${POSTGRES_HOST:-"localhost"}
