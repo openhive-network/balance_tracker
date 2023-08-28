@@ -218,7 +218,7 @@ test:
       } > .env.local
       cat .env.local
       IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      timeout 59m docker compose "${COMPOSE_OPTIONS[@]}" up --detach --wait --wait-timeout 3600
+      timeout -s INT -k 60 3540 docker compose ${COMPOSE_OPTIONS[@]} up --detach
       # docker compose "${COMPOSE_OPTIONS[@]}" up --exit-code-from haf
       popd
 

@@ -22,7 +22,7 @@ services:
     networks:
       haf-network:
     healthcheck:
-      test: ["CMD-SHELL","curl -f localhost:8090"]
+      test: ["CMD-SHELL","curl -f localhost:8091"]
       interval: 60s
       timeout: 10s
       retries: 3
