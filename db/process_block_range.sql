@@ -145,6 +145,9 @@ LOOP
     WHEN ___balance_change.op_type = 70 AND _start_delayed_vests = TRUE THEN
     PERFORM btracker_app.process_delayed_voting_operation(___balance_change.body);
 
+    WHEN ___balance_change.op_type = 68 THEN
+    PERFORM btracker_app.process_hardfork_hive_operation(___balance_change.body);
+
     WHEN ___balance_change.op_type = 60 THEN
     
       CASE ((___balance_change.body)->'value'->>'hardfork_id')::INT
@@ -173,7 +176,7 @@ LOOP
       WHEN 16 THEN
         UPDATE btracker_app.app_status SET withdraw_rate = 13;
         _withdraw_rate = 13;
-    
+
       WHEN 24 THEN
         UPDATE btracker_app.app_status SET start_delayed_vests = TRUE;
         _start_delayed_vests = TRUE;
@@ -185,6 +188,55 @@ LOOP
   END CASE;
 
 END LOOP;
+END
+$$
+;
+
+
+CREATE OR REPLACE FUNCTION btracker_app.process_hardfork_hive_operation(body jsonb)
+RETURNS VOID
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+WITH hardfork_hive_operation AS MATERIALIZED
+(
+  SELECT 
+    (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account
+),
+balances AS (
+  UPDATE btracker_app.current_account_balances SET
+    balance = 0
+  FROM hardfork_hive_operation
+  WHERE account = _account
+),
+rewards AS (
+  UPDATE btracker_app.account_rewards SET
+    balance = 0
+  FROM hardfork_hive_operation
+  WHERE account = _account
+),
+delegations AS (
+  UPDATE btracker_app.account_delegations SET
+    delegated_vests = 0
+  FROM hardfork_hive_operation
+  WHERE account = _account
+),
+savings AS (
+  UPDATE btracker_app.account_savings SET
+    saving_balance = 0,
+    savings_withdraw_requests = 0
+  FROM hardfork_hive_operation
+  WHERE account = _account
+)
+  UPDATE btracker_app.account_withdraws SET
+    vesting_withdraw_rate = 0,
+    to_withdraw = 0,
+    withdrawn = 0,
+    delayed_vests = 0
+  FROM hardfork_hive_operation
+  WHERE account = _account;
+
 END
 $$
 ;
