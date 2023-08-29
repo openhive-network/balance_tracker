@@ -8,7 +8,7 @@ WITH withdraw_vesting_operation AS
 (
   SELECT 
     (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
-    ((body)->'value'->'vesting_shares'->>'amount')::BIGINT AS _vesting_withdraw
+    GREATEST(((body)->'value'->'vesting_shares'->>'amount')::BIGINT, 0) AS _vesting_withdraw
 )
 INSERT INTO btracker_app.account_withdraws 
   (
