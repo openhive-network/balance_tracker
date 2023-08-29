@@ -17,13 +17,14 @@ CREATE TABLE IF NOT EXISTS btracker_app.app_status
 (
   continue_processing BOOLEAN NOT NULL,
   last_processed_block INT NOT NULL,
-  withdraw_rate INT NOT NULL
+  withdraw_rate INT NOT NULL,
+  start_delayed_vests BOOLEAN NOT NULL
 );
 
 INSERT INTO btracker_app.app_status
-(continue_processing, last_processed_block, withdraw_rate)
+(continue_processing, last_processed_block, withdraw_rate, start_delayed_vests)
 VALUES
-(True, 0, 104)
+(True, 0, 104, FALSE)
 ;
 
 --ACCOUNT BALANCES
@@ -106,7 +107,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_withdraws
   vesting_withdraw_rate BIGINT DEFAULT 0,     
   to_withdraw BIGINT DEFAULT 0,
   withdrawn BIGINT DEFAULT 0,          
-  withdraw_routes BIGINT DEFAULT 0,     
+  withdraw_routes BIGINT DEFAULT 0,
+  delayed_vests BIGINT DEFAULT 0,  
 
   CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
 ) INHERITS (hive.btracker_app);
