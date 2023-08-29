@@ -111,7 +111,7 @@ END
 $$
 ;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body jsonb)
+CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body jsonb, _start_delayed_vests BOOLEAN)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 AS
@@ -119,11 +119,17 @@ $$
 DECLARE
 _vesting_withdraw BIGINT;
 _account INT;
+_vesting_deposit BIGINT;
+_precision INT;
+_to_account INT;
 BEGIN
 
   SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account'),
-        ((body)->'value'->'withdrawn'->>'amount')::BIGINT
-  INTO _account, _vesting_withdraw;
+        (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'to_account'),
+        ((body)->'value'->'withdrawn'->>'amount')::BIGINT,
+        ((body)->'value'->'deposited'->>'amount')::BIGINT,
+        ((body)->'value'->'deposited'->>'precision')::INT
+  INTO _account, _to_account, _vesting_withdraw, _vesting_deposit, _precision;
 
   INSERT INTO btracker_app.account_withdraws 
   (
@@ -137,6 +143,40 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_account_withdraws
     DO UPDATE SET
         withdrawn = btracker_app.account_withdraws.withdrawn + EXCLUDED.withdrawn;
+
+  IF _start_delayed_vests = TRUE THEN
+
+    INSERT INTO btracker_app.account_withdraws 
+    (
+      account,
+      delayed_vests
+      )
+      SELECT 
+        _account,
+        _vesting_withdraw
+
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
+      DO UPDATE SET
+          delayed_vests = GREATEST(btracker_app.account_withdraws.delayed_vests - EXCLUDED.delayed_vests, 0);
+    
+    IF _precision = 6 THEN
+
+      INSERT INTO btracker_app.account_withdraws 
+      (
+      account,
+      delayed_vests
+      )
+      SELECT 
+        _to_account,
+        _vesting_deposit
+
+      ON CONFLICT ON CONSTRAINT pk_account_withdraws
+      DO UPDATE SET
+          delayed_vests = btracker_app.account_withdraws.delayed_vests + EXCLUDED.delayed_vests;
+
+    END IF;
+
+  END IF;
 
   UPDATE btracker_app.account_withdraws SET 
     vesting_withdraw_rate = 0,

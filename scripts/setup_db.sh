@@ -58,6 +58,8 @@ psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_block_ran
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_delegations.sql
 
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_delayed.sql
+
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_savings.sql
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_rewards.sql

@@ -16,6 +16,7 @@ DECLARE
   _vesting_multiplication RECORD;
   _to_withdraw BIGINT;
   _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
+  _start_delayed_vests BOOLEAN := (SELECT start_delayed_vests FROM btracker_app.app_status);
 BEGIN
 RAISE NOTICE 'Processing balances';
 FOR __balance_change IN
@@ -88,57 +89,63 @@ FOR ___balance_change IN
 
 LOOP
 
-  CASE ___balance_change.op_type
+  CASE 
 
-    WHEN 40 THEN
+    WHEN ___balance_change.op_type = 40 THEN
     PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 41 THEN
+    WHEN ___balance_change.op_type = 41 THEN
     PERFORM btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 62 THEN
+    WHEN ___balance_change.op_type = 62 THEN
     PERFORM btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 32 THEN
+    WHEN ___balance_change.op_type = 32 THEN
     PERFORM btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 33 THEN
+    WHEN ___balance_change.op_type = 33 THEN
     PERFORM btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 34 THEN
+    WHEN ___balance_change.op_type = 34 THEN
     PERFORM btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 59 THEN
+    WHEN ___balance_change.op_type = 59 THEN
     PERFORM btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 55 THEN
+    WHEN ___balance_change.op_type = 55 THEN
     PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 39 THEN
+    WHEN ___balance_change.op_type = 39 THEN
     PERFORM btracker_app.process_claim_reward_balance_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 51 THEN
+    WHEN ___balance_change.op_type = 51 THEN
     PERFORM btracker_app.process_author_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 52 THEN
+    WHEN ___balance_change.op_type = 52 THEN
     PERFORM btracker_app.process_curation_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 63 THEN
+    WHEN ___balance_change.op_type = 63 THEN
     PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
 
-    WHEN 4 THEN
+    WHEN ___balance_change.op_type = 4 THEN
     PERFORM btracker_app.process_withdraw_vesting_operation(___balance_change.body, _withdraw_rate);
 
-    WHEN 20 THEN
+    WHEN ___balance_change.op_type = 20 THEN
     PERFORM btracker_app.process_set_withdraw_vesting_route_operation(___balance_change.body);
 
-    WHEN 56 THEN
-    PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body);
+    WHEN ___balance_change.op_type = 56 THEN
+    PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body, _start_delayed_vests);
 
-    WHEN 53 THEN
+    WHEN ___balance_change.op_type = 53 THEN
     PERFORM btracker_app.process_comment_reward_operation(___balance_change.body);
 
-    WHEN 60 THEN
+    WHEN ___balance_change.op_type = 77 AND _start_delayed_vests = TRUE THEN
+    PERFORM btracker_app.process_transfer_to_vesting_completed_operation(___balance_change.body);
+
+    WHEN ___balance_change.op_type = 70 AND _start_delayed_vests = TRUE THEN
+    PERFORM btracker_app.process_delayed_voting_operation(___balance_change.body);
+
+    WHEN ___balance_change.op_type = 60 THEN
     
       CASE ((___balance_change.body)->'value'->>'hardfork_id')::INT
       -- HARDFORK 1
@@ -166,6 +173,10 @@ LOOP
       WHEN 16 THEN
         UPDATE btracker_app.app_status SET withdraw_rate = 13;
         _withdraw_rate = 13;
+    
+      WHEN 24 THEN
+        UPDATE btracker_app.app_status SET start_delayed_vests = TRUE;
+        _start_delayed_vests = TRUE;
     
       ELSE
       END CASE;
