@@ -7,6 +7,8 @@ services:
       - --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
     environment:
       HIVED_UID:
+      DATADIR: /home/hived/datadir
+      SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "
         host    haf_block_log    haf_app_admin    all    trust\n
         host    haf_block_log    haf_admin        all    trust\n
