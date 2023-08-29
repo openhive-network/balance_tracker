@@ -34,7 +34,7 @@ FOR __balance_change IN
       There was in the block 905693 a HF1 that generated bunch of virtual operations `vesting_shares_split_operation`( above 5000 ).
       This operation multiplied VESTS by milion for every account.
     */
-    SELECT * FROM hive.get_impacted_balances(ho.body, ho.block_num > 905693)
+    SELECT * FROM hive.get_impacted_balances(ho.body_binary, ho.block_num > 905693)
   ) bio ON true
   JOIN hive.accounts_view av ON av.name = bio.account_name
   WHERE ho.block_num BETWEEN _from AND _to
@@ -68,15 +68,15 @@ RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 
 FOR ___balance_change IN
   SELECT 
-    (ov.body::jsonb) AS body,
+    ov.body AS body,
     ov.id AS source_op,
     ov.block_num as source_op_block,
     ov.op_type_id as op_type
   FROM hive.btracker_app_operations_view ov
   WHERE 
-    (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53) or
-    (ov.op_type_id = 55 and ((ov.body::jsonb)->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
-    (ov.op_type_id IN (51,63) and ((ov.body::jsonb)->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
+    (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68) or
+    (ov.op_type_id = 55 and (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
+    (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
     AND ov.block_num BETWEEN _from AND _to
   ORDER BY ov.block_num, ov.id
 
