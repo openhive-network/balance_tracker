@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.5
 # When updating docker-builder and benchmark-test-runner use the images built from latest develop commit
 # from repository registry.gitlab.syncad.com/hive/common-ci-configuration
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/docker-builder:27bf7a315f3cacdf45336501112e6ac414d39006
+FROM registry.gitlab.syncad.com/hive/common-ci-configuration/docker-builder:bade6e0b0c68841ea0b1c001bd453e38d27a6f98
 
 COPY --from=ghcr.io/forinil/jmeter-alpine:5.6.2 --link /opt/tools/jmeter /opt/tools/jmeter
-COPY --from=registry.gitlab.syncad.com/hive/common-ci-configuration/benchmark-test-runner:27bf7a315f3cacdf45336501112e6ac414d39006 \
+COPY --from=registry.gitlab.syncad.com/hive/common-ci-configuration/benchmark-test-runner:bade6e0b0c68841ea0b1c001bd453e38d27a6f98 \
   --link /opt/tools/m2u /opt/tools/m2u
 
 USER root

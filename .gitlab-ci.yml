@@ -171,7 +171,7 @@ docker-build:
 test:
   extends: .docker_image_builder_job_template
   stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-2
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-3
   needs:
     - prepare_haf_image
     - prepare_haf_data

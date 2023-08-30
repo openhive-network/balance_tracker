@@ -8,7 +8,7 @@ variable "TAG" {
   default = "latest"
 }
 variable "TAG_CI" {
-  default = "docker-24.0.1-2"
+  default = "docker-24.0.1-3"
 }
 variable "BASE_TAG" {
   default = "ubuntu-22.04-1"
