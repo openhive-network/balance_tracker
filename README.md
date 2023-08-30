@@ -51,7 +51,7 @@ git config --local submodule.haf.update none
 
 before checking out the submodules (that is running `git submodule update --init --recursive`).
 
-The submodule is, however, necessary, for test run in CI. As such when updating it please update the commit hash in files [.gitlab-ci.yml](.gitlab-ci.yml) and [doocker/.env](docker/.env).
+The submodule is, however, necessary, for test run in CI. As such when updating it please update the commit hash in files [.gitlab-ci.yml](.gitlab-ci.yml) and [docker/.env](docker/.env).
 
 ### Setup with PostgREST backend
 
