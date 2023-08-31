@@ -19,7 +19,6 @@ services:
     volumes:
       - haf_datadir:/home/hived/datadir
       - haf_shmdir:/home/hived/shm_dir
-      - ./haf/config_5M.ini:/home/hived/datadir/config.ini
       - ./blockchain:/home/hived/datadir/blockchain
     networks:
       haf-network:
