@@ -2,11 +2,11 @@ version: '3.9'
 services:
   haf:
     image: ${HAF_REGISTRY:-hiveio/haf}:${HAF_VERSION:-v1.27.4.0}
-    entrypoint:
-      - /home/haf_admin/docker_entrypoint.sh
-      - --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
+    entrypoint: /home/haf_admin/docker_entrypoint.sh
+    command: $${HAF_COMMAND}
     environment:
       HIVED_UID:
+      HAF_COMMAND:
       DATADIR: /home/hived/datadir
       SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "

@@ -178,6 +178,7 @@ test:
     - docker-build
     - docker-ci-runner-build
   variables:
+    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
     HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
     HAF_DATA_DIRECTORY: $DATA_CACHE_HAF/datadir
     HAF_SHM_DIRECTORY: $DATA_CACHE_HAF/shm_dir
