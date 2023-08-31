@@ -352,10 +352,6 @@ $$
 BEGIN
   CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
   CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
-  CREATE INDEX idx_btracker_app_account_rewards_nai ON btracker_app.account_rewards(nai);
-  CREATE INDEX idx_btracker_app_account_rewards_nai_account ON btracker_app.account_rewards(account, nai);
-  CREATE INDEX idx_btracker_app_account_withdraws_account ON btracker_app.account_withdraws(account);
-
 
 END
 $$

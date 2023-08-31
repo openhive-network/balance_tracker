@@ -67,3 +67,17 @@ psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_rewards.s
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_withdraws.sql
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../api/btracker_api.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/btracker_indexes.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../endpoints/endpoints_schema.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../endpoints/get_account_balances.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/account_dump_schema.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/account_stats_hived.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/account_stats_btracker.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/compare_accounts.sql
