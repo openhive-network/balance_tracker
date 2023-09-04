@@ -220,7 +220,7 @@ $$
 BEGIN
   RAISE NOTICE 'Entering massive processing of block range: <%, %>...', _from, _to;
   RAISE NOTICE 'Detaching HAF application context...';
-  PERFORM hive.app_context_detach(_appContext);
+  CALL hive.appproc_context_detach(_appContext);
 
   --- You can do here also other things to speedup your app, i.e. disable constrains, remove indexes etc.
 
@@ -258,7 +258,7 @@ BEGIN
   END IF;
 
   RAISE NOTICE 'Attaching HAF application context at block: %.', _last_block;
-  PERFORM hive.app_context_attach(_appContext, _last_block);
+  CALL hive.appproc_context_attach(_appContext, _last_block);
 
  --- You should enable here all things previously disabled at begin of this function...
 
@@ -300,7 +300,7 @@ BEGIN
   RAISE NOTICE 'Last block processed by application: %', __last_block;
 
   IF NOT hive.app_context_is_attached(_appContext) THEN
-    PERFORM hive.app_context_attach(_appContext, __last_block);
+    CALL hive.appproc_context_attach(_appContext, __last_block);
   END IF;
 
   RAISE NOTICE 'Entering application main loop...';
