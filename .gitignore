@@ -3,3 +3,4 @@ tests/performance/result.jtl
 tests/performance/.~lock.log.jtl#
 db/__pycache__
 server/__pycache__
+btracker_sync.log

@@ -1,5 +1,3 @@
-DROP SCHEMA IF EXISTS btracker_app CASCADE;
-
 CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
 GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
@@ -10,6 +8,12 @@ RETURNS VOID
 LANGUAGE 'plpgsql'
 AS $$
 BEGIN
+
+  IF NOT hive.app_context_exists('btracker_app') THEN 
+
+  PERFORM hive.app_create_context('btracker_app');
+
+  END IF;
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
@@ -288,13 +292,6 @@ DECLARE
   __next_block_range hive.blocks_range;
 
 BEGIN
-  IF NOT hive.app_context_exists(_appContext) THEN
-    RAISE NOTICE 'Attempting to create a HAF application context...';
-    PERFORM hive.app_create_context(_appContext);
-    PERFORM btracker_app.define_schema();
-    COMMIT;
-  END IF;
-
   PERFORM btracker_app.allowProcessing();
   COMMIT;
 
@@ -326,7 +323,7 @@ BEGIN
       RAISE NOTICE 'Attempting to process block range: <%,%>', __next_block_range.first_block, __next_block_range.last_block;
 
       IF __next_block_range.first_block != __next_block_range.last_block THEN
-        CALL btracker_app.do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 100, __last_block);
+        CALL btracker_app.do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 10000, __last_block);
       ELSE
         CALL btracker_app.processBlock(__next_block_range.last_block);
         __last_block := __next_block_range.last_block;
@@ -352,10 +349,6 @@ $$
 BEGIN
   CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
   CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
-  CREATE INDEX idx_btracker_app_account_rewards_nai ON btracker_app.account_rewards(nai);
-  CREATE INDEX idx_btracker_app_account_rewards_nai_account ON btracker_app.account_rewards(account, nai);
-  CREATE INDEX idx_btracker_app_account_withdraws_account ON btracker_app.account_withdraws(account);
-
 
 END
 $$
