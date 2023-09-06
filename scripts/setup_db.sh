@@ -69,3 +69,6 @@ psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/process_withdraws
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../api/btracker_api.sql
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../db/btracker_indexes.sql
+
+psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../endpoints/get_account_balances.sql
+
