@@ -1,13 +1,9 @@
-CREATE SCHEMA IF NOT EXISTS btracker_app AUTHORIZATION btracker_owner;
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
-
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.define_schema()
-RETURNS VOID
-LANGUAGE 'plpgsql'
-AS $$
+DO $$
 BEGIN
+
+CREATE SCHEMA btracker_app AUTHORIZATION btracker_owner;
 
   IF NOT hive.app_context_exists('btracker_app') THEN 
 
@@ -151,6 +147,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
 ) INHERITS (hive.btracker_app);
 
 GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
+
+GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
 END
 $$
