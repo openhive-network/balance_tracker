@@ -150,6 +150,8 @@ GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
 
 GRANT USAGE ON SCHEMA btracker_app to btracker_user;
 
+ EXCEPTION WHEN duplicate_schema THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;
+
 END
 $$
 ;
