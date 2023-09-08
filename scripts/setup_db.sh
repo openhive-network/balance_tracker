@@ -74,6 +74,4 @@ psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/accoun
 
 psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -f $SCRIPTPATH/../dump_accounts/compare_accounts.sql
 
-if [ -z "$NO_CONTEXT" ]; then
-psql $POSTGRES_ACCESS -v ON_ERROR_STOP=on -c "SELECT btracker_app.define_schema()"
-fi
+
