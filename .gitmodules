@@ -1,3 +1,4 @@
 [submodule "haf"]
 	path = haf
-	url = https://gitlab.syncad.com/hive/haf.git
+	url = ../haf.git
+	branch = develop
