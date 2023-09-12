@@ -7,7 +7,6 @@ POSTGRES_USER="haf_admin"
 POSTGRES_HOST="localhost"
 POSTGRES_PORT=5432
 POSTGRES_URL=""
-NO_CONTEXT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,9 +21,6 @@ while [ $# -gt 0 ]; do
         ;;
     --postgres-url=*)
         POSTGRES_URL="${1#*=}"
-        ;;
-    --no-context=*)
-        NO_CONTEXT="${1#*=}"
         ;;
     -*)
         echo "ERROR: '$1' is not a valid option"
