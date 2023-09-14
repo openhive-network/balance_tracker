@@ -1,10 +1,10 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-WITH claim_reward_balance_operation AS MATERIALIZED
+WITH claim_reward_balance_operation AS 
 (
   SELECT 
     (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
@@ -75,11 +75,11 @@ CREATE OR REPLACE FUNCTION btracker_app.process_author_reward_operation(
   _source_op_block INT
 )
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  WITH author_reward_operation AS MATERIALIZED
+  WITH author_reward_operation AS 
   (
     SELECT
       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'author') AS _account,
@@ -145,11 +145,11 @@ CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(
   _source_op_block INT
 )
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  WITH curation_reward_operation AS MATERIALIZED
+  WITH curation_reward_operation AS 
   (
     SELECT 
       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'curator') AS _account,
@@ -211,11 +211,11 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_comment_benefactor_reward_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-WITH comment_benefactor_reward_operation AS MATERIALIZED
+WITH comment_benefactor_reward_operation AS 
 (
   SELECT 
     (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'benefactor') AS _account,
@@ -277,12 +277,12 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body jsonb)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
 
-WITH comment_reward_operation AS MATERIALIZED
+WITH comment_reward_operation AS
 (
   SELECT 
     (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'author') AS _account,
