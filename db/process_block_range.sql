@@ -195,7 +195,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_hardfork_hive_operation(body jsonb)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN

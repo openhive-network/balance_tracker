@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_vesting_completed_operation(body jsonb)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -29,7 +29,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_delayed_voting_operation(body jsonb)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN

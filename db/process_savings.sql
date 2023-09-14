@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -39,7 +39,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -98,7 +98,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_cancel_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -151,7 +151,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_fill_transfer_from_savings_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -195,7 +195,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_interest_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN

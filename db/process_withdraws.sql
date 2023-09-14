@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(body jsonb, _withdraw_rate INT)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
@@ -33,7 +33,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body jsonb)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 DECLARE
@@ -113,7 +113,7 @@ $$
 
 CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body jsonb, _start_delayed_vests BOOLEAN)
 RETURNS VOID
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 DECLARE
