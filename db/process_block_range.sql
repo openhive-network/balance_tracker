@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_c(in _from INT, in _to INT, IN _report_step INT = 1000)
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_a(in _from INT, in _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
@@ -9,16 +9,10 @@ AS
 $$
 DECLARE
   __balance_change RECORD;
-  ___balance_change RECORD;
   __current_balance BIGINT;
   __last_reported_block INT := 0;
-  ___last_reported_block INT := 0;
-  _vesting_multiplication RECORD;
-  _to_withdraw BIGINT;
-  _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
-  _start_delayed_vests BOOLEAN := (SELECT start_delayed_vests FROM btracker_app.app_status);
 BEGIN
-RAISE NOTICE 'Processing balances';
+--RAISE NOTICE 'Processing balances';
 FOR __balance_change IN
   WITH balance_impacting_ops AS
   (
@@ -55,17 +49,36 @@ LOOP
   SELECT __balance_change.account, __balance_change.nai, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0)
   ;
 
---	if __balance_change.source_op_block = 199701 then
---	RAISE NOTICE 'Balance change data: account: %, amount change: %, source_op: %, source_block: %, current_balance: %', __balance_change.account, __balance_change.balance, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0);
---	end if;
+	--	if __balance_change.source_op_block = 199701 then
+	--	RAISE NOTICE 'Balance change data: account: %, amount change: %, source_op: %, source_block: %, current_balance: %', __balance_change.account, __balance_change.balance, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0);
+	--	end if;
 
-  IF __balance_change.source_op_block % _report_step = 0 AND __last_reported_block != __balance_change.source_op_block THEN
-    RAISE NOTICE 'Processed data for block: %', __balance_change.source_op_block;
-    __last_reported_block := __balance_change.source_op_block;
-  END IF;
+  --IF __balance_change.source_op_block % _report_step = 0 AND __last_reported_block != __balance_change.source_op_block THEN
+  --  RAISE NOTICE 'Processed data for block: %', __balance_change.source_op_block;
+  --  __last_reported_block := __balance_change.source_op_block;
+  --END IF;
 END LOOP;
+END
+$$
+;
 
-RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_b(in _from INT, in _to INT, IN _report_step INT = 1000)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+SET cursor_tuple_fraction='0.9'
+AS
+$$
+DECLARE
+  ___balance_change RECORD;
+  _vesting_multiplication RECORD;
+  _to_withdraw BIGINT;
+  _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
+  _start_delayed_vests BOOLEAN := (SELECT start_delayed_vests FROM btracker_app.app_status);
+BEGIN
+--RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
 
 FOR ___balance_change IN
   SELECT 
@@ -151,7 +164,7 @@ LOOP
     WHEN ___balance_change.op_type = 60 THEN
     
       CASE ((___balance_change.body)->'value'->>'hardfork_id')::INT
-      -- HARDFORK 1
+-- HARDFORK 1
       WHEN 1 THEN
         FOR _vesting_multiplication IN
         SELECT 
@@ -172,11 +185,11 @@ LOOP
         WHERE account = _vesting_multiplication.account;
 
         END LOOP;
-      -- HARDFORK 16
+-- HARDFORK 16
       WHEN 16 THEN
         UPDATE btracker_app.app_status SET withdraw_rate = 13;
         _withdraw_rate = 13;
-
+-- HARDFORK 24
       WHEN 24 THEN
         UPDATE btracker_app.app_status SET start_delayed_vests = TRUE;
         _start_delayed_vests = TRUE;
