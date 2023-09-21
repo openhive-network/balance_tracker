@@ -98,6 +98,18 @@ docker-psql-client-build:
     NAME: "psql-client"
     TARGET: "psql-client"
 
+docker-setup-and-processing-build:
+  stage: build
+  image: docker:24.0.6
+  services:
+    - docker:24.0.6-dind
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker build -f Dockerfile.alpine -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${CI_REGISTRY_IMAGE}:latest .
+    - docker push --all-tags ${CI_REGISTRY_IMAGE}
+  tags:
+    - public-runner-docker
+
 .test-template:
   extends: .docker_image_builder_job_template
   stage: test

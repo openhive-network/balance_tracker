@@ -1,7 +1,6 @@
-#!/bin/bash
+#! /bin/sh
 
 set -e
-set -o pipefail
 
 print_help () {
     echo "Usage: $0 [OPTION[=VALUE]]..."
