@@ -1,0 +1,42 @@
+services:
+  haf:
+    environment:
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+    volumes:
+      - ./haf/postgresql_conf.d:/home/hived/datadir/haf_postgresql_conf.d:ro
+      - ./haf/postgresql_logs:/home/hived/datadir/postgresql_logs
+    networks:
+      haf-network:
+        ipv4_address: 172.201.0.2
+    ports:
+      - 5432:5432
+
+  backend-postgrest:
+    image: postgrest-with-curl:latest
+    build:
+      context: .
+      args: 
+        POSTGREST_VERSION: ${POSTGREST_VERSION:-latest}
+      dockerfile_inline: |
+        ARG POSTGREST_VERSION=latest
+        FROM bitnami/postgrest:$${POSTGREST_VERSION}
+        USER root
+        RUN apt update && \
+            apt install -y curl && \
+            apt-get clean && \
+            rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
+        USER postgrest
+        HEALTHCHECK --interval=20s --timeout=5s CMD curl -f localhost:3001/ready
+
+networks:
+  haf-network:
+    name: haf-network
+    attachable: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.201.0.0/23
+          ip_range: 172.201.1.0/24
+          gateway: 172.201.0.1
