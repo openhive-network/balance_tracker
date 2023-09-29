@@ -1,0 +1,205 @@
+stages:
+ - build
+ - test
+ - cleanup
+
+variables:
+  # Variables required by Common CI jobs
+  CI_COMMON_JOB_VERSION: "27bf7a315f3cacdf45336501112e6ac414d39006"
+  DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
+  DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
+  IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
+  # Git configuration
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+  # HAF configuration
+  DATA_CACHE_HAF_TEMPLATE: /cache/replay_data_balance_tracker_haf
+  DATA_CACHE_HAF: "/cache/replay_data_balance_tracker_haf_${CI_PIPELINE_ID}"
+  BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
+
+include:
+  - template: Workflows/Branch-Pipelines.gitlab-ci.yml
+  - project: hive/haf
+    ref: ce733449e24cd01666047da6d77a7d3e287589cd # develop
+    file: /scripts/ci-helpers/prepare_data_image_job.yml
+
+prepare_haf_image:
+  stage: build
+  extends: .prepare_haf_image
+  variables:
+    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
+    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
+    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
+  before_script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR/haf
+  tags:
+    - public-runner-docker
+
+prepare_haf_data:
+  extends: .prepare_haf_data_5m
+  needs:
+    - job: prepare_haf_image
+      artifacts: true
+  stage: build
+  variables:
+    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
+    BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
+    CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
+  tags:
+    - data-cache-storage
+
+.docker-base-build-template:
+  extends: .docker_image_builder_job_template
+  stage: build
+  variables:
+    BASE_REPO_NAME: base
+    BASE_TAG: ubuntu-22.04-1
+    NAME: ""
+    TARGET: "$NAME-base"
+  before_script:
+    - !reference [.docker_image_builder_job_template, before_script]
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  script:
+    - |
+      echo -e "\e[0Ksection_end:$(date +%s):tag\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):build[collapsed=true]\r\e[0KBaking $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME} image..."
+      function image-exists() {
+        local image=$1
+        docker manifest inspect "$1" > /dev/null
+        return $?
+      }
+      if image-exists "$CI_REGISTRY_IMAGE/$NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
+        echo "Image $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping..."
+      else
+        echo "Baking $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
+        git config --global --add safe.directory $(pwd)
+        docker buildx bake --progress=plain --provenance=false --push "$TARGET"
+      fi
+      echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
+  tags:
+    - public-runner-docker
+
+docker-ci-runner-build:
+  extends: .docker-base-build-template
+  variables:
+    BASE_REPO_NAME: ""
+    NAME: "ci-runner"
+    TARGET: "ci-runner-ci"
+
+docker-psql-client-build:
+  extends: .docker-base-build-template
+  variables:
+    BASE_REPO_NAME: ""
+    BASE_TAG: "22.04"
+    NAME: "psql-client"
+    TARGET: "psql-client"
+
+test:
+  extends: .docker_image_builder_job_template
+  stage: test
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-4
+  needs:
+    - prepare_haf_image
+    - prepare_haf_data
+    - docker-psql-client-build
+    - docker-ci-runner-build
+  variables:
+    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
+    HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
+    HAF_DATA_DIRECTORY: $DATA_CACHE_HAF/datadir
+    HAF_SHM_DIRECTORY: $DATA_CACHE_HAF/shm_dir
+    PGHERO_USERNAME: unused
+    PGHERO_PASSWORD: unused
+    POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
+    COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
+    MESSAGE: Waiting for Balance Tracker to finish processing blocks...
+    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
+  timeout: 2 hours
+  before_script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):git[collapsed=true]\r\e[0KConfiguring Git..."
+      git config --global --add safe.directory "$CI_PROJECT_DIR"
+      git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
+      echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
+  script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
+
+      cp /blockchain/block_log_5m/block_log docker/blockchain/block_log
+      chmod a+w docker/blockchain/block_log
+
+      pushd docker
+      # Put all the variables that can be predefined in the "variables"
+      # block and all the variables that have to be dynamically set by the script below
+      {
+        echo "HAF_VERSION=instance-$HAF_IMAGE_NAME_COMMIT"
+        echo "HIVED_UID=$HIVED_UID"
+      } > .env.local
+      cat .env.local
+      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
+      timeout -s INT -k 60 3540 docker compose ${COMPOSE_OPTIONS[@]} up --detach
+      popd
+
+      echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
+
+      until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
+      do 
+        echo "$MESSAGE"
+        sleep 3
+      done
+      echo "Block processing is finished."
+
+      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+
+      ./balance-tracker.sh run-tests --backend-host=docker
+      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
+      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
+      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
+
+      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  after_script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
+
+      pushd docker
+      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
+      docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
+      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
+      docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
+      popd
+
+      tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+
+      echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
+  artifacts:
+    paths:
+      - docker/container-logs.tar.gz
+      - tests/performance/result_report/
+      - tests/performance/results.tar.gz
+      - jmeter.log
+    reports:
+      junit: tests/performance/junit-result.xml
+    expire_in: 1 week
+    when: always
+  tags:
+    - data-cache-storage
+
+cleanup_haf_cache_manual:
+  extends: .cleanup_cache_manual
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_TEMPLATE}_*"
+  resource_group: ${CI_COMMIT_SHA}
+  tags:
+    - data-cache-storage
