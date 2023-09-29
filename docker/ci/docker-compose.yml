@@ -1,0 +1,22 @@
+services:
+  haf:
+    environment:
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+    ports:
+      - 5432:5432
+
+volumes:
+  haf_datadir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_DATA_DIRECTORY}/
+  haf_shmdir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_SHM_DIRECTORY}/
