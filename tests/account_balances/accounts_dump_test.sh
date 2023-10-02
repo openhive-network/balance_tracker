@@ -63,7 +63,7 @@ POSTGRES_ACCESS_ADMIN="postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT
     pip install psycopg2-binary
  
     echo "Starting data_insertion_stript.py..."
-    python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host $POSTGRES_HOST --port $POSTGRES_PORT --user $POSTGRES_USER
+    python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" --user "$POSTGRES_USER"
 
     echo "Looking for diffrences between hived node and btracker stats..."
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SELECT btracker_account_dump.compare_accounts();"

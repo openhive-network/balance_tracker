@@ -2,15 +2,15 @@ SET ROLE btracker_owner;
 
 CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
 
-DROP TYPE IF EXISTS btracker_endpoints.account_info_rewards CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.account_info_rewards CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.account_info_rewards AS
 (
-  curation_rewards BIGINT,
-  posting_rewards BIGINT
+    curation_rewards BIGINT,
+    posting_rewards BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_info_rewards(_account INT)
-RETURNS btracker_endpoints.account_info_rewards
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_info_rewards(_account int)
+RETURNS btracker_endpoints.account_info_rewards -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -29,19 +29,18 @@ BEGIN
 
   RETURN _result;
 END
-$$
-;
+$$;
 
-DROP TYPE IF EXISTS btracker_endpoints.account_savings CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.account_savings CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.account_savings AS
 (
-  hbd_savings numeric,
-  hive_savings numeric,
-  savings_withdraw_requests INT
+    hbd_savings numeric,
+    hive_savings numeric,
+    savings_withdraw_requests INT
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_savings(_account INT)
-RETURNS btracker_endpoints.account_savings
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_savings(_account int)
+RETURNS btracker_endpoints.account_savings -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -63,20 +62,19 @@ WHERE account= _account;
 
 RETURN __result;
 END
-$$
-;
+$$;
 
-DROP TYPE IF EXISTS btracker_endpoints.account_rewards CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.account_rewards CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.account_rewards AS
 (
-  hbd_rewards numeric,
-  hive_rewards numeric,
-  vests_rewards numeric,
-  hive_vesting_rewards numeric
+    hbd_rewards numeric,
+    hive_rewards numeric,
+    vests_rewards numeric,
+    hive_vesting_rewards numeric
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_rewards(_account INT)
-RETURNS btracker_endpoints.account_rewards
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_rewards(_account int)
+RETURNS btracker_endpoints.account_rewards -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -95,19 +93,18 @@ FROM btracker_app.account_rewards WHERE account= _account;
 
 RETURN __result;
 END
-$$
-;
+$$;
 
 
-DROP TYPE IF EXISTS btracker_endpoints.btracker_vests_balance CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.btracker_vests_balance CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.btracker_vests_balance AS
 (
-  delegated_vests BIGINT,
-  received_vests BIGINT
+    delegated_vests BIGINT,
+    received_vests BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_delegations(_account INT)
-RETURNS btracker_endpoints.btracker_vests_balance
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_delegations(_account int)
+RETURNS btracker_endpoints.btracker_vests_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -125,21 +122,20 @@ BEGIN
 
   RETURN _result;
 END
-$$
-;
+$$;
 
-DROP TYPE IF EXISTS btracker_endpoints.account_withdraws CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.account_withdraws CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.account_withdraws AS
 (
-  vesting_withdraw_rate BIGINT,
-  to_withdraw BIGINT,
-  withdrawn BIGINT,
-  withdraw_routes INT,
-  delayed_vests BIGINT
+    vesting_withdraw_rate BIGINT,
+    to_withdraw BIGINT,
+    withdrawn BIGINT,
+    withdraw_routes INT,
+    delayed_vests BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_withdraws(_account INT)
-RETURNS btracker_endpoints.account_withdraws
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_withdraws(_account int)
+RETURNS btracker_endpoints.account_withdraws -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -152,24 +148,23 @@ BEGIN
   FROM btracker_app.account_withdraws WHERE account= _account;
   RETURN __result;
 END
-$$
-;
+$$;
 
 
 --ACCOUNT HIVE, HBD, VEST BALANCES
 
-DROP TYPE IF EXISTS btracker_endpoints.btracker_account_balance CASCADE;
+DROP TYPE IF EXISTS btracker_endpoints.btracker_account_balance CASCADE; -- noqa: LT01
 CREATE TYPE btracker_endpoints.btracker_account_balance AS
 (
-  hbd_balance BIGINT,
-  hive_balance BIGINT,
-  vesting_shares BIGINT,
-  vesting_balance_hive BIGINT,
-  post_voting_power_vests BIGINT
+    hbd_balance BIGINT,
+    hive_balance BIGINT,
+    vesting_shares BIGINT,
+    vesting_balance_hive BIGINT,
+    post_voting_power_vests BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(_account INT)
-RETURNS btracker_endpoints.btracker_account_balance
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(_account int)
+RETURNS btracker_endpoints.btracker_account_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -195,7 +190,6 @@ FROM btracker_endpoints.get_account_delegations(_account);
 RETURN __result;
 
 END
-$$
-;
+$$;
 
 RESET ROLE;

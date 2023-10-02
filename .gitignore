@@ -7,6 +7,7 @@ tests/performance/.~lock.log.jtl#
 db/__pycache__
 server/__pycache__
 btracker_sync.log
+shellcheck-*.*
 
 # Docker deployment
 docker/blockchain/block_log*

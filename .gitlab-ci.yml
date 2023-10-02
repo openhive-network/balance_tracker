@@ -1,4 +1,5 @@
 stages:
+ - lint
  - build
  - test
  - cleanup
@@ -22,6 +23,44 @@ include:
   - project: hive/haf
     ref: ce733449e24cd01666047da6d77a7d3e287589cd # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
+
+.lint_job:
+  stage: lint
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  artifacts:
+    name: lint-results
+    when: always
+    expire_in: 24 hours
+  tags:
+    - public-runner-docker
+
+lint_bash_scripts:
+  extends: .lint_job
+  image: koalaman/shellcheck-alpine:latest
+  before_script:
+    - apk add xmlstarlet
+  script:
+    - find . -name .git -type d -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle {} + | tee shellcheck-checkstyle-result.xml
+  after_script:
+    - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
+  artifacts:
+    paths: 
+      - shellcheck-checkstyle-result.xml
+      - shellcheck-junit-result.xml
+    reports:
+      junit: shellcheck-junit-result.xml
+
+lint_sql_scripts:
+  extends: .lint_job
+  image: 
+    name: sqlfluff/sqlfluff:2.1.4
+    entrypoint: [""]
+  script:
+    - sqlfluff lint --format yaml --write-output sql-lint.yaml
+  artifacts:
+    paths:
+      - sql-lint.yaml
 
 prepare_haf_image:
   stage: build
