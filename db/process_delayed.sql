@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_vesting_completed_operation(body jsonb)
-RETURNS VOID
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -24,11 +24,10 @@ WITH transfer_to_vesting_completed_operation AS (
         delayed_vests = btracker_app.account_withdraws.delayed_vests + EXCLUDED.delayed_vests;
 
 END
-$$
-;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_delayed_voting_operation(body jsonb)
-RETURNS VOID
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -52,5 +51,4 @@ WITH delayed_voting_operation AS (
     DO UPDATE SET
         delayed_vests = GREATEST(btracker_app.account_withdraws.delayed_vests - EXCLUDED.delayed_vests, 0);
 END
-$$
-;
+$$;

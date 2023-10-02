@@ -1,5 +1,7 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(body jsonb, _withdraw_rate INT)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(
+    body jsonb, _withdraw_rate int
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -28,11 +30,12 @@ INSERT INTO btracker_app.account_withdraws
       vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
       to_withdraw = EXCLUDED.to_withdraw;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(body jsonb)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(
+    body jsonb
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -108,11 +111,13 @@ ELSE
   END IF;
 END IF;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(body jsonb, _start_delayed_vests BOOLEAN)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(
+    body jsonb,
+    _start_delayed_vests boolean
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -185,5 +190,4 @@ BEGIN
   WHERE btracker_app.account_withdraws.account = _account 
   AND btracker_app.account_withdraws.to_withdraw = btracker_app.account_withdraws.withdrawn;
 END
-$$
-;
+$$;

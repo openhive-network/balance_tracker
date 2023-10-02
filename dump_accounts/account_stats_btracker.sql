@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION btracker_account_dump.dump_current_account_stats(account_data jsonb)
-RETURNS VOID
+RETURNS void
 LANGUAGE 'plpgsql'
 VOLATILE
 AS
@@ -28,35 +28,34 @@ SELECT
     (account_data->>'posting_rewards')::BIGINT AS posting_rewards,
     (account_data->>'curation_rewards')::BIGINT AS curation_rewards;
 END
-$$
-;
+$$;
 
 
-DROP TYPE IF EXISTS btracker_account_dump.account_type CASCADE;
+DROP TYPE IF EXISTS btracker_account_dump.account_type CASCADE; -- noqa: LT01
 CREATE TYPE btracker_account_dump.account_type AS
 (
-  name TEXT,
-  balance BIGINT,
-  hbd_balance BIGINT,
-  vesting_shares BIGINT,
-  savings_balance BIGINT,
-  savings_hbd_balance BIGINT,
-  savings_withdraw_requests INT,
-  vesting_withdraw_rate BIGINT,
-  to_withdraw BIGINT,
-  withdrawn BIGINT,
-  withdraw_routes INT,
-  reward_hbd_balance BIGINT,
-  reward_hive_balance BIGINT,
-  reward_vesting_balance BIGINT,
-  reward_vesting_hive BIGINT,
-  delegated_vesting_shares BIGINT,
-  received_vesting_shares BIGINT,
-  posting_rewards BIGINT
+    name TEXT,
+    balance BIGINT,
+    hbd_balance BIGINT,
+    vesting_shares BIGINT,
+    savings_balance BIGINT,
+    savings_hbd_balance BIGINT,
+    savings_withdraw_requests INT,
+    vesting_withdraw_rate BIGINT,
+    to_withdraw BIGINT,
+    withdrawn BIGINT,
+    withdraw_routes INT,
+    reward_hbd_balance BIGINT,
+    reward_hive_balance BIGINT,
+    reward_vesting_balance BIGINT,
+    reward_vesting_hive BIGINT,
+    delegated_vesting_shares BIGINT,
+    received_vesting_shares BIGINT,
+    posting_rewards BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_account_dump.get_account_setof(_account TEXT)
-RETURNS btracker_account_dump.account_type
+CREATE OR REPLACE FUNCTION btracker_account_dump.get_account_setof(_account text)
+RETURNS btracker_account_dump.account_type -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -100,11 +99,10 @@ BEGIN
 
   RETURN __result;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_account_dump.compare_differing_account(_account TEXT)
-RETURNS SETOF btracker_account_dump.account_type
+CREATE OR REPLACE FUNCTION btracker_account_dump.compare_differing_account(_account text)
+RETURNS SETOF btracker_account_dump.account_type -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -133,5 +131,4 @@ BEGIN
 SELECT * FROM btracker_account_dump.get_account_setof(_account);
 
 END
-$$
-;
+$$;

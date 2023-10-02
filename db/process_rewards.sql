@@ -1,5 +1,7 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(
+    body jsonb, _source_op bigint, _source_op_block int
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -65,16 +67,16 @@ WITH claim_reward_balance_operation AS
       source_op_block = EXCLUDED.source_op_block;
 
 END
-$$
-;
+$$;
 
 
 CREATE OR REPLACE FUNCTION btracker_app.process_author_reward_operation(
-  body jsonb,
-  _source_op BIGINT,
-  _source_op_block INT
+    body jsonb,
+    _source_op bigint,
+    _source_op_block int
 )
-RETURNS VOID
+
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -136,15 +138,15 @@ BEGIN
     source_op_block = EXCLUDED.source_op_block;
   
 END
-$$
-;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_curation_reward_operation(
-  body jsonb, 
-  _source_op BIGINT, 
-  _source_op_block INT
+    body jsonb,
+    _source_op bigint,
+    _source_op_block int
 )
-RETURNS VOID
+
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -206,11 +208,12 @@ INSERT INTO btracker_app.account_rewards (
     curation_rewards = btracker_app.account_info_rewards.curation_rewards + EXCLUDED.curation_rewards;
   
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_comment_benefactor_reward_operation(body jsonb, _source_op BIGINT, _source_op_block INT)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_benefactor_reward_operation(
+    body jsonb, _source_op bigint, _source_op_block int
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -271,12 +274,12 @@ INSERT INTO btracker_app.account_rewards (
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block;
 END
-$$
-;
+$$;
 
-
-CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(body jsonb)
-RETURNS VOID
+CREATE OR REPLACE FUNCTION btracker_app.process_comment_reward_operation(
+    body jsonb
+)
+RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
@@ -302,5 +305,4 @@ INSERT INTO btracker_app.account_info_rewards (
     posting_rewards = btracker_app.account_info_rewards.posting_rewards + EXCLUDED.posting_rewards;
 
 END
-$$
-;
+$$;

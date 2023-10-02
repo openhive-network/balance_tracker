@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS btracker_account_dump.differing_accounts (
 EXCEPTION WHEN duplicate_schema THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;
 
 END
-$$
-;
+$$;
 
 RESET ROLE;

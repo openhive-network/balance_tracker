@@ -3,18 +3,23 @@
 set -e
 
 print_help () {
-    echo "Usage: $0 [OPTION[=VALUE]]..."
-    echo
-    echo "Allows to setup a database already filled by HAF instance, to work with haf_be application."
-    echo "OPTIONS:"
-    echo "  --host=VALUE             Allows to specify a PostgreSQL host location (defaults to localhost)"
-    echo "  --port=NUMBER            Allows to specify a PostgreSQL operating port (defaults to 5432)"
-    echo "  --user=VALUE             Allows to specify a PostgreSQL user (defaults to haf_admin)"
+    cat <<EOF
+Usage: $0 [OPTION[=VALUE]]...
+
+Allows to setup a database already filled by HAF instance, to work with haf_be application.
+OPTIONS:
+    --host=VALUE             Allows to specify a PostgreSQL host location (defaults to localhost)
+    --port=NUMBER            Allows to specify a PostgreSQL operating port (defaults to 5432)
+    --user=VALUE             Allows to specify a PostgreSQL user (defaults to haf_admin)
+    --url=URL                Allows to specify a PostgreSQL URL (empty by default, overrides options above)
+    --help,-h,-?             Displays this help message
+EOF
 }
 
-POSTGRES_HOST="localhost"
-POSTGRES_PORT=5432
-POSTGRES_USER="haf_admin"
+POSTGRES_USER=${POSTGRES_USER:-"haf_admin"}
+POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
+POSTGRES_URL=${POSTGRES_URL:-""}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -27,7 +32,10 @@ while [ $# -gt 0 ]; do
     --user=*)
         POSTGRES_USER="${1#*=}"
         ;;
-    --help)
+    --postgres-url=*)
+        POSTGRES_URL="${1#*=}"
+        ;;
+    --help|-h|-?)
         print_help
         exit 0
         ;;
@@ -47,22 +55,22 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-POSTGRES_ACCESS_ADMIN="postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"
+POSTGRES_ACCESS_ADMIN=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"}
 
 
 drop_db() {
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "SELECT hive.app_remove_context('btracker_app');"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_app CASCADE;"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "SELECT hive.app_remove_context('btracker_app');"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_app CASCADE;"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
 
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_owner TO postgres; "
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_owner"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_owner"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_owner TO postgres; "
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_owner"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_owner"
 
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_user TO postgres; "
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_user"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_user"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_user TO postgres; "
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_user"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_user"
 
 }
 

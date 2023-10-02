@@ -8,7 +8,7 @@ clean_data() {
 }
 
 create_db() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -f $PWD/db/btracker_app.sql
+    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -f "$PWD/db/btracker_app.sql"
 }
 
 run_indexer() {
@@ -26,7 +26,7 @@ run_indexer() {
         args=("${@:2}")
     fi
     
-    psql -a -v "ON_ERROR_STOP=1" "$args" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
+    psql -a -v "ON_ERROR_STOP=1" "${args[@]}" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $block_num);"
 }
 
 create_indexes() {
@@ -34,12 +34,12 @@ create_indexes() {
 }
 
 create_api() {
-    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
+    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f "$PWD/api/btracker_api.sql"
 }
 
 start_webserver() {
     if [ "$1" = "py" ]; then
-        ./main.py ${@:2}
+        ./main.py "${@:2}"
     else
         postgrest postgrest.conf
     fi
@@ -54,9 +54,9 @@ install_postgrest() {
     wget https://github.com/PostgREST/postgrest/releases/download/v8.0.0/postgrest-v8.0.0-linux-x64-static.tar.xz
 
     POSTGREST=$(find . -name 'postgrest*')
-    tar xJf $POSTGREST
+    tar xJf "$POSTGREST"
     sudo mv 'postgrest' '/usr/local/bin/postgrest'
-    rm $POSTGREST
+    rm "$POSTGREST"
 }
 
 install_jmeter() {
@@ -72,27 +72,29 @@ install_jmeter() {
 
     jmeter="jmeter-${jmeter_v}"
     touch $jmeter
-    echo '#!/usr/bin/env bash' >> $jmeter
-    echo '' >> $jmeter
-    echo "cd '/usr/local/src/apache-jmeter-${jmeter_v}/bin'" >> $jmeter
-    echo './jmeter $@' >> $jmeter
+    {
+        echo '#!/usr/bin/env bash'
+        echo ''
+        echo "cd '/usr/local/src/apache-jmeter-${jmeter_v}/bin'"
+        echo './jmeter $@'
+    } >> $jmeter
     sudo chmod +x $jmeter
     sudo mv $jmeter "/usr/local/bin/${jmeter}"
 }
 
 run_tests() {
-    ./tests/run_tests.sh $jmeter_v $2
+    ./tests/run_tests.sh $jmeter_v "$2"
 }
 
 recreate_db() {
-    clean_data ${@:2}
-    create_db ${@:2}
-    create_indexes ${@:2}
-    run_indexer $@
+    clean_data "${@:2}"
+    create_db "${@:2}"
+    create_indexes "${@:2}"
+    run_indexer "$@"
 }
 
 restart_all() {
-    recreate_db $@
+    recreate_db "$@"
     create_api
 }
 
@@ -101,34 +103,33 @@ start_ui() {
 }
 
 setup() {
-    bash $SCRIPTS_DIR/setup_db.sh 
+    bash "$SCRIPTS_DIR/setup_db.sh "
 }
 
 process_blocks() {
-    run_indexer $@
+    run_indexer "$@"
 }
 
 SCRIPTS_DIR=$PWD/scripts
 
-postgrest_v=9.0.0
 jmeter_v=5.4.3
 
 if [ "$1" = "re-all" ]; then
-    restart_all ${@:2}
+    restart_all "${@:2}"
     echo 'SUCCESS: DB and API recreated'
 elif [ "$1" = "re-all-start" ]; then
-    restart_all ${@:2}
+    restart_all "${@:2}"
     echo 'SUCCESS: DB and API recreated'
     start_webserver
 elif [ "$1" = "setup" ]; then
     setup 
 elif [ "$1" = "process-blocks" ]; then
-    process_blocks ${@:2}
+    process_blocks "${@:2}"
 elif [ "$1" = "re-db" ]; then
-    recreate_db ${@:2}
+    recreate_db "${@:2}"
     echo 'SUCCESS: DB recreated'
 elif [ "$1" = "re-db-start" ]; then
-    recreate_db ${@:2}
+    recreate_db "${@:2}"
     echo 'SUCCESS: DB recreated'
     start_webserver
 elif [ "$1" = "re-api" ]; then
@@ -151,13 +152,13 @@ elif [ "$1" = "test-py" ]; then
 elif [ "$1" = "start" ]; then
     start_webserver
 elif [ "$1" = "start-py" ]; then
-    start_webserver "py" ${@:2}
+    start_webserver "py" "${@:2}"
 elif [ "$1" = "start-ui" ]; then
     start_ui
 elif [ "$1" = "create-indexes" ]; then
-    create_indexes ${@:2}
+    create_indexes "${@:2}"
 elif [ "$1" = "continue-processing" ]; then
-    run_indexer ${@:2}
+    run_indexer "${@:2}"
 else
     echo "job not found"
 fi

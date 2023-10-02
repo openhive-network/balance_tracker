@@ -1,10 +1,12 @@
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_a(in _from INT, in _to INT, IN _report_step INT = 1000)
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_a(
+    IN _from INT, IN _to INT, IN _report_step INT = 1000
+)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
-SET cursor_tuple_fraction='0.9'
+SET cursor_tuple_fraction = '0.9'
 AS
 $$
 DECLARE
@@ -59,16 +61,15 @@ LOOP
   --END IF;
 END LOOP;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_b(in _from INT, in _to INT, IN _report_step INT = 1000)
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_b(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
-SET cursor_tuple_fraction='0.9'
+SET cursor_tuple_fraction = '0.9'
 AS
 $$
 DECLARE
@@ -78,7 +79,7 @@ DECLARE
   _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
   _start_delayed_vests BOOLEAN := (SELECT start_delayed_vests FROM btracker_app.app_status);
 BEGIN
---RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';
+--RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';)
 
 FOR ___balance_change IN
   SELECT 
@@ -201,12 +202,12 @@ LOOP
   END CASE;
 
 END LOOP;
+PERFORM btracker_app.storeLastProcessedBlock(_to);
+RAISE NOTICE 'Updated last processed block.';
 END
-$$
-;
+$$;
 
-
-CREATE OR REPLACE FUNCTION btracker_app.process_hardfork_hive_operation(body jsonb)
+CREATE OR REPLACE FUNCTION btracker_app.process_hardfork_hive_operation(body JSONB)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
@@ -251,5 +252,4 @@ savings AS (
   WHERE account = _account;
 
 END
-$$
-;
+$$;

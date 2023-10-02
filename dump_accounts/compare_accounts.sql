@@ -1,7 +1,5 @@
-
-
 CREATE OR REPLACE FUNCTION btracker_account_dump.compare_accounts()
-RETURNS VOID
+RETURNS void
 LANGUAGE 'plpgsql'
 VOLATILE
 AS
@@ -55,11 +53,10 @@ WHERE account_balances.balance <> _current_account_stats.balance
 
 ;
 END
-$$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION btracker_account_dump.compare_differing_account(_account TEXT)
-RETURNS SETOF btracker_account_dump.account_type
+CREATE OR REPLACE FUNCTION btracker_account_dump.compare_differing_account(_account text)
+RETURNS SETOF btracker_account_dump.account_type -- noqa: LT01
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
@@ -89,5 +86,4 @@ BEGIN
 SELECT * FROM btracker_account_dump.get_account_setof(_account);
 
 END
-$$
-;
+$$;
