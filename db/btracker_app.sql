@@ -233,7 +233,9 @@ BEGIN
 
     RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
 
-    PERFORM btracker_app.process_block_range_data_c(b, _last_block);
+    PERFORM btracker_app.process_block_range_data_a(b, _last_block);
+    PERFORM btracker_app.process_block_range_data_b(b, _last_block);
+
 
     PERFORM btracker_app.storeLastProcessedBlock(_last_block);
 
@@ -248,7 +250,8 @@ BEGIN
   IF btracker_app.continueProcessing() AND _last_block < _to THEN
     RAISE NOTICE 'Attempting to process a block range (rest): <%, %>', b, _last_block;
     --- Supplement last part of range if anything left.
-    PERFORM btracker_app.process_block_range_data_c(_last_block, _to);
+    PERFORM btracker_app.process_block_range_data_a(_last_block, _to);
+    PERFORM btracker_app.process_block_range_data_b(_last_block, _to);
     _last_block := _to;
 
     PERFORM btracker_app.storeLastProcessedBlock(_last_block);
@@ -272,7 +275,8 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
-  PERFORM btracker_app.process_block_range_data_c(_block, _block);
+  PERFORM btracker_app.process_block_range_data_a(_block, _block);
+  PERFORM btracker_app.process_block_range_data_b(_block, _block);
   COMMIT; -- For single block processing we want to commit all changes for each one.
 END
 $$
