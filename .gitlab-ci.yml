@@ -45,6 +45,7 @@ prepare_haf_data:
     SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
     CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
+  resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
 
@@ -97,10 +98,10 @@ docker-psql-client-build:
     NAME: "psql-client"
     TARGET: "psql-client"
 
-test:
+.test-template:
   extends: .docker_image_builder_job_template
   stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-4
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-5
   needs:
     - prepare_haf_image
     - prepare_haf_data
@@ -157,14 +158,6 @@ test:
       echo "Block processing is finished."
 
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
-      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
-
-      ./balance-tracker.sh run-tests --backend-host=docker
-      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
-      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
-      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
-
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   after_script:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
@@ -182,6 +175,44 @@ test:
 
       echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
+    expire_in: 1 week
+    when: always
+  resource_group: ${CI_COMMIT_SHA}
+  tags:
+    - data-cache-storage
+
+
+
+regression-test:
+  extends: .test-template
+  script:
+    - !reference [.test-template, script]
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+
+      (cd tests/account_balances && bash ./accounts_dump_test.sh --host=docker)
+
+      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  artifacts:
+    paths:
+      - docker/container-logs.tar.gz
+    expire_in: 1 week
+    when: always
+
+performance-test:
+  extends: .test-template
+  script:
+    - !reference [.test-template, script]
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+
+      ./balance-tracker.sh run-tests --backend-host=docker
+      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
+      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
+      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
+
+      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  artifacts:
     paths:
       - docker/container-logs.tar.gz
       - tests/performance/result_report/
@@ -189,10 +220,7 @@ test:
       - jmeter.log
     reports:
       junit: tests/performance/junit-result.xml
-    expire_in: 1 week
-    when: always
-  tags:
-    - data-cache-storage
+
 
 cleanup_haf_cache_manual:
   extends: .cleanup_cache_manual
