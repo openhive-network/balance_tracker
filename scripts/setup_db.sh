@@ -14,8 +14,6 @@ OPTIONS:
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
     --no-context=true|false               When set to true, do not create context (default: false)
     --no-context                          The same as '--no-context=true'
-    --skip-if-db-exists=true|false        When set to true, skip database setup if database already exists (default: false)
-    --skip-if-db-exists                   The same as '--skip-if-db-exists=true'
     --help,-h,-?                          Displays this help message
 EOF
 }
@@ -24,7 +22,6 @@ POSTGRES_USER=${POSTGRES_USER:-"haf_admin"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
-SKIP_IF_DB_EXISTS=${SKIP_IF_DB_EXISTS:-"false"}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -39,12 +36,6 @@ while [ $# -gt 0 ]; do
         ;;
     --postgres-url=*)
         POSTGRES_URL="${1#*=}"
-        ;;
-    --skip-if-db-exists=*)
-        SKIP_IF_DB_EXISTS="${1#*=}"
-        ;;
-    --skip-if-db-exists)
-        SKIP_IF_DB_EXISTS="true"
         ;;
     --help|-h|-?)
         print_help
@@ -65,12 +56,6 @@ while [ $# -gt 0 ]; do
 done
 
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"}
-
-if [[ "$SKIP_IF_DB_EXISTS" == "true" ]]; then
-    psql "$POSTGRES_ACCESS" -c "SELECT 'btracker_app.main'::regproc"
-    DB_EXISTS=$?
-    [[ "$DB_EXISTS" == "0" ]] && echo "Database already exists, exiting..." && exit 0
-fi
 
 echo "Installing app..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/builtin_roles.sql"

@@ -34,8 +34,6 @@ cat <<-END
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
     --no-context=true|false               When set to true, do not create context (default: false)
     --no-context                          The same as '--no-context=true'
-    --skip-if-db-exists=true|false        When set to true, skip database setup if database already exists (default: false)
-    --skip-if-db-exists                   The same as '--skip-if-db-exists=true'
 
   Block processing (process-blocks) options:
     --number-of-blocks=INTEGER            Number of blocks to process (default: 10^9), if set to value greater than number of blocks in the database (or 0),
