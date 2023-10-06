@@ -3,7 +3,7 @@ variable "CI_REGISTRY_IMAGE" {
     default = "registry.gitlab.syncad.com/hive/balance_tracker"
 }
 variable "TAG_CI" {
-  default = "docker-24.0.1-4"
+  default = "docker-24.0.1-5"
 }
 variable "UBUNTU_VERSION" {
   default = "22.04"
