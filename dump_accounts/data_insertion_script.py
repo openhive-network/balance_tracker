@@ -1,49 +1,51 @@
 import json
 import os
 import psycopg2
-import sys  
+import argparse
 
+def main():
+    parser = argparse.ArgumentParser(description="Script to process JSON data and interact with PostgreSQL")
+    parser.add_argument("script_dir", help="Path to the directory containing 'accounts_dump.json'")
+    parser.add_argument("--host", default="docker", help="PostgreSQL host (default: docker)")
+    parser.add_argument("--port", type=int, default=5432, help="PostgreSQL port (default: 5432)")
+    parser.add_argument("--database", default="haf_block_log", help="PostgreSQL database name (default: haf_block_log)")
+    parser.add_argument("--user", default="haf_admin", help="PostgreSQL user (default: haf_admin)")
+    parser.add_argument("--password", default="", help="PostgreSQL password (default: empty)")
 
-if len(sys.argv) != 2:
-    print("Usage: python script.py <argument1>")
-    sys.exit(1)
+    args = parser.parse_args()
+    
+    json_file_path = os.path.join(args.script_dir, "accounts_dump.json")
 
-script_dir = sys.argv[1]
-json_file_path = os.path.join(script_dir, "accounts_dump.json")
+    with open(json_file_path) as file:
+        data = json.load(file)
 
+    accounts = data["result"]["accounts"]
 
-host = "172.17.0.2"
-port = 5432
-database = "haf_block_log"
-user = "haf_admin"
-password = ""
+    try:
+        connection = psycopg2.connect(
+            host=args.host,
+            port=args.port,
+            database=args.database,
+            user=args.user,
+            password=args.password
+        )
 
-with open(json_file_path) as file:
-    data = json.load(file)
+        cursor = connection.cursor()
 
-accounts = data["result"]["accounts"]
+        query = "SELECT btracker_account_dump.dump_current_account_stats(%s)"
 
-connection = psycopg2.connect(
-    host=host,
-    port=port,
-    database=database,
-    user=user,
-    password=password
-)
+        # Iterate over objects inside 'accounts[]'
+        for account in accounts:
+            object_value = json.dumps(account)
+            cursor.execute(query, (object_value,))
 
-cursor = connection.cursor()
+        connection.commit()
+        cursor.close()
+        connection.close()
 
+    except psycopg2.Error as e:
+        print("Error: Unable to connect to the PostgreSQL database.")
+        print(e)
 
-query = "SELECT btracker_account_dump.dump_current_account_stats(%s)"
-
-# Iterate over objects inside 'accounts[]'
-for account in accounts:
-
-    object_value = json.dumps(account)
-
-    cursor.execute(query, (object_value,))
-
-
-connection.commit()
-cursor.close()
-connection.close()
+if __name__ == "__main__":
+    main()
