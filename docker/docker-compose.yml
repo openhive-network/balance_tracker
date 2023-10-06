@@ -34,7 +34,7 @@ services:
     image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-22.04}
     working_dir: /app
     command: 
-      - "./balance-tracker.sh set-up-database --skip-if-db-exists"
+      - "./balance-tracker.sh set-up-database"
     environment:
       POSTGRES_HOST: haf
     volumes:
