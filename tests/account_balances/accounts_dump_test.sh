@@ -1,5 +1,4 @@
-#! /bin/bash
-
+#!/usr/bin/env bash
 
 set -euo pipefail
 
@@ -54,25 +53,27 @@ done
 POSTGRES_ACCESS_ADMIN="postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"
 
     echo "Clearing tables..."
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.account_balances;"
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.differing_accounts;"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.account_balances;"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.differing_accounts;"
 
     echo "Installing dependecies..."
-    pip install psycopg2
 
     gunzip "${SCRIPTDIR}/accounts_dump.json.gz"
 
+    pip install psycopg2-binary
+ 
     echo "Starting data_insertion_stript.py..."
-    python3 ../../dump_accounts/data_insertion_script.py $SCRIPTDIR
+    python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host $POSTGRES_HOST --port $POSTGRES_PORT --user $POSTGRES_USER
 
     echo "Looking for diffrences between hived node and btracker stats..."
-    psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "SELECT btracker_account_dump.compare_accounts();"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SELECT btracker_account_dump.compare_accounts();"
 
-    DIFFERING_ACCOUNTS=$(psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -t -A  -c "SELECT * FROM btracker_account_dump.differing_accounts;")
+    DIFFERING_ACCOUNTS=$(psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -t -A  -c "SELECT * FROM btracker_account_dump.differing_accounts;")
 
     if [ -z "$DIFFERING_ACCOUNTS" ]; then
         echo "Account balances are correct!"
 
     else
         echo "Account balances are incorrect..."
+        exit 1
     fi

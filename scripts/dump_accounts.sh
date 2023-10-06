@@ -73,7 +73,7 @@ if [ -f "$SCRIPTDIR/../dump_accounts/accounts_dump.json" ]; then
     echo "Starting data_insertion_stript.py..."
     psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.account_balances;"
     pip install psycopg2
-    python3 ../dump_accounts/data_insertion_script.py $SCRIPTDIR/../dump_accounts
+    python3 ../dump_accounts/data_insertion_script.py $SCRIPTDIR/../dump_accounts --host $POSTGRES_HOST --port $POSTGRES_PORT --user $POSTGRES_USER
 
     echo "Looking for diffrences between hived node and btracker stats..."
     psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.differing_accounts;"
@@ -87,7 +87,7 @@ else
     echo "Starting data_insertion_stript.py..."
     psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.account_balances;"
     pip install psycopg2
-    python3 ../dump_accounts/data_insertion_script.py $SCRIPTDIR/../dump_accounts
+    python3 ../dump_accounts/data_insertion_script.py $SCRIPTDIR/../dump_accounts --host $POSTGRES_HOST --port $POSTGRES_PORT --user $POSTGRES_USER
 
     echo "Looking for diffrences between hived node and btracker stats..."
     psql $POSTGRES_ACCESS_ADMIN -v "ON_ERROR_STOP=on" -c "TRUNCATE btracker_account_dump.differing_accounts;"
