@@ -14,14 +14,13 @@ variables:
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: recursive
   # HAF configuration
-  DATA_CACHE_HAF_TEMPLATE: /cache/replay_data_balance_tracker_haf
-  DATA_CACHE_HAF: "/cache/replay_data_balance_tracker_haf_${CI_PIPELINE_ID}"
+  DATA_CACHE_HAF_PREFIX: "/cache/replay_data_balance_tracker_haf_${CI_COMMIT_SHA}"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
 
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: ce733449e24cd01666047da6d77a7d3e287589cd # develop
+    ref: 8a5bdf1a273e2fcf20353c73c50fea84970b8885 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
@@ -31,7 +30,6 @@ include:
   artifacts:
     name: lint-results
     when: always
-    expire_in: 24 hours
   tags:
     - public-runner-docker
 
@@ -161,8 +159,8 @@ docker-setup-and-processing-build:
   variables:
     HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
     HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
-    HAF_DATA_DIRECTORY: $DATA_CACHE_HAF/datadir
-    HAF_SHM_DIRECTORY: $DATA_CACHE_HAF/shm_dir
+    HAF_DATA_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/datadir
+    HAF_SHM_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/shm_dir
     PGHERO_USERNAME: unused
     PGHERO_PASSWORD: unused
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
@@ -190,7 +188,7 @@ docker-setup-and-processing-build:
       # Put all the variables that can be predefined in the "variables"
       # block and all the variables that have to be dynamically set by the script below
       {
-        echo "HAF_VERSION=instance-$HAF_IMAGE_NAME_COMMIT"
+        echo "HAF_VERSION=instance-$HAF_COMMIT"
         echo "HIVED_UID=$HIVED_UID"
       } > .env.local
       cat .env.local
@@ -278,7 +276,7 @@ cleanup_haf_cache_manual:
   stage: cleanup
   variables:
     GIT_STRATEGY: none
-    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_TEMPLATE}_*"
+    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
   resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
