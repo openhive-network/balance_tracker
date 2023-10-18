@@ -4,7 +4,7 @@ cd /app/scripts
 
 if [ "$1" = "setup_db" ]; then
   shift
-  exec /app/scripts/setup_db.sh --postgres-host="${POSTGRES_HOST:-haf}" --skip-if-db-exists "$@"
+  exec /app/scripts/setup_db.sh --postgres-host="${POSTGRES_HOST:-haf}" "$@"
 elif [ "$1" = "process_blocks" ]; then
   shift
   exec /app/balance-tracker.sh process-blocks "$@"
