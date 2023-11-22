@@ -3,8 +3,8 @@ FROM alpine:${ALPINE_VERSION} AS psql_client
 RUN apk --no-cache add postgresql14-client
 
 FROM psql_client
-COPY scripts/setup_db.sh /app/scripts/setup_db.sh
-COPY scripts/drop_db.sh /app/scripts/drop_db.sh
+COPY scripts/install_app.sh /app/scripts/install_app.sh
+COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY db /app/db
 COPY api /app/api
 COPY endpoints /app/endpoints

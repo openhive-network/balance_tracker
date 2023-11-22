@@ -103,7 +103,7 @@ start_ui() {
 }
 
 setup() {
-    bash "$SCRIPTS_DIR/setup_db.sh "
+    bash "$SCRIPTS_DIR/install_app.sh "
 }
 
 process_blocks() {
