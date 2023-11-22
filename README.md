@@ -57,7 +57,7 @@ The submodule is, however, necessary, for test run in CI. As such when updating 
 
 1. Install backend runtime dependencies: `./balance-tracker.sh install backend-runtime-dependencies`
 1. Install PostgREST: `./balance-tracker.sh install postgrest`
-1. Set up the database: `./balance-tracker.sh set-up-database` (assuming HAF database runs on localhost on port 5432)
+1. Set up the database: `./balance-tracker.sh install-app` (assuming HAF database runs on localhost on port 5432)
 1. Process blocks: `./balance-tracker.sh process-blocks --number-of-blocks=5000000` (assuming HAF database runs on localhost on port 5432 and contains 5'000'000 blocks)  
   If you skip `--number-of-blocks` parameter balance tracker will process all blocks in the database and then wait for more. You can keep this running in the background.
 1. Start backend server: `./balance-tracker.sh serve postgrest-backend`
