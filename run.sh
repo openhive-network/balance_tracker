@@ -3,24 +3,30 @@
 set -e
 set -o pipefail
 
+DB="postgresql://haf_admin@172.17.0.2:5432/haf_block_log"
+#DB="-d haf_block_log"
+
+
 clean_data() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('btracker_app') THEN perform hive.app_remove_context('btracker_app'); end if; END \$\$"
+    psql -a -v "ON_ERROR_STOP=1" "$@" $DB -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('mario_app') THEN perform hive.app_remove_context('mario_app'); end if; END \$\$"
+    #psql -a -v "ON_ERROR_STOP=1" "$@" $DB -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('mario_app') THEN drop table mario_app.h_transactions; end if; END \$\$"
+    psql -a -v "ON_ERROR_STOP=1" "$@" $DB -c '\timing' -c "do \$\$ BEGIN if hive.app_context_exists('mario_app') THEN drop table mario_app.r_transactions; end if; END \$\$"
 }
 
 create_db() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -f $PWD/db/btracker_app.sql
+    psql -a -v "ON_ERROR_STOP=1" "$@" $DB -f $PWD/db/mario_app.sql
 }
 
 run_indexer() {
-    psql -a -v "ON_ERROR_STOP=1" "${@:2}" -d haf_block_log -c '\timing' -c "call btracker_app.main('btracker_app', $1);"
+    psql -a -v "ON_ERROR_STOP=1" "${@:2}" $DB -c '\timing' -c "call mario_app.main('mario_app');"
 }
 
 create_indexes() {
-    psql -a -v "ON_ERROR_STOP=1" "$@" -d haf_block_log -c '\timing' -c "call btracker_app.create_indexes();"
+    psql -a -v "ON_ERROR_STOP=1" "$@" $DB -c '\timing' -c "call mario_app.create_indexes();"
 }
 
 create_api() {
-    psql -a -v "ON_ERROR_STOP=1" -d haf_block_log -f $PWD/api/btracker_api.sql
+    psql -a -v "ON_ERROR_STOP=1" $DB -f $PWD/api/btracker_api.sql
 }
 
 start_webserver() {

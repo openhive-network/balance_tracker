@@ -1,0 +1,49 @@
+Queries:
+
+`explain analyze insert into hive.transactions( block_num, trx_in_block, trx_hash, ref_block_num, ref_block_prefix, expiration) values(80432000, 6666, decode('aa01', 'hex'), 1111, 3956751638, '2023-10-13 13:41:15');`
+
+or
+
+`explain analyze insert into mario_app.r_transactions( block_num, trx_in_block, trx_hash, ref_block_num, ref_block_prefix, expiration) values(80432000, 6666, decode('aa01', 'hex'), 1111, 3956751638, '2023-10-13 13:41:15');`
+
+HEAD = ~ `80432387`
+
+--In next queries `trx_hash` is changing i.e. `aa00`, `aa01`, `aa02` and so on...
+
+=====`hive.transactions`=====
+"Execution Time: 0.838 ms"
+"Execution Time: 7.235 ms"
+"Execution Time: 7.070 ms"
+"Execution Time: 0.569 ms"
+"Execution Time: 7.167 ms"
+"Execution Time: 7.027 ms"
+"Execution Time: 0.948 ms"
+"Execution Time: 7.323 ms"
+"Execution Time: 0.824 ms"
+"Execution Time: 6.754 ms"
+"Execution Time: 0.566 ms"
+"Execution Time: 6.714 ms"
+"Execution Time: 7.195 ms"
+"Execution Time: 0.794 ms"
+"Execution Time: 0.794 ms"
+=====AVG=====
+`4.121 ms`
+
+=====`mario_app.r_transactions`=====
+"Execution Time: 0.165 ms"
+"Execution Time: 0.307 ms"
+"Execution Time: 0.215 ms"
+"Execution Time: 0.248 ms"
+"Execution Time: 0.168 ms"
+"Execution Time: 0.209 ms"
+"Execution Time: 0.217 ms"
+"Execution Time: 0.213 ms"
+"Execution Time: 0.212 ms"
+"Execution Time: 0.119 ms"
+"Execution Time: 0.222 ms"
+"Execution Time: 0.191 ms"
+"Execution Time: 0.124 ms"
+"Execution Time: 0.202 ms"
+"Execution Time: 0.202 ms"
+=====AVG=====
+`0.200 ms`

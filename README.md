@@ -16,7 +16,7 @@ Tested on Ubuntu 20.04
 ## Setup with postgREST backend
 
 1. Install postgREST to /usr/local/bin `./run.sh install-postgrest`
-2. Create btracker_app schema, process blocks, create api, start server. `./run.sh re-all-start ${n_blocks}`.<br>
+2. Create mario_app schema, process blocks, create api, start server. `./run.sh re-all-start ${n_blocks}`.<br>
 `n_blocks` is the number of blocks you have in `haf_block_log` db.
 3. Install node_modules . `cd gui ; npm install ; cd ..`
 4. Start application . `./run.sh start-ui`
@@ -25,7 +25,7 @@ Tested on Ubuntu 20.04
 
 Note: python backend is not configured to be used with web UI!
 
-1. Create btracker_app schema, process blocks. `./run.sh re-db ${n_blocks}`.<br>
+1. Create mario_app schema, process blocks. `./run.sh re-db ${n_blocks}`.<br>
 `n_blocks` is the number of blocks you have in `haf_block_log` db.
 2. Start the server `python3 main.py --host=localhost --port=3000`.
 3. Call server with `curl` GET requests as in examples:
@@ -42,16 +42,16 @@ curl http://localhost:3000/rpc/get_balance_for_coin_by_time/?_account_name=danth
 
 ## After Setup
 
-- After blocks were added to btracker_app schema, postgREST backend server can be started up quickly with `./run.sh start`
+- After blocks were added to mario_app schema, postgREST backend server can be started up quickly with `./run.sh start`
 - If you have added more blocks to `haf_block_log` db, or you are running live sync, you can run <br>
 ```
-psql -v "ON_ERROR_STOP=1" -d haf_block_log -c "call btracker_app.main('btracker_app', 0);"
+psql -v "ON_ERROR_STOP=1" -d haf_block_log -c "call mario_app.main('mario_app', 0);"
 ```
 This will keep indexer waiting for new blocks and process them as backend is running.
 
 # Architecture
 
-`db/btracker_app.sql` contains code for processing raw block data into separate db, to be used by app.
+`db/mario_app.sql` contains code for processing raw block data into separate db, to be used by app.
 
 `py_config.ini` and `postgrest.conf` are configs for python and postgREST versions of backend. They contain parameters for postgres access.
 

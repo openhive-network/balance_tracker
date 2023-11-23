@@ -73,7 +73,7 @@ class BalanceTracker:
                             ((((abh.source_op_block - 1 - {_start_block}) / {__block_increment})::INT + 1) * {__block_increment} + {_start_block})::BIGINT AS block_step,
                             abh.balance::BIGINT AS balance
                         FROM
-                            btracker_app.account_balance_history abh
+                            mario_app.account_balance_history abh
                         WHERE 
                             abh.account = '{_account_name}' AND
                             abh.nai = '{_coin_type}' AND
@@ -148,7 +148,7 @@ class BalanceTracker:
                             abh.source_op_block::BIGINT AS block,
                             abh.balance::BIGINT AS balance
                             FROM
-                            btracker_app.account_balance_history abh
+                            mario_app.account_balance_history abh
                             WHERE
                             abh.account = '{_account_name}' AND
                             abh.nai = '{_coin_type}'

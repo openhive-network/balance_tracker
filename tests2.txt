@@ -1,0 +1,61 @@
+CREATE OR REPLACE FUNCTION mario_insert_trxs( table_name VARCHAR, block_num INTEGER, hash VARCHAR, nr_trxs INTEGER ) RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    command text;
+	full_hash text;
+BEGIN
+
+	command := '';
+	FOR i IN 1..nr_trxs
+	LOOP
+		full_hash:= to_hex(i-1);
+		IF length(full_hash) = 1 THEN
+			full_hash:= '0' || full_hash;
+		END IF;
+		full_hash:= hash || full_hash;
+		command := command || 'insert into '||table_name||'( block_num, trx_in_block, trx_hash, ref_block_num, ref_block_prefix, expiration)';
+		command := command || 'values('||block_num||', 6666, decode('''||full_hash||''', ''hex''), 1111, 3956751638, ''2023-10-13 13:41:15'');';
+	END LOOP;
+	EXECUTE command;
+END $$;
+
+Queries:
+
+`explain analyze select mario_insert_trxs('hive.transactions', 80434000, '00', 50);`
+
+or
+
+`explain analyze select mario_insert_trxs('mario_app.r_transactions', 80434000, '00', 50);`
+
+HEAD = ~ `80434492`
+
+--In next queries `trx_hash` is changing i.e. `00`, `01`, `02` and so on...
+
+=====`hive.transactions`=====
+"Execution Time: 44.475 ms"
+"Execution Time: 10.885 ms"
+"Execution Time: 29.391 ms"
+"Execution Time: 36.567 ms"
+"Execution Time: 45.287 ms"
+"Execution Time: 48.696 ms"
+"Execution Time: 42.795 ms"
+"Execution Time: 46.798 ms"
+"Execution Time: 19.172 ms"
+"Execution Time: 46.070 ms"
+=====AVG=====
+`37.014 ms`
+
+=====`mario_app.r_transactions`=====
+"Execution Time: 10.885 ms"
+"Execution Time: 3.789 ms"
+"Execution Time: 10.893 ms"
+"Execution Time: 4.212 ms"
+"Execution Time: 3.705 ms"
+"Execution Time: 3.950 ms"
+"Execution Time: 3.678 ms"
+"Execution Time: 3.595 ms"
+"Execution Time: 3.692 ms"
+"Execution Time: 10.427 ms"
+=====AVG=====
+`5.882 ms`
