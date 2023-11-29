@@ -300,13 +300,16 @@ $$
 DECLARE
   __last_block INT;
   __next_block_range hive.blocks_range;
+  __original_commit_mode TEXT;
+  __commit_mode_changed BOOLEAN := false;
 
 BEGIN
   PERFORM btracker_app.allowProcessing();
   COMMIT;
 
-  SELECT btracker_app.lastProcessedBlock() INTO __last_block;
+  SELECT current_setting('synchronous_commit') into __original_commit_mode;
 
+  SELECT btracker_app.lastProcessedBlock() INTO __last_block;
   RAISE NOTICE 'Last block processed by application: %', __last_block;
 
   IF NOT hive.app_context_is_attached(_appContext) THEN
@@ -333,8 +336,16 @@ BEGIN
       RAISE NOTICE 'Attempting to process block range: <%,%>', __next_block_range.first_block, __next_block_range.last_block;
 
       IF __next_block_range.first_block != __next_block_range.last_block THEN
+        IF NOT __commit_mode_changed AND __original_commit_mode != 'OFF' THEN
+          PERFORM set_config('synchronous_commit', 'OFF', false);
+          __commit_mode_changed := true;
+        END IF;
         CALL btracker_app.do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 10000, __last_block);
       ELSE
+        IF __commit_mode_changed THEN
+          PERFORM set_config('synchronous_commit', __original_commit_mode, false);
+          __commit_mode_changed := false;
+        END IF;
         CALL btracker_app.processBlock(__next_block_range.last_block);
         __last_block := __next_block_range.last_block;
       END IF;
