@@ -87,7 +87,7 @@ prepare_haf_data:
   tags:
     - data-cache-storage
 
-.docker-base-build-template:
+.docker-build-template:
   extends: .docker_image_builder_job_template
   stage: build
   variables:
@@ -110,10 +110,10 @@ prepare_haf_data:
         docker manifest inspect "$1" > /dev/null
         return $?
       }
-      if image-exists "$CI_REGISTRY_IMAGE/$NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
-        echo "Image $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping..."
+      if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
+        echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping..."
       else
-        echo "Baking $NAME${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
+        echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
         git config --global --add safe.directory $(pwd)
         docker buildx bake --progress=plain --provenance=false --push "$TARGET"
       fi
@@ -122,31 +122,29 @@ prepare_haf_data:
     - public-runner-docker
 
 docker-ci-runner-build:
-  extends: .docker-base-build-template
+  extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
 docker-psql-client-build:
-  extends: .docker-base-build-template
+  extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
-    BASE_TAG: "22.04"
+    BASE_TAG: "14"
     NAME: "psql-client"
     TARGET: "psql-client"
 
 docker-setup-and-processing-build:
-  stage: build
-  image: docker:24.0.6
-  services:
-    - docker:24.0.6-dind
-  script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build -f Dockerfile.alpine -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${CI_REGISTRY_IMAGE}:latest .
-    - docker push --all-tags ${CI_REGISTRY_IMAGE}
-  tags:
-    - public-runner-docker
+  extends: .docker-build-template
+  needs:
+    - docker-psql-client-build
+  variables:
+    BASE_REPO_NAME: ""
+    BASE_TAG: "$CI_COMMIT_SHORT_SHA"
+    NAME: ""
+    TARGET: "full-ci"
 
 .test-template:
   extends: .docker_image_builder_job_template

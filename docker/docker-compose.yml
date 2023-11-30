@@ -31,7 +31,7 @@ services:
       retries: 3
       start_period: 48h #time for replay to finish
   backend-setup:
-    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-22.04}
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-14}
     working_dir: /app
     command: 
       - "./balance-tracker.sh install-app"
@@ -50,7 +50,7 @@ services:
       haf:
         condition: service_healthy
   backend-block-processing:
-    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-22.04}
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-14}
     working_dir: /app
     command:
       - "./balance-tracker.sh process-blocks"

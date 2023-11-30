@@ -39,9 +39,10 @@ There are several targets defined in the Bakefile
 
 - *default* - alias for *psql-client*
 - *psql-client* - builds psql client image
+- *full* - builds full image
 - *ci-runner* - builds CI runner
 
-There are also some other targets meant to be used by CI only: *ci-runner-ci*
+There are also some other targets meant to be used by CI only: *ci-runner-ci*, *full-ci*
 
 To build a given target run `docker buildx bake [target-name]`. If no target name is provided the *default* target will be built.
 
@@ -68,7 +69,7 @@ The variables below are can be used to configure the Compose files.
 | HAF_VERSION                       | HAF version to use                                                                                                  | v1.27.4.0                                                                           |
 | HAF_COMMAND                       | HAF command to execute                                                                                              | --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000 |
 | BACKEND_REGISTRY                  | Registry containing psql client image                                                                               | registry.gitlab.syncad.com/hive/balance_tracker/psql-client                         |
-| BACKEND_VERSION                   | Psql client image version to use                                                                                    | 22.04                                                                               |
+| BACKEND_VERSION                   | Psql client image version to use                                                                                    | 14                                                                                  |
 | POSTGREST_REGISTRY                | Registry containing PostgREST image                                                                                 | postgrest/postgrest                                                                 |
 | POSTGREST_VERSION                 | PostgREST version to use                                                                                            | latest                                                                              |
 | SWAGGER_REGISTRY                  | Registry containing Swagger UI image (*swagger* profile only)                                                       | swaggerapi/swagger-ui                                                               |
