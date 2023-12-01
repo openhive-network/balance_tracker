@@ -1,0 +1,99 @@
+version: '3.9'
+services:
+  haf:
+    image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-instance-8a5bdf1a273e2fcf20353c73c50fea84970b8885}
+    entrypoint: /home/haf_admin/docker_entrypoint.sh
+    command: $${HAF_COMMAND}
+    environment:
+      HIVED_UID:
+      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
+      DATADIR: /home/hived/datadir
+      SHM_DIR: /home/hived/shm_dir
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+    ports:
+      - "5432:5432"
+    volumes:
+      - haf_datadir:/home/hived/datadir
+      - haf_shmdir:/home/hived/shm_dir
+      - ../blockchain:/home/hived/datadir/blockchain
+      - ../scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
+    networks:
+      haf-network:
+    healthcheck:
+      test: ["CMD-SHELL","/home/hived/healthcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 48h #time for replay to finish
+  backend-setup:
+    image: registry.gitlab.syncad.com/hive/balance_tracker:${BACKEND_VERSION:-latest}
+    working_dir: /app
+    command: "install_app"
+    environment:
+      POSTGRES_HOST: haf
+    networks:
+      haf-network:
+    depends_on:
+      haf:
+        condition: service_healthy
+  backend-block-processing:
+    image: registry.gitlab.syncad.com/hive/balance_tracker:${BACKEND_VERSION:-latest}
+    working_dir: /app
+    command: "process_blocks"
+    environment:
+      BLOCK_NUMBER: 0
+      POSTGRES_HOST: haf
+      POSTGRES_USER: btracker_owner
+    networks:
+      haf-network:
+    healthcheck:
+      test: ["CMD-SHELL","/app/block-processing-healthcheck.sh"]
+      interval: 60s
+      timeout: 5s
+      retries: 20
+      start_period: 72h #time for sync to finish
+    depends_on:
+      backend-setup:
+        condition: service_completed_successfully
+  backend-postgrest:
+    image: postgrest/postgrest:latest
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_DB_URI: postgresql://haf_app_admin@haf:5432/haf_block_log
+      PGRST_DB_SCHEMA: btracker_app
+      PGRST_DB_ANON_ROLE: btracker_user
+      PGRST_DB_POOL: 20
+      PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
+    networks:
+      haf-network:
+    depends_on:
+      haf:
+        condition: service_healthy
+      backend-block-processing:
+        condition: service_healthy
+
+networks:
+  haf-network:
+    name: haf-network
+
+volumes:
+  haf_datadir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_DATA_DIRECTORY}/
+  haf_shmdir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_SHM_DIRECTORY}/
+  pgadmin_data:
+    driver: local

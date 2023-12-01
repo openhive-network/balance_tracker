@@ -11,6 +11,7 @@ shellcheck-*.*
 
 # Docker deployment
 docker/blockchain/block_log*
+docker/ci/.env
 docker/*.tar.gz
 .env.*
 docker-compose.override.yml

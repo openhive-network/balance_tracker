@@ -66,7 +66,7 @@ target "full-ci" {
     "type=registry,ref=${registry-name("cache", "")}:${PSQL_CLIENT_VERSION}"
   ]
   cache-to = [
-    "type=registry,mode=max,ref=${registry-name("cache", "")}:${PSQL_CLIENT_VERSION}"
+    "type=registry,mode=max,image-manifest=true,ref=${registry-name("cache", "")}:${PSQL_CLIENT_VERSION}"
   ]
   tags = [
     equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
