@@ -150,21 +150,13 @@ docker-setup-and-processing-build:
   extends: .docker_image_builder_job_template
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-5
-  needs:
-    - prepare_haf_image
-    - prepare_haf_data
-    - docker-psql-client-build
-    - docker-ci-runner-build
   variables:
     HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
     HAF_DATA_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/datadir
     HAF_SHM_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/shm_dir
-    PGHERO_USERNAME: unused
-    PGHERO_PASSWORD: unused
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
-    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
   timeout: 2 hours
   before_script:
     - |
@@ -229,26 +221,46 @@ docker-setup-and-processing-build:
   tags:
     - data-cache-storage
 
-
-
-regression-test:
+.psql-client-test-template:
   extends: .test-template
+  needs:
+    - prepare_haf_image
+    - prepare_haf_data
+    - docker-psql-client-build
+    - docker-ci-runner-build
+  variables:
+    PGHERO_USERNAME: unused
+    PGHERO_PASSWORD: unused
+    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
+
+.full-image-test-template:
+  extends: .test-template
+  needs:
+    - prepare_haf_image
+    - prepare_haf_data
+    - docker-setup-and-processing-build
+    - docker-ci-runner-build
+  variables:
+    BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
+    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file ci/docker-compose.full.yml --ansi never
+
+psql-client-regression-test:
+  extends: .psql-client-test-template
   script:
     - !reference [.test-template, script]
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
 
-      (cd tests/account_balances && bash ./accounts_dump_test.sh --host=docker)
+      cd tests/account_balances
+      ./accounts_dump_test.sh --host=docker
 
       echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
     paths:
       - docker/container-logs.tar.gz
-    expire_in: 1 week
-    when: always
 
-performance-test:
-  extends: .test-template
+psql-client-performance-test:
+  extends: .psql-client-test-template
   script:
     - !reference [.test-template, script]
     - |
@@ -269,6 +281,23 @@ performance-test:
     reports:
       junit: tests/performance/junit-result.xml
 
+full-image-regression-test:
+  extends: .full-image-test-template
+  script:
+    - !reference [psql-client-regression-test, script]
+  artifacts:
+    paths:
+      !reference [psql-client-regression-test, artifacts, paths]
+
+full-image-performance-test:
+  extends: .full-image-test-template
+  script:
+    - !reference [psql-client-performance-test, script]
+  artifacts:
+    paths:
+      !reference [psql-client-performance-test, artifacts, paths]
+    reports:
+      junit: !reference [psql-client-performance-test, artifacts, reports, junit]
 
 cleanup_haf_cache_manual:
   extends: .cleanup_cache_manual
