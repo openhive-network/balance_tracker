@@ -11,7 +11,7 @@ COPY --from=registry.gitlab.syncad.com/hive/common-ci-configuration/benchmark-te
 USER root
 RUN <<EOF
   # Install system dependencies
-  apk add --no-cache bash ca-certificates openjdk11-jre postgresql-client python3 py3-pip
+  apk add --no-cache bash ca-certificates openjdk11-jre postgresql-client python3 py3-pip py3-psycopg2
 
   # Create symlinks in bin directory
   ln -s /opt/tools/jmeter/bin/jmeter.sh /usr/bin/jmeter
