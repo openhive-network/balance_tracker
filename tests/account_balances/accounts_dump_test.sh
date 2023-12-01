@@ -68,7 +68,11 @@ rm -f "${SCRIPTDIR}/accounts_dump.json"
 # zcat "${SCRIPTDIR}/accounts_dump.json.gz" > "${SCRIPTDIR}/accounts_dump.json"
 gunzip -k "${SCRIPTDIR}/accounts_dump.json.gz"
 
-pip install psycopg2-binary
+# CI comes with psycopg2 preinstalled
+if [[ -z "${CI:-}" ]]; then
+    echo "Installing dependecies..."
+    pip install psycopg2-binary
+fi
 
 echo "Starting data_insertion_stript.py..."
 python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" --user "$POSTGRES_USER"
