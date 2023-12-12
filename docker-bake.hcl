@@ -53,7 +53,7 @@ target "ci-runner-ci" {
     "type=registry,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
   ]
   cache-to = [
-    "type=registry,mode=max,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
+    "type=registry,mode=max,image-manifest=true,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
   ]
   tags = [
     "${registry-name("ci-runner", "")}:${TAG_CI}"
