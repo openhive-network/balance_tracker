@@ -20,7 +20,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 06c4090ae3a4758117fb797cdf7e55c823a2e620 # develop
+    ref: a48266963fe1b4151e845702e4580fc2242814f4 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
