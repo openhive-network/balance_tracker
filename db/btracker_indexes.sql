@@ -3,7 +3,7 @@ DO $$
   BEGIN
     IF EXISTS(SELECT 1 FROM pg_index WHERE NOT indisvalid AND indexrelid = (SELECT oid FROM pg_class WHERE relname = 'hive_operations_is_saved_into_hbd_balance')) THEN
       RAISE NOTICE 'Dropping invalid index hive_operations_is_saved_into_hbd_balance, it will be recreated';
-      DROP INDEX hive_operations_is_saved_into_hbd_balance;
+      DROP INDEX hive.hive_operations_is_saved_into_hbd_balance;
     END IF;
   END
 $$;
@@ -18,7 +18,7 @@ DO $$
   BEGIN
     IF EXISTS(SELECT 1 FROM pg_index WHERE NOT indisvalid AND indexrelid = (SELECT oid FROM pg_class WHERE relname = 'hive_operations_reversible_is_saved_into_hbd_balance')) THEN
       RAISE NOTICE 'Dropping invalid index hive_operations_reversible_is_saved_into_hbd_balance, it will be recreated';
-      DROP INDEX hive_operations_is_saved_into_hbd_balance;
+      DROP INDEX hive.hive_operations_reversible_is_saved_into_hbd_balance;
     END IF;
   END
 $$;
@@ -36,7 +36,7 @@ DO $$
   BEGIN
     IF EXISTS(SELECT 1 FROM pg_index WHERE NOT indisvalid AND indexrelid = (SELECT oid FROM pg_class WHERE relname = 'hive_operations_payout_must_be_claimed')) THEN
       RAISE NOTICE 'Dropping invalid index hive_operations_payout_must_be_claimed, it will be recreated';
-      DROP INDEX hive_operations_is_saved_into_hbd_balance;
+      DROP INDEX hive.hive_operations_payout_must_be_claimed;
     END IF;
   END
 $$;
@@ -51,7 +51,7 @@ DO $$
   BEGIN
     IF EXISTS(SELECT 1 FROM pg_index WHERE NOT indisvalid AND indexrelid = (SELECT oid FROM pg_class WHERE relname = 'hive_operations_reversible_payout_must_be_claimed')) THEN
       RAISE NOTICE 'Dropping invalid index hive_operations_reversible_payout_must_be_claimed, it will be recreated';
-      DROP INDEX hive_operations_is_saved_into_hbd_balance;
+      DROP INDEX hive.hive_operations_reversible_payout_must_be_claimed;
     END IF;
   END
 $$;
