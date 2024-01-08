@@ -72,7 +72,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../api/btracker_api.
 # want to add our own indexes, which would slow down massive sync, so we just wait (the block processor
 # wouldn't do anything until out of massive sync anyway).
 echo "Waiting for HAF to be out of massive sync"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT hive.wait_for_ready_instance(interval '3 days');"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT hive.wait_for_ready_instance(ARRAY['btracker_app'], interval '3 days');"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/btracker_indexes.sql"
 # it's only btracker_indexes.sql that needs to wait, the scripts below could safely run during
 # massive sync
