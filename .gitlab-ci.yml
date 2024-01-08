@@ -6,7 +6,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "27bf7a315f3cacdf45336501112e6ac414d39006"
+  CI_COMMON_JOB_VERSION: "44ad61be5f9d0588512f478e5baf3ec89cb92a3f"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -20,7 +20,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 8a5bdf1a273e2fcf20353c73c50fea84970b8885 # develop
+    ref: f28da7101e47f767b19fcf6cc16544773f83c802 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
@@ -158,7 +158,6 @@ docker-setup-and-processing-build:
     - docker-ci-runner-build
   variables:
     HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
-    HAF_REGISTRY: registry.gitlab.syncad.com/hive/haf/instance
     HAF_DATA_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/datadir
     HAF_SHM_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/shm_dir
     PGHERO_USERNAME: unused
@@ -188,7 +187,8 @@ docker-setup-and-processing-build:
       # Put all the variables that can be predefined in the "variables"
       # block and all the variables that have to be dynamically set by the script below
       {
-        echo "HAF_VERSION=instance-$HAF_COMMIT"
+        echo "HAF_REGISTRY=$HAF_REGISTRY_PATH"
+        echo "HAF_VERSION=$HAF_REGISTRY_TAG"
         echo "HIVED_UID=$HIVED_UID"
       } > .env.local
       cat .env.local
