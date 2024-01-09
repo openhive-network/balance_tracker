@@ -146,6 +146,8 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
 ) INHERITS (hive.btracker_app);
 
+PERFORM hive.app_context_detach('btracker_app');
+
 GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
 
 GRANT USAGE ON SCHEMA btracker_app to btracker_user;
