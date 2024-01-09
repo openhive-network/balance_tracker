@@ -7,7 +7,10 @@ CREATE SCHEMA btracker_app AUTHORIZATION btracker_owner;
 
   IF NOT hive.app_context_exists('btracker_app') THEN 
 
-  PERFORM hive.app_create_context('btracker_app');
+  PERFORM hive.app_create_context('btracker_app',
+    TRUE, -- _if_forking
+    FALSE -- _is_attached
+  );
 
   END IF;
 
