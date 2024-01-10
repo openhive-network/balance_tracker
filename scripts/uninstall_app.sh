@@ -64,13 +64,13 @@ uninstall_app() {
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
 
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_owner TO postgres; "
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_owner"
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_owner"
+    psql "$POSTGRES_ACCESS_ADMIN" -c "REASSIGN OWNED BY btracker_owner TO postgres; " || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_owner" || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_owner" || true
 
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "REASSIGN OWNED BY btracker_user TO postgres; "
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP OWNED BY btracker_user"
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP ROLE btracker_user"
+    psql "$POSTGRES_ACCESS_ADMIN" -c "REASSIGN OWNED BY btracker_user TO postgres; " || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_user" || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_user" || true
 
 }
 
