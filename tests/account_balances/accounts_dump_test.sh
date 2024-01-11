@@ -87,5 +87,7 @@ if [ -z "$DIFFERING_ACCOUNTS" ]; then
 
 else
     echo "Account balances are incorrect..."
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SELECT * FROM btracker_account_dump.differing_accounts;"
+
     exit 1
 fi
