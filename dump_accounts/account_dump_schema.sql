@@ -6,7 +6,7 @@ BEGIN
 CREATE SCHEMA btracker_account_dump AUTHORIZATION btracker_owner;
 
 CREATE TABLE IF NOT EXISTS btracker_account_dump.account_balances (
-    name TEXT,
+    account_id INT,
     balance BIGINT DEFAULT 0,
     hbd_balance BIGINT DEFAULT 0,
     vesting_shares BIGINT DEFAULT 0,
@@ -26,11 +26,11 @@ CREATE TABLE IF NOT EXISTS btracker_account_dump.account_balances (
     posting_rewards BIGINT DEFAULT 0,
     curation_rewards BIGINT DEFAULT 0,
 
-CONSTRAINT pk_account_balances_comparison PRIMARY KEY (name)
+CONSTRAINT pk_account_balances_comparison PRIMARY KEY (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS btracker_account_dump.differing_accounts (
-  account_name TEXT
+  account_id INT
 );
 
 EXCEPTION WHEN duplicate_schema THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;

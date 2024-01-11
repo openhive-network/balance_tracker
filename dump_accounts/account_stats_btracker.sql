@@ -8,7 +8,7 @@ BEGIN
 INSERT INTO btracker_account_dump.account_balances 
 
 SELECT
-    account_data->>'name'AS name,
+    (account_data->>'id')::INT AS account_id,
     (account_data->'balance'->>'amount')::BIGINT AS balance,
     (account_data->'hbd_balance'->>'amount')::BIGINT AS hbd_balance,
     (account_data->'vesting_shares'->>'amount')::BIGINT AS vesting_shares,
@@ -34,7 +34,7 @@ $$;
 DROP TYPE IF EXISTS btracker_account_dump.account_type CASCADE; -- noqa: LT01
 CREATE TYPE btracker_account_dump.account_type AS
 (
-    name TEXT,
+    account_id INT,
     balance BIGINT,
     hbd_balance BIGINT,
     vesting_shares BIGINT,
@@ -54,18 +54,17 @@ CREATE TYPE btracker_account_dump.account_type AS
     posting_rewards BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_account_dump.get_account_setof(_account text)
+CREATE OR REPLACE FUNCTION btracker_account_dump.get_account_setof(_account_id int)
 RETURNS btracker_account_dump.account_type -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
 DECLARE
-  __account_id INT := (SELECT id FROM hive.accounts_view WHERE name = _account);
   __result btracker_account_dump.account_type;
 BEGIN
   SELECT
-    _account,
+    _account_id,
     COALESCE(_result_balance.hive_balance, 0) AS hive_balance,
     COALESCE(_result_balance.hbd_balance, 0)AS hbd_balance,
     COALESCE(_result_balance.vesting_shares, 0) AS vesting_shares,
@@ -90,45 +89,13 @@ BEGIN
     COALESCE(_result_curation_posting.posting_rewards, 0) AS posting_rewards
   INTO __result
   FROM
-    (SELECT * FROM btracker_endpoints.get_account_balances(__account_id)) AS _result_balance,
-    (SELECT * FROM btracker_endpoints.get_account_delegations(__account_id)) AS _result_vest_balance,
-    (SELECT * FROM btracker_endpoints.get_account_rewards(__account_id)) AS _result_rewards,
-    (SELECT * FROM btracker_endpoints.get_account_savings(__account_id)) AS _result_savings,
-    (SELECT * FROM btracker_endpoints.get_account_info_rewards(__account_id)) AS _result_curation_posting,
-    (SELECT * FROM btracker_endpoints.get_account_withdraws(__account_id)) AS _result_withdraws;
+    (SELECT * FROM btracker_endpoints.get_account_balances(_account_id)) AS _result_balance,
+    (SELECT * FROM btracker_endpoints.get_account_delegations(_account_id)) AS _result_vest_balance,
+    (SELECT * FROM btracker_endpoints.get_account_rewards(_account_id)) AS _result_rewards,
+    (SELECT * FROM btracker_endpoints.get_account_savings(_account_id)) AS _result_savings,
+    (SELECT * FROM btracker_endpoints.get_account_info_rewards(_account_id)) AS _result_curation_posting,
+    (SELECT * FROM btracker_endpoints.get_account_withdraws(_account_id)) AS _result_withdraws;
 
   RETURN __result;
-END
-$$;
-
-CREATE OR REPLACE FUNCTION btracker_account_dump.compare_differing_account(_account text)
-RETURNS SETOF btracker_account_dump.account_type -- noqa: LT01
-LANGUAGE 'plpgsql'
-STABLE
-AS
-$$
-BEGIN
-  RETURN QUERY SELECT 
-    name,
-    balance,
-    hbd_balance,
-    vesting_shares,
-    savings_balance,
-    savings_hbd_balance,
-    vesting_withdraw_rate,
-    to_withdraw,
-    withdrawn,
-    reward_hbd_balance,
-    reward_hive_balance,
-    reward_vesting_balance,
-    reward_vesting_hive,
-    delegated_vesting_shares,
-    received_vesting_shares,
-    posting_rewards
-
-  FROM btracker_account_dump.account_balances WHERE name = _account
-  UNION ALL
-SELECT * FROM btracker_account_dump.get_account_setof(_account);
-
 END
 $$;
