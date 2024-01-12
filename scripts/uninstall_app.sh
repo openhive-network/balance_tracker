@@ -64,10 +64,10 @@ uninstall_app() {
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
 
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_owner" || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_owner CASCADE" || true
     psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_owner" || true
 
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_user" || true
+    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_user CASCADE" || true
     psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_user" || true
 
 }
