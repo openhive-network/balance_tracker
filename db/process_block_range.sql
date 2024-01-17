@@ -16,26 +16,45 @@ DECLARE
 BEGIN
 --RAISE NOTICE 'Processing balances';
 FOR __balance_change IN
-  WITH balance_impacting_ops AS
+  WITH balance_impacting_ops AS MATERIALIZED
   (
     SELECT ot.id
     FROM hive.operation_types ot
     WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
-  )
-  SELECT av.id AS account, bio.asset_symbol_nai AS nai, bio.amount as balance, ho.id AS source_op, ho.block_num AS source_op_block
-  FROM hive.btracker_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
-  JOIN balance_impacting_ops b ON ho.op_type_id = b.id
-  JOIN LATERAL
+  ),
+  ops_in_range AS MATERIALIZED 
   (
-    /*
-      There was in the block 905693 a HF1 that generated bunch of virtual operations `vesting_shares_split_operation`( above 5000 ).
-      This operation multiplied VESTS by milion for every account.
-    */
-    SELECT * FROM hive.get_impacted_balances(ho.body_binary, ho.block_num > 905693)
-  ) bio ON true
-  JOIN hive.accounts_view av ON av.name = bio.account_name
-  WHERE ho.block_num BETWEEN _from AND _to
-  ORDER BY ho.block_num, ho.id
+    SELECT 
+      ho.id AS source_op,
+      ho.block_num AS source_op_block,
+      ho.body_binary
+    FROM hive.btracker_app_operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
+    WHERE ho.op_type_id = ANY(SELECT id FROM balance_impacting_ops) AND ho.block_num BETWEEN _from AND _to
+    ORDER BY ho.block_num, ho.id
+  ),
+  get_impacted AS (
+  SELECT 
+  	hive.get_impacted_balances(gib.body_binary, gib.source_op_block > 905693) AS get_impacted_balances,
+  	gib.source_op,
+  	gib.source_op_block 
+  FROM ops_in_range gib
+  ),
+  get_impacted_two AS (
+  SELECT 
+	  (gi.get_impacted_balances).account_name,
+  	(gi.get_impacted_balances).asset_symbol_nai AS nai,
+	  (gi.get_impacted_balances).amount AS balance,
+	  gi.source_op,
+	  gi.source_op_block
+  FROM get_impacted gi
+  )
+  SELECT 
+  	(select av.id from hive.accounts_view av where av.name = git.account_name) as account,
+  	git.nai,
+	  git.balance,
+	  git.source_op,
+	  git.source_op_block
+  FROM get_impacted_two git
 LOOP
   INSERT INTO btracker_app.current_account_balances
     (account, nai, source_op, source_op_block, balance)
