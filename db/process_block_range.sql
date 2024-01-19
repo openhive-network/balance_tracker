@@ -92,137 +92,101 @@ SET cursor_tuple_fraction = '0.9'
 AS
 $$
 DECLARE
-  ___balance_change RECORD;
-  _vesting_multiplication RECORD;
-  _to_withdraw BIGINT;
-  _withdraw_rate INT := (SELECT withdraw_rate FROM btracker_app.app_status);
-  _start_delayed_vests BOOLEAN := (SELECT start_delayed_vests FROM btracker_app.app_status);
+  _result INT;
 BEGIN
 --RAISE NOTICE 'Processing delegations, rewards, savings, withdraws';)
-
-FOR ___balance_change IN
-  SELECT 
-    ov.body AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id as op_type
-  FROM hive.btracker_app_operations_view ov
-  WHERE 
-    (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68) or
-    (ov.op_type_id = 55 and (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
-    (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
-    AND ov.block_num BETWEEN _from AND _to
-  ORDER BY ov.block_num, ov.id
-
 --delegations (40,41,62)
 --savings (32,33,34,59,55)
 --rewards (39,51,52,63,53)
 --withdraws (4,20,56)
 --hardforks (60)
 
-LOOP
+WITH process_block_range_data_b AS MATERIALIZED 
+( 
+SELECT 
+  ov.body AS body,
+  ov.id AS source_op,
+  ov.block_num as source_op_block,
+  ov.op_type_id 
+FROM hive.btracker_app_operations_view ov
+WHERE 
+  (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68) or
+  (ov.op_type_id = 55 and (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
+  (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
+  AND ov.block_num BETWEEN _from AND _to
+),
+insert_balance AS MATERIALIZED 
+(
+SELECT pbr.source_op,
+  (CASE 
+  WHEN pbr.op_type_id = 40 THEN
+    btracker_app.process_delegate_vesting_shares_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-  CASE 
+  WHEN pbr.op_type_id = 41 THEN
+    btracker_app.process_account_create_with_delegation_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 40 THEN
-    PERFORM btracker_app.process_delegate_vesting_shares_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 62 THEN
+    btracker_app.process_return_vesting_delegation_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 41 THEN
-    PERFORM btracker_app.process_account_create_with_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 32 THEN
+    btracker_app.process_transfer_to_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 62 THEN
-    PERFORM btracker_app.process_return_vesting_delegation_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 33 THEN
+    btracker_app.process_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 32 THEN
-    PERFORM btracker_app.process_transfer_to_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 34 THEN
+    btracker_app.process_cancel_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 33 THEN
-    PERFORM btracker_app.process_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 59 THEN
+    btracker_app.process_fill_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 34 THEN
-    PERFORM btracker_app.process_cancel_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 55 THEN
+    btracker_app.process_interest_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 59 THEN
-    PERFORM btracker_app.process_fill_transfer_from_savings_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 39 THEN
+    btracker_app.process_claim_reward_balance_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 55 THEN
-    PERFORM btracker_app.process_interest_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 51 THEN
+    btracker_app.process_author_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 39 THEN
-    PERFORM btracker_app.process_claim_reward_balance_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 52 THEN
+    btracker_app.process_curation_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 51 THEN
-    PERFORM btracker_app.process_author_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 63 THEN
+    btracker_app.process_comment_benefactor_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-    WHEN ___balance_change.op_type = 52 THEN
-    PERFORM btracker_app.process_curation_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 4 THEN
+    btracker_app.process_withdraw_vesting_operation(pbr.body, (SELECT withdraw_rate FROM btracker_app.app_status))
 
-    WHEN ___balance_change.op_type = 63 THEN
-    PERFORM btracker_app.process_comment_benefactor_reward_operation(___balance_change.body, ___balance_change.source_op, ___balance_change.source_op_block);
+  WHEN pbr.op_type_id = 20 THEN
+    btracker_app.process_set_withdraw_vesting_route_operation(pbr.body)
 
-    WHEN ___balance_change.op_type = 4 THEN
-    PERFORM btracker_app.process_withdraw_vesting_operation(___balance_change.body, _withdraw_rate);
+  WHEN pbr.op_type_id = 56 THEN
+    btracker_app.process_fill_vesting_withdraw_operation(pbr.body, (SELECT start_delayed_vests FROM btracker_app.app_status))
 
-    WHEN ___balance_change.op_type = 20 THEN
-    PERFORM btracker_app.process_set_withdraw_vesting_route_operation(___balance_change.body);
+  WHEN pbr.op_type_id = 53 THEN
+    btracker_app.process_comment_reward_operation(pbr.body)
 
-    WHEN ___balance_change.op_type = 56 THEN
-    PERFORM btracker_app.process_fill_vesting_withdraw_operation(___balance_change.body, _start_delayed_vests);
+  WHEN pbr.op_type_id = 77 AND (SELECT start_delayed_vests FROM btracker_app.app_status) = TRUE THEN
+    btracker_app.process_transfer_to_vesting_completed_operation(pbr.body)
 
-    WHEN ___balance_change.op_type = 53 THEN
-    PERFORM btracker_app.process_comment_reward_operation(___balance_change.body);
+  WHEN pbr.op_type_id = 70 AND (SELECT start_delayed_vests FROM btracker_app.app_status) = TRUE THEN
+    btracker_app.process_delayed_voting_operation(pbr.body)
 
-    WHEN ___balance_change.op_type = 77 AND _start_delayed_vests = TRUE THEN
-    PERFORM btracker_app.process_transfer_to_vesting_completed_operation(___balance_change.body);
+  WHEN pbr.op_type_id = 68 THEN
+    btracker_app.process_hardfork_hive_operation(pbr.body)
 
-    WHEN ___balance_change.op_type = 70 AND _start_delayed_vests = TRUE THEN
-    PERFORM btracker_app.process_delayed_voting_operation(___balance_change.body);
+  WHEN pbr.op_type_id = 60 THEN
+    btracker_app.process_hardfork(((pbr.body)->'value'->>'hardfork_id')::INT)
+  END)
+FROM process_block_range_data_b pbr
+ORDER BY pbr.source_op_block, pbr.source_op
+)
 
-    WHEN ___balance_change.op_type = 68 THEN
-    PERFORM btracker_app.process_hardfork_hive_operation(___balance_change.body);
+  SELECT COUNT(*) FROM insert_balance INTO _result;
 
-    WHEN ___balance_change.op_type = 60 THEN
-    
-      CASE ((___balance_change.body)->'value'->>'hardfork_id')::INT
--- HARDFORK 1
-      WHEN 1 THEN
-        FOR _vesting_multiplication IN
-        SELECT 
-          account, 
-          vesting_withdraw_rate, 
-          to_withdraw, 
-          withdrawn 
-        FROM btracker_app.account_withdraws
-
-        LOOP
-
-        SELECT _vesting_multiplication.to_withdraw * 1000000 INTO _to_withdraw;
-
-        UPDATE btracker_app.account_withdraws SET 
-          vesting_withdraw_rate = _to_withdraw / _withdraw_rate,
-          to_withdraw = _to_withdraw,
-          withdrawn = _vesting_multiplication.withdrawn * 1000000
-        WHERE account = _vesting_multiplication.account;
-
-        END LOOP;
--- HARDFORK 16
-      WHEN 16 THEN
-        UPDATE btracker_app.app_status SET withdraw_rate = 13;
-        _withdraw_rate = 13;
--- HARDFORK 24
-      WHEN 24 THEN
-        UPDATE btracker_app.app_status SET start_delayed_vests = TRUE;
-        _start_delayed_vests = TRUE;
-    
-      ELSE
-      END CASE;
-
-    ELSE
-  END CASE;
-
-END LOOP;
-PERFORM btracker_app.storeLastProcessedBlock(_to);
-RAISE NOTICE 'Updated last processed block.';
+  PERFORM btracker_app.storeLastProcessedBlock(_to);
+  RAISE NOTICE 'Updated last processed block.';
 END
 $$;
 
@@ -269,6 +233,44 @@ savings AS (
     delayed_vests = 0
   FROM hardfork_hive_operation
   WHERE account = _account;
+
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_app.process_hardfork(_hardfork_id INT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+
+  CASE 
+
+  WHEN _hardfork_id = 1 THEN
+  WITH account_withdraws AS MATERIALIZED 
+  (
+  SELECT 
+    account as account_id, 
+    (to_withdraw * 1000000) AS _to_withdraw,
+    ((to_withdraw * 1000000)/ 104) AS _vesting_withdraw_rate,
+    (withdrawn * 1000000) AS _withdrawn
+  FROM btracker_app.account_withdraws
+  )
+  UPDATE btracker_app.account_withdraws SET 
+    vesting_withdraw_rate = ad._vesting_withdraw_rate,
+    to_withdraw = ad._to_withdraw,
+    withdrawn = ad._withdrawn 
+  FROM account_withdraws ad
+  WHERE account = ad.account_id;
+
+  WHEN _hardfork_id = 16 THEN
+  UPDATE btracker_app.app_status SET withdraw_rate = 13;
+
+  WHEN _hardfork_id = 24 THEN
+  UPDATE btracker_app.app_status SET start_delayed_vests = TRUE;
+
+  ELSE
+  END CASE;
 
 END
 $$;
