@@ -1,31 +1,17 @@
 stages:
- - lint
- - build
- - test
- - cleanup
- - publish
+  - lint
+  - setup
+  - build
+  - test
+  - publish
 
 variables:
-  # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "d4e29410ea168096e1a822f77c7ce741d9cfb57a"
-  DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
-  DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
-  IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
-  # Git configuration
-  GIT_STRATEGY: clone
-  GIT_SUBMODULE_STRATEGY: recursive
-  # HAF configuration
-  DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
-  BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
+  DATA_REPLAY_TAG: data-cache-storage
 
 include:
-  - template: Workflows/Branch-Pipelines.gitlab-ci.yml
-  - project: hive/haf
-    ref: 2c4ed8e60b6f77316e6c7eea522da7854233fa25 # develop
-    file: /scripts/ci-helpers/prepare_data_image_job.yml
-  - project: 'hive/common-ci-configuration'
-    ref: d4e29410ea168096e1a822f77c7ce741d9cfb57a
-    file: /templates/cache_cleanup.gitlab-ci.yml
+  - local: scripts/ci-helpers/includes.gitlab-ci.yml
+
+############ Templates ############
 
 .lint_job:
   stage: lint
@@ -37,59 +23,6 @@ include:
   tags:
     - public-runner-docker
 
-lint_bash_scripts:
-  extends: .lint_job
-  image: koalaman/shellcheck-alpine:latest
-  before_script:
-    - apk add xmlstarlet
-  script:
-    - find . -name .git -type d -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle {} + | tee shellcheck-checkstyle-result.xml
-  after_script:
-    - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
-  artifacts:
-    paths: 
-      - shellcheck-checkstyle-result.xml
-      - shellcheck-junit-result.xml
-    reports:
-      junit: shellcheck-junit-result.xml
-
-lint_sql_scripts:
-  extends: .lint_job
-  image: 
-    name: sqlfluff/sqlfluff:2.1.4
-    entrypoint: [""]
-  script:
-    - sqlfluff lint --format yaml --write-output sql-lint.yaml
-  artifacts:
-    paths:
-      - sql-lint.yaml
-
-prepare_haf_image:
-  stage: build
-  extends: .prepare_haf_image
-  variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
-    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
-    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
-  before_script:
-    - git config --global --add safe.directory $CI_PROJECT_DIR/haf
-  tags:
-    - public-runner-docker
-    - hived-for-tests
-
-prepare_haf_data:
-  extends: .prepare_haf_data_5m
-  needs:
-    - job: prepare_haf_image
-      artifacts: true
-  stage: build
-  variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
-    BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
-    CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
-  tags:
-    - data-cache-storage
-
 .docker-build-template:
   extends: .docker_image_builder_job_template
   stage: build
@@ -98,7 +31,6 @@ prepare_haf_data:
     BASE_TAG: ubuntu-22.04-1
     NAME: ""
     TARGET: "$NAME-base"
-    PROGRESS_DISPLAY: "plain"
   before_script:
     - !reference [.docker_image_builder_job_template, before_script]
     - |
@@ -132,6 +64,58 @@ prepare_haf_data:
     - public-runner-docker
     - hived-for-tests
 
+############ End templates ############
+
+############ Setup ############
+
+lint_bash_scripts:
+  extends: .lint_job
+  image: koalaman/shellcheck-alpine:latest
+  before_script:
+    - apk add xmlstarlet
+  script:
+    - find . -name .git -type d -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle {} + | tee shellcheck-checkstyle-result.xml
+  after_script:
+    - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
+  artifacts:
+    paths: 
+      - shellcheck-checkstyle-result.xml
+      - shellcheck-junit-result.xml
+    reports:
+      junit: shellcheck-junit-result.xml
+
+lint_sql_scripts:
+  extends: .lint_job
+  image: 
+    name: sqlfluff/sqlfluff:2.1.4
+    entrypoint: [""]
+  script:
+    - sqlfluff lint --format yaml --write-output sql-lint.yaml
+  artifacts:
+    paths:
+      - sql-lint.yaml
+
+determine-runner-tag:
+  extends: .determine-runner-tag-template
+  stage: setup
+
+############ End setup ############
+
+############ Build ############
+
+prepare_haf_image:
+  stage: build
+  extends: .prepare_haf_image
+  variables:
+    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
+    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
+    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
+  before_script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR/haf
+  tags:
+    - public-runner-docker
+    - hived-for-tests
+
 docker-ci-runner-build:
   extends: .docker-build-template
   variables:
@@ -158,186 +142,55 @@ docker-setup-and-processing-build:
     NAME: ""
     TARGET: "full-ci"
 
-.test-template:
-  extends: .docker_image_builder_job_template
+############ End build ############
+
+############ Test ############
+
+dynamic-tag-pipeline-trigger:
+  extends: .dynamic-tag-pipeline-trigger-template
   stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
-  variables:
-    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
-    DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
-    SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
-    HAF_DATA_DIRECTORY: ${DATADIR}
-    HAF_SHM_DIRECTORY: ${SHM_DIR}
-    POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
-    COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
-    MESSAGE: Waiting for Balance Tracker to finish processing blocks...
-    FF_NETWORK_PER_BUILD: 1
-  timeout: 1 hours
-  before_script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-      echo -e "\e[0Ksection_start:$(date +%s):git[collapsed=true]\r\e[0KConfiguring Git..."
-      git config --global --add safe.directory "$CI_PROJECT_DIR"
-      git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
-      echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
-  script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
-
-      cp /blockchain/block_log_5m/block_log docker/blockchain/block_log
-      chmod a+w docker/blockchain/block_log
-
-      "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
-
-      pushd docker
-      # Put all the variables that can be predefined in the "variables"
-      # block and all the variables that have to be dynamically set by the script below
-      {
-        echo "HAF_REGISTRY=$HAF_REGISTRY_PATH"
-        echo "HAF_VERSION=$HAF_REGISTRY_TAG"
-        echo "HIVED_UID=$HIVED_UID"
-      } > .env.local
-      cat .env.local
-      echo "Docker Compose options string: $COMPOSE_OPTIONS_STRING"
-      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      echo "Docker Compose options: ${COMPOSE_OPTIONS[@]}"
-      docker compose config | tee docker-compose-config.yml.log
-      timeout -s INT -k 1m 15m docker compose ${COMPOSE_OPTIONS[@]} up --detach
-      popd
-
-      echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
-      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
-
-      function wait-for-btracker-startup() {
-        until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
-        do 
-          echo "$MESSAGE"
-          sleep 3
-        done
-      }
-      export -f wait-for-btracker-startup
-      export POSTGRES_ACCESS
-      export COMMAND
-      export MESSAGE
-
-      timeout -k 1m 10m bash -c wait-for-btracker-startup
-
-      echo "Block processing is finished."
-
-      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
-  after_script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
-
-      pushd docker
-      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
-      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
-      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
-      docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
-      docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
-      popd
-
-      tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
-      
-      # Manually remove the copy of the repaly data to preserve disk space on the replay server
-      sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
-
-      echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
-  artifacts:
-    expire_in: 1 week
-    when: always
-  tags:
-    - data-cache-storage
-
-.psql-client-test-template:
-  extends: .test-template
   needs:
-    - prepare_haf_image
-    - prepare_haf_data
-    - docker-psql-client-build
-    - docker-ci-runner-build
-  variables:
-    PGHERO_USERNAME: unused
-    PGHERO_PASSWORD: unused
-    COMPOSE_OPTIONS_STRING: --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
+    - job: determine-runner-tag
+    - job: prepare_haf_image
+    - job: docker-ci-runner-build
+      artifacts: false
+    - job: docker-psql-client-build
+      artifacts: false
+    - job: docker-setup-and-processing-build
+      artifacts: false
+  trigger:
+    strategy: depend
+    forward:
+      yaml_variables: true
+      pipeline_variables: true
+    include:
+      - local: scripts/ci-helpers/dynamic-tag-pipeline.gitlab-ci.yml
 
-.full-image-test-template:
-  extends: .test-template
+dynamic-pipeline-details-collector:
+  extends: .dynamic-pipeline-details-collector-template
+  stage: test
   needs:
-    - prepare_haf_image
-    - prepare_haf_data
-    - docker-setup-and-processing-build
-    - docker-ci-runner-build
-  variables:
-    BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
-    COMPOSE_OPTIONS_STRING: --env-file .env.local --file ci/docker-compose.full.yml --ansi never
-
-psql-client-regression-test:
-  extends: .psql-client-test-template
-  script:
-    - !reference [.test-template, script]
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
-
-      cd tests/account_balances
-      ./accounts_dump_test.sh --host=docker
-
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
-  artifacts:
-    paths:
-      - docker/container-logs.tar.gz
-
-psql-client-performance-test:
-  extends: .psql-client-test-template
-  script:
-    - !reference [.test-template, script]
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
-
-      timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=docker
-      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
-      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
-      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
-
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
-  artifacts:
-    paths:
-      - docker/container-logs.tar.gz
-      - tests/performance/result_report/
-      - tests/performance/results.tar.gz
-      - jmeter.log
-    reports:
-      junit: tests/performance/junit-result.xml
-
-full-image-regression-test:
-  extends: .full-image-test-template
-  script:
-    - !reference [psql-client-regression-test, script]
-  artifacts:
-    paths:
-      !reference [psql-client-regression-test, artifacts, paths]
-
-full-image-performance-test:
-  extends: .full-image-test-template
-  script:
-    - !reference [psql-client-performance-test, script]
-  artifacts:
-    paths:
-      !reference [psql-client-performance-test, artifacts, paths]
-    reports:
-      junit: !reference [psql-client-performance-test, artifacts, reports, junit]
-
-cleanup_haf_cache_manual:
-  extends: .cleanup_cache_manual_template
-  stage: cleanup
-  variables:
-    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
+    - job: dynamic-tag-pipeline-trigger
   tags:
-    - data-cache-storage
+    - public-runner-docker
+
+dynamic-pipeline-test-results-collector:
+  extends: .dynamic-pipeline-test-results-collector-template
+  stage: test
+  needs:
+    - job: dynamic-pipeline-details-collector
+  parallel:
+    matrix:
+      - CHILD_PIPELINE_JOB: [ 
+          "full-image-performance-test",
+          "psql-client-performance-test"
+        ]
+  tags:
+    - public-runner-docker
+
+############ End test ############
+
+############ Publish ############
 
 build_and_publish_image:
   stage: publish
@@ -349,3 +202,5 @@ build_and_publish_image:
   tags:
     - public-runner-docker
     - hived-for-tests
+
+############ End publish ############
