@@ -1,0 +1,21 @@
+variables:
+  # Variables required by Common CI jobs
+  CI_COMMON_JOB_VERSION: "69a155cc9861188941a3f1a31db049ecc71e8de0"
+  DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
+  DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
+  IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
+  JQ_IMAGE_TAG: "$CI_COMMON_JOB_VERSION"
+
+  # Git configuration
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+
+include:
+  - template: Workflows/Branch-Pipelines.gitlab-ci.yml
+  - project: hive/haf
+    ref: 6d163d7dd3e994978a1d1c2598e45ad0a707bd2c # develop
+    file: /scripts/ci-helpers/prepare_data_image_job.yml
+  - project: hive/common-ci-configuration
+    ref: 69a155cc9861188941a3f1a31db049ecc71e8de0
+    file:
+      - /templates/dynamic_tag_jobs.gitlab-ci.yml
