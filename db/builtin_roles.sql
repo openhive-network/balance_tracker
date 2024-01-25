@@ -16,5 +16,4 @@ $$;
 --- Allow to create schemas
 GRANT CREATE ON DATABASE haf_block_log TO btracker_owner;
 GRANT btracker_owner TO haf_admin;
-GRANT btracker_owner TO haf_app_admin;
 GRANT btracker_user TO btracker_owner;
