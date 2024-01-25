@@ -59,7 +59,7 @@ cat <<-END
     --log-dir=PATH                        Log directory for frontend and/or backend logs
     --postgres-host=HOSTNAME              PostgreSQL hostname (default: localhost)
     --postgres-port=PORT                  PostgreSQL port (default: 5432)
-    --postgres-user=USERNAME              PostgreSQL user name (default: haf_app_admin)
+    --postgres-user=USERNAME              PostgreSQL user name (default: btracker_user)
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
     --postgrest-host=HOST                 PostgREST bind address (default: !4)
                                           See https://postgrest.org/en/stable/references/configuration.html#server-host for
@@ -369,7 +369,7 @@ start_postgrest() {
   echo "Starting PostgREST..."
   echo "Arguments: $*"
 
-  postgres_user=${POSTGRES_USER:-"haf_app_admin"}
+  postgres_user=${POSTGRES_USER:-"btracker_user"}
   postgres_host=${POSTGRES_HOST:-"localhost"}
   postgres_port=${POSTGRES_PORT:-5432}
   postgres_url=${POSTGRES_URL:-""}

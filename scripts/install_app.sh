@@ -8,7 +8,7 @@ Usage: $0 [OPTION[=VALUE]]...
 
 Script for setting up the balance tracker database
 OPTIONS:
-    --postgres-host=HOSTNAME              PostgreSQL hostname (default: localhost)
+    --host=HOSTNAME              PostgreSQL hostname (default: localhost)
     --postgres-port=PORT                  PostgreSQL port (default: 5432)
     --postgres-user=USERNAME              PostgreSQL user name (default: haf_admin)
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
@@ -18,14 +18,14 @@ OPTIONS:
 EOF
 }
 
-POSTGRES_USER=${POSTGRES_USER:-"haf_admin"}
+POSTGRES_USER=${POSTGRES_USER:-"btracker_owner"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --postgres-host=*)
+    --host=*)
         POSTGRES_HOST="${1#*=}"
         ;;
     --postgres-port=*)
@@ -58,7 +58,7 @@ done
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"}
 
 echo "Installing app..."
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/builtin_roles.sql"
+psql "postgresql://haf_admin@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/builtin_roles.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/btracker_app.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/process_block_range.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/process_delegations.sql"
