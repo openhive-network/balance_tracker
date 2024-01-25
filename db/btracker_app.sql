@@ -324,7 +324,6 @@ BEGIN
   WHILE btracker_app.continueProcessing() AND (_maxBlockLimit = 0 OR __last_block < _maxBlockLimit) LOOP
     __next_block_range := hive.app_next_block(_appContext);
 
-    COMMIT;
     IF __next_block_range IS NULL THEN
       RAISE WARNING 'Waiting for next block...';
     ELSE
