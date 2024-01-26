@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
@@ -221,3 +223,5 @@ BEGIN
   ) result;
 END
 $$;
+
+RESET ROLE;

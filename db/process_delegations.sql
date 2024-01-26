@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_delegate_vesting_shares_operation(
     body jsonb, _source_op bigint, _source_op_block int
 )
@@ -229,3 +231,5 @@ SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'val
 
 END
 $$;
+
+RESET ROLE;

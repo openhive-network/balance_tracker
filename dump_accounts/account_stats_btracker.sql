@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_account_dump.dump_current_account_stats(account_data jsonb)
 RETURNS void
 LANGUAGE 'plpgsql'
@@ -99,3 +101,5 @@ BEGIN
   RETURN __result;
 END
 $$;
+
+RESET ROLE;

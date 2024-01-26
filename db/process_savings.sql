@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_savings_operation(
     body jsonb, _source_op bigint, _source_op_block int
 )
@@ -236,3 +238,5 @@ INSERT INTO btracker_app.account_savings
 
 END
 $$;
+
+RESET ROLE;

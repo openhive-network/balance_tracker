@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_account_dump.compare_accounts()
 RETURNS void
 LANGUAGE 'plpgsql'
@@ -194,3 +196,5 @@ SELECT * FROM btracker_account_dump.get_account_setof(_account_id);
 
 END
 $$;
+
+RESET ROLE;
