@@ -2,9 +2,13 @@
 DO $$
 BEGIN
   CREATE ROLE btracker_owner WITH LOGIN INHERIT IN ROLE hive_applications_group;
+EXCEPTION WHEN duplicate_object THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;
+END
+$$;
 
-  CREATE ROLE btracker_user WITH LOGIN INHERIT IN ROLE hive_applications_group;
-  
+DO $$
+BEGIN
+  CREATE ROLE btracker_user WITH LOGIN INHERIT IN ROLE hive_applications_group;  
 EXCEPTION WHEN duplicate_object THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;
 END
 $$;
