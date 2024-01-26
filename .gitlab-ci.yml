@@ -157,6 +157,8 @@ docker-setup-and-processing-build:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
+    FF_NETWORK_PER_BUILD: 1
+
   timeout: 2 hours
   before_script:
     - |
