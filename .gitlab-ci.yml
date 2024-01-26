@@ -275,7 +275,7 @@ psql-client-performance-test:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
 
-      ./balance-tracker.sh run-tests --backend-host=docker
+      timeout 10m ./balance-tracker.sh run-tests --backend-host=docker
       tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
       cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
       m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
