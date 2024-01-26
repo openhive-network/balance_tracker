@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_transfer_to_vesting_completed_operation(body jsonb)
 RETURNS void
 LANGUAGE 'plpgsql' VOLATILE
@@ -52,3 +54,5 @@ WITH delayed_voting_operation AS (
         delayed_vests = GREATEST(btracker_app.account_withdraws.delayed_vests - EXCLUDED.delayed_vests, 0);
 END
 $$;
+
+RESET ROLE;

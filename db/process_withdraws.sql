@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(
     body jsonb, _withdraw_rate int
 )
@@ -191,3 +193,5 @@ BEGIN
   AND btracker_app.account_withdraws.to_withdraw = btracker_app.account_withdraws.withdrawn;
 END
 $$;
+
+RESET ROLE;

@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_claim_reward_balance_operation(
     body jsonb, _source_op bigint, _source_op_block int
 )
@@ -306,3 +308,5 @@ INSERT INTO btracker_app.account_info_rewards (
 
 END
 $$;
+
+RESET ROLE;

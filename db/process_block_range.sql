@@ -1,3 +1,5 @@
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_data_a(
     IN _from INT, IN _to INT, IN _report_step INT = 1000
 )
@@ -299,3 +301,5 @@ _account_id, _nai, _source_op, _source_op_block, COALESCE(__current_balance, 0);
 
 END 
 $$;
+
+RESET ROLE;
