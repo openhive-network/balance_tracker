@@ -276,7 +276,7 @@ BEGIN
 
   SELECT current_setting('synchronous_commit') into __original_commit_mode;
 
-  SELECT hive.get_current_block_num() INTO __last_block;
+  SELECT hive.app_get_current_block_num() INTO __last_block;
   RAISE NOTICE 'Last block processed by application: %', __last_block;
 
   IF NOT hive.app_context_is_attached(_appContext) THEN
