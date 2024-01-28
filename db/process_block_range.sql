@@ -175,8 +175,6 @@ ORDER BY pbr.source_op_block, pbr.source_op
 SELECT COUNT(*) INTO _result 
 FROM insert_balance;
 
-  PERFORM btracker_app.storeLastProcessedBlock(_to);
-  RAISE NOTICE 'Updated last processed block.';
 END
 $$;
 
