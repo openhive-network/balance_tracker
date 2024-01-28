@@ -19,15 +19,14 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
 CREATE TABLE IF NOT EXISTS btracker_app.app_status
 (
   continue_processing BOOLEAN NOT NULL,
-  last_processed_block INT NOT NULL,
   withdraw_rate INT NOT NULL,
   start_delayed_vests BOOLEAN NOT NULL
 );
 
 INSERT INTO btracker_app.app_status
-(continue_processing, last_processed_block, withdraw_rate, start_delayed_vests)
+(continue_processing, withdraw_rate, start_delayed_vests)
 VALUES
-(True, 0, 104, FALSE)
+(True, 104, FALSE)
 ;
 
 --ACCOUNT BALANCES
@@ -192,28 +191,6 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.storeLastProcessedBlock(
-    IN _lastBlock INT
-)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-  UPDATE btracker_app.app_status SET last_processed_block = _lastBlock;
-END
-$$;
-
-CREATE OR REPLACE FUNCTION btracker_app.lastProcessedBlock()
-RETURNS INT
-LANGUAGE 'plpgsql' STABLE
-AS
-$$
-BEGIN
-  RETURN last_processed_block FROM btracker_app.app_status LIMIT 1;
-END
-$$;
-
 CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(
     IN _appContext VARCHAR,
     IN _from INT,
@@ -244,7 +221,7 @@ BEGIN
     PERFORM btracker_app.process_block_range_data_b(b, _last_block);
 
 
-    PERFORM btracker_app.storeLastProcessedBlock(_last_block);
+    PERFORM hive.app_set_current_block_num(_appContext, _last_block);
 
     COMMIT;
 
@@ -253,19 +230,6 @@ BEGIN
     EXIT WHEN NOT btracker_app.continueProcessing();
 
   END LOOP;
-
-  IF btracker_app.continueProcessing() AND _last_block < _to THEN
-    RAISE NOTICE 'Attempting to process a block range (rest): <%, %>', b, _last_block;
-    --- Supplement last part of range if anything left.
-    PERFORM btracker_app.process_block_range_data_a(_last_block, _to);
-    PERFORM btracker_app.process_block_range_data_b(_last_block, _to);
-    _last_block := _to;
-
-    PERFORM btracker_app.storeLastProcessedBlock(_last_block);
-
-    COMMIT;
-    RAISE NOTICE 'Block range: <%, %> processed successfully.', b, _last_block;
-  END IF;
 
   RAISE NOTICE 'Attaching HAF application context at block: %.', _last_block;
   CALL hive.appproc_context_attach(_appContext, _last_block);
@@ -312,7 +276,7 @@ BEGIN
 
   SELECT current_setting('synchronous_commit') into __original_commit_mode;
 
-  SELECT btracker_app.lastProcessedBlock() INTO __last_block;
+  SELECT hive.app_get_current_block_num(_appContext) INTO __last_block;
   RAISE NOTICE 'Last block processed by application: %', __last_block;
 
   IF NOT hive.app_context_is_attached(_appContext) THEN
@@ -353,13 +317,9 @@ BEGIN
       END IF;
 
     END IF;
-
   END LOOP;
 
   RAISE NOTICE 'Exiting application main loop at processed block: %.', __last_block;
-  PERFORM btracker_app.storeLastProcessedBlock(__last_block);
-
-  COMMIT;
 END
 $$;
 
