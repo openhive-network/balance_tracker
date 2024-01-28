@@ -221,7 +221,7 @@ BEGIN
     PERFORM btracker_app.process_block_range_data_b(b, _last_block);
 
 
-    PERFORM hive.set_current_block_num(_last_block);
+    PERFORM hive.app_set_current_block_num(_last_block);
 
     COMMIT;
 
