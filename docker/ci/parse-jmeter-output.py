@@ -4,7 +4,7 @@ import re
 import sys
 
 for line in sys.stdin:
-    match = re.search('summary =[\s].*Err:[ ]{0,10}([0-9]{1,10})[ ].*',line)
+    match = re.search('summary =[\s].*Err:[ ]{0,10}([1-9][0-9]{1,10})[ ].*',line)
     if match :
         print("Match found: {}".format(line))
         print("Test error(s) detected. Exiting with code 1.")
