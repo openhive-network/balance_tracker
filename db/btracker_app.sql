@@ -240,13 +240,14 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE PROCEDURE btracker_app.processBlock(IN _block INT)
+CREATE OR REPLACE PROCEDURE btracker_app.processBlock(IN _appContext VARCHAR, IN _block INT)
 LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
   PERFORM btracker_app.process_block_range_data_a(_block, _block);
   PERFORM btracker_app.process_block_range_data_b(_block, _block);
+  PERFORM hive.app_set_current_block_num(_appContext, _block);
   COMMIT; -- For single block processing we want to commit all changes for each one.
 END
 $$;
@@ -312,7 +313,7 @@ BEGIN
           PERFORM set_config('synchronous_commit', __original_commit_mode, false);
           __commit_mode_changed := false;
         END IF;
-        CALL btracker_app.processBlock(__next_block_range.last_block);
+        CALL btracker_app.processBlock(_appContext, __next_block_range.last_block);
         __last_block := __next_block_range.last_block;
       END IF;
 
