@@ -306,6 +306,8 @@ BEGIN
           PERFORM set_config('synchronous_commit', 'OFF', false);
           __commit_mode_changed := true;
         END IF;
+        --revert increment of current_block_num by app_next_block as we will do massive sync processing
+        PEFORM hive.set_current_block_num(_appContext, __next_block_range.first_block - 1);
         CALL btracker_app.do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 10000, __last_block);
       ELSE
         IF __commit_mode_changed THEN
