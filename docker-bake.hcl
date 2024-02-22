@@ -5,6 +5,9 @@ variable "CI_REGISTRY_IMAGE" {
 variable "CI_COMMIT_SHORT_SHA" {
   default = "latest"
 }
+variable "CI_COMMIT_TAG" {
+  default = ""
+}
 variable "CI_COMMIT_BRANCH" {
   default = "develop"
 }
@@ -98,6 +101,7 @@ target "full-ci" {
   ]
   tags = [
     equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
+    notempty(CI_COMMIT_TAG) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}": "",
     "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
   ]
   output = [
