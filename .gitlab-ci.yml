@@ -95,6 +95,7 @@ prepare_haf_data:
     BASE_TAG: ubuntu-22.04-1
     NAME: ""
     TARGET: "$NAME-base"
+    PROGRESS_DISPLAY: "plain"
   before_script:
     - !reference [.docker_image_builder_job_template, before_script]
     - |
@@ -115,7 +116,7 @@ prepare_haf_data:
       else
         echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
         git config --global --add safe.directory $(pwd)
-        docker buildx bake --progress=plain --provenance=false --push "$TARGET"
+        scripts/build_instance.sh "$CI_PROJECT_DIR"
       fi
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
@@ -125,6 +126,7 @@ docker-ci-runner-build:
   extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
+    BASE_TAG: "docker-24.0.1-6"
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
@@ -134,7 +136,7 @@ docker-psql-client-build:
     BASE_REPO_NAME: ""
     BASE_TAG: "14"
     NAME: "psql-client"
-    TARGET: "psql-client"
+    TARGET: "psql-client-ci"
 
 docker-setup-and-processing-build:
   extends: .docker-build-template

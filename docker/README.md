@@ -37,7 +37,7 @@ No custom PostgREST image is neeed for the API. The application has been tested 
 
 There are several targets defined in the Bakefile
 
-- *default* - alias for *psql-client*
+- *default* - alias for *full*
 - *psql-client* - builds psql client image
 - *full* - builds full image
 - *ci-runner* - builds CI runner
