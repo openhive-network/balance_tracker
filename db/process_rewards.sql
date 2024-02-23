@@ -54,10 +54,24 @@ WITH claim_reward_balance_operation AS
   SELECT
     crbo._account,
     38,
-  (SELECT ROUND(caar.balance * crbo._vesting_payout / car.balance, 3)
-  FROM btracker_app.account_rewards car
-  JOIN btracker_app.account_rewards caar ON caar.nai = 38 AND caar.account = car.account 
-  WHERE car.nai = 37 and car.account = crbo._account),
+  (
+    WITH calculate_hive_car AS MATERIALIZED
+    (
+    SELECT  car.balance
+    FROM btracker_app.account_rewards car
+    WHERE car.nai = 37 and car.account = crbo._account
+    ),
+    calculate_hive_caar AS MATERIALIZED
+    (
+    SELECT caar.balance
+    FROM btracker_app.account_rewards caar
+    WHERE caar.nai = 38 and caar.account = crbo._account
+    )
+    SELECT 
+    ROUND(
+      (SELECT balance FROM calculate_hive_car) * crbo._vesting_payout / (SELECT balance FROM calculate_hive_caar)
+      , 3)
+  ),
     _source_op,
     _source_op_block
   FROM claim_reward_balance_operation crbo
