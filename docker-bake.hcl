@@ -15,7 +15,7 @@ variable "CI_DEFAULT_BRANCH" {
   default = "develop"
 }
 variable "TAG_CI" {
-  default = "docker-24.0.1-6"
+  default = "docker-24.0.1-7"
 }
 variable "PSQL_CLIENT_VERSION" {
   default = "14"
