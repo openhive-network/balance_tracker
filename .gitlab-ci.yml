@@ -167,7 +167,7 @@ docker-setup-and-processing-build:
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
     FF_NETWORK_PER_BUILD: 1
 
-  timeout: 2 hours
+  timeout: 1 hours
   before_script:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
@@ -193,8 +193,11 @@ docker-setup-and-processing-build:
         echo "HIVED_UID=$HIVED_UID"
       } > .env.local
       cat .env.local
+      echo "Docker Compose options string: $COMPOSE_OPTIONS_STRING"
       IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      timeout -s INT -k 60 3540 docker compose ${COMPOSE_OPTIONS[@]} up --detach
+      echo "Docker Compose options: ${COMPOSE_OPTIONS[@]}"
+      docker compose config | tee docker-compose-config.yml.log
+      timeout -s INT -k 1m 15m docker compose ${COMPOSE_OPTIONS[@]} up --detach
       popd
 
       echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
@@ -212,7 +215,7 @@ docker-setup-and-processing-build:
       export COMMAND
       export MESSAGE
 
-      timeout -k 60 3540 bash -c wait-for-btracker-startup
+      timeout -k 1m 10m bash -c wait-for-btracker-startup
 
       echo "Block processing is finished."
 
@@ -285,7 +288,7 @@ psql-client-performance-test:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
 
-      timeout 10m ./balance-tracker.sh run-tests --backend-host=docker
+      timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=docker
       tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
       cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
       m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
