@@ -6,7 +6,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "44ad61be5f9d0588512f478e5baf3ec89cb92a3f"
+  CI_COMMON_JOB_VERSION: "eb487d93c44de8089e762785dd6dcd68b4d73b40"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -20,7 +20,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: dc384f725d4bb7820b2be0d36dbbacb17e42f0e9 # develop
+    ref: 31855db5ca181e27ed4815e98f7e249df52cb096 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
