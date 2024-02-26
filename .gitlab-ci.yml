@@ -6,7 +6,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "eb487d93c44de8089e762785dd6dcd68b4d73b40"
+  CI_COMMON_JOB_VERSION: "7ea99b10bbf0f9b1fbb88f52a78ead4c82f15d75"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -14,13 +14,13 @@ variables:
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: recursive
   # HAF configuration
-  DATA_CACHE_HAF_PREFIX: "/cache/replay_data_balance_tracker_haf_${CI_COMMIT_SHA}"
+  DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
 
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 31855db5ca181e27ed4815e98f7e249df52cb096 # develop
+    ref: b55244559833580cfa0ed92e9a387812a191ca3f # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
@@ -83,7 +83,6 @@ prepare_haf_data:
     SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
     CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
-  resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
 
@@ -132,7 +131,7 @@ docker-ci-runner-build:
   extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
-    BASE_TAG: "docker-24.0.1-6"
+    BASE_TAG: "docker-24.0.1-7"
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
@@ -157,16 +156,18 @@ docker-setup-and-processing-build:
 .test-template:
   extends: .docker_image_builder_job_template
   stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-6
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
   variables:
     HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
-    HAF_DATA_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/datadir
-    HAF_SHM_DIRECTORY: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}/shm_dir
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
+    DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
+    SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
+    HAF_DATA_DIRECTORY: ${DATADIR}
+    HAF_SHM_DIRECTORY: ${SHM_DIR}
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
     MESSAGE: Waiting for Balance Tracker to finish processing blocks...
     FF_NETWORK_PER_BUILD: 1
-
   timeout: 1 hours
   before_script:
     - |
@@ -183,6 +184,8 @@ docker-setup-and-processing-build:
 
       cp /blockchain/block_log_5m/block_log docker/blockchain/block_log
       chmod a+w docker/blockchain/block_log
+
+      "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
       pushd docker
       # Put all the variables that can be predefined in the "variables"
@@ -234,12 +237,14 @@ docker-setup-and-processing-build:
       popd
 
       tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+      
+      # Manually remove the copy of the repaly data to preserve disk space on the replay server
+      sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
 
       echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
     expire_in: 1 week
     when: always
-  resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
 
@@ -327,6 +332,5 @@ cleanup_haf_cache_manual:
   variables:
     GIT_STRATEGY: none
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
-  resource_group: ${CI_COMMIT_SHA}
   tags:
     - data-cache-storage
