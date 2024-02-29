@@ -269,6 +269,9 @@ DECLARE
   __next_block_range hive.blocks_range;
   __original_commit_mode TEXT;
   __commit_mode_changed BOOLEAN := false;
+  __massive_processing_threshold INT := 100;
+  __block_range_len INT := 0;
+
 
 BEGIN
   PERFORM btracker_app.allowProcessing();
@@ -300,8 +303,9 @@ BEGIN
       END IF;
 
       RAISE NOTICE 'Attempting to process block range: <%,%>', __next_block_range.first_block, __next_block_range.last_block;
+      __block_range_len := __next_block_range.last_block - __next_block_range.first_block + 1;
 
-      IF __next_block_range.first_block != __next_block_range.last_block THEN
+      IF __block_range_len >= __massive_processing_threshold THEN
         IF NOT __commit_mode_changed AND __original_commit_mode != 'OFF' THEN
           PERFORM set_config('synchronous_commit', 'OFF', false);
           __commit_mode_changed := true;
@@ -312,8 +316,8 @@ BEGIN
           PERFORM set_config('synchronous_commit', __original_commit_mode, false);
           __commit_mode_changed := false;
         END IF;
-        CALL btracker_app.processBlock(__next_block_range.last_block);
-        __last_block := __next_block_range.last_block;
+        CALL btracker_app.processBlock(__next_block_range.first_block);
+        __last_block := __next_block_range.first_block;
       END IF;
 
     END IF;
