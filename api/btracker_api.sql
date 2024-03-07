@@ -20,6 +20,9 @@ $$
 DECLARE 
   __partial_account_name VARCHAR = LOWER(_partial_account_name || '%');
 BEGIN
+
+  PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+
   RETURN json_agg(account_query.accounts
     ORDER BY
       account_query.name_lengths,
@@ -61,6 +64,12 @@ BEGIN
   END IF;
 
   __block_increment = ((_end_block - _start_block) / 1000)::BIGINT;
+
+  IF _end_block <= hive.app_get_irreversible_block() THEN
+    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
+  ELSE
+    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+  END IF;
 
   RETURN to_jsonb(result) FROM (
     SELECT
@@ -138,6 +147,7 @@ $$
 DECLARE
   __coin_type_arr INT[] = '{13, 21, 37}';
   __time_increment INTERVAL;
+  _to INT := (SELECT bv.num FROM hive.blocks_view bv WHERE bv.created_at < _end_time ORDER BY created_at DESC LIMIT 1)::INT;
 BEGIN
   IF _start_time >= _end_time THEN
     SELECT raise_exception(
@@ -146,6 +156,12 @@ BEGIN
   IF _coin_type != ALL (__coin_type_arr) THEN
     SELECT raise_exception(
       FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
+  END IF;
+
+  IF _to <= hive.app_get_irreversible_block() THEN
+    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
+  ELSE
+    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
   __time_increment = (_end_time - _start_time) / 1000;
