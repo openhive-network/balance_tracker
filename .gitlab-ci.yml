@@ -3,6 +3,7 @@ stages:
  - build
  - test
  - cleanup
+ - publish
 
 variables:
   # Variables required by Common CI jobs
@@ -121,7 +122,7 @@ prepare_haf_data:
       else
         echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
         git config --global --add safe.directory $(pwd)
-        scripts/build_instance.sh "$CI_PROJECT_DIR"
+        scripts/build_docker_image.sh "$CI_PROJECT_DIR"
       fi
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
@@ -334,3 +335,11 @@ cleanup_haf_cache_manual:
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
   tags:
     - data-cache-storage
+
+build_and_publish_image:
+  stage: publish
+  extends: .publish_docker_image_template
+  script:
+    - scripts/ci-helpers/build_and_publish_instance.sh
+  tags:
+    - public-runner-docker

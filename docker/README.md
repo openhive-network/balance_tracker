@@ -46,6 +46,10 @@ There are also some other targets meant to be used by CI only: *ci-runner-ci*, *
 
 To build a given target run `docker buildx bake [target-name]`. If no target name is provided the *default* target will be built.
 
+On Linux, you can also run `scripts/build_docker_image.sh [src_dir] --target=[target-name]` to build any of the targets. If no target name is provided the *default* target will be built. Run `scripts/build_docker_image.sh --help` to see all the options.
+
+There's also `scripts/ci-helpers/build_instance.sh`, which can be used to build the *full* target. Running `scripts/ci-helpers/build_instance.sh [image_tag] [src_dir] [registry_url]` is functionally identical to running `scripts/build_docker_image.sh [src_dir] --registry=[registry_url] --target=full --tag=[image_tag]`.
+
 ## Running Balance Tracker with Docker Compose
 
 ### Profiles
