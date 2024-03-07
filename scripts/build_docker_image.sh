@@ -6,18 +6,17 @@ print_help () {
     cat <<-EOF
 Usage: $0 <source directory> [OPTION[=VALUE]]...
 
-Build a Balance Tracker Docker image
+Build any Docker image defined as a target in docker-bake.hcl
 OPTIONS:
   --registry=URL        Docker registry to assign the image to (default: 'registry.gitlab.syncad.com/hive/balance_tracker')
-  --tag=TAG             Docker tag to be build - only matters for full image (default: 'latest')
-  --target=TARGET       Target defined in docker-bake.hcl (default: 'default' - build full image)
+  --tag=TAG             Docker tag to be build (defaults set in docker-bake.hcl)
+  --target=TARGET       Target defined in docker-bake.hcl (default: 'default' - builds full image)
   --progress=TYPE       Determines how to display build progress (default: 'auto')
   --help|-h|-?          Display this help screen and exit
 EOF
 }
 
 export CI_REGISTRY_IMAGE=${CI_REGISTRY_IMAGE:-"registry.gitlab.syncad.com/hive/balance_tracker"}
-export CI_COMMIT_SHORT_SHA=${CI_COMMIT_SHORT_SHA:-"latest"}
 PROGRESS_DISPLAY=${PROGRESS_DISPLAY:-"auto"}
 TARGET=${TARGET:-"default"}
 
@@ -29,7 +28,7 @@ while [ $# -gt 0 ]; do
         ;;
     --tag=*)
         arg="${1#*=}"
-        CI_COMMIT_SHORT_SHA="$arg"
+        BASE_TAG="$arg"
         ;;    
     --progress=*)
         arg="${1#*=}"
@@ -58,7 +57,20 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-
+# Different targets use different tag variables
+if [[ -n $BASE_TAG ]]; then
+  case ${TARGET:-} in
+    psql-client|psql-client-ci)
+      export PSQL_CLIENT_VERSION=$BASE_TAG
+      ;;
+    full|full-ci)
+      export TAG=$BASE_TAG
+      ;;
+    ci-runner|ci-runner-ci)
+      export TAG_CI=$BASE_TAG
+      ;;
+  esac
+fi
 
 pushd "$SRCROOTDIR"
 

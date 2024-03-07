@@ -2,7 +2,7 @@
 variable "CI_REGISTRY_IMAGE" {
     default = "registry.gitlab.syncad.com/hive/balance_tracker"
 }
-variable "CI_COMMIT_SHORT_SHA" {
+variable "TAG" {
   default = "latest"
 }
 variable "CI_COMMIT_TAG" {
@@ -20,12 +20,24 @@ variable "TAG_CI" {
 variable "PSQL_CLIENT_VERSION" {
   default = "14"
 }
-variable "BUILD_TIME" {}
-variable "GIT_COMMIT_SHA" {}
-variable "GIT_CURRENT_BRANCH" {}
-variable "GIT_LAST_LOG_MESSAGE" {}
-variable "GIT_LAST_COMMITTER" {}
-variable "GIT_LAST_COMMIT_DATE" {}
+variable "BUILD_TIME" {
+  default = "${timestamp()}"
+}
+variable "GIT_COMMIT_SHA" {
+  default = "[unknown]"
+}
+variable "GIT_CURRENT_BRANCH" {
+  default = "[unknown]"
+}
+variable "GIT_LAST_LOG_MESSAGE" {
+  default = "[unknown]"
+}
+variable "GIT_LAST_COMMITTER" {
+  default = "[unknown]"
+}
+variable "GIT_LAST_COMMIT_DATE" {
+  default = "[unknown]"
+}
 
 # Functions
 function "notempty" {
@@ -65,13 +77,13 @@ target "psql-client-ci" {
   ]
 }
 
-## Locally tag image with "$CI_COMMIT_SHORT_SHA",
+## Locally tag image with "$TAG",
 ## which is "latest" by default
 target "full" {
   inherits = ["psql-client"]
   target = "full"
   tags = [
-    "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+    "${CI_REGISTRY_IMAGE}:${TAG}"
   ]
   args = {
     BUILD_TIME = "${BUILD_TIME}",
@@ -102,7 +114,7 @@ target "full-ci" {
   tags = [
     equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
     notempty(CI_COMMIT_TAG) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}": "",
-    "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+    "${CI_REGISTRY_IMAGE}:${TAG}"
   ]
   output = [
     "type=registry"
