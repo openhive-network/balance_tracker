@@ -18,16 +18,19 @@ $$
 DECLARE
   _result btracker_endpoints.account_info_rewards;
 BEGIN
-  SELECT cv.curation_rewards, cv.posting_rewards
-  INTO _result
-  FROM btracker_app.account_info_rewards cv
-  WHERE cv.account = _account;
 
-  IF NOT FOUND THEN 
-    _result = (0::BIGINT, 0::BIGINT);
-  END IF;
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-  RETURN _result;
+SELECT cv.curation_rewards, cv.posting_rewards
+INTO _result
+FROM btracker_app.account_info_rewards cv
+WHERE cv.account = _account;
+
+IF NOT FOUND THEN 
+  _result = (0::BIGINT, 0::BIGINT);
+END IF;
+
+RETURN _result;
 END
 $$;
 
@@ -48,6 +51,8 @@ $$
 DECLARE
   __result btracker_endpoints.account_savings;
 BEGIN
+
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
 SELECT  
   MAX(CASE WHEN nai = 13 THEN saving_balance END) AS hbd,
@@ -83,6 +88,8 @@ DECLARE
   __result btracker_endpoints.account_rewards;
 BEGIN
 
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+
 SELECT  
   MAX(CASE WHEN nai = 13 THEN balance END) AS hbd,
   MAX(CASE WHEN nai = 21 THEN balance END) AS hive,
@@ -112,15 +119,18 @@ $$
 DECLARE
   _result btracker_endpoints.btracker_vests_balance;
 BEGIN
-  SELECT cv.delegated_vests, cv.received_vests
-  INTO _result
-  FROM btracker_app.account_delegations cv WHERE cv.account = _account;
 
-  IF NOT FOUND THEN 
-    _result = (0::BIGINT, 0::BIGINT);
-  END IF;
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-  RETURN _result;
+SELECT cv.delegated_vests, cv.received_vests
+INTO _result
+FROM btracker_app.account_delegations cv WHERE cv.account = _account;
+
+IF NOT FOUND THEN 
+  _result = (0::BIGINT, 0::BIGINT);
+END IF;
+
+RETURN _result;
 END
 $$;
 
@@ -143,10 +153,13 @@ $$
 DECLARE
   __result btracker_endpoints.account_withdraws;
 BEGIN
-  SELECT vesting_withdraw_rate, to_withdraw, withdrawn, withdraw_routes, delayed_vests
-  INTO __result
-  FROM btracker_app.account_withdraws WHERE account= _account;
-  RETURN __result;
+
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+
+SELECT vesting_withdraw_rate, to_withdraw, withdrawn, withdraw_routes, delayed_vests
+INTO __result
+FROM btracker_app.account_withdraws WHERE account= _account;
+RETURN __result;
 END
 $$;
 
@@ -172,6 +185,8 @@ $$
 DECLARE
   __result btracker_endpoints.btracker_account_balance;
 BEGIN
+
+PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
 SELECT  
   MAX(CASE WHEN nai = 13 THEN balance END) AS hbd,
