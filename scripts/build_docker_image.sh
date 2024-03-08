@@ -63,7 +63,7 @@ if [[ -n $BASE_TAG ]]; then
     psql-client|psql-client-ci)
       export PSQL_CLIENT_VERSION=$BASE_TAG
       ;;
-    full|full-ci)
+    default|full|full-ci)
       export TAG=$BASE_TAG
       ;;
     ci-runner|ci-runner-ci)
