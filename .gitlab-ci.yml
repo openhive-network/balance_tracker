@@ -339,6 +339,9 @@ cleanup_haf_cache_manual:
 build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
+  before_script:
+    - !reference [.docker_image_builder_job_template, before_script]
+    - !reference [.publish_docker_image_template, before_script]
   script:
     - scripts/ci-helpers/build_and_publish_instance.sh
   tags:
