@@ -33,6 +33,9 @@ services:
     command: "install_app"
     environment:
       POSTGRES_HOST: haf
+    volumes:
+      - ../scripts/generate_version_sql.sh:app/scripts/generate_version_sql.sh
+      - ../.git:app/.git
     networks:
       haf-network:
     depends_on:
