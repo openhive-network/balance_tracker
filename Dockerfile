@@ -43,6 +43,8 @@ RUN <<EOF
   set -e
   mkdir /app
   chown haf_admin /app
+  apk add --no-cache git
+
 EOF
 
 USER haf_admin
