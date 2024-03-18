@@ -7,7 +7,6 @@ RUN <<EOF
   apk add --no-cache sudo git bash
   adduser -s /bin/bash -G users -D "haf_admin"
   echo "haf_admin ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
-
 EOF
 
 USER haf_admin
