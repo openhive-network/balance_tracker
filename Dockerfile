@@ -26,6 +26,7 @@ FROM psql_client as version-calculcation
 
 COPY --chown=haf_admin:users . /home/haf_admin/src
 WORKDIR /home/haf_admin/src
+RUN apk add --no-cache sudo git bash
 RUN scripts/generate_version_sql.sh $(pwd)
 
 FROM psql_client AS full
@@ -51,13 +52,10 @@ LABEL io.hive.image.commit.log_message="$GIT_LAST_LOG_MESSAGE"
 LABEL io.hive.image.commit.author="$GIT_LAST_COMMITTER"
 LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
 
-COPY --from=daemontools /usr/bin/tai64n /usr/bin/tai64nlocal /usr/bin/
-
 USER root
 
 RUN <<EOF
   set -e
-  apk add --no-cache sudo git bash
   mkdir /app
   chown haf_admin /app
 EOF
