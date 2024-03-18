@@ -13,7 +13,7 @@ WORKDIR /home/haf_admin
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
 
-FROM psql as version-calculcation
+FROM psql_client as version-calculcation
 
 COPY --chown=haf_admin:users . /home/haf_admin/src
 WORKDIR /home/haf_admin/src
