@@ -44,6 +44,7 @@ services:
       - ../endpoints:/app/endpoints
       - ../dump_accounts:/app/dump_accounts
       - ../scripts:/app/scripts
+      - ../scripts/set_version_in_sql.pgsql:/app/scripts/set_version_in_sql.pgsql
       - ../balance-tracker.sh:/app/balance-tracker.sh
     networks:
       haf-network:
