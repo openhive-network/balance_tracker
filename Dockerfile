@@ -63,4 +63,6 @@ COPY --chown=haf_admin:users docker/scripts/block-processing-healthcheck.sh /app
 COPY --chown=haf_admin:users docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=haf_admin:users scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
+WORKDIR /app/scripts
+
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

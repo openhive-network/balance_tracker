@@ -44,7 +44,6 @@ services:
       - ../endpoints:/app/endpoints
       - ../dump_accounts:/app/dump_accounts
       - ../scripts:/app/scripts
-      - ../scripts/set_version_in_sql.pgsql:/app/scripts/set_version_in_sql.pgsql
       - ../balance-tracker.sh:/app/balance-tracker.sh
     networks:
       haf-network:
@@ -85,7 +84,7 @@ services:
       PGRST_DB_SCHEMA: btracker_app
       PGRST_DB_ANON_ROLE: btracker_user
       PGRST_DB_POOL: 20
-      PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
+      PGRST_DB_POOL_ACQUISITION_TIMEOUT: 1
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
     networks:
       haf-network:
