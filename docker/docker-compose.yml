@@ -62,7 +62,7 @@ services:
       POSTGRES_USER: btracker_owner
     volumes:
       - ../balance-tracker.sh:/app/balance-tracker.sh 
-      - ./scripts/block-processing-healthcheck.sh:/app/healthcheck.sh
+      - ../scripts/block-processing-healthcheck.sh:/app/healthcheck.sh
     networks:
       haf-network:
     healthcheck:
