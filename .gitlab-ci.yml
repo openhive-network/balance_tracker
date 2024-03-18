@@ -149,6 +149,8 @@ docker-setup-and-processing-build:
   needs:
     - docker-psql-client-build
   variables:
+    GIT_SUBMODULE_STRATEGY: none
+    GIT_DEPTH: 1
     BASE_REPO_NAME: ""
     BASE_TAG: "$CI_COMMIT_SHORT_SHA"
     NAME: ""
