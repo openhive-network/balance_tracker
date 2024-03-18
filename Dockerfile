@@ -24,8 +24,10 @@ EOF
 
 FROM psql_client as version-calculcation
 USER root
-COPY --chown=haf_admin:users . /home/haf_admin
+COPY --chown=haf_admin:users . /home/haf_admin/src
 RUN apk add --no-cache sudo git bash
+WORKDIR /home/haf_admin/src
+
 RUN scripts/generate_version_sql.sh $(pwd)
 
 FROM psql_client AS full
