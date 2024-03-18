@@ -25,7 +25,6 @@ EOF
 FROM psql_client as version-calculcation
 USER root
 COPY --chown=haf_admin:users . /home/haf_admin/src
-WORKDIR /home/haf_admin/src
 RUN apk add --no-cache sudo git bash
 RUN scripts/generate_version_sql.sh $(pwd)
 
@@ -71,6 +70,6 @@ COPY dump_accounts /app/dump_accounts
 COPY balance-tracker.sh /app/balance-tracker.sh
 COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
 COPY docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --from=version-calculcation --chown=haf_admin:users /home/haf_admin/src/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
+COPY --from=version-calculcation --chown=haf_admin:users /home/haf_admin/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
