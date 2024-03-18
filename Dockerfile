@@ -47,13 +47,16 @@ RUN <<EOF
 
 EOF
 
+
+USER root
+RUN apk update && apk add git
+
 USER haf_admin
 
 RUN mkdir -p /app/scripts
 RUN mkdir -p /app/db
 RUN mkdir -p /app/api
 RUN mkdir -p /app/endpoints
-RUN apk update && apk add git
 
 COPY --chown=haf_admin:users scripts/install_app.sh /app/scripts/install_app.sh
 COPY --chown=haf_admin:users scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
