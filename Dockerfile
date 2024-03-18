@@ -6,12 +6,22 @@ RUN <<EOF
   set -e
   apk add --no-cache sudo git bash
   adduser -s /bin/bash -G users -D "haf_admin"
+  echo "haf_admin ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
+
 EOF
 
 USER haf_admin
 WORKDIR /home/haf_admin
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
+
+FROM psql_client as daemontools
+USER root
+RUN <<EOF
+    set -e
+    echo http://dl-cdn.alpinelinux.org/alpine/edge/community > /etc/apk/repositories
+    apk --no-cache add daemontools-encore
+EOF
 
 FROM psql_client as version-calculcation
 
