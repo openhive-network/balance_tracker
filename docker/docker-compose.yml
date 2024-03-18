@@ -46,7 +46,6 @@ services:
       - ../scripts:/app/scripts
       - ../balance-tracker.sh:/app/balance-tracker.sh
       - ../.git:/app/.git
-
     networks:
       haf-network:
     depends_on:

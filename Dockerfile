@@ -43,7 +43,7 @@ RUN <<EOF
   set -e
   mkdir /app
   chown haf_admin /app
-  apk add --no-cache git
+  apk update && apk add git
 
 EOF
 
@@ -53,6 +53,7 @@ RUN mkdir -p /app/scripts
 RUN mkdir -p /app/db
 RUN mkdir -p /app/api
 RUN mkdir -p /app/endpoints
+RUN apk update && apk add git
 
 COPY --chown=haf_admin:users scripts/install_app.sh /app/scripts/install_app.sh
 COPY --chown=haf_admin:users scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
