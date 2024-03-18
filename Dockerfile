@@ -61,6 +61,6 @@ COPY --chown=haf_admin:users dump_accounts /app/dump_accounts
 COPY --chown=haf_admin:users balance-tracker.sh /app/balance-tracker.sh
 COPY --chown=haf_admin:users docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
 COPY --chown=haf_admin:users docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --chown=haf_admin:users scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
+COPY --chown=haf_admin:users set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
