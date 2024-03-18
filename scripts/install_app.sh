@@ -25,7 +25,6 @@ POSTGRES_USER=${POSTGRES_USER:-"haf_admin"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
-btracker_dir="$SCRIPTPATH/.."
 
 while [ $# -gt 0 ]; do
   case "$1" in
