@@ -14,22 +14,6 @@ WORKDIR /home/haf_admin
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
 
-FROM psql_client as daemontools
-USER root
-RUN <<EOF
-    set -e
-    echo http://dl-cdn.alpinelinux.org/alpine/edge/community > /etc/apk/repositories
-    apk --no-cache add daemontools-encore
-EOF
-
-FROM psql_client as version-calculcation
-COPY --chown=haf_admin:users . /home/haf_admin/src
-USER root
-RUN apk add --no-cache sudo git bash
-USER haf_admin
-WORKDIR /home/haf_admin/src
-RUN scripts/generate_version_sql.sh $(pwd)
-
 FROM psql_client AS full
 
 ARG BUILD_TIME
@@ -63,15 +47,20 @@ EOF
 
 USER haf_admin
 
-COPY scripts/install_app.sh /app/scripts/install_app.sh
-COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
-COPY db /app/db
-COPY api /app/api
-COPY endpoints /app/endpoints
-COPY dump_accounts /app/dump_accounts
-COPY balance-tracker.sh /app/balance-tracker.sh
-COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
-COPY docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --from=version-calculcation --chown=haf_admin:users /home/haf_admin/src/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
+RUN mkdir -p /app/scripts
+RUN mkdir -p /app/db
+RUN mkdir -p /app/api
+RUN mkdir -p /app/endpoints
+
+COPY --chown=haf_admin:users scripts/install_app.sh /app/scripts/install_app.sh
+COPY --chown=haf_admin:users scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
+COPY --chown=haf_admin:users db /app/db
+COPY --chown=haf_admin:users api /app/api
+COPY --chown=haf_admin:users endpoints /app/endpoints
+COPY --chown=haf_admin:users dump_accounts /app/dump_accounts
+COPY --chown=haf_admin:users balance-tracker.sh /app/balance-tracker.sh
+COPY --chown=haf_admin:users docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
+COPY --chown=haf_admin:users docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=haf_admin:users scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

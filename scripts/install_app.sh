@@ -76,4 +76,4 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../endpoints/get_acc
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/account_dump_schema.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/account_stats_btracker.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/compare_accounts.sql"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$btracker_dir/scripts/set_version_in_sql.pgsql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/set_version_in_sql.pgsql"
