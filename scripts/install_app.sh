@@ -1,6 +1,9 @@
-#! /bin/sh
+#!/bin/bash
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit 1; pwd -P )"
+set -euo pipefail
+
+
+SCRIPTPATH="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 print_help () {
     cat <<EOF
@@ -22,6 +25,7 @@ POSTGRES_USER=${POSTGRES_USER:-"haf_admin"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
+btracker_dir="$SCRIPTPATH/.."
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -58,6 +62,11 @@ done
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"}
 
 echo "Installing app..."
+
+pushd "$btracker_dir"
+./scripts/generate_version_sql.sh "$btracker_dir"
+popd
+
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/builtin_roles.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/btracker_app.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../db/process_block_range.sql"
@@ -71,3 +80,4 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../endpoints/get_acc
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/account_dump_schema.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/account_stats_btracker.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../dump_accounts/compare_accounts.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/set_version_in_sql.pgsql"

@@ -74,6 +74,8 @@ fi
 
 pushd "$SRCROOTDIR"
 
+./scripts/generate_version_sql.sh "$(pwd)"
+
 # All the variables below must be declared and assigned separately
 # for 'set -e' to work correctly. See https://www.shellcheck.net/wiki/SC2155
 # for an explanation

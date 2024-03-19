@@ -4,7 +4,7 @@ FROM ghcr.io/alphagov/paas/psql:${PAAS_PSQL_VERSION} AS psql_client
 
 RUN <<EOF
   set -e
-  apk add --no-cache bash
+  apk add --no-cache sudo git bash
   adduser -s /bin/bash -G users -D "haf_admin"
 EOF
 
@@ -46,14 +46,24 @@ EOF
 
 USER haf_admin
 
-COPY scripts/install_app.sh /app/scripts/install_app.sh
-COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
-COPY db /app/db
-COPY api /app/api
-COPY endpoints /app/endpoints
-COPY dump_accounts /app/dump_accounts
-COPY balance-tracker.sh /app/balance-tracker.sh
-COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
-COPY docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN mkdir -p /app/scripts
+RUN mkdir -p /app/db
+RUN mkdir -p /app/api
+RUN mkdir -p /app/endpoints
+
+COPY --chown=haf_admin:users scripts/install_app.sh /app/scripts/install_app.sh
+COPY --chown=haf_admin:users scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
+COPY --chown=haf_admin:users db /app/db
+COPY --chown=haf_admin:users api /app/api
+COPY --chown=haf_admin:users endpoints /app/endpoints
+COPY --chown=haf_admin:users dump_accounts /app/dump_accounts
+COPY --chown=haf_admin:users .git /app/.git
+COPY --chown=haf_admin:users scripts/generate_version_sql.sh /app/scripts/generate_version_sql.sh
+COPY --chown=haf_admin:users balance-tracker.sh /app/balance-tracker.sh
+COPY --chown=haf_admin:users docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
+COPY --chown=haf_admin:users docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=haf_admin:users scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
+
+WORKDIR /app/scripts
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -29,6 +29,11 @@ VALUES
 (True, 104, FALSE)
 ;
 
+CREATE TABLE IF NOT EXISTS btracker_app.version(
+  schema_hash TEXT,
+  runtime_hash TEXT
+);
+
 --ACCOUNT BALANCES
 
 CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
@@ -189,6 +194,35 @@ $$
 BEGIN
   UPDATE btracker_app.app_status SET continue_processing = False;
 END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_app.set_version(_git_hash TEXT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _schema_hash TEXT := (SELECT schema_hash FROM btracker_app.version LIMIT 1);
+BEGIN
+TRUNCATE TABLE btracker_app.version;
+
+IF _schema_hash IS NULL THEN
+  INSERT INTO btracker_app.version(schema_hash, runtime_hash) VALUES (_git_hash, _git_hash);
+ELSE
+  INSERT INTO btracker_app.version(schema_hash, runtime_hash) VALUES (_schema_hash, _git_hash);
+END IF;
+
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_app.get_version()
+RETURNS TEXT
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN runtime_hash FROM btracker_app.version LIMIT 1;
+END;
 $$;
 
 CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(
