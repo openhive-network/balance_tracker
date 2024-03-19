@@ -111,19 +111,9 @@ prepare_haf_data:
         docker manifest inspect "$1" > /dev/null
         return $?
       }
-      if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
-        echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping build..."
-        if [[ -n "$CI_COMMIT_TAG" && "$TARGET" == "full-ci" ]]; then
-          echo "Tagging pre-existing image with Git tag..."
-          docker pull "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"
-          docker tag "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
-          docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
-        fi
-      else
-        echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
-        git config --global --add safe.directory $(pwd)
-        scripts/build_docker_image.sh "$CI_PROJECT_DIR"
-      fi
+      echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
+      git config --global --add safe.directory $(pwd)
+      scripts/build_docker_image.sh "$CI_PROJECT_DIR"
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
     - public-runner-docker
