@@ -7,7 +7,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "7ea99b10bbf0f9b1fbb88f52a78ead4c82f15d75"
+  CI_COMMON_JOB_VERSION: "b2ff9f5a48bc8fb379c66ec4e7907ea1e796ff1b"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -21,7 +21,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 05b3e1d22b48d065c8abbf40e6177df59f9c3b73 # master
+    ref: 7bb7aab44a7083994c36f040e84d501c11afc159 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
@@ -127,6 +127,7 @@ prepare_haf_data:
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
     - public-runner-docker
+    - hived-for-tests
 
 docker-ci-runner-build:
   extends: .docker-build-template
@@ -340,9 +341,9 @@ build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
   before_script:
-    - !reference [.docker_image_builder_job_template, before_script]
     - !reference [.publish_docker_image_template, before_script]
   script:
     - scripts/ci-helpers/build_and_publish_instance.sh
   tags:
     - public-runner-docker
+    - hived-for-tests
