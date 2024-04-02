@@ -251,6 +251,12 @@ docker-setup-and-processing-build:
 
 .psql-client-test-template:
   extends: .test-template
+  before_script:
+    - !reference [.test-template, before_script]
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):version[collapsed=true]\r\e[0KGenerating version script..."
+      "${CI_PROJECT_DIR}/scripts/generate_version_sql.sh" "${CI_PROJECT_DIR}"
+      echo -e "\e[0Ksection_end:$(date +%s):version\r\e[0K"
   needs:
     - prepare_haf_image
     - prepare_haf_data
