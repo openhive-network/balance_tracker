@@ -132,7 +132,7 @@ docker-ci-runner-build:
   extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
-    BASE_TAG: "docker-24.0.1-7"
+    BASE_TAG: "docker-24.0.1-8"
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
@@ -157,7 +157,7 @@ docker-setup-and-processing-build:
 .test-template:
   extends: .docker_image_builder_job_template
   stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-8
   variables:
     HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
