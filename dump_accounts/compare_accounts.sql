@@ -32,62 +32,62 @@ WITH account_balances AS MATERIALIZED (
 ),
 account_hive_hbd_vests AS MATERIALIZED (
   SELECT  
-    account as account_id,
-    MAX(CASE WHEN nai = 13 THEN balance END) AS hbd_balance,
-    MAX(CASE WHEN nai = 21 THEN balance END) AS balance, 
-    MAX(CASE WHEN nai = 37 THEN balance END) AS vesting_shares 
-  FROM btracker_app.current_account_balances
-  GROUP BY account
+    cab.account as account_id,
+    MAX(CASE WHEN cab.nai = 13 THEN cab.balance END) AS hbd_balance,
+    MAX(CASE WHEN cab.nai = 21 THEN cab.balance END) AS balance,
+    MAX(CASE WHEN cab.nai = 37 THEN cab.balance END) AS vesting_shares
+  FROM current_account_balances cab
+  GROUP BY cab.account
 ),
 account_delegations AS MATERIALIZED (
   SELECT 
     cv.account as account_id,
     cv.delegated_vests AS delegated_vesting_shares,
     cv.received_vests AS received_vesting_shares
-  FROM btracker_app.account_delegations cv 
+  FROM account_delegations cv
   GROUP BY cv.account
 ),
 account_rewards AS MATERIALIZED (
   SELECT
-    account as account_id,
-    MAX(CASE WHEN nai = 13 THEN balance END) AS reward_hbd_balance,
-    MAX(CASE WHEN nai = 21 THEN balance END) AS reward_hive_balance,
-    MAX(CASE WHEN nai = 37 THEN balance END) AS reward_vesting_balance,
-    MAX(CASE WHEN nai = 38 THEN balance END) AS reward_vesting_hive
-  FROM btracker_app.account_rewards
-  GROUP BY account
+    ar.account as account_id,
+    MAX(CASE WHEN nai = 13 THEN ar.balance END) AS reward_hbd_balance,
+    MAX(CASE WHEN nai = 21 THEN ar.balance END) AS reward_hive_balance,
+    MAX(CASE WHEN nai = 37 THEN ar.balance END) AS reward_vesting_balance,
+    MAX(CASE WHEN nai = 38 THEN ar.balance END) AS reward_vesting_hive
+  FROM account_rewards ar
+  GROUP BY ar.account
 ),
-account_savings AS MATERIALIZED (
+account_savings_cte AS MATERIALIZED (
   SELECT  
-    account as account_id,
-    MAX(CASE WHEN nai = 13 THEN saving_balance END) AS savings_hbd_balance,
-    MAX(CASE WHEN nai = 21 THEN saving_balance END) AS savings_balance
-  FROM btracker_app.account_savings
-  GROUP BY account
+    asv.account as account_id,
+    MAX(CASE WHEN nai = 13 THEN asv.saving_balance END) AS savings_hbd_balance,
+    MAX(CASE WHEN nai = 21 THEN asv.saving_balance END) AS savings_balance
+  FROM account_savings asv
+  GROUP BY asv.account
 ),
 account_withdraw_savings AS MATERIALIZED (
   SELECT 
-    account as account_id,
-    SUM (savings_withdraw_requests) AS savings_withdraw_requests
-  FROM btracker_app.account_savings
-  GROUP BY account
+    asv.account as account_id,
+    SUM (asv.savings_withdraw_requests) AS savings_withdraw_requests
+  FROM account_savings asv
+  GROUP BY asv.account
 ),
 account_info_rewards AS MATERIALIZED (
   SELECT 
     cv.account as account_id,
     cv.posting_rewards as posting_rewards
-  FROM btracker_app.account_info_rewards cv
+  FROM account_info_rewards cv
   GROUP BY cv.account
 ),
 account_withdraws AS MATERIALIZED (
   SELECT 
-    account as account_id,
+    aw.account as account_id,
     vesting_withdraw_rate,
     to_withdraw,
     withdrawn,
     withdraw_routes
-  FROM btracker_app.account_withdraws 
-  GROUP BY account
+  FROM account_withdraws aw
+  GROUP BY aw.account
 ),
 selected AS MATERIALIZED (
 SELECT
@@ -132,7 +132,7 @@ FROM account_balances ab
 LEFT JOIN account_hive_hbd_vests ahhv ON ahhv.account_id = ab.account_id
 LEFT JOIN account_delegations ad ON ad.account_id = ab.account_id
 LEFT JOIN account_rewards ar ON ar.account_id = ab.account_id
-LEFT JOIN account_savings asa ON asa.account_id = ab.account_id
+LEFT JOIN account_savings_cte asa ON asa.account_id = ab.account_id
 LEFT JOIN account_withdraw_savings aws ON aws.account_id = ab.account_id
 LEFT JOIN account_info_rewards air ON air.account_id = ab.account_id
 LEFT JOIN account_withdraws aw ON aw.account_id = ab.account_id

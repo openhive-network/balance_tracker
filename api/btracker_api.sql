@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.raise_exception(TEXT)
+CREATE OR REPLACE FUNCTION raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -10,7 +10,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.find_matching_accounts(
+CREATE OR REPLACE FUNCTION find_matching_accounts(
     _partial_account_name TEXT
 )
 RETURNS TEXT
@@ -43,7 +43,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_block(
+CREATE OR REPLACE FUNCTION get_balance_for_coin_by_block(
     _account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT
 )
 RETURNS TEXT
@@ -107,7 +107,7 @@ BEGIN
                     ((((abh.source_op_block - 1 - _start_block) / __block_increment)::INT + 1) * __block_increment + _start_block)::BIGINT AS block_step,
                     abh.balance::BIGINT AS balance
                   FROM
-                    btracker_app.account_balance_history abh JOIN
+                    account_balance_history abh JOIN
                     hive.accounts ha ON abh.account = ha.id
                   WHERE 
                     ha.name = _account_name AND
@@ -134,7 +134,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.get_balance_for_coin_by_time(
+CREATE OR REPLACE FUNCTION get_balance_for_coin_by_time(
     _account_name TEXT,
     _coin_type INT,
     _start_time TIMESTAMP,
@@ -206,7 +206,7 @@ BEGIN
                       abh.source_op_block::BIGINT AS block,
                       abh.balance::BIGINT AS balance
                     FROM
-                      btracker_app.account_balance_history abh JOIN
+                      account_balance_history abh JOIN
                       hive.accounts ha ON abh.account = ha.id
                     WHERE
                       ha.name = _account_name AND

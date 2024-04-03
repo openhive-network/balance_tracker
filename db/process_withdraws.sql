@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_withdraw_vesting_operation(
+CREATE OR REPLACE FUNCTION process_withdraw_vesting_operation(
     body jsonb, _withdraw_rate int
 )
 RETURNS void
@@ -11,10 +11,10 @@ BEGIN
 WITH withdraw_vesting_operation AS
 (
   SELECT 
-    (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
+    (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'account') AS _account,
     GREATEST(((body)->'value'->'vesting_shares'->>'amount')::BIGINT, 0) AS _vesting_withdraw
 )
-INSERT INTO btracker_app.account_withdraws 
+INSERT INTO account_withdraws
   (
     account,
     vesting_withdraw_rate,
@@ -34,7 +34,7 @@ INSERT INTO btracker_app.account_withdraws
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_set_withdraw_vesting_route_operation(
+CREATE OR REPLACE FUNCTION process_set_withdraw_vesting_route_operation(
     body jsonb
 )
 RETURNS void
@@ -48,19 +48,19 @@ DECLARE
   _current_balance INT;
 BEGIN
 
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account'),
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'to_account'),
+SELECT (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'from_account'),
+       (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'to_account'),
        ((body)->'value'->>'percent')::INT
 INTO _account, _to_account, _percent;
 
   SELECT cawr.percent INTO _current_balance
-  FROM btracker_app.account_routes cawr 
+  FROM account_routes cawr
   WHERE cawr.account=  _account
   AND cawr.to_account=  _to_account;
   
 IF _current_balance IS NULL THEN
 
- INSERT INTO btracker_app.account_routes 
+ INSERT INTO account_routes
     (
       account,
       to_account,
@@ -71,7 +71,7 @@ IF _current_balance IS NULL THEN
         _to_account,
         _percent;
 
- INSERT INTO btracker_app.account_withdraws 
+ INSERT INTO account_withdraws
     (
       account,
       withdraw_routes
@@ -82,11 +82,11 @@ IF _current_balance IS NULL THEN
 
       ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdraw_routes = btracker_app.account_withdraws.withdraw_routes + EXCLUDED.withdraw_routes;
+          withdraw_routes = account_withdraws.withdraw_routes + EXCLUDED.withdraw_routes;
 ELSE
   IF _percent = 0 THEN
 
-  INSERT INTO btracker_app.account_withdraws 
+  INSERT INTO account_withdraws
     (
       account,
       withdraw_routes
@@ -97,15 +97,15 @@ ELSE
 
       ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          withdraw_routes = btracker_app.account_withdraws.withdraw_routes - EXCLUDED.withdraw_routes;
+          withdraw_routes = account_withdraws.withdraw_routes - EXCLUDED.withdraw_routes;
 
-  DELETE FROM btracker_app.account_routes
+  DELETE FROM account_routes
   WHERE account = _account
   AND to_account = _to_account;
 
   ELSE
 
-  UPDATE btracker_app.account_routes SET 
+  UPDATE account_routes SET
     percent = _percent
   WHERE account = _account 
   AND to_account = _to_account;
@@ -115,7 +115,7 @@ END IF;
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_fill_vesting_withdraw_operation(
+CREATE OR REPLACE FUNCTION process_fill_vesting_withdraw_operation(
     body jsonb,
     _start_delayed_vests boolean
 )
@@ -131,14 +131,14 @@ _precision INT;
 _to_account INT;
 BEGIN
 
-  SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'from_account'),
-        (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'to_account'),
+  SELECT (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'from_account'),
+        (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'to_account'),
         ((body)->'value'->'withdrawn'->>'amount')::BIGINT,
         ((body)->'value'->'deposited'->>'amount')::BIGINT,
         ((body)->'value'->'deposited'->>'precision')::INT
   INTO _account, _to_account, _vesting_withdraw, _vesting_deposit, _precision;
 
-  INSERT INTO btracker_app.account_withdraws 
+  INSERT INTO account_withdraws
   (
     account,
     withdrawn
@@ -149,11 +149,11 @@ BEGIN
 
     ON CONFLICT ON CONSTRAINT pk_account_withdraws
     DO UPDATE SET
-        withdrawn = btracker_app.account_withdraws.withdrawn + EXCLUDED.withdrawn;
+        withdrawn = account_withdraws.withdrawn + EXCLUDED.withdrawn;
 
   IF _start_delayed_vests = TRUE THEN
 
-    INSERT INTO btracker_app.account_withdraws 
+    INSERT INTO account_withdraws
     (
       account,
       delayed_vests
@@ -164,11 +164,11 @@ BEGIN
 
       ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          delayed_vests = GREATEST(btracker_app.account_withdraws.delayed_vests - EXCLUDED.delayed_vests, 0);
+          delayed_vests = GREATEST(account_withdraws.delayed_vests - EXCLUDED.delayed_vests, 0);
     
     IF _precision = 6 THEN
 
-      INSERT INTO btracker_app.account_withdraws 
+      INSERT INTO account_withdraws
       (
       account,
       delayed_vests
@@ -179,18 +179,18 @@ BEGIN
 
       ON CONFLICT ON CONSTRAINT pk_account_withdraws
       DO UPDATE SET
-          delayed_vests = btracker_app.account_withdraws.delayed_vests + EXCLUDED.delayed_vests;
+          delayed_vests = account_withdraws.delayed_vests + EXCLUDED.delayed_vests;
 
     END IF;
 
   END IF;
 
-  UPDATE btracker_app.account_withdraws SET 
+  UPDATE account_withdraws SET
     vesting_withdraw_rate = 0,
     to_withdraw = 0,
     withdrawn = 0
-  WHERE btracker_app.account_withdraws.account = _account 
-  AND btracker_app.account_withdraws.to_withdraw = btracker_app.account_withdraws.withdrawn;
+  WHERE account_withdraws.account = _account
+  AND account_withdraws.to_withdraw = account_withdraws.withdrawn;
 END
 $$;
 

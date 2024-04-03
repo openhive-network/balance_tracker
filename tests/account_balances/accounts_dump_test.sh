@@ -8,6 +8,7 @@ SCRIPTDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 POSTGRES_HOST="localhost"
 POSTGRES_PORT=5432
 POSTGRES_USER="haf_admin"
+BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
 
 print_help () {
     echo "Usage: $0 [OPTION[=VALUE]]..."
@@ -29,6 +30,9 @@ while [ $# -gt 0 ]; do
         ;;
     --user=*)
         POSTGRES_USER="${1#*=}"
+        ;;
+    --schema=*)
+        BTRACKER_SCHEMA="${1#*=}"
         ;;
     --help)
         print_help
@@ -78,7 +82,7 @@ echo "Starting data_insertion_stript.py..."
 python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" --user "$POSTGRES_USER"
 
 echo "Looking for diffrences between hived node and btracker stats..."
-psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SELECT btracker_account_dump.compare_accounts();"
+psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "SELECT btracker_account_dump.compare_accounts();"
 
 DIFFERING_ACCOUNTS=$(psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -t -A  -c "SELECT * FROM btracker_account_dump.differing_accounts;")
 

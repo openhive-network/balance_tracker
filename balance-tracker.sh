@@ -208,6 +208,7 @@ process_blocks() {
   postgres_host=${POSTGRES_HOST:-"localhost"}
   postgres_port=${POSTGRES_PORT:-5432}
   postgres_url=${POSTGRES_URL:-""}
+  btracker_schema=${BTRACKER_SCHEMA:-"btracker_app"}
   log_dir=${LOG_DIR:-}
 
   while [ $# -gt 0 ]; do
@@ -226,6 +227,9 @@ process_blocks() {
         ;;
       --postgres-url=*)
         postgres_url="${1#*=}"
+        ;;
+      --schema=*)
+        btracker_schema="${1#*=}"
         ;;
       --log-dir=*)
         log_dir="${1#*=}"
@@ -254,12 +258,12 @@ process_blocks() {
 
   if [ -z "$log_dir" ]; then
     echo "Running indexer in the foreground"
-    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "call btracker_app.main('btracker_app', $block_number);"
+    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "call ${btracker_schema}.main('${btracker_schema}', $block_number);"
     echo "Finished running indexer"
   else
     echo "Running indexer in the background"
     mkdir -p "$log_dir"
-    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "call btracker_app.main('btracker_app', $block_number);" 2>&1 | /usr/bin/rotatelogs "$log_dir/process-blocks.%Y-%m-%d-%H_%M_%S.log" 5M &
+    psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "call ${btracker_schema}.main('${btracker_schema}', $block_number);" 2>&1 | /usr/bin/rotatelogs "$log_dir/process-blocks.%Y-%m-%d-%H_%M_%S.log" 5M &
   fi
 }
 
