@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_delegate_vesting_shares_operation(
+CREATE OR REPLACE FUNCTION process_delegate_vesting_shares_operation(
     body jsonb, _source_op bigint, _source_op_block int
 )
 RETURNS void
@@ -15,14 +15,14 @@ DECLARE
     ___current_blocked_balance BIGINT;
 BEGIN
 
-  SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'delegator'),
-        (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'delegatee'),
+  SELECT (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'delegator'),
+        (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'delegatee'),
         ((body)->'value'->'vesting_shares'->>'amount')::BIGINT
   INTO _delegator, _delegatee, _balance;
 
 --  DELEGATIONS TRACKING
   SELECT cad.balance INTO _current_balance
-  FROM btracker_app.current_accounts_delegations cad 
+  FROM current_accounts_delegations cad
   WHERE cad.delegator= _delegator AND cad.delegatee= _delegatee;
     
   IF _current_balance IS NULL THEN
@@ -30,7 +30,7 @@ BEGIN
   --IF DELEGATION BETWEEN THIS PAIR NEVER HAPPENED BEFORE
 
   --UPDATE CURRENT_ACCOUNTS_DELEGATIONS
-    INSERT INTO btracker_app.current_accounts_delegations 
+    INSERT INTO current_accounts_delegations
     (
       delegator,
       delegatee,
@@ -46,7 +46,7 @@ BEGIN
         _source_op_block;
 
   --ADD DELEGATED VESTS TO DELEGATOR
-      INSERT INTO btracker_app.account_delegations
+      INSERT INTO account_delegations
       (
       account,
       delegated_vests
@@ -56,10 +56,10 @@ BEGIN
         _balance
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          delegated_vests = btracker_app.account_delegations.delegated_vests + EXCLUDED.delegated_vests;
+          delegated_vests = account_delegations.delegated_vests + EXCLUDED.delegated_vests;
 
   --ADD RECEIVED VESTS TO DELEGATEE
-      INSERT INTO btracker_app.account_delegations
+      INSERT INTO account_delegations
       (
       account,
       received_vests     
@@ -69,11 +69,11 @@ BEGIN
         _balance
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          received_vests = btracker_app.account_delegations.received_vests + EXCLUDED.received_vests;
+          received_vests = account_delegations.received_vests + EXCLUDED.received_vests;
 
     ELSE
 
-    UPDATE btracker_app.current_accounts_delegations SET 
+    UPDATE current_accounts_delegations SET
       balance = _balance,
       source_op = _source_op,
       source_op_block = _source_op_block
@@ -88,7 +88,7 @@ BEGIN
   
   --DELEGATEE'S RECEIVED VESTS ARE BEING LOWERED INSTANTLY
 
-      INSERT INTO btracker_app.account_delegations
+      INSERT INTO account_delegations
       (
       account,
       received_vests     
@@ -98,7 +98,7 @@ BEGIN
         ___current_blocked_balance
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          received_vests = btracker_app.account_delegations.received_vests - EXCLUDED.received_vests;
+          received_vests = account_delegations.received_vests - EXCLUDED.received_vests;
   ELSE
 
   --IF DELEGATION BETWEEN ACCOUNTS HAPPENED BUT THE DELEGATION IS HIGHER
@@ -107,7 +107,7 @@ BEGIN
     
   --ADD THE DIFFERENCE TO BOTH ACCOUNTS DELEGATED AND RECEIVED
 
-      INSERT INTO btracker_app.account_delegations
+      INSERT INTO account_delegations
       (
       account,
       delegated_vests
@@ -117,9 +117,9 @@ BEGIN
         ___current_blocked_balance
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          delegated_vests = btracker_app.account_delegations.delegated_vests + EXCLUDED.delegated_vests;
+          delegated_vests = account_delegations.delegated_vests + EXCLUDED.delegated_vests;
   
-      INSERT INTO btracker_app.account_delegations
+      INSERT INTO account_delegations
       (
       account,
       received_vests     
@@ -129,7 +129,7 @@ BEGIN
         ___current_blocked_balance
       ON CONFLICT ON CONSTRAINT pk_temp_vests
       DO UPDATE SET
-          received_vests = btracker_app.account_delegations.received_vests + EXCLUDED.received_vests;
+          received_vests = account_delegations.received_vests + EXCLUDED.received_vests;
     
   END IF;
 
@@ -138,14 +138,14 @@ BEGIN
   --IF DELEGATION IS BEING CANCELED BETWEEN ACCOUNTS REMOVE IT FROM CURRENT_ACCOUNT_DELEGATION
 
   IF _balance = 0 THEN
-    DELETE FROM btracker_app.current_accounts_delegations
+    DELETE FROM current_accounts_delegations
     WHERE delegator = _delegator AND delegatee = _delegatee;
   END IF;
 
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_account_create_with_delegation_operation(
+CREATE OR REPLACE FUNCTION process_account_create_with_delegation_operation(
     body jsonb, _source_op bigint, _source_op_block int
 )
 RETURNS void
@@ -155,13 +155,13 @@ $$
 BEGIN
 WITH account_create_with_delegation_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'creator') AS _delegator,
-       (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'new_account_name')AS _delegatee,
+SELECT (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'creator') AS _delegator,
+       (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'new_account_name')AS _delegatee,
        ((body)->'value'->'delegation'->>'amount')::BIGINT AS _balance
 ),
 create_delegation AS 
 (
-  INSERT INTO btracker_app.current_accounts_delegations 
+  INSERT INTO current_accounts_delegations
   (
     delegator,
     delegatee,
@@ -179,7 +179,7 @@ create_delegation AS
 ),
 increase_delegations AS 
 (
-  INSERT INTO btracker_app.account_delegations
+  INSERT INTO account_delegations
   (
     account,
     delegated_vests
@@ -190,9 +190,9 @@ increase_delegations AS
   FROM account_create_with_delegation_operation
   ON CONFLICT ON CONSTRAINT pk_temp_vests
   DO UPDATE SET
-      delegated_vests = btracker_app.account_delegations.delegated_vests + EXCLUDED.delegated_vests
+      delegated_vests = account_delegations.delegated_vests + EXCLUDED.delegated_vests
 )
-  INSERT INTO btracker_app.account_delegations
+  INSERT INTO account_delegations
   (
     account,
     received_vests     
@@ -203,12 +203,12 @@ increase_delegations AS
   FROM account_create_with_delegation_operation
   ON CONFLICT ON CONSTRAINT pk_temp_vests
   DO UPDATE SET
-      received_vests = btracker_app.account_delegations.received_vests + EXCLUDED.received_vests;
+      received_vests = account_delegations.received_vests + EXCLUDED.received_vests;
 
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_return_vesting_delegation_operation(
+CREATE OR REPLACE FUNCTION process_return_vesting_delegation_operation(
     body jsonb, source_op bigint, source_op_block int
 )
 RETURNS void
@@ -218,16 +218,16 @@ $$
 BEGIN
 WITH return_vesting_delegation_operation AS 
 (
-SELECT (SELECT id FROM hive.btracker_app_accounts_view WHERE name = (body)->'value'->>'account') AS _account,
+SELECT (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'account') AS _account,
        ((body)->'value'->'vesting_shares'->>'amount')::BIGINT AS _balance
 )
 
-  INSERT INTO btracker_app.account_delegations (account, delegated_vests)
+  INSERT INTO account_delegations (account, delegated_vests)
   SELECT _account, _balance
   FROM return_vesting_delegation_operation
 
   ON CONFLICT ON CONSTRAINT pk_temp_vests DO UPDATE SET
-    delegated_vests = btracker_app.account_delegations.delegated_vests - EXCLUDED.delegated_vests;
+    delegated_vests = account_delegations.delegated_vests - EXCLUDED.delegated_vests;
 
 END
 $$;

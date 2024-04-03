@@ -24,6 +24,7 @@ POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
 PROCESS_BLOCK_LIMIT=${PROCESS_BLOCK_LIMIT:-0}
+BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,6 +42,9 @@ while [ $# -gt 0 ]; do
         ;;
     --limit=*)
         PROCESS_BLOCK_LIMIT="${1#*=}"
+        ;;
+    --schema=*)
+        BTRACKER_SCHEMA="${1#*=}"
         ;;
     --help|-h|-?)
         print_help
@@ -67,7 +71,7 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POS
 process_blocks() {
     n_blocks="${1:-null}"
     log_file="btracker_sync.log"
-    psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -c "\timing" -c "CALL btracker_app.main('btracker_app', $n_blocks);" 2>&1 | ts '%Y-%m-%d %H:%M:%.S' | tee -i $log_file
+    psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);" 2>&1 | ts '%Y-%m-%d %H:%M:%.S' | tee -i $log_file
 }
 
 process_blocks "$PROCESS_BLOCK_LIMIT"

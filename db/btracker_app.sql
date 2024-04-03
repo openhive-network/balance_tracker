@@ -1,29 +1,40 @@
+-- noqa: disable=CP03
+
 SET ROLE btracker_owner;
 
 DO $$
+  DECLARE __schema_name VARCHAR;
+  DECLARE __context_table VARCHAR:='hive.';
 BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+  __context_table:=__context_table || __schema_name;
 
-CREATE SCHEMA btracker_app AUTHORIZATION btracker_owner;
+  RAISE NOTICE 'balance_tracker will be installed in schema % with context %', __schema_name, __schema_name;
 
-  IF NOT hive.app_context_exists('btracker_app') THEN 
+  IF hive.app_context_exists(__schema_name) THEN
+      RAISE NOTICE 'Context % already exists, it means all tables are already created and data installing is skipped', __schema_name;
+      RETURN;
+  END IF;
 
-  PERFORM hive.app_create_context('btracker_app',
-    TRUE, -- _if_forking
-    FALSE -- _is_attached
+  PERFORM hive.app_create_context(
+    _name =>__schema_name,
+    _schema => __schema_name,
+    _is_forking => TRUE,
+    _is_attached => FALSE
   );
 
-  END IF;
+
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
-CREATE TABLE IF NOT EXISTS btracker_app.app_status
+CREATE TABLE IF NOT EXISTS app_status
 (
   continue_processing BOOLEAN NOT NULL,
   withdraw_rate INT NOT NULL,
   start_delayed_vests BOOLEAN NOT NULL
 );
 
-INSERT INTO btracker_app.app_status
+INSERT INTO app_status
 (continue_processing, withdraw_rate, start_delayed_vests)
 VALUES
 (True, 104, FALSE)
@@ -31,7 +42,7 @@ VALUES
 
 --ACCOUNT BALANCES
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
+CREATE TABLE IF NOT EXISTS current_account_balances
 (
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
@@ -40,9 +51,11 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_account_balances
   source_op_block INT NOT NULL, -- Block containing the source operation
 
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
-) INHERITS (hive.btracker_app);
+);
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
+PERFORM hive.app_register_table( __schema_name, 'current_account_balances', __schema_name );
+
+CREATE TABLE IF NOT EXISTS account_balance_history
 (
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
@@ -55,11 +68,13 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_balance_history
       That's why constraint has been eliminated.
   */
   --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
-) INHERITS (hive.btracker_app);
+);
+
+PERFORM hive.app_register_table( __schema_name, 'account_balance_history', __schema_name );
 
 --ACCOUNT REWARDS
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_rewards
+CREATE TABLE IF NOT EXISTS account_rewards
 (
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
@@ -68,20 +83,24 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_rewards
   source_op_block INT NOT NULL, -- Block containing the source operation
 
   CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai)
-) INHERITS (hive.btracker_app);
+);
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_info_rewards
+PERFORM hive.app_register_table( __schema_name, 'account_rewards', __schema_name );
+
+CREATE TABLE IF NOT EXISTS account_info_rewards
 (
   account INT NOT NULL, 
   posting_rewards BIGINT DEFAULT 0,
   curation_rewards  BIGINT DEFAULT 0, 
 
   CONSTRAINT pk_account_info_rewards PRIMARY KEY (account)
-) INHERITS (hive.btracker_app);
+);
+
+  PERFORM hive.app_register_table( __schema_name, 'account_info_rewards', __schema_name );
 
 --ACCOUNT DELEGATIONS
 
-CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
+CREATE TABLE IF NOT EXISTS current_accounts_delegations
 (
   delegator INT NOT NULL,
   delegatee INT NOT NULL,     
@@ -90,20 +109,22 @@ CREATE TABLE IF NOT EXISTS btracker_app.current_accounts_delegations
   source_op_block INT NOT NULL, 
 
   CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
-) INHERITS (hive.btracker_app);
+);
+PERFORM hive.app_register_table( __schema_name, 'current_accounts_delegations', __schema_name );
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_delegations
+CREATE TABLE IF NOT EXISTS account_delegations
 (
   account INT NOT NULL,
   received_vests BIGINT DEFAULT 0,     
   delegated_vests BIGINT DEFAULT 0,         
 
   CONSTRAINT pk_temp_vests PRIMARY KEY (account)
-) INHERITS (hive.btracker_app);
+);
+PERFORM hive.app_register_table( __schema_name, 'account_delegations', __schema_name );
 
 --ACCOUNT WITHDRAWS
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_withdraws
+CREATE TABLE IF NOT EXISTS account_withdraws
 (
   account INT NOT NULL,
   vesting_withdraw_rate BIGINT DEFAULT 0,     
@@ -113,20 +134,22 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_withdraws
   delayed_vests BIGINT DEFAULT 0,  
 
   CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
-) INHERITS (hive.btracker_app);
+);
+PERFORM hive.app_register_table( __schema_name, 'account_withdraws', __schema_name );
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_routes
+CREATE TABLE IF NOT EXISTS account_routes
 (
   account INT NOT NULL,
   to_account INT NOT NULL,     
   percent INT NOT NULL,
     
   CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
-) INHERITS (hive.btracker_app);
+);
+PERFORM hive.app_register_table( __schema_name, 'account_routes', __schema_name );
 
 --ACCOUNT SAVINGS
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_savings
+CREATE TABLE IF NOT EXISTS account_savings
 (
   account INT NOT NULL,
   nai     INT NOT NULL, 
@@ -136,9 +159,10 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_savings
   savings_withdraw_requests INT DEFAULT 0,
 
   CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
-) INHERITS (hive.btracker_app);
+);
+PERFORM hive.app_register_table( __schema_name, 'account_savings', __schema_name );
 
-CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
+CREATE TABLE IF NOT EXISTS transfer_saving_id
 (
   account INT NOT NULL,
   nai     INT NOT NULL, 
@@ -146,52 +170,47 @@ CREATE TABLE IF NOT EXISTS btracker_app.transfer_saving_id
   request_id  BIGINT NOT NULL, 
 
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
-) INHERITS (hive.btracker_app);
-
-GRANT SELECT ON ALL TABLES IN SCHEMA btracker_app TO btracker_user;
-
-GRANT USAGE ON SCHEMA btracker_app to btracker_user;
-
- EXCEPTION WHEN duplicate_schema THEN RAISE NOTICE '%, skipping', SQLERRM USING ERRCODE = SQLSTATE;
+);
+PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
 END
 $$;
 
 --- Helper function telling application main-loop to continue execution.
-CREATE OR REPLACE FUNCTION btracker_app.continueProcessing()
+CREATE OR REPLACE FUNCTION continueProcessing()
 RETURNS BOOLEAN
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
-  RETURN continue_processing FROM btracker_app.app_status LIMIT 1;
+  RETURN continue_processing FROM app_status LIMIT 1;
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.allowProcessing()
+CREATE OR REPLACE FUNCTION allowProcessing()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  UPDATE btracker_app.app_status SET continue_processing = True;
+  UPDATE app_status SET continue_processing = True;
 END
 $$;
 
 /** Helper function to be called from separate transaction (must be committed)
     to safely stop execution of the application.
 **/
-CREATE OR REPLACE FUNCTION btracker_app.stopProcessing()
+CREATE OR REPLACE FUNCTION stopProcessing()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  UPDATE btracker_app.app_status SET continue_processing = False;
+  UPDATE app_status SET continue_processing = False;
 END
 $$;
 
-CREATE OR REPLACE PROCEDURE btracker_app.do_massive_processing(
+CREATE OR REPLACE PROCEDURE do_massive_processing(
     IN _appContext VARCHAR,
     IN _from INT,
     IN _to INT,
@@ -217,8 +236,8 @@ BEGIN
 
     RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
 
-    PERFORM btracker_app.process_block_range_data_a(b, _last_block);
-    PERFORM btracker_app.process_block_range_data_b(b, _last_block);
+    PERFORM process_block_range_data_a(b, _last_block);
+    PERFORM process_block_range_data_b(b, _last_block);
 
 
     PERFORM hive.app_set_current_block_num(_appContext, _last_block);
@@ -227,7 +246,7 @@ BEGIN
 
     RAISE NOTICE 'Block range: <%, %> processed successfully.', b, _last_block;
 
-    EXIT WHEN NOT btracker_app.continueProcessing();
+    EXIT WHEN NOT continueProcessing();
 
   END LOOP;
 
@@ -240,13 +259,13 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE PROCEDURE btracker_app.processBlock(IN _block INT)
+CREATE OR REPLACE PROCEDURE processBlock(IN _block INT)
 LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
-  PERFORM btracker_app.process_block_range_data_a(_block, _block);
-  PERFORM btracker_app.process_block_range_data_b(_block, _block);
+  PERFORM process_block_range_data_a(_block, _block);
+  PERFORM process_block_range_data_b(_block, _block);
   COMMIT; -- For single block processing we want to commit all changes for each one.
 END
 $$;
@@ -255,10 +274,10 @@ $$;
   - defines its data schema,
   - creates HAF application context,
   - starts application main-loop (which iterates infinitely).
-    To stop it call `btracker_app.stopProcessing();`
+    To stop it call `stopProcessing();`
     from another session and commit its trasaction.
 */
-CREATE OR REPLACE PROCEDURE btracker_app.main(
+CREATE OR REPLACE PROCEDURE main(
     IN _appContext VARCHAR, IN _maxBlockLimit INT = 0
 )
 LANGUAGE 'plpgsql'
@@ -271,7 +290,7 @@ DECLARE
   __commit_mode_changed BOOLEAN := false;
 
 BEGIN
-  PERFORM btracker_app.allowProcessing();
+  PERFORM allowProcessing();
   COMMIT;
 
   SELECT current_setting('synchronous_commit') into __original_commit_mode;
@@ -285,7 +304,7 @@ BEGIN
 
   RAISE NOTICE 'Entering application main loop...';
 
-  WHILE btracker_app.continueProcessing() AND (_maxBlockLimit = 0 OR __last_block < _maxBlockLimit) LOOP
+  WHILE continueProcessing() AND (_maxBlockLimit = 0 OR __last_block < _maxBlockLimit) LOOP
     __next_block_range := hive.app_next_block(_appContext);
 
     IF __next_block_range IS NULL THEN
@@ -306,13 +325,13 @@ BEGIN
           PERFORM set_config('synchronous_commit', 'OFF', false);
           __commit_mode_changed := true;
         END IF;
-        CALL btracker_app.do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 10000, __last_block);
+        CALL do_massive_processing(_appContext, __next_block_range.first_block, __next_block_range.last_block, 10000, __last_block);
       ELSE
         IF __commit_mode_changed THEN
           PERFORM set_config('synchronous_commit', __original_commit_mode, false);
           __commit_mode_changed := false;
         END IF;
-        CALL btracker_app.processBlock(__next_block_range.last_block);
+        CALL processBlock(__next_block_range.last_block);
         __last_block := __next_block_range.last_block;
       END IF;
 
@@ -323,14 +342,14 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_app.create_btracker_indexes()
+CREATE OR REPLACE FUNCTION create_btracker_indexes()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  CREATE INDEX idx_btracker_app_account_balance_history_nai ON btracker_app.account_balance_history(nai);
-  CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON btracker_app.account_balance_history(account, nai);
+  CREATE INDEX idx_btracker_app_account_balance_history_nai ON account_balance_history(nai);
+  CREATE INDEX idx_btracker_app_account_balance_history_account_nai ON account_balance_history(account, nai);
 
 END
 $$;

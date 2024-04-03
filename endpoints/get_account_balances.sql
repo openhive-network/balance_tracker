@@ -23,7 +23,7 @@ PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]
 
 SELECT cv.curation_rewards, cv.posting_rewards
 INTO _result
-FROM btracker_app.account_info_rewards cv
+FROM account_info_rewards cv
 WHERE cv.account = _account;
 
 IF NOT FOUND THEN 
@@ -46,6 +46,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_savings(_account int)
 RETURNS btracker_endpoints.account_savings -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
+SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -58,11 +59,11 @@ SELECT
   MAX(CASE WHEN nai = 13 THEN saving_balance END) AS hbd,
   MAX(CASE WHEN nai = 21 THEN saving_balance END) AS hive
 INTO __result.hbd_savings, __result.hive_savings
-FROM btracker_app.account_savings WHERE account= _account;
+FROM account_savings WHERE account= _account;
 
 SELECT SUM (savings_withdraw_requests) AS total
 INTO __result.savings_withdraw_requests
-FROM btracker_app.account_savings
+FROM account_savings
 WHERE account= _account;
 
 RETURN __result;
@@ -82,6 +83,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_rewards(_account int)
 RETURNS btracker_endpoints.account_rewards -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
+SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -96,7 +98,7 @@ SELECT
   MAX(CASE WHEN nai = 37 THEN balance END) AS vests,
   MAX(CASE WHEN nai = 38 THEN balance END) AS vesting_hive
 INTO __result
-FROM btracker_app.account_rewards WHERE account= _account;
+FROM account_rewards WHERE account= _account;
 
 RETURN __result;
 END
@@ -114,6 +116,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_delegations(_account i
 RETURNS btracker_endpoints.btracker_vests_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
+SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -124,7 +127,7 @@ PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]
 
 SELECT cv.delegated_vests, cv.received_vests
 INTO _result
-FROM btracker_app.account_delegations cv WHERE cv.account = _account;
+FROM account_delegations cv WHERE cv.account = _account;
 
 IF NOT FOUND THEN 
   _result = (0::BIGINT, 0::BIGINT);
@@ -148,6 +151,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_withdraws(_account int
 RETURNS btracker_endpoints.account_withdraws -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
+SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -158,7 +162,7 @@ PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]
 
 SELECT vesting_withdraw_rate, to_withdraw, withdrawn, withdraw_routes, delayed_vests
 INTO __result
-FROM btracker_app.account_withdraws WHERE account= _account;
+FROM account_withdraws WHERE account= _account;
 RETURN __result;
 END
 $$;
@@ -180,6 +184,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(_account int)
 RETURNS btracker_endpoints.btracker_account_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
+SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -193,7 +198,7 @@ SELECT
   MAX(CASE WHEN nai = 21 THEN balance END) AS hive, 
   MAX(CASE WHEN nai = 37 THEN balance END) AS vest 
 INTO __result
-FROM btracker_app.current_account_balances WHERE account= _account;
+FROM current_account_balances WHERE account= _account;
 
 SELECT hive.get_vesting_balance((SELECT num FROM hive.blocks_view ORDER BY num DESC LIMIT 1), __result.vesting_shares) 
 INTO __result.vesting_balance_hive;
