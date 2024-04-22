@@ -63,17 +63,26 @@ POSTGRES_ACCESS_ADMIN=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOS
 
 
 uninstall_app() {
+    drop_users_sql=$(cat <<EOF
+do
+\$\$
+BEGIN
+ IF NOT EXISTS( SELECT 1 FROM hive.contexts hc WHERE owner = 'btracker_owner' ) THEN
+    DROP OWNED BY btracker_owner CASCADE;
+    DROP ROLE btracker_owner;
+    DROP OWNED BY btracker_user CASCADE;
+    DROP ROLE btracker_user;
+ END IF;
+END\$\$;
+EOF
+)
+
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "do \$\$ BEGIN if hive.app_context_exists('${BTRACKER_SCHEMA}') THEN perform hive.app_remove_context('${BTRACKER_SCHEMA}'); end if; END \$\$"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS ${BTRACKER_SCHEMA} CASCADE;"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
 
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_owner CASCADE" || true
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_owner" || true
-
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP OWNED BY btracker_user CASCADE" || true
-    psql "$POSTGRES_ACCESS_ADMIN" -c "DROP ROLE btracker_user" || true
-
+    psql "$POSTGRES_ACCESS_ADMIN" -c "${drop_users_sql}" || true
 }
 
 uninstall_app
