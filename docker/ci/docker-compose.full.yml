@@ -65,11 +65,12 @@ services:
     environment:
       PGRST_ADMIN_SERVER_PORT: 3001
       PGRST_DB_URI: postgresql://btracker_owner@haf:5432/haf_block_log
-      PGRST_DB_SCHEMA: btracker_app
+      PGRST_DB_SCHEMA: btracker_endpoints
       PGRST_DB_ANON_ROLE: btracker_user
       PGRST_DB_POOL: 20
       PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
+      PGRST_DB_EXTRA_SEARCH_PATH: btracker_app
     networks:
       haf-network:
     depends_on:

@@ -63,6 +63,17 @@ POSTGRES_ACCESS_ADMIN=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOS
 
 
 uninstall_app() {
+    remove_context_sql=$(cat << EOF
+do
+\$\$
+BEGIN
+  IF hive.app_context_exists('${BTRACKER_SCHEMA}') THEN
+   perform hive.app_remove_context('${BTRACKER_SCHEMA}');
+  END IF;
+END\$\$;
+EOF
+)
+
     drop_users_sql=$(cat <<EOF
 do
 \$\$
@@ -77,10 +88,8 @@ END\$\$;
 EOF
 )
 
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "do \$\$ BEGIN if hive.app_context_exists('${BTRACKER_SCHEMA}') THEN perform hive.app_remove_context('${BTRACKER_SCHEMA}'); end if; END \$\$"
+    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "${remove_context_sql}"
     psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS ${BTRACKER_SCHEMA} CASCADE;"
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_account_dump CASCADE;"
-    psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=OFF" -c "DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;"
 
     psql "$POSTGRES_ACCESS_ADMIN" -c "${drop_users_sql}" || true
 }

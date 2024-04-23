@@ -1,3 +1,8 @@
+-- endpoints functions belongs to separated schema but have to be executed
+-- with SEARCH_PATH with schema in which btracker context is installed
+-- if PostgREST is a client of this schema, then in its configuration
+-- entry with db-extra-search-path = <context search path>
+
 SET ROLE btracker_owner;
 
 CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
@@ -46,7 +51,6 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_savings(_account int)
 RETURNS btracker_endpoints.account_savings -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
-SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -83,7 +87,6 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_rewards(_account int)
 RETURNS btracker_endpoints.account_rewards -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
-SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -116,7 +119,6 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_delegations(_account i
 RETURNS btracker_endpoints.btracker_vests_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
-SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -151,7 +153,6 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_withdraws(_account int
 RETURNS btracker_endpoints.account_withdraws -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
-SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
@@ -184,7 +185,6 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(_account int)
 RETURNS btracker_endpoints.btracker_account_balance -- noqa: LT01
 LANGUAGE 'plpgsql'
 STABLE
-SET SEARCH_PATH = :BTRACKER_SCHEMA -- noqa: LT01
 AS
 $$
 DECLARE
