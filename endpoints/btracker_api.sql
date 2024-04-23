@@ -1,6 +1,8 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION raise_exception(TEXT)
+CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
+
+CREATE OR REPLACE FUNCTION btracker_endpoints.raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
 AS
@@ -10,7 +12,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION find_matching_accounts(
+CREATE OR REPLACE FUNCTION btracker_endpoints.find_matching_accounts(
     _partial_account_name TEXT
 )
 RETURNS TEXT
@@ -43,7 +45,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_for_coin_by_block(
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_for_coin_by_block(
     _account_name TEXT, _coin_type INT, _start_block BIGINT, _end_block BIGINT
 )
 RETURNS TEXT
@@ -55,11 +57,11 @@ DECLARE
   __block_increment BIGINT;
 BEGIN
   IF _start_block >= _end_block THEN
-    SELECT raise_exception(
+    SELECT btracker_endpoints.raise_exception(
       'ERROR: "_start_block" must be lower than "_end_block"!');
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
-    SELECT raise_exception(
+    SELECT btracker_endpoints.raise_exception(
       FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
   END IF;
 
@@ -134,7 +136,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_for_coin_by_time(
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_for_coin_by_time(
     _account_name TEXT,
     _coin_type INT,
     _start_time TIMESTAMP,
@@ -150,11 +152,11 @@ DECLARE
   _to INT := (SELECT bv.num FROM hive.blocks_view bv WHERE bv.created_at < _end_time ORDER BY created_at DESC LIMIT 1)::INT;
 BEGIN
   IF _start_time >= _end_time THEN
-    SELECT raise_exception(
+    SELECT btracker_endpoints.raise_exception(
       'ERROR: "_start_time" must be lower than "_end_time"!');
   END IF;
   IF _coin_type != ALL (__coin_type_arr) THEN
-    SELECT raise_exception(
+    SELECT btracker_endpoints.raise_exception(
       FORMAT('ERROR: "_coin_type" must be one of %s!', __coin_type_arr));
   END IF;
 

@@ -49,7 +49,6 @@ USER haf_admin
 COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY db /app/db
-COPY api /app/api
 COPY endpoints /app/endpoints
 COPY dump_accounts /app/dump_accounts
 COPY balance-tracker.sh /app/balance-tracker.sh
