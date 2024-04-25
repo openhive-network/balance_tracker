@@ -1,4 +1,4 @@
-version: '3.9'
+name: 'btracker'
 services:
   haf:
     image: ${HAF_REGISTRY:-hiveio/haf}:${HAF_VERSION:-v1.27.4.0}

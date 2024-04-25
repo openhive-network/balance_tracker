@@ -71,7 +71,7 @@ The variables below are can be used to configure the Compose files.
 |-----------------------------------|---------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
 | HAF_REGISTRY                      | Registry containing HAF image                                                                                       | hiveio/haf                                                                          |
 | HAF_VERSION                       | HAF version to use                                                                                                  | v1.27.4.0                                                                           |
-| HAF_COMMAND                       | HAF command to execute                                                                                              | --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000 |
+| HAF_COMMAND                       | HAF command to execute                                                                                              | --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000 |
 | BACKEND_REGISTRY                  | Registry containing psql client image                                                                               | registry.gitlab.syncad.com/hive/balance_tracker/psql-client                         |
 | BACKEND_VERSION                   | Psql client image version to use                                                                                    | 14                                                                                  |
 | POSTGREST_REGISTRY                | Registry containing PostgREST image                                                                                 | postgrest/postgrest                                                                 |
@@ -99,7 +99,7 @@ You can override them by editing the [.env](.env) file or by creating your own e
   echo "HAF_VERSION=instance-v1.27.5-rc0"
   echo "POSTGREST_REGISTRY=bitnami/postgrest"
   echo "HIVED_UID=0"
-  echo "HAF_COMMAND=--shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000"
+  echo "HAF_COMMAND=--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000"
 } > .env.local
 
 # Start the containers
@@ -166,7 +166,7 @@ cd docker
   echo "HIVED_UID=$(id -u)" # Your user id
   echo "HAF_DATA_DIRECTORY=/srv/haf/data"
   echo "HAF_SHM_DIRECTORY=/srv/haf/shm"
-  echo "HAF_COMMAND=--shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000"
+  echo "HAF_COMMAND=--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000"
 } > .env.local
 
 # Create an override file that makes the haf-nettwork attachable
