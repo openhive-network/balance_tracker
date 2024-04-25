@@ -1,12 +1,12 @@
-version: '3.9'
+name: 'btracker'
 services:
   haf:
-    image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-instance-8a5bdf1a273e2fcf20353c73c50fea84970b8885}
+    image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-05b3e1d2}
     entrypoint: /home/haf_admin/docker_entrypoint.sh
     command: $${HAF_COMMAND}
     environment:
       HIVED_UID:
-      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
+      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
       DATADIR: /home/hived/datadir
       SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "

@@ -21,7 +21,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: e988b4e0d221f4b8efcad2bc2e1b587e4c227669 # master
+    ref: 05b3e1d22b48d065c8abbf40e6177df59f9c3b73 # master
     file: /scripts/ci-helpers/prepare_data_image_job.yml
 
 .lint_job:
@@ -159,7 +159,7 @@ docker-setup-and-processing-build:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
   variables:
-    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-replay-at-block=5000000
+    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
@@ -259,7 +259,7 @@ docker-setup-and-processing-build:
   variables:
     PGHERO_USERNAME: unused
     PGHERO_PASSWORD: unused
-    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
+    COMPOSE_OPTIONS_STRING: --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
 
 .full-image-test-template:
   extends: .test-template
@@ -270,7 +270,7 @@ docker-setup-and-processing-build:
     - docker-ci-runner-build
   variables:
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
-    COMPOSE_OPTIONS_STRING: --project-name btracker --env-file .env.local --file ci/docker-compose.full.yml --ansi never
+    COMPOSE_OPTIONS_STRING: --env-file .env.local --file ci/docker-compose.full.yml --ansi never
 
 psql-client-regression-test:
   extends: .psql-client-test-template
