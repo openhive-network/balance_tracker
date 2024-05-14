@@ -236,8 +236,8 @@ BEGIN
 
     RAISE NOTICE 'Attempting to process a block range: <%, %>', b, _last_block;
 
-    PERFORM process_block_range_data_a(b, _last_block);
-    PERFORM process_block_range_data_b(b, _last_block);
+    PERFORM btracker_block_range_data_a(b, _last_block);
+    PERFORM btracker_block_range_data_b(b, _last_block);
 
 
     PERFORM hive.app_set_current_block_num(_appContext, _last_block);
@@ -264,8 +264,8 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
-  PERFORM process_block_range_data_a(_block, _block);
-  PERFORM process_block_range_data_b(_block, _block);
+  PERFORM btracker_block_range_data_a(_block, _block);
+  PERFORM btracker_block_range_data_b(_block, _block);
   COMMIT; -- For single block processing we want to commit all changes for each one.
 END
 $$;
