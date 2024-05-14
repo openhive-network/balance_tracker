@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION process_block_range_data_a(
+CREATE OR REPLACE FUNCTION btracker_block_range_data_a(
     IN _from INT, IN _to INT, IN _report_step INT = 1000
 )
 RETURNS VOID
@@ -70,7 +70,7 @@ FROM insert_balances;
 END
 $$;
 
-CREATE OR REPLACE FUNCTION process_block_range_data_b(IN _from INT, IN _to INT, IN _report_step INT = 1000)
+CREATE OR REPLACE FUNCTION btracker_block_range_data_b(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
