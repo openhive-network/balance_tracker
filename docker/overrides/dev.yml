@@ -1,6 +1,7 @@
 services:
   haf:
     environment:
+      PGCTLTIMEOUT: 600
       PG_ACCESS: "
         host    all    all    all    trust\n
         "

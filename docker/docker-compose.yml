@@ -1,23 +1,24 @@
 name: 'btracker'
 services:
   haf:
-    image: ${HAF_REGISTRY:-hiveio/haf}:${HAF_VERSION:-v1.27.4.0}
+    image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-9ec94375}
     entrypoint: /home/haf_admin/docker_entrypoint.sh
     command: $${HAF_COMMAND}
     environment:
       HIVED_UID:
-      HAF_COMMAND:
+      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
       DATADIR: /home/hived/datadir
       SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "
         host    haf_block_log    btracker_user    all    trust\n
-        host    haf_block_log    btracker_owner   all    trust\n
         host    haf_block_log    haf_admin        all    trust\n
         host    postgres         haf_admin        all    trust\n
         host    haf_block_log    pghero           all    trust\n
         host    postgres         pghero           all    trust\n
         host    haf_block_log    btracker_owner   all    trust\n
         "
+    ports:
+      - "5432:5432"
     volumes:
       - haf_datadir:/home/hived/datadir
       - haf_shmdir:/home/hived/shm_dir
@@ -32,39 +33,27 @@ services:
       retries: 3
       start_period: 48h #time for replay to finish
   backend-setup:
-    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-14}
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker}:${BACKEND_VERSION:-latest}
     working_dir: /app
-    command: 
-      - "./balance-tracker.sh install-app"
+    command: "install_app"
     environment:
       POSTGRES_HOST: haf
-    volumes:
-      - ../api:/app/api
-      - ../db:/app/db
-      - ../endpoints:/app/endpoints
-      - ../dump_accounts:/app/dump_accounts
-      - ../scripts:/app/scripts
-      - ../balance-tracker.sh:/app/balance-tracker.sh
     networks:
       haf-network:
     depends_on:
       haf:
         condition: service_healthy
   backend-block-processing:
-    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker/psql-client}:${BACKEND_VERSION:-14}
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker}:${BACKEND_VERSION:-latest}
     working_dir: /app
-    command:
-      - "./balance-tracker.sh process-blocks"
+    command: "process_blocks"
     environment:
       POSTGRES_HOST: haf
       POSTGRES_USER: btracker_owner
-    volumes:
-      - ../balance-tracker.sh:/app/balance-tracker.sh 
-      - ./scripts/block-processing-healthcheck.sh:/app/healthcheck.sh
     networks:
       haf-network:
     healthcheck:
-      test: ["CMD-SHELL","/app/healthcheck.sh"]
+      test: ["CMD-SHELL","/app/block-processing-healthcheck.sh"]
       interval: 60s
       timeout: 5s
       retries: 20
@@ -92,55 +81,6 @@ services:
       haf:
         condition: service_healthy
       backend-block-processing:
-        condition: service_healthy
-  swagger:
-    image: ${SWAGGER_REGISTRY:-swaggerapi/swagger-ui}:${SWAGGER_VERSION:-latest}
-    ports:
-      - "8080:8080"
-    profiles:
-      - swagger
-    environment:
-      API_URL: http://localhost:3000/
-    healthcheck:
-      test: ["CMD-SHELL","curl -f localhost:8080"]
-    depends_on:
-      backend-postgrest:
-        condition: service_started
-  pghero:
-    image: ${PGHERO_REGISTRY:-ankane/pghero}:${PGHERO_VERSION:-latest}
-    ports:
-      - "2080:8080"
-    profiles:
-      - db-tools
-    environment:
-      DATABASE_URL: postgresql://pghero@haf:5432/haf_block_log
-      PGHERO_USERNAME:
-      PGHERO_PASSWORD:
-    networks:
-      haf-network:
-    healthcheck:
-      test: ["CMD-SHELL","wget --no-verbose --tries=1 --spider --spider http://$PGHERO_USERNAME:$PGHERO_PASSWORD@localhost:8080/ || exit 1"]
-    depends_on:
-      haf:
-        condition: service_healthy
-  pgadmin:
-    image: ${PGADMIN_REGISTRY:-dpage/pgadmin4}:${PGADMIN_VERSION:-latest}
-    ports:
-      - "1080:80"
-    profiles:
-      - db-tools
-    environment:
-      PGADMIN_DEFAULT_EMAIL:
-      PGADMIN_DEFAULT_PASSWORD:
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./pgadmin4/servers.json:/pgadmin4/servers.json:ro
-    networks:
-      haf-network:
-    healthcheck:
-      test: ["CMD-SHELL","wget --no-verbose --tries=1 --spider --spider http://localhost/ || exit 1"]
-    depends_on:
-      haf:
         condition: service_healthy
 
 networks:

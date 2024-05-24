@@ -110,7 +110,7 @@ If you wish to create your own .env file , you may want to use [.env](.env) as a
 
 #### Configuring HAF
 
-You can configure HAF by editing its [configuration file](haf/config_5M.ini) and by overriding the entrypoint using Compose override files (more on those below).
+You can configure HAF by changing HAF_COMMAND value or overriding the entrypoint using Compose override files (more on those below).
 
 #### Configuring containers by using override files
 
@@ -136,19 +136,21 @@ docker compose config
 docker compose up -d
 ```
 
-There are two examples of override files provided:
+There is one example override files provide: [dev.yml](overrides/dev.yml).
 
-- [docker-compose.bind-mounts.yml](docker-compose.bind-mounts.yml)
-- [docker-compose.dev.yml](docker-compose.dev.yml)
+The file makes several changes to the configuration described in [docker-compose.yml](docker-compose.yml):
 
-The first one changes the location of named volumes used by HAF container on from the host's default to the directories specified by the environment variables mentioned in [Environment variables](#environment-variables) section above. This makes the named volumes behave like bind mounts - which means that command `docker compose down -v` will not remove HAF's data. You need to do that manually.
+- adds variable `PGCTLTIMEOUT` set to 600 to HAF's environment
+- changes value of variable `PG_ACCESS` in HAF's environment to `host    all    all    all    trust\n`
+- exposes port 5432 on HAF's container
+- changes the location of named volumes used by HAF container on from the host's default to the directories specified by the environment variables mentioned in [Environment variables](#environment-variables) section above. This makes the named volumes behave like bind mounts - which means that command `docker compose down -v` will not remove HAF's data. It needs to be done that manually.
 
 The second one provides various overrides that can be useful for development, like static IP for the HAF container, healthcheck for the PostGREST container (not enabled by default, since it requires building a custom PostgREST image) or making the *haf-network* attachable.
 
-If you want to use one (or both) of those files, you need to provide Docker Compose a list of YAML files to use, eg.
+If you want to use that file, you need to provide Docker Compose a list of YAML files to use, eg.
 
 ```bash
-docker compose --file docker-compose.yml --file docker-compose.dev.yml up -d
+docker compose --file docker-compose.yml --file overrides/dev.yml up --detach
 ```
 
 And, of course, you can combine all of these ways of configuring the containers, eg.
@@ -182,7 +184,7 @@ docker compose --project-name balance-tracker \
   --env-file .env.local \
   --file docker-compose.yml \
   --file docker-compose.override.yml \
-  --file docker-compose.bind-mounts.yml \
+  --file overrides/dev.yml \
   config
 
 # Create the HAF data directories
@@ -194,7 +196,7 @@ docker compose --project-name balance-tracker \
   --env-file .env.local \
   --file docker-compose.yml \
   --file docker-compose.override.yml \
-  --file docker-compose.bind-mounts.yml \
+  --file overrides/dev.yml \
   up -d
 ```
 

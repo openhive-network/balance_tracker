@@ -56,31 +56,11 @@ group "default" {
 }
 
 # Targets
-target "psql-client" {
-  dockerfile = "Dockerfile"
-  target = "psql_client"
-  tags = [
-    "${registry-name("psql-client", "")}:${PSQL_CLIENT_VERSION}"
-  ]
-  platforms = [
-    "linux/amd64"
-  ]
-  output = [
-    "type=docker"
-  ]
-}
-
-target "psql-client-ci" {
-  inherits = ["psql-client"]
-  output = [
-    "type=registry"
-  ]
-}
 
 ## Locally tag image with "$TAG",
 ## which is "latest" by default
 target "full" {
-  inherits = ["psql-client"]
+  dockerfile = "Dockerfile"
   target = "full"
   tags = [
     "${CI_REGISTRY_IMAGE}:${TAG}"
@@ -93,6 +73,9 @@ target "full" {
     GIT_LAST_COMMITTER = "${GIT_LAST_COMMITTER}",
     GIT_LAST_COMMIT_DATE = "${GIT_LAST_COMMIT_DATE}",
   }
+  platforms = [
+    "linux/amd64"
+  ]
   output = [
     "type=docker"
   ]
