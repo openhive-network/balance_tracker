@@ -7,13 +7,15 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "12db226cfde2df929bb8bcb0c7c51d04c8900d32"
+  CI_COMMON_JOB_VERSION: "62833b5ff44f5073728658e229f3445394d404c2"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
   # Git configuration
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_DEPTH: 1
+  GIT_SUBMODULE_UPDATE_FLAGS: --jobs 4
   # HAF configuration
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
@@ -21,10 +23,10 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 34e9093286c922151468ffe5488aacb9318b9fe0 # develop
+    ref: 9ec94375c984c8a888505fab6dfe10e26b8533fb # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
   - project: 'hive/common-ci-configuration'
-    ref: 12db226cfde2df929bb8bcb0c7c51d04c8900d32
+    ref: 62833b5ff44f5073728658e229f3445394d404c2
     file:
       - '/templates/cache_cleanup.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
@@ -118,10 +120,10 @@ prepare_haf_data:
   extends: .docker_image_builder_job_template
   stage: build
   variables:
-    BASE_REPO_NAME: base
-    BASE_TAG: ubuntu-22.04-1
+    BASE_REPO_NAME: ""
+    BASE_TAG: ""
     NAME: ""
-    TARGET: "$NAME-base"
+    TARGET: "$NAME"
     PROGRESS_DISPLAY: "plain"
   before_script:
     - !reference [.docker_image_builder_job_template, before_script]
@@ -139,17 +141,17 @@ prepare_haf_data:
         return $?
       }
       if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
-        echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG already exists. Skipping build..."
+        echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG} already exists. Skipping..."
         if [[ -n "$CI_COMMIT_TAG" && "$TARGET" == "full-ci" ]]; then
           echo "Tagging pre-existing image with Git tag..."
-          docker pull "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"
-          docker tag "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+          docker pull "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG}"
+          docker tag "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG}" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
           docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
         fi
       else
-        echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME} base image..."
+        echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG} image..."
         git config --global --add safe.directory $(pwd)
-        scripts/build_docker_image.sh "$CI_PROJECT_DIR"
+        scripts/ci-helpers/build_docker_image.sh "$CI_PROJECT_DIR"
       fi
       echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
@@ -164,19 +166,11 @@ docker-ci-runner-build:
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
-docker-psql-client-build:
-  extends: .docker-build-template
-  variables:
-    BASE_REPO_NAME: ""
-    BASE_TAG: "14"
-    NAME: "psql-client"
-    TARGET: "psql-client-ci"
-
 docker-setup-and-processing-build:
   extends: .docker-build-template
-  needs:
-    - docker-psql-client-build
   variables:
+    GIT_SUBMODULE_STRATEGY: none
+    GIT_DEPTH: 1
     BASE_REPO_NAME: ""
     BASE_TAG: "$CI_COMMIT_SHORT_SHA"
     NAME: ""
@@ -187,16 +181,14 @@ docker-setup-and-processing-build:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
   variables:
-    HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
     HAF_SHM_DIRECTORY: ${SHM_DIR}
+    BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
-    COMMAND: SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';
-    MESSAGE: Waiting for Balance Tracker to finish processing blocks...
-    FF_NETWORK_PER_BUILD: 1
+    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/dev.yml --ansi never
   timeout: 1 hours
   before_script:
     - |
@@ -211,45 +203,18 @@ docker-setup-and-processing-build:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
-      cp /blockchain/block_log_5m/block_log docker/blockchain/block_log
+      cp "${BLOCK_LOG_SOURCE_DIR_5M}/block_log" "${CI_PROJECT_DIR}/docker/blockchain/block_log"
+      cp "${BLOCK_LOG_SOURCE_DIR_5M}/block_log.artifacts" "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts"
       chmod a+w docker/blockchain/block_log
 
       "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
-      pushd docker
-      # Put all the variables that can be predefined in the "variables"
-      # block and all the variables that have to be dynamically set by the script below
-      {
-        echo "HAF_REGISTRY=$HAF_REGISTRY_PATH"
-        echo "HAF_VERSION=$HAF_REGISTRY_TAG"
-        echo "HIVED_UID=$HIVED_UID"
-      } > .env.local
-      cat .env.local
-      echo "Docker Compose options string: $COMPOSE_OPTIONS_STRING"
-      IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-      echo "Docker Compose options: ${COMPOSE_OPTIONS[@]}"
-      docker compose config | tee docker-compose-config.yml.log
-      timeout -s INT -k 1m 15m docker compose ${COMPOSE_OPTIONS[@]} up --detach
-      popd
+      "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
       echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
       echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
 
-      function wait-for-btracker-startup() {
-        until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
-        do 
-          echo "$MESSAGE"
-          sleep 3
-        done
-      }
-      export -f wait-for-btracker-startup
-      export POSTGRES_ACCESS
-      export COMMAND
-      export MESSAGE
-
-      timeout -k 1m 10m bash -c wait-for-btracker-startup
-
-      echo "Block processing is finished."
+      "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
 
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
   after_script:
@@ -277,35 +242,12 @@ docker-setup-and-processing-build:
   tags:
     - data-cache-storage
 
-.psql-client-test-template:
+full-image-regression-test:
   extends: .test-template
-  needs:
-    - prepare_haf_image
-    - prepare_haf_data
-    - docker-psql-client-build
-    - docker-ci-runner-build
-  variables:
-    PGHERO_USERNAME: unused
-    PGHERO_PASSWORD: unused
-    COMPOSE_OPTIONS_STRING: --env-file .env.local --file docker-compose.yml --file ci/docker-compose.yml --ansi never
-
-.full-image-test-template:
-  extends: .test-template
-  needs:
-    - prepare_haf_image
-    - prepare_haf_data
-    - docker-setup-and-processing-build
-    - docker-ci-runner-build
-  variables:
-    BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
-    COMPOSE_OPTIONS_STRING: --env-file .env.local --file ci/docker-compose.full.yml --ansi never
-
-psql-client-regression-test:
-  extends: .psql-client-test-template
   script:
     - !reference [.test-template, script]
     - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
       cd tests/account_balances
       ./accounts_dump_test.sh --host=docker
@@ -315,12 +257,12 @@ psql-client-regression-test:
     paths:
       - docker/container-logs.tar.gz
 
-psql-client-performance-test:
-  extends: .psql-client-test-template
+full-image-performance-test:
+  extends: .test-template
   script:
     - !reference [.test-template, script]
     - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests[collapsed=true]\r\e[0KRunning tests..."
+      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
       timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=docker --postgres-host=docker
       tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
@@ -336,32 +278,6 @@ psql-client-performance-test:
       - jmeter.log
     reports:
       junit: tests/performance/junit-result.xml
-
-full-image-regression-test:
-  extends: .full-image-test-template
-  script:
-    - !reference [psql-client-regression-test, script]
-  artifacts:
-    paths:
-      !reference [psql-client-regression-test, artifacts, paths]
-
-full-image-performance-test:
-  extends: .full-image-test-template
-  script:
-    - !reference [psql-client-performance-test, script]
-  artifacts:
-    paths:
-      !reference [psql-client-performance-test, artifacts, paths]
-    reports:
-      junit: !reference [psql-client-performance-test, artifacts, reports, junit]
-
-cleanup_haf_cache_manual:
-  extends: .cleanup_cache_manual_template
-  stage: cleanup
-  variables:
-    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
-  tags:
-    - data-cache-storage
 
 build_and_publish_image:
   stage: publish
@@ -400,3 +316,11 @@ deploy-wax-spec-production-public-npm:
       artifacts: true
   tags:
     - public-runner-docker
+
+cleanup_haf_cache_manual:
+  extends: .cleanup_cache_manual_template
+  stage: cleanup
+  variables:
+    CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
+  tags:
+    - data-cache-storage
