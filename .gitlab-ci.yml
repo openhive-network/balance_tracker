@@ -7,7 +7,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "b2ff9f5a48bc8fb379c66ec4e7907ea1e796ff1b"
+  CI_COMMON_JOB_VERSION: "91d072682e22869aea3acd7affa20db0f6a7a2c8"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -21,8 +21,11 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 7bb7aab44a7083994c36f040e84d501c11afc159 # develop
+    ref: e9d964849997e0cb18903f0910c4bdb293997195 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
+  - project: 'hive/common-ci-configuration'
+    ref: 91d072682e22869aea3acd7affa20db0f6a7a2c8
+    file: /templates/cache_cleanup.gitlab-ci.yml
 
 .lint_job:
   stage: lint
@@ -329,10 +332,9 @@ full-image-performance-test:
       junit: !reference [psql-client-performance-test, artifacts, reports, junit]
 
 cleanup_haf_cache_manual:
-  extends: .cleanup_cache_manual
+  extends: .cleanup_cache_manual_template
   stage: cleanup
   variables:
-    GIT_STRATEGY: none
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
   tags:
     - data-cache-storage
