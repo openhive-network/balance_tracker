@@ -4,10 +4,15 @@ tests/performance/result.xml
 tests/performance/junit-result.xml
 tests/performance/*.tar.gz
 tests/performance/.~lock.log.jtl#
+tests/account_balances/accounts_dump.json
 db/__pycache__
 server/__pycache__
 btracker_sync.log
 shellcheck-*.*
+**/test-results.xml
+**/test-results.jtl
+**/local.env
+**/ci.env
 
 # Docker deployment
 docker/blockchain/block_log*
