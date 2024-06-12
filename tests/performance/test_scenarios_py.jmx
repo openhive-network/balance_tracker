@@ -34,7 +34,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=d</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=d</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -53,7 +53,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=da</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=da</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -72,7 +72,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=dan</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=dan</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -91,7 +91,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=dant</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=dant</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -110,7 +110,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=danth</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=danth</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -129,7 +129,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=danthe</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=danthe</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -148,7 +148,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=danthem</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=danthem</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -167,7 +167,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?_partial_account_name=dantheman</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/find_matching_accounts/?partial-account-name=dantheman</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -201,7 +201,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?_account_name=dantheman&amp;_coin_type=21&amp;_start_block=0&amp;_end_block=60516546</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?account-name=dantheman&amp;coin-type=21&amp;from-block=0&amp;to-block=60516546</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -220,7 +220,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?_account_name=dantheman&amp;_coin_type=37&amp;_start_block=0&amp;_end_block=60516546</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?account-name=dantheman&amp;coin-type=37&amp;from-block=0&amp;to-block=60516546</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -239,7 +239,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?_account_name=dantheman&amp;_coin_type=13&amp;_start_block=0&amp;_end_block=60516546</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?account-name=dantheman&amp;coin-type=13&amp;from-block=0&amp;to-block=60516546</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -258,7 +258,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?_account_name=dantheman&amp;_coin_type=21&amp;_start_block=0&amp;_end_block=30258273</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?account-name=dantheman&amp;coin-type=21&amp;from-block=0&amp;to-block=30258273</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -277,7 +277,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?_account_name=dantheman&amp;_coin_type=21&amp;_start_block=15129137&amp;_end_block=45387410</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_block/?account-name=dantheman&amp;coin-type=21&amp;from-block=15129137&amp;to-block=45387410</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -311,7 +311,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?_account_name=dantheman&amp;_coin_type=21&amp;_start_time=2016-03-24 16:05:00&amp;_end_time=2021-12-31 10:59:54</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?account-name=dantheman&amp;coin-type=21&amp;start-date=2016-03-24 16:05:00&amp;end-date=2021-12-31 10:59:54</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -330,7 +330,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?_account_name=dantheman&amp;_coin_type=37&amp;_start_time=2016-03-24 16:05:00&amp;_end_time=2021-12-31 10:59:54</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?account-name=dantheman&amp;coin-type=37&amp;start-date=2016-03-24 16:05:00&amp;end-date=2021-12-31 10:59:54</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -349,7 +349,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?_account_name=dantheman&amp;_coin_type=13&amp;_start_time=2016-03-24 16:05:00&amp;_end_time=2021-12-31 10:59:54</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?account-name=dantheman&amp;coin-type=13&amp;start-date=2016-03-24 16:05:00&amp;end-date=2021-12-31 10:59:54</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -368,7 +368,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?_account_name=dantheman&amp;_coin_type=21&amp;_start_time=2016-03-24 16:05:00&amp;_end_time=2019-02-11 16:11:45</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?account-name=dantheman&amp;coin-type=21&amp;start-date=2016-03-24 16:05:00&amp;end-date=2019-02-11 16:11:45</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -387,7 +387,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?_account_name=dantheman&amp;_coin_type=21&amp;_start_time=2017-09-03 01:18:21&amp;_end_time=2020-07-22 21:43:30</stringProp>
+          <stringProp name="HTTPSampler.path">rpc/get_balance_for_coin_by_time/?account-name=dantheman&amp;coin-type=21&amp;start-date=2017-09-03 01:18:21&amp;end-date=2020-07-22 21:43:30</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
