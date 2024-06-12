@@ -21,7 +21,7 @@ class BalanceTracker:
                 ha.name AS accounts,
                 LENGTH(ha.name) AS name_lengths
                 FROM
-                hive.accounts ha
+                hive.accounts_view ha
                 WHERE
                 ha.name LIKE '{_partial_account_name}%'
                 ORDER BY
@@ -159,7 +159,7 @@ class BalanceTracker:
                             num AS block,
                             created_at::TIMESTAMP
                             FROM
-                            hive.blocks
+                            hive.blocks_view
                         ) time_query
                         ON hive_query.block = time_query.block
                         ) add_timestamps
