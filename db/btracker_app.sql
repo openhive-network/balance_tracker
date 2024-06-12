@@ -312,6 +312,16 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION raise_exception(TEXT)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  RAISE EXCEPTION '%', $1;
+END
+$$;
+
 /** Application entry point, which:
   - defines its data schema,
   - creates HAF application context,
