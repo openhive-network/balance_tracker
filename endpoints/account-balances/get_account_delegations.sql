@@ -26,7 +26,7 @@ CREATE TYPE btracker_endpoints.vests_balance AS (
 -- openapi-generated-code-end
 
 /** openapi:paths
-/btracker/account-balances/{account-name}/delegations:
+/account-balances/{account-name}/delegations:
   get:
     tags:
       - Account-balances
@@ -40,9 +40,9 @@ CREATE TYPE btracker_endpoints.vests_balance AS (
       * `SELECT * FROM btracker_endpoints.get_account_delegations('initminer');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/account-balances/blocktrades/delegations`
+      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/delegations`
       
-      * `GET https://{btracker-host}/btracker/account-balances/initminer/delegations`
+      * `GET https://{btracker-host}/%1$s/account-balances/initminer/delegations`
     operationId: btracker_endpoints.get_account_delegations
     parameters:
       - in: path

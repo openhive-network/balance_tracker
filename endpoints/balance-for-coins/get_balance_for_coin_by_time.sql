@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:paths
-/btracker/balance-for-coins/{account-name}/by-time:
+/balance-for-coins/{account-name}/by-time:
   get:
     tags:
       - Balance-for-coins
@@ -15,9 +15,9 @@ SET ROLE btracker_owner;
       * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time('initminer');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/balance-for-coins/blocktrades/by-time`
+      * `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades/by-time`
       
-      * `GET https://{btracker-host}/btracker/balance-for-coins/initminer/by-time`
+      * `GET https://{btracker-host}/%1$s/balance-for-coins/initminer/by-time`
     operationId: btracker_endpoints.get_balance_for_coin_by_time
     parameters:
       - in: path

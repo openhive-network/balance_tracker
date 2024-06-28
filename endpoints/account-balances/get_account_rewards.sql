@@ -40,7 +40,7 @@ CREATE TYPE btracker_endpoints.account_rewards AS (
 -- openapi-generated-code-end
 
 /** openapi:paths
-/btracker/account-balances/{account-name}/rewards:
+/account-balances/{account-name}/rewards:
   get:
     tags:
       - Account-balances
@@ -54,9 +54,9 @@ CREATE TYPE btracker_endpoints.account_rewards AS (
       * `SELECT * FROM btracker_endpoints.get_account_rewards('initminer');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/account-balances/blocktrades/rewards`
+      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards`
       
-      * `GET https://{btracker-host}/btracker/account-balances/initminer/rewards`
+      * `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards`
     operationId: btracker_endpoints.get_account_rewards
     parameters:
       - in: path

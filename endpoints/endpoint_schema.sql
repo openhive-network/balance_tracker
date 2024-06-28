@@ -22,12 +22,19 @@ tags:
   - name: Matching-accounts
     description: Api searching for similarly named accounts
 servers:
-  - url: /
+  - url: /%1$s
  */
+
+DO $__$
+DECLARE 
+  __schema_name VARCHAR;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
 
 CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
 
-create or replace function btracker_endpoints.root() returns json as $_$
+EXECUTE FORMAT(
+'create or replace function btracker_endpoints.root() returns json as $_$
 declare
 -- openapi-spec
 -- openapi-generated-code-begin
@@ -63,17 +70,17 @@ declare
   ],
   "servers": [
     {
-      "url": "/"
+      "url": "/%1$s"
     }
   ],
   "paths": {
-    "/btracker/matching-accounts/{partial-account-name}": {
+    "/matching-accounts/{partial-account-name}": {
       "get": {
         "tags": [
           "Matching-accounts"
         ],
         "summary": "Similar accounts",
-        "description": "Returns list of similarly named accounts \n\nSQL example\n* `SELECT * FROM btracker_endpoints.find_matching_accounts('blocktrade');`\n\n* `SELECT * FROM btracker_endpoints.find_matching_accounts('initmi');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/matching-accounts/blocktrade`\n\n* `GET https://{btracker-host}/btracker/matching-accounts/initmi`\n",
+        "description": "Returns list of similarly named accounts \n\nSQL example\n* `SELECT * FROM btracker_endpoints.find_matching_accounts(''blocktrade'');`\n\n* `SELECT * FROM btracker_endpoints.find_matching_accounts(''initmi'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/matching-accounts/blocktrade`\n\n* `GET https://{btracker-host}/%1$s/matching-accounts/initmi`\n",
         "operationId": "btracker_endpoints.find_matching_accounts",
         "parameters": [
           {
@@ -107,13 +114,13 @@ declare
         }
       }
     },
-    "/btracker/balance-for-coins/{account-name}": {
+    "/balance-for-coins/{account-name}": {
       "get": {
         "tags": [
           "Balance-for-coins"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/balance-for-coins/blocktrades`\n\n* `GET https://{btracker-host}/btracker/balance-for-coins/initminer`\n",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades`\n\n* `GET https://{btracker-host}/%1$s/balance-for-coins/initminer`\n",
         "operationId": "btracker_endpoints.get_balance_for_coin_by_block",
         "parameters": [
           {
@@ -176,13 +183,13 @@ declare
         }
       }
     },
-    "/btracker/balance-for-coins/{account-name}/by-time": {
+    "/balance-for-coins/{account-name}/by-time": {
       "get": {
         "tags": [
           "Balance-for-coins"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in time range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/balance-for-coins/blocktrades/by-time`\n\n* `GET https://{btracker-host}/btracker/balance-for-coins/initminer/by-time`\n",
+        "description": "History of change of `coin-type` balance in time range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades/by-time`\n\n* `GET https://{btracker-host}/%1$s/balance-for-coins/initminer/by-time`\n",
         "operationId": "btracker_endpoints.get_balance_for_coin_by_time",
         "parameters": [
           {
@@ -245,13 +252,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}": {
+    "/account-balances/{account-name}": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account balances",
-        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_balances('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer`\n",
+        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_balances(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer`\n",
         "operationId": "btracker_endpoints.get_account_balances",
         "parameters": [
           {
@@ -290,13 +297,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}/delegations": {
+    "/account-balances/{account-name}/delegations": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account delegations",
-        "description": "Lists current account delegated and received VESTs\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_delegations('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_delegations('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades/delegations`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer/delegations`\n",
+        "description": "Lists current account delegated and received VESTs\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_delegations(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_delegations(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/delegations`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/delegations`\n",
         "operationId": "btracker_endpoints.get_account_delegations",
         "parameters": [
           {
@@ -332,13 +339,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}/rewards/info": {
+    "/account-balances/{account-name}/rewards/info": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account posting and curation rewards",
-        "description": "Returns the sum of the received posting and curation rewards of the account since its creation\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades/rewards/info`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer/rewards/info`\n",
+        "description": "Returns the sum of the received posting and curation rewards of the account since its creation\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards/info`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards/info`\n",
         "operationId": "btracker_endpoints.get_account_info_rewards",
         "parameters": [
           {
@@ -374,13 +381,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}/rewards": {
+    "/account-balances/{account-name}/rewards": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account reward balances",
-        "description": "Returns current, not yet claimed rewards obtained by posting and commenting\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_rewards('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_rewards('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades/rewards`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer/rewards`\n",
+        "description": "Returns current, not yet claimed rewards obtained by posting and commenting\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_rewards(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_rewards(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards`\n",
         "operationId": "btracker_endpoints.get_account_rewards",
         "parameters": [
           {
@@ -418,13 +425,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}/savings": {
+    "/account-balances/{account-name}/savings": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account saving balances",
-        "description": "Returns current hbd and hive savings\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_savings('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_savings('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades/savings`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer/savings`\n",
+        "description": "Returns current hbd and hive savings\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_savings(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/savings`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/savings`\n",
         "operationId": "btracker_endpoints.get_account_savings",
         "parameters": [
           {
@@ -461,13 +468,13 @@ declare
         }
       }
     },
-    "/btracker/account-balances/{account-name}/withdrawals": {
+    "/account-balances/{account-name}/withdrawals": {
       "get": {
         "tags": [
           "Account-balances"
         ],
         "summary": "Account withdrawals",
-        "description": "Returns current vest withdrawals, amount withdrawn, amount left to withdraw and \nrate of a withdrawal \n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_withdraws('blocktrades');`\n\n* `SELECT * FROM btracker_endpoints.get_account_withdraws('initminer');`\n\nREST call example\n* `GET https://{btracker-host}/btracker/account-balances/blocktrades/withdrawals`\n\n* `GET https://{btracker-host}/btracker/account-balances/initminer/withdrawals`\n",
+        "description": "Returns current vest withdrawals, amount withdrawn, amount left to withdraw and \nrate of a withdrawal \n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_withdraws(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_withdraws(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/withdrawals`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/withdrawals`\n",
         "operationId": "btracker_endpoints.get_account_withdraws",
         "parameters": [
           {
@@ -520,12 +527,12 @@ declare
           "hive_balance": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "account's HIVE balance"
+            "description": "account''s HIVE balance"
           },
           "vesting_shares": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "account's VEST balance"
+            "description": "account''s VEST balance"
           },
           "vesting_balance_hive": {
             "type": "integer",
@@ -535,7 +542,7 @@ declare
           "post_voting_power_vests": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "account's VEST balance - delegated VESTs + reveived VESTs, presented in HIVE,calculated based on the current HIVE price"
+            "description": "account''s VEST balance - delegated VESTs + reveived VESTs, presented in HIVE,calculated based on the current HIVE price"
           }
         }
       },
@@ -545,12 +552,12 @@ declare
           "delegated_vests": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "VESTS delegated to another user,  account's power is lowered by delegated VESTS"
+            "description": "VESTS delegated to another user,  account''s power is lowered by delegated VESTS"
           },
           "received_vests": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "VESTS received from another user,  account's power is increased by received VESTS"
+            "description": "VESTS received from another user,  account''s power is increased by received VESTS"
           }
         }
       },
@@ -565,7 +572,7 @@ declare
           "posting_rewards": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "curator's reward expressed in VEST"
+            "description": "curator''s reward expressed in VEST"
           }
         }
       },
@@ -609,7 +616,7 @@ declare
           },
           "savings_withdraw_requests": {
             "type": "integer",
-            "description": "number representing how many payouts are pending  from user's saving balance"
+            "description": "number representing how many payouts are pending  from user''s saving balance"
           }
         }
       },
@@ -650,6 +657,10 @@ $$;
 begin
   return openapi;
 end
-$_$ language plpgsql;
+$_$ language plpgsql;'
+,__schema_name);
+
+END
+$__$;
 
 RESET ROLE;

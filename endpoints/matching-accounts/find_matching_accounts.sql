@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:paths
-/btracker/matching-accounts/{partial-account-name}:
+/matching-accounts/{partial-account-name}:
   get:
     tags:
       - Matching-accounts
@@ -15,9 +15,9 @@ SET ROLE btracker_owner;
       * `SELECT * FROM btracker_endpoints.find_matching_accounts('initmi');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/matching-accounts/blocktrade`
+      * `GET https://{btracker-host}/%1$s/matching-accounts/blocktrade`
       
-      * `GET https://{btracker-host}/btracker/matching-accounts/initmi`
+      * `GET https://{btracker-host}/%1$s/matching-accounts/initmi`
     operationId: btracker_endpoints.find_matching_accounts
     parameters:
       - in: path

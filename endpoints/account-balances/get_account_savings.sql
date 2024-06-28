@@ -28,7 +28,7 @@ CREATE TYPE btracker_endpoints.account_savings AS (
 -- openapi-generated-code-end
 
 /** openapi:paths
-/btracker/account-balances/{account-name}/savings:
+/account-balances/{account-name}/savings:
   get:
     tags:
       - Account-balances
@@ -42,9 +42,9 @@ CREATE TYPE btracker_endpoints.account_savings AS (
       * `SELECT * FROM btracker_endpoints.get_account_savings('initminer');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/account-balances/blocktrades/savings`
+      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/savings`
       
-      * `GET https://{btracker-host}/btracker/account-balances/initminer/savings`
+      * `GET https://{btracker-host}/%1$s/account-balances/initminer/savings`
     operationId: btracker_endpoints.get_account_savings
     parameters:
       - in: path
