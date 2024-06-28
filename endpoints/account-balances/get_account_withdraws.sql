@@ -38,7 +38,7 @@ CREATE TYPE btracker_endpoints.account_withdrawals AS (
 -- openapi-generated-code-end
 
 /** openapi:paths
-/btracker/account-balances/{account-name}/withdrawals:
+/account-balances/{account-name}/withdrawals:
   get:
     tags:
       - Account-balances
@@ -53,9 +53,9 @@ CREATE TYPE btracker_endpoints.account_withdrawals AS (
       * `SELECT * FROM btracker_endpoints.get_account_withdraws('initminer');`
 
       REST call example
-      * `GET https://{btracker-host}/btracker/account-balances/blocktrades/withdrawals`
+      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/withdrawals`
       
-      * `GET https://{btracker-host}/btracker/account-balances/initminer/withdrawals`
+      * `GET https://{btracker-host}/%1$s/account-balances/initminer/withdrawals`
     operationId: btracker_endpoints.get_account_withdraws
     parameters:
       - in: path
