@@ -215,23 +215,19 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION updateIndexesCreated(_is_indexes_created BOOLEAN)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-  UPDATE btracker_app_status SET is_indexes_created = _is_indexes_created;
-END
-$$;
-
 CREATE OR REPLACE FUNCTION isIndexesCreated()
 RETURNS BOOLEAN
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
-  RETURN is_indexes_created FROM btracker_app_status LIMIT 1;
+  RETURN COALESCE(
+    (
+      SELECT true FROM pg_index WHERE indexrelid = 
+      (
+        SELECT oid FROM pg_class WHERE relname = 'idx_btracker_app_account_balance_history_nai'
+      )
+    ), false);
 END
 $$;
 
@@ -248,13 +244,13 @@ $$
 BEGIN
   IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
-  ELSE
-    IF NOT isIndexesCreated() THEN
-      PERFORM create_btracker_indexes();
-      PERFORM updateIndexesCreated(true);
-    END IF;
-    CALL btracker_single_processing(_block_range.first_block, _logs);
+    RETURN;
   END IF;
+
+  IF NOT isIndexesCreated() THEN
+    PERFORM create_btracker_indexes();
+  END IF;
+  CALL btracker_single_processing(_block_range.first_block, _logs);
 END
 $$;
 
