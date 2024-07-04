@@ -43,7 +43,6 @@ services:
     working_dir: /app
     command: "process_blocks"
     environment:
-      BLOCK_NUMBER: 0
       POSTGRES_HOST: haf
       POSTGRES_USER: btracker_owner
     networks:

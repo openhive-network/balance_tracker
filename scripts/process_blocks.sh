@@ -14,7 +14,7 @@ OPTIONS:
     --port=NUMBER            Allows to specify a PostgreSQL operating port (defaults to 5432)
     --user=VALUE             Allows to specify a PostgreSQL user (defaults to btracker_owner)
     --url=URL                Allows to specify a PostgreSQL URL (empty by default, overrides options above)
-    --limit=VALUE            Allows to specify maximum number of blocks to process (defaults to 0, which means 'process all the blocks and wait for more')
+    --stop-at-block=VALUE            Allows to specify maximum number of blocks to process (defaults to 0, which means 'process all the blocks and wait for more')
     --help,-h,-?             Displays this help message
 EOF
 }
@@ -23,7 +23,7 @@ POSTGRES_USER=${POSTGRES_USER:-"btracker_owner"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
-PROCESS_BLOCK_LIMIT=${PROCESS_BLOCK_LIMIT:-0}
+PROCESS_BLOCK_LIMIT=${PROCESS_BLOCK_LIMIT:-null}
 BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
 
 while [ $# -gt 0 ]; do
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     --postgres-url=*)
         POSTGRES_URL="${1#*=}"
         ;;
-    --limit=*)
+    --stop-at-block=*)
         PROCESS_BLOCK_LIMIT="${1#*=}"
         ;;
     --schema=*)
@@ -69,9 +69,9 @@ done
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log"}
 
 process_blocks() {
-    n_blocks="${1:-null}"
+    local n_blocks="${1:-null}"
     log_file="btracker_sync.log"
-    psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);" 2>&1 | ts '%Y-%m-%d %H:%M:%.S' | tee -i $log_file
+    psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);" 2>&1 | tee -i $log_file
 }
 
 process_blocks "$PROCESS_BLOCK_LIMIT"
