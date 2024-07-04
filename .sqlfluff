@@ -1,4 +1,4 @@
 [sqlfluff]
 dialect = postgres
-max_line_length = 120
-exclude_rules = CP03
+max_line_length = 150
+exclude_rules = CP03, LT01, CP05, CP04

@@ -56,7 +56,6 @@ services:
     command:
       - "./balance-tracker.sh process-blocks"
     environment:
-      BLOCK_NUMBER: 0
       POSTGRES_HOST: haf
       POSTGRES_USER: btracker_owner
     volumes:

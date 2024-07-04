@@ -145,21 +145,21 @@ SELECT
     process_comment_benefactor_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
   WHEN pbr.op_type_id = 4 THEN
-    process_withdraw_vesting_operation(pbr.body, (SELECT withdraw_rate FROM app_status))
+    process_withdraw_vesting_operation(pbr.body, (SELECT withdraw_rate FROM btracker_app_status))
 
   WHEN pbr.op_type_id = 20 THEN
     process_set_withdraw_vesting_route_operation(pbr.body)
 
   WHEN pbr.op_type_id = 56 THEN
-    process_fill_vesting_withdraw_operation(pbr.body, (SELECT start_delayed_vests FROM app_status))
+    process_fill_vesting_withdraw_operation(pbr.body, (SELECT start_delayed_vests FROM btracker_app_status))
 
   WHEN pbr.op_type_id = 53 THEN
     process_comment_reward_operation(pbr.body)
 
-  WHEN pbr.op_type_id = 77 AND (SELECT start_delayed_vests FROM app_status) = TRUE THEN
+  WHEN pbr.op_type_id = 77 AND (SELECT start_delayed_vests FROM btracker_app_status) = TRUE THEN
     process_transfer_to_vesting_completed_operation(pbr.body)
 
-  WHEN pbr.op_type_id = 70 AND (SELECT start_delayed_vests FROM app_status) = TRUE THEN
+  WHEN pbr.op_type_id = 70 AND (SELECT start_delayed_vests FROM btracker_app_status) = TRUE THEN
     process_delayed_voting_operation(pbr.body)
 
   WHEN pbr.op_type_id = 68 THEN
@@ -252,10 +252,10 @@ BEGIN
   WHERE account = ad.account_id;
 
   WHEN _hardfork_id = 16 THEN
-  UPDATE app_status SET withdraw_rate = 13;
+  UPDATE btracker_app_status SET withdraw_rate = 13;
 
   WHEN _hardfork_id = 24 THEN
-  UPDATE app_status SET start_delayed_vests = TRUE;
+  UPDATE btracker_app_status SET start_delayed_vests = TRUE;
 
   ELSE
   END CASE;

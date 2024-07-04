@@ -203,7 +203,7 @@ process_blocks() {
   echo "Running indexer..."
   echo "Arguments: $*"
 
-  block_number=${BLOCK_NUMBER:-}
+  block_number=${BLOCK_NUMBER:-null}
   postgres_user=${POSTGRES_USER:-"btracker_owner"}
   postgres_host=${POSTGRES_HOST:-"localhost"}
   postgres_port=${POSTGRES_PORT:-5432}
