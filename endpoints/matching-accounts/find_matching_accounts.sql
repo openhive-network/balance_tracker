@@ -10,9 +10,9 @@ SET ROLE btracker_owner;
       Returns list of similarly named accounts 
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.find_matching_accounts('blocktrade');`
+      * `SELECT * FROM btracker_endpoints.find_matching_accounts(''blocktrade'');`
 
-      * `SELECT * FROM btracker_endpoints.find_matching_accounts('initmi');`
+      * `SELECT * FROM btracker_endpoints.find_matching_accounts(''initmi'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/matching-accounts/blocktrade`

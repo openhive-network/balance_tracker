@@ -11,11 +11,11 @@ btracker_endpoints.account_balance:
     hive_balance:
       type: integer
       x-sql-datatype: BIGINT
-      description: account's HIVE balance
+      description: account''s HIVE balance
     vesting_shares:
       type: integer
       x-sql-datatype: BIGINT
-      description: account's VEST balance
+      description: account''s VEST balance
     vesting_balance_hive:
       type: integer
       x-sql-datatype: BIGINT
@@ -26,7 +26,7 @@ btracker_endpoints.account_balance:
       type: integer
       x-sql-datatype: BIGINT
       description: >-
-        account's VEST balance - delegated VESTs + reveived VESTs,
+        account''s VEST balance - delegated VESTs + reveived VESTs,
         presented in HIVE,calculated based on the current HIVE price
  */
 -- openapi-generated-code-begin
@@ -50,9 +50,9 @@ CREATE TYPE btracker_endpoints.account_balance AS (
       Lists account hbd, hive and vest balances
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_balances('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_balances('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_balances(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades`
