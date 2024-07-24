@@ -9,13 +9,13 @@ btracker_endpoints.vests_balance:
       x-sql-datatype: BIGINT
       description: >-
         VESTS delegated to another user, 
-        account's power is lowered by delegated VESTS
+        account''s power is lowered by delegated VESTS
     received_vests:
       type: integer
       x-sql-datatype: BIGINT
       description: >-
         VESTS received from another user, 
-        account's power is increased by received VESTS
+        account''s power is increased by received VESTS
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_endpoints.vests_balance CASCADE;
@@ -35,9 +35,9 @@ CREATE TYPE btracker_endpoints.vests_balance AS (
       Lists current account delegated and received VESTs
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_delegations('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_delegations(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_delegations('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_delegations(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/delegations`

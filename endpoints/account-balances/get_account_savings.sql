@@ -16,7 +16,7 @@ btracker_endpoints.account_savings:
       type: integer
       description: >-
         number representing how many payouts are pending 
-        from user's saving balance
+        from user''s saving balance
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_endpoints.account_savings CASCADE;
@@ -37,9 +37,9 @@ CREATE TYPE btracker_endpoints.account_savings AS (
       Returns current hbd and hive savings
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_savings('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_savings('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_savings(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/savings`

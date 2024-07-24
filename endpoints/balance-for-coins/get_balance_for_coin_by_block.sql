@@ -10,9 +10,9 @@ SET ROLE btracker_owner;
       History of change of `coin-type` balance in given block range
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades`

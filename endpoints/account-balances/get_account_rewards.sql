@@ -49,9 +49,9 @@ CREATE TYPE btracker_endpoints.account_rewards AS (
       Returns current, not yet claimed rewards obtained by posting and commenting
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_rewards('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_rewards(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_rewards('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_rewards(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards`
