@@ -11,7 +11,7 @@ btracker_endpoints.account_info_rewards:
     posting_rewards:
       type: integer
       x-sql-datatype: BIGINT
-      description: curator's reward expressed in VEST
+      description: curator''s reward expressed in VEST
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_endpoints.account_info_rewards CASCADE;
@@ -31,9 +31,9 @@ CREATE TYPE btracker_endpoints.account_info_rewards AS (
       Returns the sum of the received posting and curation rewards of the account since its creation
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_info_rewards('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_info_rewards('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_info_rewards(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards/info`

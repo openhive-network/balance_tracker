@@ -48,9 +48,9 @@ CREATE TYPE btracker_endpoints.account_withdrawals AS (
       rate of a withdrawal 
 
       SQL example
-      * `SELECT * FROM btracker_endpoints.get_account_withdraws('blocktrades');`
+      * `SELECT * FROM btracker_endpoints.get_account_withdraws(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_withdraws('initminer');`
+      * `SELECT * FROM btracker_endpoints.get_account_withdraws(''initminer'');`
 
       REST call example
       * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/withdrawals`
