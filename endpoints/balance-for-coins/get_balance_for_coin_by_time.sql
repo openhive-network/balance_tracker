@@ -61,6 +61,7 @@ SET ROLE btracker_owner;
           application/json:
             schema:
               type: string
+              x-sql-datatype: JSONB
             example: ["blocktrade", "blocktrades"]
       '404':
         description: No such account in the database
@@ -73,7 +74,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_for_coin_by_time(
     "start-date" TIMESTAMP,
     "end-date" TIMESTAMP
 )
-RETURNS TEXT 
+RETURNS JSONB 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 AS
