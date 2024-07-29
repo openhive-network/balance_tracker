@@ -168,7 +168,8 @@ declare
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "x-sql-datatype": "JSONB"
                 },
                 "example": [
                   "blocktrade",
@@ -237,7 +238,8 @@ declare
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "x-sql-datatype": "JSONB"
                 },
                 "example": [
                   "blocktrade",
