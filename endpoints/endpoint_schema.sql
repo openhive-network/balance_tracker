@@ -19,8 +19,6 @@ tags:
     description: Historical informations about account balances (deprecated API)
   - name: Account-balances
     description: Backend APIs for HAF block explorer, returns informations about account balances
-  - name: Matching-accounts
-    description: Api searching for similarly named accounts
 servers:
   - url: /%1$s
  */
@@ -28,8 +26,10 @@ servers:
 DO $__$
 DECLARE 
   __schema_name VARCHAR;
+  __swagger_url TEXT;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
+  __swagger_url := current_setting('custom.swagger_url')::TEXT;
 
 CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
 
@@ -62,10 +62,6 @@ declare
     {
       "name": "Account-balances",
       "description": "Backend APIs for HAF block explorer, returns informations about account balances"
-    },
-    {
-      "name": "Matching-accounts",
-      "description": "Api searching for similarly named accounts"
     }
   ],
   "servers": [
@@ -74,53 +70,13 @@ declare
     }
   ],
   "paths": {
-    "/matching-accounts/{partial-account-name}": {
-      "get": {
-        "tags": [
-          "Matching-accounts"
-        ],
-        "summary": "Similar accounts",
-        "description": "Returns list of similarly named accounts \n\nSQL example\n* `SELECT * FROM btracker_endpoints.find_matching_accounts(''blocktrade'');`\n\n* `SELECT * FROM btracker_endpoints.find_matching_accounts(''initmi'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/matching-accounts/blocktrade`\n\n* `GET https://{btracker-host}/%1$s/matching-accounts/initmi`\n",
-        "operationId": "btracker_endpoints.find_matching_accounts",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "partial-account-name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Name of the account"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of accounts\n",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                },
-                "example": [
-                  "blocktrade",
-                  "blocktrades"
-                ]
-              }
-            }
-          },
-          "404": {
-            "description": "No such account in the database"
-          }
-        }
-      }
-    },
     "/balance-for-coins/{account-name}": {
       "get": {
         "tags": [
           "Balance-for-coins"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades`\n\n* `GET https://{btracker-host}/%1$s/balance-for-coins/initminer`\n",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_block(''initminer'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/balance-for-coins/blocktrades''`\n\n* `GET ''https://%2$s/%1$s/balance-for-coins/initminer''`\n",
         "operationId": "btracker_endpoints.get_balance_for_coin_by_block",
         "parameters": [
           {
@@ -190,7 +146,7 @@ declare
           "Balance-for-coins"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in time range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/balance-for-coins/blocktrades/by-time`\n\n* `GET https://{btracker-host}/%1$s/balance-for-coins/initminer/by-time`\n",
+        "description": "History of change of `coin-type` balance in time range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''initminer'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/balance-for-coins/blocktrades/by-time''`\n\n* `GET ''https://%2$s/%1$s/balance-for-coins/initminer/by-time''`\n",
         "operationId": "btracker_endpoints.get_balance_for_coin_by_time",
         "parameters": [
           {
@@ -260,7 +216,7 @@ declare
           "Account-balances"
         ],
         "summary": "Account balances",
-        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_balances(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer`\n",
+        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades''`\n",
         "operationId": "btracker_endpoints.get_account_balances",
         "parameters": [
           {
@@ -275,19 +231,19 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account balances\n\n* Returns `btracker_endpoints.account_balance`\n",
+            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.balances`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.account_balance"
+                  "$ref": "#/components/schemas/btracker_endpoints.balances"
                 },
                 "example": [
                   {
-                    "hbd_balance": 1000,
-                    "hive_balance": 1000,
-                    "vesting_shares": 1000,
-                    "vesting_balance_hive": 1000,
-                    "post_voting_power_vests": 1000
+                    "hbd_balance": 77246982,
+                    "hive_balance": 29594875,
+                    "vesting_shares": "8172549681941451",
+                    "vesting_balance_hive": 2720696229,
+                    "post_voting_power_vests": "8172549681941451"
                   }
                 ]
               }
@@ -305,7 +261,7 @@ declare
           "Account-balances"
         ],
         "summary": "Account delegations",
-        "description": "Lists current account delegated and received VESTs\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_delegations(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_delegations(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/delegations`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/delegations`\n",
+        "description": "Lists current account delegated and received VESTs\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades/delegations''`\n",
         "operationId": "btracker_endpoints.get_account_delegations",
         "parameters": [
           {
@@ -320,102 +276,16 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account delegations\n\n* Returns `btracker_endpoints.vests_balance`\n",
+            "description": "Account delegations\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.delegations`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.vests_balance"
+                  "$ref": "#/components/schemas/btracker_endpoints.delegations"
                 },
                 "example": [
                   {
-                    "delegated_vests": 1000,
-                    "received_vests": 1000
-                  }
-                ]
-              }
-            }
-          },
-          "404": {
-            "description": "No such account in the database"
-          }
-        }
-      }
-    },
-    "/account-balances/{account-name}/rewards/info": {
-      "get": {
-        "tags": [
-          "Account-balances"
-        ],
-        "summary": "Account posting and curation rewards",
-        "description": "Returns the sum of the received posting and curation rewards of the account since its creation\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards/info`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards/info`\n",
-        "operationId": "btracker_endpoints.get_account_info_rewards",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "account-name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Name of the account"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Account posting and curation rewards\n\n* Returns `btracker_endpoints.account_info_rewards`\n",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.account_info_rewards"
-                },
-                "example": [
-                  {
-                    "curation_rewards": 1000,
-                    "posting_rewards": 1000
-                  }
-                ]
-              }
-            }
-          },
-          "404": {
-            "description": "No such account in the database"
-          }
-        }
-      }
-    },
-    "/account-balances/{account-name}/rewards": {
-      "get": {
-        "tags": [
-          "Account-balances"
-        ],
-        "summary": "Account reward balances",
-        "description": "Returns current, not yet claimed rewards obtained by posting and commenting\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_rewards(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_rewards(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards`\n",
-        "operationId": "btracker_endpoints.get_account_rewards",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "account-name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Name of the account"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Account reward balance\n\n* Returns `btracker_endpoints.account_rewards`\n",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.account_rewards"
-                },
-                "example": [
-                  {
-                    "hbd_rewards": 1000,
-                    "hive_rewards": 1000,
-                    "vests_rewards": 1000,
-                    "hive_vesting_rewards": 1000
+                    "delegated_vests": "0",
+                    "received_vests": "0"
                   }
                 ]
               }
@@ -433,7 +303,7 @@ declare
           "Account-balances"
         ],
         "summary": "Account saving balances",
-        "description": "Returns current hbd and hive savings\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_savings(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/savings`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/savings`\n",
+        "description": "Returns current hbd and hive savings\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades/savings''`\n",
         "operationId": "btracker_endpoints.get_account_savings",
         "parameters": [
           {
@@ -448,17 +318,17 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account saving balance\n\n* Returns `btracker_endpoints.account_savings`\n",
+            "description": "Account saving balance\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.savings`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.account_savings"
+                  "$ref": "#/components/schemas/btracker_endpoints.savings"
                 },
                 "example": [
                   {
-                    "hbd_savings": 1000,
-                    "hive_savings": 1000,
-                    "savings_withdraw_requests": 1
+                    "hbd_savings": 0,
+                    "hive_savings": 0,
+                    "savings_withdraw_requests": 0
                   }
                 ]
               }
@@ -476,7 +346,7 @@ declare
           "Account-balances"
         ],
         "summary": "Account withdrawals",
-        "description": "Returns current vest withdrawals, amount withdrawn, amount left to withdraw and \nrate of a withdrawal \n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_withdraws(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_withdraws(''initminer'');`\n\nREST call example\n* `GET https://{btracker-host}/%1$s/account-balances/blocktrades/withdrawals`\n\n* `GET https://{btracker-host}/%1$s/account-balances/initminer/withdrawals`\n",
+        "description": "Returns current vest withdrawals, amount withdrawn, amount left to withdraw and \nrate of a withdrawal \n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_withdraws(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades/withdrawals''`\n",
         "operationId": "btracker_endpoints.get_account_withdraws",
         "parameters": [
           {
@@ -491,19 +361,105 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account withdrawals\n\n* Returns `btracker_endpoints.account_withdrawals`\n",
+            "description": "Account withdrawals\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.withdrawals`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.account_withdrawals"
+                  "$ref": "#/components/schemas/btracker_endpoints.withdrawals"
                 },
                 "example": [
                   {
-                    "vesting_withdraw_rate": 1000,
-                    "to_withdraw": 1000,
-                    "withdrawn": 1000,
-                    "withdraw_routes": 1,
-                    "delayed_vests": 1000
+                    "vesting_withdraw_rate": "80404818220529",
+                    "to_withdraw": "8362101094935031",
+                    "withdrawn": "804048182205290",
+                    "withdraw_routes": 4,
+                    "delayed_vests": "0"
+                  }
+                ]
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/account-balances/{account-name}/rewards": {
+      "get": {
+        "tags": [
+          "Account-balances"
+        ],
+        "summary": "Account reward balances",
+        "description": "Returns current, not yet claimed rewards obtained by posting and commenting\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_rewards(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades/rewards''`\n",
+        "operationId": "btracker_endpoints.get_account_rewards",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account reward balance\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.rewards`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_endpoints.rewards"
+                },
+                "example": [
+                  {
+                    "hbd_rewards": 0,
+                    "hive_rewards": 0,
+                    "vests_rewards": "0",
+                    "hive_vesting_rewards": 0
+                  }
+                ]
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/account-balances/{account-name}/rewards/info": {
+      "get": {
+        "tags": [
+          "Account-balances"
+        ],
+        "summary": "Account posting and curation rewards",
+        "description": "Returns the sum of the received posting and curation rewards of the account since its creation\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`\n\nREST call example\n* `GET ''https://%2$s/%1$s/account-balances/blocktrades/rewards/info''`\n",
+        "operationId": "btracker_endpoints.get_account_info_rewards",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account posting and curation rewards\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.info_rewards`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_endpoints.info_rewards"
+                },
+                "example": [
+                  {
+                    "curation_rewards": "196115157",
+                    "posting_rewards": "65916519"
                   }
                 ]
               }
@@ -518,7 +474,7 @@ declare
   },
   "components": {
     "schemas": {
-      "btracker_endpoints.account_balance": {
+      "btracker_endpoints.balances": {
         "type": "object",
         "properties": {
           "hbd_balance": {
@@ -532,8 +488,7 @@ declare
             "description": "account''s HIVE balance"
           },
           "vesting_shares": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "account''s VEST balance"
           },
           "vesting_balance_hive": {
@@ -542,78 +497,35 @@ declare
             "description": "the VEST balance, presented in HIVE,  is calculated based on the current HIVE price"
           },
           "post_voting_power_vests": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "account''s VEST balance - delegated VESTs + reveived VESTs, presented in HIVE,calculated based on the current HIVE price"
           }
         }
       },
-      "btracker_endpoints.vests_balance": {
+      "btracker_endpoints.delegations": {
         "type": "object",
         "properties": {
           "delegated_vests": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "VESTS delegated to another user,  account''s power is lowered by delegated VESTS"
           },
           "received_vests": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "VESTS received from another user,  account''s power is increased by received VESTS"
           }
         }
       },
-      "btracker_endpoints.account_info_rewards": {
-        "type": "object",
-        "properties": {
-          "curation_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
-            "description": "rewards obtained by posting and commenting expressed in VEST"
-          },
-          "posting_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
-            "description": "curator''s reward expressed in VEST"
-          }
-        }
-      },
-      "btracker_endpoints.account_rewards": {
-        "type": "object",
-        "properties": {
-          "hbd_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "numeric",
-            "description": "not yet claimed HIVE backed dollars  stored in hbd reward balance"
-          },
-          "hive_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "numeric",
-            "description": "not yet claimed HIVE  stored in hive reward balance"
-          },
-          "vests_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "numeric",
-            "description": "not yet claimed VESTS  stored in vest reward balance"
-          },
-          "hive_vesting_rewards": {
-            "type": "integer",
-            "x-sql-datatype": "numeric",
-            "description": "the reward vesting balance, denominated in HIVE,  is determined by the prevailing HIVE price at the time of reward reception"
-          }
-        }
-      },
-      "btracker_endpoints.account_savings": {
+      "btracker_endpoints.savings": {
         "type": "object",
         "properties": {
           "hbd_savings": {
             "type": "integer",
-            "x-sql-datatype": "numeric",
+            "x-sql-datatype": "BIGINT",
             "description": "saving balance of HIVE backed dollars"
           },
           "hive_savings": {
             "type": "integer",
-            "x-sql-datatype": "numeric",
+            "x-sql-datatype": "BIGINT",
             "description": "HIVE saving balance"
           },
           "savings_withdraw_requests": {
@@ -622,22 +534,19 @@ declare
           }
         }
       },
-      "btracker_endpoints.account_withdrawals": {
+      "btracker_endpoints.withdrawals": {
         "type": "object",
         "properties": {
           "vesting_withdraw_rate": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "received until the withdrawal is complete,  with each installment amounting to 1/13 of the withdrawn total"
           },
           "to_withdraw": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "the remaining total VESTS needed to complete withdrawals"
           },
           "withdrawn": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "the total VESTS already withdrawn from active withdrawals"
           },
           "withdraw_routes": {
@@ -645,9 +554,45 @@ declare
             "description": "list of account receiving the part of a withdrawal"
           },
           "delayed_vests": {
+            "type": "string",
+            "description": "blocked VESTS by a withdrawal"
+          }
+        }
+      },
+      "btracker_endpoints.rewards": {
+        "type": "object",
+        "properties": {
+          "hbd_rewards": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "blocked VESTS by a withdrawal"
+            "description": "not yet claimed HIVE backed dollars  stored in hbd reward balance"
+          },
+          "hive_rewards": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "not yet claimed HIVE  stored in hive reward balance"
+          },
+          "vests_rewards": {
+            "type": "string",
+            "description": "not yet claimed VESTS  stored in vest reward balance"
+          },
+          "hive_vesting_rewards": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "the reward vesting balance, denominated in HIVE,  is determined by the prevailing HIVE price at the time of reward reception"
+          }
+        }
+      },
+      "btracker_endpoints.info_rewards": {
+        "type": "object",
+        "properties": {
+          "curation_rewards": {
+            "type": "string",
+            "description": "rewards obtained by posting and commenting expressed in VEST"
+          },
+          "posting_rewards": {
+            "type": "string",
+            "description": "curator''s reward expressed in VEST"
           }
         }
       }
@@ -660,7 +605,7 @@ begin
   return openapi;
 end
 $_$ language plpgsql;'
-,__schema_name);
+,__schema_name, __swagger_url);
 
 END
 $__$;

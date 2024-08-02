@@ -1,23 +1,21 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_endpoints.account_info_rewards:
+btracker_endpoints.info_rewards:
   type: object
   properties:
     curation_rewards:
-      type: integer
-      x-sql-datatype: BIGINT
+      type: string
       description: rewards obtained by posting and commenting expressed in VEST
     posting_rewards:
-      type: integer
-      x-sql-datatype: BIGINT
+      type: string
       description: curator''s reward expressed in VEST
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_endpoints.account_info_rewards CASCADE;
-CREATE TYPE btracker_endpoints.account_info_rewards AS (
-    "curation_rewards" BIGINT,
-    "posting_rewards" BIGINT
+DROP TYPE IF EXISTS btracker_endpoints.info_rewards CASCADE;
+CREATE TYPE btracker_endpoints.info_rewards AS (
+    "curation_rewards" TEXT,
+    "posting_rewards" TEXT
 );
 -- openapi-generated-code-end
 
@@ -33,12 +31,8 @@ CREATE TYPE btracker_endpoints.account_info_rewards AS (
       SQL example
       * `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_info_rewards(''initminer'');`
-
       REST call example
-      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/rewards/info`
-      
-      * `GET https://{btracker-host}/%1$s/account-balances/initminer/rewards/info`
+      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/rewards/info''`
     operationId: btracker_endpoints.get_account_info_rewards
     parameters:
       - in: path
@@ -51,15 +45,16 @@ CREATE TYPE btracker_endpoints.account_info_rewards AS (
       '200':
         description: |
           Account posting and curation rewards
+          (VEST balances are represented as string due to json limitations)
 
-          * Returns `btracker_endpoints.account_info_rewards`
+          * Returns `btracker_endpoints.info_rewards`
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_endpoints.account_info_rewards'
+              $ref: '#/components/schemas/btracker_endpoints.info_rewards'
             example:
-              - curation_rewards: 1000
-                posting_rewards: 1000
+              - curation_rewards: "196115157"
+                posting_rewards: "65916519"
       '404':
         description: No such account in the database
  */
@@ -68,29 +63,32 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_info_rewards;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_info_rewards(
     "account-name" TEXT
 )
-RETURNS btracker_endpoints.account_info_rewards 
+RETURNS btracker_endpoints.info_rewards 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
-DECLARE
-  _result btracker_endpoints.account_info_rewards;
-  _account INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
+  PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+  RETURN (
+    WITH get_account_id AS MATERIALIZED
+    (
+      SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name"
+    )
+    SELECT 
+      (COALESCE(air.curation_rewards::TEXT, '0'),
+      COALESCE(air.posting_rewards::TEXT, '0'))::btracker_endpoints.info_rewards 
+    FROM (
+      SELECT 
+        NULL::TEXT AS curation_rewards,
+        NULL::TEXT AS posting_rewards
+    ) default_values
+    LEFT JOIN get_account_id gai ON true
+    LEFT JOIN account_info_rewards air ON air.account = gai.id
+  );
 
-SELECT cv.curation_rewards, cv.posting_rewards
-INTO _result
-FROM account_info_rewards cv
-WHERE cv.account = _account;
-
-IF NOT FOUND THEN 
-  _result = (0::BIGINT, 0::BIGINT);
-END IF;
-
-RETURN _result;
 END
 $$;
 

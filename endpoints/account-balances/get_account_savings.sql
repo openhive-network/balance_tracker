@@ -1,16 +1,16 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_endpoints.account_savings:
+btracker_endpoints.savings:
   type: object
   properties:
     hbd_savings:
       type: integer
-      x-sql-datatype: numeric
+      x-sql-datatype: BIGINT
       description: saving balance of HIVE backed dollars
     hive_savings:
       type: integer
-      x-sql-datatype: numeric
+      x-sql-datatype: BIGINT
       description: HIVE saving balance
     savings_withdraw_requests:
       type: integer
@@ -19,10 +19,10 @@ btracker_endpoints.account_savings:
         from user''s saving balance
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_endpoints.account_savings CASCADE;
-CREATE TYPE btracker_endpoints.account_savings AS (
-    "hbd_savings" numeric,
-    "hive_savings" numeric,
+DROP TYPE IF EXISTS btracker_endpoints.savings CASCADE;
+CREATE TYPE btracker_endpoints.savings AS (
+    "hbd_savings" BIGINT,
+    "hive_savings" BIGINT,
     "savings_withdraw_requests" INT
 );
 -- openapi-generated-code-end
@@ -39,12 +39,8 @@ CREATE TYPE btracker_endpoints.account_savings AS (
       SQL example
       * `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_savings(''initminer'');`
-
       REST call example
-      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades/savings`
-      
-      * `GET https://{btracker-host}/%1$s/account-balances/initminer/savings`
+      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/savings''`
     operationId: btracker_endpoints.get_account_savings
     parameters:
       - in: path
@@ -57,16 +53,17 @@ CREATE TYPE btracker_endpoints.account_savings AS (
       '200':
         description: |
           Account saving balance
+          (VEST balances are represented as string due to json limitations)
 
-          * Returns `btracker_endpoints.account_savings`
+          * Returns `btracker_endpoints.savings`
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_endpoints.account_savings'
+              $ref: '#/components/schemas/btracker_endpoints.savings'
             example:
-              - hbd_savings: 1000
-                hive_savings: 1000
-                savings_withdraw_requests: 1
+              - hbd_savings: 0
+                hive_savings: 0
+                savings_withdraw_requests: 0
       '404':
         description: No such account in the database
  */
@@ -75,31 +72,42 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_savings;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_savings(
     "account-name" TEXT
 )
-RETURNS btracker_endpoints.account_savings 
+RETURNS btracker_endpoints.savings 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
-DECLARE
-  __result btracker_endpoints.account_savings;
-  _account INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
+  PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-
-SELECT  
-  MAX(CASE WHEN nai = 13 THEN saving_balance END) AS hbd,
-  MAX(CASE WHEN nai = 21 THEN saving_balance END) AS hive
-INTO __result.hbd_savings, __result.hive_savings
-FROM account_savings WHERE account= _account;
-
-SELECT SUM (savings_withdraw_requests) AS total
-INTO __result.savings_withdraw_requests
-FROM account_savings
-WHERE account= _account;
-
-RETURN __result;
+  RETURN (
+    WITH get_account_id AS MATERIALIZED
+    (
+      SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name" 
+    ),
+    get_balances AS MATERIALIZED
+    (
+      SELECT  
+        MAX(CASE WHEN ats.nai = 13 THEN ats.saving_balance END) AS hbd_savings,
+        MAX(CASE WHEN ats.nai = 21 THEN ats.saving_balance END) AS hive_savings
+      FROM account_savings ats
+      WHERE ats.account= (SELECT id FROM get_account_id)
+    ),
+    get_withdraw_requests AS
+    (
+      SELECT SUM(ats.savings_withdraw_requests) AS total
+      FROM account_savings ats
+      WHERE ats.account= (SELECT id FROM get_account_id)
+    )
+    SELECT (
+      COALESCE(gb.hbd_savings,0),
+      COALESCE(gb.hive_savings ,0),
+      COALESCE(gwr.total ,0))::btracker_endpoints.savings
+    FROM 
+      get_balances gb,
+      get_withdraw_requests gwr
+  );
 END
 $$;
 
