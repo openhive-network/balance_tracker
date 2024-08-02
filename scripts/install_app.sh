@@ -12,6 +12,7 @@ OPTIONS:
     --postgres-port=PORT                  PostgreSQL port (default: 5432)
     --postgres-user=USERNAME              PostgreSQL user name (default: haf_admin)
     --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
+    --swagger-url=URL                     Allows to specify a server URL
     --no-context=true|false               When set to true, do not create context (default: false)
     --no-context                          The same as '--no-context=true'
     --help,-h,-?                          Displays this help message
@@ -23,6 +24,8 @@ POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
 BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
+SWAGGER_URL=${SWAGGER_URL:-"{btracker-host}"}
+
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -37,6 +40,9 @@ while [ $# -gt 0 ]; do
         ;;
     --postgres-url=*)
         POSTGRES_URL="${1#*=}"
+        ;;
+    --swagger-url=*)
+        SWAGGER_URL="${1#*=}"
         ;;
     --schema=*)
         BTRACKER_SCHEMA="${1#*=}"
@@ -71,8 +77,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_savings.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_rewards.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_withdraws.sql"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/endpoint_schema.sql"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/matching-accounts/find_matching_accounts.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.swagger_url = '$SWAGGER_URL'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/endpoint_schema.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/balance-for-coins/get_balance_for_coin_by_block.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/balance-for-coins/get_balance_for_coin_by_time.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_account_balances.sql"

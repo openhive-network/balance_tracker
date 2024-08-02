@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_endpoints.account_balance:
+btracker_endpoints.balances:
   type: object
   properties:
     hbd_balance:
@@ -13,8 +13,7 @@ btracker_endpoints.account_balance:
       x-sql-datatype: BIGINT
       description: account''s HIVE balance
     vesting_shares:
-      type: integer
-      x-sql-datatype: BIGINT
+      type: string
       description: account''s VEST balance
     vesting_balance_hive:
       type: integer
@@ -23,20 +22,19 @@ btracker_endpoints.account_balance:
         the VEST balance, presented in HIVE, 
         is calculated based on the current HIVE price
     post_voting_power_vests:
-      type: integer
-      x-sql-datatype: BIGINT
+      type: string
       description: >-
         account''s VEST balance - delegated VESTs + reveived VESTs,
         presented in HIVE,calculated based on the current HIVE price
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_endpoints.account_balance CASCADE;
-CREATE TYPE btracker_endpoints.account_balance AS (
+DROP TYPE IF EXISTS btracker_endpoints.balances CASCADE;
+CREATE TYPE btracker_endpoints.balances AS (
     "hbd_balance" BIGINT,
     "hive_balance" BIGINT,
-    "vesting_shares" BIGINT,
+    "vesting_shares" TEXT,
     "vesting_balance_hive" BIGINT,
-    "post_voting_power_vests" BIGINT
+    "post_voting_power_vests" TEXT
 );
 -- openapi-generated-code-end
 
@@ -52,12 +50,8 @@ CREATE TYPE btracker_endpoints.account_balance AS (
       SQL example
       * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`
 
-      * `SELECT * FROM btracker_endpoints.get_account_balances(''initminer'');`
-
       REST call example
-      * `GET https://{btracker-host}/%1$s/account-balances/blocktrades`
-      
-      * `GET https://{btracker-host}/%1$s/account-balances/initminer`
+      * `GET ''https://%2$s/%1$s/account-balances/blocktrades''`
     operationId: btracker_endpoints.get_account_balances
     parameters:
       - in: path
@@ -69,19 +63,20 @@ CREATE TYPE btracker_endpoints.account_balance AS (
     responses:
       '200':
         description: |
-          Account balances
+          Account balances 
+          (VEST balances are represented as string due to json limitations)
 
-          * Returns `btracker_endpoints.account_balance`
+          * Returns `btracker_endpoints.balances`
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_endpoints.account_balance'
+              $ref: '#/components/schemas/btracker_endpoints.balances'
             example:
-              - hbd_balance: 1000
-                hive_balance: 1000
-                vesting_shares: 1000
-                vesting_balance_hive: 1000
-                post_voting_power_vests: 1000
+              - hbd_balance: 77246982
+                hive_balance: 29594875
+                vesting_shares: "8172549681941451"
+                vesting_balance_hive: 2720696229
+                post_voting_power_vests: "8172549681941451"
       '404':
         description: No such account in the database
  */
@@ -90,35 +85,55 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_balances;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(
     "account-name" TEXT
 )
-RETURNS btracker_endpoints.account_balance 
+RETURNS btracker_endpoints.balances 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
-DECLARE
-  __result btracker_endpoints.account_balance;
-  _account INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
+  PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-
-SELECT  
-  MAX(CASE WHEN nai = 13 THEN balance END) AS hbd,
-  MAX(CASE WHEN nai = 21 THEN balance END) AS hive, 
-  MAX(CASE WHEN nai = 37 THEN balance END) AS vest 
-INTO __result
-FROM current_account_balances WHERE account= _account;
-
-SELECT hive.get_vesting_balance((SELECT num FROM hive.blocks_view ORDER BY num DESC LIMIT 1), __result.vesting_shares) 
-INTO __result.vesting_balance_hive;
-
-SELECT (__result.vesting_shares - delegated_vests + received_vests) 
-INTO __result.post_voting_power_vests
-FROM btracker_endpoints.get_account_delegations("account-name");
-
-RETURN __result;
-
+  RETURN (
+    WITH get_account_id AS MATERIALIZED
+    (
+      SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name" 
+    ),
+    get_balances AS MATERIALIZED
+    (
+      SELECT  
+        MAX(CASE WHEN cab.nai = 13 THEN cab.balance END) AS hbd_balance,
+        MAX(CASE WHEN cab.nai = 21 THEN cab.balance END) AS hive_balance, 
+        MAX(CASE WHEN cab.nai = 37 THEN cab.balance END) AS vesting_shares 
+      FROM current_account_balances cab
+      WHERE cab.account= (SELECT id FROM get_account_id)
+    ),
+    get_vest_balance AS
+    (
+      SELECT hive.get_vesting_balance(bv.num, gb.vesting_shares) AS vesting_balance_hive
+      FROM get_balances gb
+      JOIN LATERAL (
+        SELECT num FROM hive.blocks_view ORDER BY num DESC LIMIT 1
+      ) bv ON TRUE
+    ),
+    get_post_voting_power AS
+    (
+      SELECT (
+        COALESCE(gb.vesting_shares, 0) - gad.delegated_vests::BIGINT + gad.received_vests::BIGINT
+      ) AS post_voting_power_vests
+      FROM get_balances gb, btracker_endpoints.get_account_delegations("account-name") gad
+    )
+    SELECT (
+      COALESCE(gb.hbd_balance,0),
+      COALESCE(gb.hive_balance ,0),
+      COALESCE(gb.vesting_shares::TEXT ,'0'),
+      COALESCE(gvb.vesting_balance_hive ,0),
+      COALESCE(gpvp.post_voting_power_vests::TEXT ,'0'))::btracker_endpoints.balances
+    FROM 
+      get_balances gb,
+      get_vest_balance gvb,
+      get_post_voting_power gpvp
+  );
 END
 $$;
 
