@@ -13,6 +13,7 @@ shellcheck-*.*
 **/test-results.jtl
 **/local.env
 **/ci.env
+endpoints_openapi
 
 # Docker deployment
 docker/blockchain/block_log*
