@@ -40,7 +40,7 @@ CREATE TYPE btracker_endpoints.savings AS (
       * `SELECT * FROM btracker_endpoints.get_account_savings(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/savings''`
+      * `GET ''https://%1$s/balance-api/account-balances/blocktrades/savings''`
     operationId: btracker_endpoints.get_account_savings
     parameters:
       - in: path

@@ -32,7 +32,7 @@ CREATE TYPE btracker_endpoints.info_rewards AS (
       * `SELECT * FROM btracker_endpoints.get_account_info_rewards(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/rewards/info''`
+      * `GET ''https://%1$s/balance-api/account-balances/blocktrades/rewards/info''`
     operationId: btracker_endpoints.get_account_info_rewards
     parameters:
       - in: path

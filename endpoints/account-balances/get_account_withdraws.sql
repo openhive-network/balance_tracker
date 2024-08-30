@@ -47,7 +47,7 @@ CREATE TYPE btracker_endpoints.withdrawals AS (
       * `SELECT * FROM btracker_endpoints.get_account_withdraws(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/withdrawals''`
+      * `GET ''https://%1$s/balance-api/account-balances/blocktrades/withdrawals''`
     operationId: btracker_endpoints.get_account_withdraws
     parameters:
       - in: path
