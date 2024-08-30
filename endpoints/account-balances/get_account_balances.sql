@@ -51,7 +51,7 @@ CREATE TYPE btracker_endpoints.balances AS (
       * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/account-balances/blocktrades''`
+      * `GET ''https://%1$s/balance-api/account-balances/blocktrades''`
     operationId: btracker_endpoints.get_account_balances
     parameters:
       - in: path

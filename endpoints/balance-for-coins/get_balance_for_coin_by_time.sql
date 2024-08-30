@@ -15,9 +15,9 @@ SET ROLE btracker_owner;
       * `SELECT * FROM btracker_endpoints.get_balance_for_coin_by_time(''initminer'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/balance-for-coins/blocktrades/by-time''`
+      * `GET ''https://%1$s/balance-api/balance-for-coins/blocktrades/by-time''`
       
-      * `GET ''https://%2$s/%1$s/balance-for-coins/initminer/by-time''`
+      * `GET ''https://%1$s/balance-api/balance-for-coins/initminer/by-time''`
     operationId: btracker_endpoints.get_balance_for_coin_by_time
     parameters:
       - in: path

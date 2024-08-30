@@ -36,7 +36,7 @@ CREATE TYPE btracker_endpoints.delegations AS (
       * `SELECT * FROM btracker_endpoints.get_account_delegations(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%2$s/%1$s/account-balances/blocktrades/delegations''`
+      * `GET ''https://%1$s/balance-api/account-balances/blocktrades/delegations''`
     operationId: btracker_endpoints.get_account_delegations
     parameters:
       - in: path
