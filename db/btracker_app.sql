@@ -224,7 +224,7 @@ BEGIN
   RETURN EXISTS(
       SELECT true FROM pg_index WHERE indexrelid = 
       (
-        SELECT oid FROM pg_class WHERE relname = 'idx_btracker_app_account_balance_history_nai'
+        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_history_account_source_op_idx'
       )
     );
 END
@@ -380,8 +380,7 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  CREATE INDEX IF NOT EXISTS idx_btracker_app_account_balance_history_nai ON account_balance_history(nai);
-  CREATE INDEX IF NOT EXISTS idx_btracker_app_account_balance_history_account_nai ON account_balance_history(account, nai);
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,source_op DESC);
 END
 $$;
 
