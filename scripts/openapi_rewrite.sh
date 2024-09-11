@@ -15,14 +15,10 @@ temp_output_file=$(mktemp)
 OUTPUT="$SCRIPTDIR/output"
 ENDPOINTS_IN_ORDER="
 ../$endpoints/endpoint_schema.sql
-../$endpoints/balance-for-coins/get_balance_for_coin_by_block.sql
-../$endpoints/balance-for-coins/get_balance_for_coin_by_time.sql
+../$endpoints/types/coin_type.sql
+../$endpoints/types/sort_direction.sql
 ../$endpoints/account-balances/get_account_balances.sql
-../$endpoints/account-balances/get_account_delegations.sql
-../$endpoints/account-balances/get_account_savings.sql
-../$endpoints/account-balances/get_account_withdraws.sql
-../$endpoints/account-balances/get_account_rewards.sql
-../$endpoints/account-balances/get_account_info_rewards.sql"
+../$endpoints/account-balances/get_balance_history.sql"
 
 # Function to reverse the lines
 reverse_lines() {
