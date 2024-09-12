@@ -248,7 +248,7 @@ declare
           "Accounts"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?page-size=2''`\n",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VEST&page-size=2''`\n",
         "operationId": "btracker_endpoints.get_balance_history",
         "parameters": [
           {
@@ -263,7 +263,7 @@ declare
           {
             "in": "query",
             "name": "coin-type",
-            "required": false,
+            "required": true,
             "schema": {
               "$ref": "#/components/schemas/btracker_endpoints.nai_type"
             },
@@ -354,8 +354,30 @@ declare
                   "x-sql-datatype": "JSON"
                 },
                 "example": [
-                  "blocktrade",
-                  "blocktrades"
+                  {
+                    "total_operations": 188291,
+                    "total_pages": 94146,
+                    "operations_result": [
+                      {
+                        "block_num": 4999992,
+                        "operation_id": "21474802120262208",
+                        "op_type_id": 64,
+                        "balance": "8172549681941451",
+                        "prev_balance": "8172546678091286",
+                        "balance_change": "3003850165",
+                        "timestamp": "2016-09-15T19:46:57"
+                      },
+                      {
+                        "block_num": 4999959,
+                        "operation_id": "21474660386343488",
+                        "op_type_id": 64,
+                        "balance": "8172546678091286",
+                        "prev_balance": "8172543674223181",
+                        "balance_change": "3003868105",
+                        "timestamp": "2016-09-15T19:45:12"
+                      }
+                    ]
+                  }
                 ]
               }
             }
