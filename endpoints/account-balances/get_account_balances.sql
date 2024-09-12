@@ -201,6 +201,19 @@ BEGIN
     (
       SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name" 
     ),
+    get_delegations AS
+    (
+      SELECT 
+        COALESCE(ad.delegated_vests::TEXT, '0') AS delegated_vests,
+        COALESCE(ad.received_vests::TEXT, '0') AS received_vests
+      FROM (
+        SELECT 
+          NULL::TEXT AS delegated_vests,
+          NULL::TEXT AS received_vests
+      ) default_values
+      LEFT JOIN get_account_id gai ON true
+      LEFT JOIN account_delegations ad ON ad.account = gai.id
+    ),
     get_balances AS MATERIALIZED
     (
       SELECT  
@@ -223,20 +236,7 @@ BEGIN
       SELECT (
         COALESCE(gb.vesting_shares, 0) - gad.delegated_vests::BIGINT + gad.received_vests::BIGINT
       ) AS post_voting_power_vests
-      FROM get_balances gb, btracker_endpoints.get_account_delegations("account-name") gad
-    ),
-    get_delegations AS
-    (
-      SELECT 
-        COALESCE(ad.delegated_vests::TEXT, '0') AS delegated_vests,
-        COALESCE(ad.received_vests::TEXT, '0') AS received_vests
-      FROM (
-        SELECT 
-          NULL::TEXT AS delegated_vests,
-          NULL::TEXT AS received_vests
-      ) default_values
-      LEFT JOIN get_account_id gai ON true
-      LEFT JOIN account_delegations ad ON ad.account = gai.id
+      FROM get_balances gb, get_delegations gad
     ),
     get_info_rewards AS
     (
