@@ -24,7 +24,7 @@ CREATE TYPE btracker_endpoints.balance_history AS (
       * `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`
 
       REST call example
-      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?page-size=2''`
+      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VEST&page-size=2''`
     operationId: btracker_endpoints.get_balance_history
     parameters:
       - in: path
@@ -35,7 +35,7 @@ CREATE TYPE btracker_endpoints.balance_history AS (
         description: Name of the account
       - in: query
         name: coin-type
-        required: false
+        required: true
         schema:
           $ref: '#/components/schemas/btracker_endpoints.nai_type'
         description: |
@@ -114,7 +114,32 @@ CREATE TYPE btracker_endpoints.balance_history AS (
             schema:
               type: string
               x-sql-datatype: JSON
-            example: ["blocktrade", "blocktrades"]
+            example: 
+              - {
+                  "total_operations": 188291,
+                  "total_pages": 94146,
+                  "operations_result": [
+                    {
+                      "block_num": 4999992,
+                      "operation_id": "21474802120262208",
+                      "op_type_id": 64,
+                      "balance": "8172549681941451",
+                      "prev_balance": "8172546678091286",
+                      "balance_change": "3003850165",
+                      "timestamp": "2016-09-15T19:46:57"
+                    },
+                    {
+                      "block_num": 4999959,
+                      "operation_id": "21474660386343488",
+                      "op_type_id": 64,
+                      "balance": "8172546678091286",
+                      "prev_balance": "8172543674223181",
+                      "balance_change": "3003868105",
+                      "timestamp": "2016-09-15T19:45:12"
+                    }
+                  ]
+                }
+            
       '404':
         description: No such account in the database
  */
@@ -189,13 +214,15 @@ BEGIN
 
   _coin_type := (CASE WHEN "coin-type" = 'HBD' THEN 13 WHEN "coin-type" = 'HIVE' THEN 21 ELSE 37 END);
 
+  --count for given parameters 
   SELECT COUNT(*) INTO _ops_count
-  FROM hafbe_bal.account_balance_history 
+  FROM account_balance_history 
   WHERE 
     account = _account_id AND nai = _coin_type AND
     (_to_block_filter OR source_op < _to_op) AND
     (_from_block_filter OR source_op >= _from_op);
 
+  --amount of pages
   SELECT 
     (
       CASE WHEN (_ops_count % "page-size") = 0 THEN 
@@ -212,13 +239,14 @@ BEGIN
         SELECT to_json(array_agg(row)) FROM (
           WITH ranked_rows AS
           (
+          ---------paging----------
             SELECT 
               source_op_block,
               source_op, 
               ROW_NUMBER() OVER ( ORDER BY
                 (CASE WHEN _is_desc_direction THEN source_op ELSE NULL END) DESC,
                 (CASE WHEN NOT _is_desc_direction THEN source_op ELSE NULL END) ASC) as row_num
-            FROM hafbe_bal.account_balance_history
+            FROM account_balance_history
             WHERE 
               account = _account_id AND nai = _coin_type AND
               (_to_block_filter OR source_op < _to_op) AND
@@ -231,6 +259,8 @@ BEGIN
             FROM ranked_rows
             WHERE row_num = _offset
           ),
+          --------------------------
+          --history with extra row--
           gather_page AS MATERIALIZED
           (
             SELECT 
@@ -243,7 +273,7 @@ BEGIN
                 (CASE WHEN _is_desc_direction THEN ab.source_op ELSE NULL END) DESC,
                 (CASE WHEN NOT _is_desc_direction THEN ab.source_op ELSE NULL END) ASC) as row_num
             FROM
-              hafbe_bal.account_balance_history ab, filter_params fp
+              account_balance_history ab, filter_params fp
             WHERE 
               ab.account = _account_id AND 
               ab.nai = _coin_type AND
@@ -253,6 +283,8 @@ BEGIN
               (_from_block_filter OR ab.source_op >= _from_op)
             LIMIT "page-size" + 1
           ),
+          --------------------------
+          --calculate prev balance--
           join_prev_balance AS MATERIALIZED
           (
             SELECT 
@@ -275,7 +307,7 @@ BEGIN
                 (
                   CASE WHEN jpb.prev_balance IS NULL THEN
                     (
-                      SELECT abh.balance FROM hafbe_bal.account_balance_history abh
+                      SELECT abh.balance FROM account_balance_history abh
                       WHERE 
                         abh.source_op < jpb.source_op AND
                         abh.account = _account_id AND 
@@ -290,6 +322,7 @@ BEGIN
               ) AS prev_balance
             FROM join_prev_balance jpb
           )
+          --------------------------
           SELECT 
             (ab.source_op_block,
             ab.source_op::TEXT,
