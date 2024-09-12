@@ -14,6 +14,7 @@ shellcheck-*.*
 **/local.env
 **/ci.env
 endpoints_openapi
+build
 
 # Docker deployment
 docker/blockchain/block_log*
