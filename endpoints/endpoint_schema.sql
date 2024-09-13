@@ -181,13 +181,13 @@ declare
     }
   },
   "paths": {
-    "/accounts/{account-name}/balance": {
+    "/accounts/{account-name}/balances": {
       "get": {
         "tags": [
           "Accounts"
         ],
         "summary": "Account balances",
-        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance''`\n",
+        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balances''`\n",
         "operationId": "btracker_endpoints.get_account_balances",
         "parameters": [
           {
