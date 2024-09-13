@@ -275,6 +275,11 @@ run_tests() {
   test_loop_count=${TEST_LOOP_COUNT:-60}
   backend_port=${BACKEND_PORT:-3000}
   backend_host=${BACKEND_HOST:-localhost}
+  postgres_user=${POSTGRES_USER:-"btracker_owner"}
+  postgres_host=${POSTGRES_HOST:-"localhost"}
+  postgres_port=${POSTGRES_PORT:-5432}
+  postgres_url=${POSTGRES_URL:-""}
+  btracker_schema=${BTRACKER_SCHEMA:-"btracker_app"}
 
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -289,6 +294,21 @@ run_tests() {
         ;;
       --test-loop-count=*)
         test_loop_count="${1#*=}"
+        ;;
+      --postgres-host=*)
+        postgres_host="${1#*=}"
+        ;;
+      --postgres-port=*)
+        postgres_port="${1#*=}"
+        ;;
+      --postgres-user=*)
+        postgres_user="${1#*=}"
+        ;;
+      --postgres-url=*)
+        postgres_url="${1#*=}"
+        ;;
+      --schema=*)
+        btracker_schema="${1#*=}"
         ;;
       --backend-port=*)
         backend_port="${1#*=}"
@@ -309,6 +329,10 @@ run_tests() {
     esac
     shift
   done
+
+  postgres_access=${postgres_url:-"postgresql://$postgres_user@$postgres_host:$postgres_port/haf_block_log"}
+
+  psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "SELECT ${btracker_schema}.create_btracker_indexes();"
 
   test_summary_report_path="${test_result_path%jtl}xml"
 
