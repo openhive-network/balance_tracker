@@ -124,7 +124,7 @@ CREATE TYPE btracker_endpoints.balances AS (
 -- openapi-generated-code-end
 
 /** openapi:paths
-/accounts/{account-name}/balance:
+/accounts/{account-name}/balances:
   get:
     tags:
       - Accounts
@@ -136,7 +136,7 @@ CREATE TYPE btracker_endpoints.balances AS (
       * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`
 
       REST call example
-      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balance''`
+      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balances''`
     operationId: btracker_endpoints.get_account_balances
     parameters:
       - in: path
