@@ -23,7 +23,6 @@ BEGIN
     _name =>__schema_name,
     _schema => __schema_name,
     _is_forking => TRUE,
-    _is_attached => FALSE,
     _stages => synchronization_stages
   );
 
