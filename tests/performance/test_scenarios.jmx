@@ -216,20 +216,20 @@
                 <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="start-date" elementType="HTTPArgument">
+              <elementProp name="from-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2016-03-24 16:05:00</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">start-date</stringProp>
+                <stringProp name="Argument.name">from-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="end-date" elementType="HTTPArgument">
+              <elementProp name="to-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2021-12-31 10:59:54</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">end-date</stringProp>
+                <stringProp name="Argument.name">to-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
             </collectionProp>
@@ -268,20 +268,20 @@
                 <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="start-date" elementType="HTTPArgument">
+              <elementProp name="from-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2016-03-24 16:05:00</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">start-date</stringProp>
+                <stringProp name="Argument.name">from-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="end-date" elementType="HTTPArgument">
+              <elementProp name="to-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2021-12-31 10:59:54</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">end-date</stringProp>
+                <stringProp name="Argument.name">to-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
             </collectionProp>
@@ -320,20 +320,20 @@
                 <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="start-date" elementType="HTTPArgument">
+              <elementProp name="from-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2016-03-24 16:05:00</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">start-date</stringProp>
+                <stringProp name="Argument.name">from-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
-              <elementProp name="end-date" elementType="HTTPArgument">
+              <elementProp name="to-block" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">2021-12-31 10:59:54</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
-                <stringProp name="Argument.name">end-date</stringProp>
+                <stringProp name="Argument.name">to-block</stringProp>
                 <stringProp name="HTTPArgument.content_type">application/json</stringProp>
               </elementProp>
             </collectionProp>

@@ -77,34 +77,36 @@ CREATE TYPE btracker_endpoints.balance_history AS (
         name: from-block
         required: false
         schema:
-          type: integer
-          x-sql-datatype: BIGINT
+          type: string
           default: NULL
-        description: Lower limit of the block range
+        description: |
+          Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).
+
+          The provided `timestamp` will be converted to a `block-num` by finding the first block 
+          where the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).
+
+          The function will interpret and convert the input based on its format, example input:
+
+          * `2016-09-15 19:47:21`
+
+          * `5000000`
       - in: query
         name: to-block
         required: false
         schema:
-          type: integer
-          x-sql-datatype: BIGINT
-          default: NULL
-        description: Upper limit of the block range
-      - in: query
-        name: start-date
-        required: false
-        schema:
           type: string
-          format: date-time
           default: NULL
-        description: Lower limit of the time range
-      - in: query
-        name: end-date
-        required: false
-        schema:
-          type: string
-          format: date-time
-          default: NULL
-        description: Upper limit of the time range
+        description: | 
+          Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). 
+
+          The provided `timestamp` will be converted to a `block-num` by finding the first block 
+          where the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).
+          
+          The function will convert the value depending on its format, example input:
+
+          * `2016-09-15 19:47:21`
+
+          * `5000000`
     responses:
       '200':
         description: |
@@ -151,10 +153,8 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_history(
     "page" INT = 1,
     "page-size" INT = 100,
     "direction" btracker_endpoints.sort_direction = 'desc',
-    "from-block" BIGINT = NULL,
-    "to-block" BIGINT = NULL,
-    "start-date" TIMESTAMP = NULL,
-    "end-date" TIMESTAMP = NULL
+    "from-block" TEXT = NULL,
+    "to-block" TEXT = NULL
 )
 RETURNS JSON 
 -- openapi-generated-code-end
@@ -165,6 +165,7 @@ SET jit = OFF
 AS
 $$
 DECLARE
+  _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
   _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
   _offset INT := ((("page" - 1) * "page-size") + 1);
   _is_desc_direction BOOLEAN := ("direction" = 'desc');
@@ -176,38 +177,28 @@ DECLARE
   _ops_count INT;
   _calculate_total_pages INT;
 BEGIN
-  IF "start-date" IS NOT NULL THEN
-    "from-block" := (SELECT num FROM hive.blocks_view bv WHERE bv.created_at >= "start-date" ORDER BY created_at ASC LIMIT 1);
-    ASSERT "from-block" IS NOT NULL, 'No block found for the given start-date';
-  END IF;
-
-  IF "end-date" IS NOT NULL THEN  
-    "to-block" := (SELECT num FROM hive.blocks_view bv WHERE bv.created_at < "end-date" ORDER BY created_at DESC LIMIT 1);
-    ASSERT "to-block" IS NOT NULL, 'No block found for the given end-date';
-  END IF;
-
-  IF "to-block" <= hive.app_get_irreversible_block() THEN
+  IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
-  IF "to-block" IS NULL THEN
+  IF _block_range.last_block IS NULL THEN
     _to_block_filter := TRUE;
   ELSE
     SELECT ov.id INTO _to_op
 		FROM hive.operations_view ov
-		WHERE ov.block_num <= "to-block"
+		WHERE ov.block_num <= _block_range.last_block
 		ORDER BY ov.block_num DESC, ov.id DESC
 		LIMIT 1;
   END IF;
 
-  IF "from-block" IS NULL THEN
+  IF _block_range.first_block IS NULL THEN
     _from_block_filter := TRUE;
   ELSE
     SELECT ov.id INTO _from_op
 		FROM hive.operations_view ov
-		WHERE ov.block_num >= "from-block"
+		WHERE ov.block_num >= _block_range.first_block
 		ORDER BY ov.block_num, ov.id
 		LIMIT 1;
   END IF;
