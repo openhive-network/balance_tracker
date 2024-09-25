@@ -304,44 +304,20 @@ declare
             "name": "from-block",
             "required": false,
             "schema": {
-              "type": "integer",
-              "x-sql-datatype": "BIGINT",
+              "type": "string",
               "default": null
             },
-            "description": "Lower limit of the block range"
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           },
           {
             "in": "query",
             "name": "to-block",
             "required": false,
             "schema": {
-              "type": "integer",
-              "x-sql-datatype": "BIGINT",
-              "default": null
-            },
-            "description": "Upper limit of the block range"
-          },
-          {
-            "in": "query",
-            "name": "start-date",
-            "required": false,
-            "schema": {
               "type": "string",
-              "format": "date-time",
               "default": null
             },
-            "description": "Lower limit of the time range"
-          },
-          {
-            "in": "query",
-            "name": "end-date",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date-time",
-              "default": null
-            },
-            "description": "Upper limit of the time range"
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           }
         ],
         "responses": {
