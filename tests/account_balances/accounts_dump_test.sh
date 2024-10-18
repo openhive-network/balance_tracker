@@ -81,8 +81,16 @@ fi
 echo "Starting data_insertion_stript.py..."
 python3 ../../dump_accounts/data_insertion_script.py "$SCRIPTDIR" --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" --user "$POSTGRES_USER"
 
+if command -v ts > /dev/null 2>&1; then
+    timestamper="ts '%Y-%m-%d %H:%M:%.S'"
+elif command -v tai64nlocal > /dev/null 2>&1; then
+    timestamper="tai64n | tai64nlocal"
+else
+    timestamper="cat"
+fi
+
 echo "Looking for diffrences between hived node and btracker stats..."
-psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "SELECT btracker_account_dump.compare_accounts();"
+psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "SELECT btracker_account_dump.compare_accounts();" 2>&1 | tee -i >(eval "$timestamper" > "account_dump_test.log")
 
 DIFFERING_ACCOUNTS=$(psql "$POSTGRES_ACCESS_ADMIN" -v "ON_ERROR_STOP=on" -t -A  -c "SELECT * FROM btracker_account_dump.differing_accounts;")
 
