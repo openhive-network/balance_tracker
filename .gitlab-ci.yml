@@ -1,6 +1,7 @@
 stages:
  - lint
  - build
+ - sync
  - test
  - cleanup
  - publish
@@ -19,15 +20,20 @@ variables:
   # HAF configuration
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
+  FF_NETWORK_PER_BUILD: 1
+  BUILDER_IMAGE_TAG: "@sha256:834e666ee84fb78d66a695b274b87f75535f96fda98e51726a23eab60812813b"
+  BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
 
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: 9ec94375c984c8a888505fab6dfe10e26b8533fb # develop
+    ref: f8116ec663c2856dd020ae54b0cf41631238466b # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
   - project: 'hive/common-ci-configuration'
     ref: 62833b5ff44f5073728658e229f3445394d404c2
     file:
+      - '/templates/test_jobs.gitlab-ci.yml'
+      - '/templates/python_projects.gitlab-ci.yml'
       - '/templates/cache_cleanup.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
 
@@ -166,7 +172,7 @@ docker-ci-runner-build:
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
-docker-setup-and-processing-build:
+docker-setup-docker-image-build:
   extends: .docker-build-template
   variables:
     GIT_SUBMODULE_STRATEGY: none
@@ -176,10 +182,15 @@ docker-setup-and-processing-build:
     NAME: ""
     TARGET: "full-ci"
 
-.test-template:
+sync:
   extends: .docker_image_builder_job_template
-  stage: test
+  stage: sync
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
+  needs:
+    - prepare_haf_image
+    - prepare_haf_data
+    - docker-setup-docker-image-build
+    - docker-ci-runner-build
   variables:
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
@@ -231,40 +242,111 @@ docker-setup-and-processing-build:
       popd
 
       tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+
+      cp -a "${SHM_DIR}" "${DATADIR}/shm_dir"
+      cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log" "${DATADIR}/blockchain/block_log"
+      cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts" "${DATADIR}/blockchain/block_log.artifacts"
+
+      mkdir -p "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
+      sudo cp -a "${DATADIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
+
+      ls -lah "${DATADIR}"
+      ls -lah "${DATADIR}/blockchain"
+      ls -lah "${DATADIR}/shm_dir"
+
+      ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
+      ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/blockchain"
+      ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/shm_dir"
       
       # Manually remove the copy of the repaly data to preserve disk space on the replay server
       sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
 
       echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
+    paths:
+      - docker/container-logs.tar.gz
     expire_in: 1 week
     when: always
   tags:
     - data-cache-storage
 
-full-image-regression-test:
-  extends: .test-template
+.hfm-only-service: &hfm-only-service
+  name: $HAF_IMAGE_NAME
+  alias: hfm-only-instance
+  variables:
+    PGCTLTIMEOUT: 600 # give PostgreSQL more time to start if GitLab shut it down improperly after the sync job
+    PG_ACCESS: |
+                "host    all              haf_admin        0.0.0.0/0    trust"
+                "host    all              hived            0.0.0.0/0    trust"
+                "host    all              btracker_user       0.0.0.0/0    trust"
+                "host    all              btracker_owner      0.0.0.0/0    trust"
+                "host    all              all              0.0.0.0/0    scram-sha-256"
+  command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
+
+.postgrest-service: &postgrest-service
+  name: registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest
+  alias: postgrest-server
+  variables:
+    PGRST_ADMIN_SERVER_PORT: 3001
+    PGRST_SERVER_PORT: 3000
+    # Pointing to the PostgreSQL service running in hfm-only-instance
+    PGRST_DB_URI: postgresql://haf_admin@hfm-only-instance:5432/haf_block_log
+    PGRST_DB_SCHEMA: btracker_endpoints
+    PGRST_DB_ANON_ROLE: btracker_user
+    PGRST_DB_POOL: 20
+    PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
+    PGRST_DB_EXTRA_SEARCH_PATH: btracker_app
+    HEALTHCHECK_TCP_PORT: 3000
+
+regression-test:
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
+  stage: test
+  needs:
+    - job: sync
+      artifacts: true
+    - job: docker-setup-docker-image-build
+      artifacts: true
+    - job: prepare_haf_image
+      artifacts: true
+  services:
+    - *hfm-only-service
+  variables:
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
   script:
-    - !reference [.test-template, script]
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
       cd tests/account_balances
-      ./accounts_dump_test.sh --host=docker
+      ./accounts_dump_test.sh --host=hfm-only-instance
 
       echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
     paths:
-      - docker/container-logs.tar.gz
+      - tests/account_balances/account_dump_test.log
+    when: always
+  tags:
+    - data-cache-storage
 
-full-image-performance-test:
-  extends: .test-template
+performance-test:
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
+  stage: test
+  needs:
+    - job: sync
+      artifacts: true
+    - job: docker-setup-docker-image-build
+      artifacts: true
+    - job: prepare_haf_image
+      artifacts: true
+  services:
+    - *hfm-only-service
+    - *postgrest-service
+  variables:
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
   script:
-    - !reference [.test-template, script]
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
-      timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=docker --postgres-host=docker
+      timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=postgrest-server --postgres-host=hfm-only-instance
       tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
       cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
       m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
@@ -278,6 +360,8 @@ full-image-performance-test:
       - jmeter.log
     reports:
       junit: tests/performance/junit-result.xml
+  tags:
+    - data-cache-storage
 
 build_and_publish_image:
   stage: publish
