@@ -17,7 +17,7 @@ BEGIN
 WITH balance_impacting_ops AS MATERIALIZED
 (
   SELECT ot.id
-  FROM hive.operation_types ot
+  FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
 ops_in_range AS  

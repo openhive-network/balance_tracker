@@ -78,7 +78,7 @@ EOF
 do
 \$\$
 BEGIN
- IF NOT EXISTS( SELECT 1 FROM hive.contexts hc WHERE owner = 'btracker_owner' ) THEN
+ IF NOT EXISTS( SELECT 1 FROM hafd.contexts hc WHERE owner = 'btracker_owner' ) THEN
     DROP OWNED BY btracker_owner CASCADE;
     DROP ROLE btracker_owner;
     DROP OWNED BY btracker_user CASCADE;
