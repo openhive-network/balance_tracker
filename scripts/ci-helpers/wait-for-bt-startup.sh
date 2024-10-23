@@ -29,7 +29,7 @@ function wait-for-bt-startup() {
 }
 
 #shellcheck disable=SC2089
-COMMAND="SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hive.contexts WHERE name = 'btracker_app';"
+COMMAND="SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hafd.contexts WHERE name = 'btracker_app';"
 MESSAGE="Waiting for Balance Tracker to finish processing blocks..."
 
 while [ $# -gt 0 ]; do
