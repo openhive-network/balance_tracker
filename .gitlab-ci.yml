@@ -27,7 +27,7 @@ variables:
 include:
   - template: Workflows/Branch-Pipelines.gitlab-ci.yml
   - project: hive/haf
-    ref: f8116ec663c2856dd020ae54b0cf41631238466b # develop
+    ref: 0465775a45530386230f096ae1a04850a6c2f9a0 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
   - project: 'hive/common-ci-configuration'
     ref: 62833b5ff44f5073728658e229f3445394d404c2
@@ -324,6 +324,31 @@ regression-test:
     paths:
       - tests/account_balances/account_dump_test.log
     when: always
+  tags:
+    - data-cache-storage
+
+setup-scripts-test:
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-7
+  stage: test
+  needs:
+    - job: sync
+      artifacts: true
+    - job: docker-setup-docker-image-build
+      artifacts: true
+    - job: prepare_haf_image
+      artifacts: true
+  services:
+    - *hfm-only-service
+  variables:
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+  script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+
+      cd tests/functional
+      ./test_scripts.sh --host=hfm-only-instance
+
+      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   tags:
     - data-cache-storage
 
