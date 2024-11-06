@@ -60,6 +60,8 @@ else
     TARGET="full"
 fi
 
+export TAG=$BUILD_IMAGE_TAG
+
 pushd "$SRCROOTDIR"
 
 # All the variables below must be declared and assigned separately
