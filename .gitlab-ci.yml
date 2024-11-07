@@ -8,7 +8,7 @@ stages:
 
 variables:
   # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "62833b5ff44f5073728658e229f3445394d404c2"
+  CI_COMMON_JOB_VERSION: "e74d7109838ff05fdc239bced6a726aa7ad46a9b"
   DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
   DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
   IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
@@ -30,10 +30,11 @@ include:
     ref: f86feed67302eb7b20bbdf30258c4171d159e1c9 # develop
     file: /scripts/ci-helpers/prepare_data_image_job.yml
   - project: 'hive/common-ci-configuration'
-    ref: 62833b5ff44f5073728658e229f3445394d404c2
+    ref: e74d7109838ff05fdc239bced6a726aa7ad46a9b
     file:
       - '/templates/test_jobs.gitlab-ci.yml'
       - '/templates/python_projects.gitlab-ci.yml'
+      - '/templates/docker_image_jobs.gitlab-ci.yml'
       - '/templates/cache_cleanup.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
 
