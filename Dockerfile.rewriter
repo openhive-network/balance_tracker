@@ -1,0 +1,30 @@
+FROM openresty/openresty:alpine AS without_tag
+
+COPY docker/balance_tracker_nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+COPY rewrite_rules.conf /usr/local/openresty/nginx/conf/rewrite_rules.conf
+
+ARG BUILD_TIME
+ARG GIT_COMMIT_SHA
+ARG GIT_CURRENT_BRANCH
+ARG GIT_LAST_LOG_MESSAGE
+ARG GIT_LAST_COMMITTER
+ARG GIT_LAST_COMMIT_DATE
+LABEL org.opencontainers.image.created="$BUILD_TIME"
+LABEL org.opencontainers.image.url="https://hive.io/"
+LABEL org.opencontainers.image.documentation="https://gitlab.syncad.com/hive/balance_tracker"
+LABEL org.opencontainers.image.source="https://gitlab.syncad.com/hive/balance_tracker"
+#LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="$GIT_COMMIT_SHA"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.ref.name="Balance Tracker"
+LABEL org.opencontainers.image.title="HAF Balance Tracker PostgREST URL Rewriter Image"
+LABEL org.opencontainers.image.description="Rewrites REST calls to provide more natural REST URLs than PostgREST alone allows"
+LABEL io.hive.image.branch="$GIT_CURRENT_BRANCH"
+LABEL io.hive.image.commit.log_message="$GIT_LAST_LOG_MESSAGE"
+LABEL io.hive.image.commit.author="$GIT_LAST_COMMITTER"
+LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
+
+FROM without_tag AS with_tag
+
+ARG GIT_COMMIT_TAG
+LABEL org.opencontainers.image.version="${GIT_COMMIT_TAG}"
