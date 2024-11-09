@@ -50,9 +50,9 @@ _TST_IMGTAG=${BUILD_IMAGE_TAG:?"Missing argument #1 - image tag to be built"}
 _TST_SRCDIR=${SRCROOTDIR:?"Missing arg #2 - source directory"}
 _TST_REGISTRY=${REGISTRY:?"Missing arg #3 - container registry URL"}
 
-# On CI build the image using the registry-stored BuildKit cache 
+# On CI build the image using the registry-stored BuildKit cache
 # and push it to registry immediately.
-# Locally, build it using local BuildKit cache and load it to the 
+# Locally, build it using local BuildKit cache and load it to the
 # local image store.
 if [[ -n ${CI:-} ]]; then
     TARGET="full-ci"
@@ -77,7 +77,7 @@ export GIT_COMMIT_SHA
 
 GIT_CURRENT_BRANCH="$(git branch --show-current || true)"
 if [ -z "$GIT_CURRENT_BRANCH" ]; then
-  GIT_CURRENT_BRANCH="$(git describe --abbrev=0 --all | sed 's/^.*\///' || true)"
+  GIT_CURRENT_BRANCH="$(git describe --abbrev=0 --all --exclude 'pipelines/*' | sed 's/^.*\///' || true)"
   if [ -z "$GIT_CURRENT_BRANCH" ]; then
     GIT_CURRENT_BRANCH="[unknown]"
   fi
@@ -102,7 +102,35 @@ if [ -z "$GIT_LAST_COMMIT_DATE" ]; then
 fi
 export GIT_LAST_COMMIT_DATE
 
+# This script can be called with BUILD_IMAGE_TAG set to either a short commit hash
+# or a release tag like 1.27.5rc6.  If it's a release tag, we need to build the
+# image differently to include the release string in.
+case "$BUILD_IMAGE_TAG" in
+  1.*)
+    REWRITER_TARGET=with_tag
+    TAG_BUILD_ARGS="--build-arg GIT_COMMIT_TAG=$BUILD_IMAGE_TAG"
+    ;;
+  *)
+    REWRITER_TARGET=without_tag
+    ;;
+esac
+
 docker buildx bake --provenance=false --progress="$PROGRESS_DISPLAY" "$TARGET"
+
+# shellcheck disable=SC2086
+docker buildx build \
+    --build-arg BUILD_TIME="$BUILD_TIME" \
+    --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" \
+    --build-arg GIT_CURRENT_BRANCH="$GIT_CURRENT_BRANCH" \
+    --build-arg GIT_LAST_LOG_MESSAGE="$GIT_LAST_LOG_MESSAGE" \
+    --build-arg GIT_LAST_COMMITTER="$GIT_LAST_COMMITTER" \
+    --build-arg GIT_LAST_COMMIT_DATE="$GIT_LAST_COMMIT_DATE" \
+    --target=$REWRITER_TARGET \
+    $TAG_BUILD_ARGS \
+    --tag "$REGISTRY/postgrest-rewriter:$BUILD_IMAGE_TAG" \
+    --load \
+    --file Dockerfile.rewriter .
+docker push "$REGISTRY/postgrest-rewriter:$BUILD_IMAGE_TAG"
 
 popd
 
