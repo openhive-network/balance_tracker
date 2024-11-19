@@ -16,7 +16,10 @@ http {
 
             location / {
                     include rewrite_rules.conf;
-                    rewrite_log on;
+                    # ${REWRITE_LOG} will be replaced by the docker entrypoint script.
+                    # Set REWRITE_LOG=on in the environment to enable rewrite logging,
+                    # otherwise it will remain disabled
+                    ${REWRITE_LOG}
 
                     proxy_pass  http://balance-tracker-postgrest:3000;  # my PostREST is  here!
 
