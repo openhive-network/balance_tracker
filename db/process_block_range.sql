@@ -89,18 +89,29 @@ BEGIN
 --hardforks (60)
 
 WITH process_block_range_data_b AS MATERIALIZED 
-( 
+(
 SELECT 
-  ov.body AS body,
+  ov.body_binary::jsonb AS body,
   ov.id AS source_op,
   ov.block_num as source_op_block,
   ov.op_type_id 
 FROM operations_view ov
 WHERE 
+ ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68,51,63,55) AND 
+ ov.block_num BETWEEN _from AND _to
+),
+filter_ops AS 
+(
+SELECT 
+  ov.body,
+  ov.source_op,
+  ov.source_op_block,
+  ov.op_type_id 
+FROM process_block_range_data_b ov
+WHERE 
   (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68) or
   (ov.op_type_id = 55 and (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
   (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
-  AND ov.block_num BETWEEN _from AND _to
 ),
 insert_balance AS MATERIALIZED 
 (
@@ -168,7 +179,7 @@ SELECT
   WHEN pbr.op_type_id = 60 THEN
     process_hardfork(((pbr.body)->'value'->>'hardfork_id')::INT)
   END)
-FROM process_block_range_data_b pbr
+FROM filter_ops pbr
 ORDER BY pbr.source_op_block, pbr.source_op
 )
 
