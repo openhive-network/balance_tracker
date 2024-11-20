@@ -254,7 +254,7 @@ process_blocks() {
     echo 'Running indexer for existing blocks and expecting new blocks...'
   fi
 
-  postgres_access=${postgres_url:-"postgresql://$postgres_user@$postgres_host:$postgres_port/haf_block_log"}
+  postgres_access=${postgres_url:-"postgresql://$postgres_user@$postgres_host:$postgres_port/haf_block_log?application_name=btracker_block_processing"}
 
   if [ -z "$log_dir" ]; then
     echo "Running indexer in the foreground"
