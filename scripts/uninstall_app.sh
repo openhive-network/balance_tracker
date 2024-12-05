@@ -11,6 +11,7 @@ OPTIONS:
     --host=VALUE             Allows to specify a PostgreSQL host location (defaults to localhost)
     --port=NUMBER            Allows to specify a PostgreSQL operating port (defaults to 5432)
     --user=VALUE             Allows to specify a PostgreSQL user (defaults to haf_admin)
+    --schema=VALUE           Allows to specify a schema name (defaults to btracker_app)
     --url=URL                Allows to specify a PostgreSQL URL (empty by default, overrides options above)
     --help,-h,-?             Displays this help message
 EOF
