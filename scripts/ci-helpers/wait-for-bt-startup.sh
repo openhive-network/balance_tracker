@@ -17,10 +17,10 @@ EOF
 function wait-for-bt-startup() {
     if command -v psql &> /dev/null
     then
-        until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 0 &>/dev/null
+        until psql "$POSTGRES_ACCESS" --quiet --tuples-only --command="$COMMAND" | grep 1 &>/dev/null
         do 
             echo "$MESSAGE"
-            sleep 3
+            sleep 20
         done
     else
         echo "Please install psql before running this script."
@@ -29,7 +29,7 @@ function wait-for-bt-startup() {
 }
 
 #shellcheck disable=SC2089
-COMMAND="SELECT CASE WHEN irreversible_block = 5000000 THEN 0 ELSE 1 END FROM hafd.contexts WHERE name = 'btracker_app';"
+COMMAND="SELECT hive.is_app_in_sync('btracker_app')::INT;"
 MESSAGE="Waiting for Balance Tracker to finish processing blocks..."
 
 while [ $# -gt 0 ]; do
