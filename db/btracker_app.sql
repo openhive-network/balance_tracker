@@ -245,7 +245,7 @@ BEGIN
     RETURN;
   END IF;
 
-  PERFORM vacuum_full_btracker_indexes();
+  PERFORM vacuum_full_btracker_tables();
 
   IF NOT isIndexesCreated() THEN
     PERFORM create_btracker_indexes();
@@ -375,7 +375,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION vacuum_full_btracker_indexes()
+CREATE OR REPLACE FUNCTION vacuum_full_btracker_tables()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
