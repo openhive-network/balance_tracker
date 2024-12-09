@@ -245,6 +245,8 @@ BEGIN
     RETURN;
   END IF;
 
+  PERFORM vacuum_full_btracker_indexes();
+
   IF NOT isIndexesCreated() THEN
     PERFORM create_btracker_indexes();
   END IF;
@@ -370,6 +372,19 @@ BEGIN
   END LOOP;
 
   ASSERT FALSE, 'Cannot reach this point';
+END
+$$;
+
+CREATE OR REPLACE FUNCTION vacuum_full_btracker_indexes()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  -- These tables get a lot of updates, so we can improve performance by occassionally doing a full vacuum to clean up the larger number of dead tuples.
+  -- For now, lets do it every time we exit massive sync. It should probably also be done after time hafbe is shutdown and restarted. 
+  -- And it might be useful to do it peridoically during massive sync itself (e.g. once every 1M or 10M blocks).
+  VACUUM FULL ANALYZE current_account_balances, account_rewards, account_info_rewards, account_delegations, current_accounts_delegations, account_withdraws, account_savings, account_routes, transfer_saving_id;
 END
 $$;
 
