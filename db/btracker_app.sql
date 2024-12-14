@@ -242,6 +242,7 @@ $$
 BEGIN
   IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
+    --PERFORM hive.app_request_table_vacuum('hafbe_bal.account_balance_history', interval '10 minutes'); --eventually fixup hard-coded schema name!
     RETURN;
   END IF;
 
