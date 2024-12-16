@@ -396,7 +396,12 @@ build_and_publish_image:
   before_script:
     - !reference [.publish_docker_image_template, before_script]
   script:
-    - scripts/ci-helpers/build_and_publish_instance.sh
+    - |
+      scripts/ci-helpers/build_and_publish_instance.sh
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+        docker tag "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG" "registry-upload.hive.blog/balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
+        docker push "registry-upload.hive.blog/balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
+      fi
   tags:
     - public-runner-docker
     - hived-for-tests
