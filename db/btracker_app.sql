@@ -30,6 +30,54 @@ BEGIN
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
+CREATE TABLE IF NOT EXISTS account_open_orders
+(
+  account INT NOT NULL,
+  nai INT NOT NULL,     --balance currency
+  amount BIGINT NOT NULL,
+  price NUMERIC NOT NULL,  
+  order_type SMALLINT NOT NULL, --0 for sell, 1 for buy
+  created_date TIMESTAMP NOT NULL,
+  order_id BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+
+  CONSTRAINT pk_account_open_orders PRIMARY KEY (account, order_id)
+);
+PERFORM hive.app_register_table( __schema_name, 'account_open_orders', __schema_name );
+
+
+CREATE TABLE IF NOT EXISTS account_escrow_transfers
+(
+  account INT NOT NULL,
+  to_account INT NOT NULL,
+  agent INT NOT NULL,
+  hbd_amount BIGINT NOT NULL,
+  hive_amount BIGINT NOT NULL,
+  escrow_id BIGINT NOT NULL,
+  ratification_deadline TIMESTAMP NOT NULL,
+  escrow_expiration TIMESTAMP NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+
+  CONSTRAINT pk_account_escrow_transfers PRIMARY KEY (account, escrow_id)
+);
+PERFORM hive.app_register_table( __schema_name, 'account_escrow_transfers', __schema_name );
+
+CREATE TABLE IF NOT EXISTS account_pending_conversions
+(
+  account INT NOT NULL,
+  amount BIGINT NOT NULL,
+  conversion_date TIMESTAMP NOT NULL,
+  conversion_id BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+
+  CONSTRAINT pk_account_pending_conversions PRIMARY KEY (account, conversion_id)
+);
+PERFORM hive.app_register_table( __schema_name, 'account_pending_conversions', __schema_name );
+
+
 CREATE TABLE IF NOT EXISTS btracker_app_status
 (
   continue_processing BOOLEAN NOT NULL,
@@ -166,6 +214,10 @@ CREATE TABLE IF NOT EXISTS account_savings
 );
 PERFORM hive.app_register_table( __schema_name, 'account_savings', __schema_name );
 
+--modification for the above table to get pending withdrawals
+ALTER TABLE account_savings
+ADD COLUMN IF NOT EXISTS pending_withdrawals BIGINT DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS transfer_saving_id
 (
   account INT NOT NULL,
@@ -177,6 +229,8 @@ CREATE TABLE IF NOT EXISTS transfer_saving_id
 );
 PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
+ALTER TABLE transfer_saving_id
+ADD COLUMN IF NOT EXISTS complete_date TIMESTAMP;
 END
 $$;
 
@@ -293,6 +347,7 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
+  __current_time timestamp;  -- Add this line
 BEGIN
   PERFORM set_config('synchronous_commit', 'ON', false);
 
@@ -303,6 +358,67 @@ BEGIN
 
   PERFORM btracker_block_range_data_a(_block, _block);
   PERFORM btracker_block_range_data_b(_block, _block);
+
+  -- getting the current current blockchain time from block timestamp
+  SELECT created_at INTO __current_time 
+  FROM hive.blocks 
+  WHERE num = _block;
+
+  -- processing added balances (ones added by hasan)
+  PERFORM remove_completed_operations(_block, __current_time);
+
+  -- processing new operations for this block
+  -- limit orders
+  INSERT INTO account_open_orders
+  SELECT 
+    op.value->>'account' as account,
+    CASE (op.value->>'order_type')::int 
+      WHEN 0 THEN 13
+      ELSE 37
+    END as nai,
+    (op.value->>'amount')::bigint,
+    (op.value->>'price')::numeric,
+    (op.value->>'order_type')::smallint,
+    __current_time,
+    operations.id,
+    operations.id,
+    _block
+  FROM hive.operations_view operations
+  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+  WHERE operations.block_num = _block
+  AND op.key = 'limit_order_create';
+
+  -- escrow transfers
+  INSERT INTO account_escrow_transfers
+  SELECT
+    op.value->>'from' as account,
+    op.value->>'to' as to_account,
+    op.value->>'agent' as agent,
+    (op.value->>'hbd_amount')::bigint,
+    (op.value->>'hive_amount')::bigint,
+    (op.value->>'escrow_id')::bigint,
+    (__current_time + (op.value->>'ratification_deadline')::interval),
+    (__current_time + (op.value->>'escrow_expiration')::interval),
+    operations.id,
+    _block
+  FROM hive.operations_view operations
+  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+  WHERE operations.block_num = _block
+  AND op.key = 'escrow_transfer';
+
+  -- conversions
+  INSERT INTO account_pending_conversions
+  SELECT
+    op.value->>'owner' as account,
+    (op.value->>'amount')::bigint,
+    (__current_time + INTERVAL '3.5 days'),
+    operations.id,
+    operations.id,
+    _block
+  FROM hive.operations_view operations
+  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+  WHERE operations.block_num = _block
+  AND op.key = 'convert';
 
   IF _logs THEN
     __end_ts := clock_timestamp();

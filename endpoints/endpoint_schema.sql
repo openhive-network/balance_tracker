@@ -175,6 +175,31 @@ declare
           "delayed_vests": {
             "type": "string",
             "description": "blocked VESTS by a withdrawal"
+          },
+          "open_orders": {
+            "type": "object",
+            "properties": {
+              "hive": { "type": "integer" },
+              "hbd": { "type": "integer" }
+            }
+          },
+          "escrow_transfers": {
+            "type": "object",
+            "properties": {
+              "hive": { "type": "integer" },
+              "hbd": { "type": "integer" }
+            }
+          },
+          "pending_conversions": {
+            "type": "integer",
+            "description": "Amount of HBD pending conversion to HIVE"
+          },
+          "pending_savings_withdrawals": {
+            "type": "object",
+            "properties": {
+              "hive": { "type": "integer" },
+              "hbd": { "type": "integer" }
+            }
           }
         }
       }
@@ -230,7 +255,20 @@ declare
                     "to_withdraw": "8362101094935031",
                     "withdrawn": "804048182205290",
                     "withdraw_routes": 4,
-                    "delayed_vests": "0"
+                    "delayed_vests": "0",
+                    "open_orders": {
+                      "hive": 0,
+                      "hbd": 0
+                    },
+                    "escrow_transfers": {
+                      "hive": 0,
+                      "hbd": 0
+                    },
+                    "pending_conversions": 0,
+                    "pending_savings_withdrawals": {
+                      "hive": 0,
+                      "hbd": 0
+                    }
                   }
                 ]
               }
