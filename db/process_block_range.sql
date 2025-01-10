@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_block_range_data_a(
-    IN _from INT, IN _to INT, IN _report_step INT = 1000
+    IN _from INT, IN _to INT
 )
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
@@ -12,8 +12,12 @@ AS
 $$
 DECLARE 
  _result INT;
+ __balance_history INT;
+ __current_balances INT;
 BEGIN
 --RAISE NOTICE 'Processing balances';
+
+-- get all operations that can impact balances
 WITH balance_impacting_ops AS MATERIALIZED
 (
   SELECT ot.id
@@ -30,43 +34,159 @@ ops_in_range AS
   WHERE ho.op_type_id = ANY(SELECT id FROM balance_impacting_ops) AND ho.block_num BETWEEN _from AND _to
   ORDER BY ho.block_num, ho.id
 ),
-get_impacted AS (
-SELECT 
-  hive.get_impacted_balances(gib.body_binary, gib.source_op_block > 905693) AS get_impacted_balances,
-  gib.source_op,
-  gib.source_op_block 
-FROM ops_in_range gib
-),
-get_impacted_two AS (
-SELECT 
 
-  (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_balances).account_name) AS account_id,
-  (gi.get_impacted_balances).asset_symbol_nai AS nai,
-  (gi.get_impacted_balances).amount AS balance,
-  gi.source_op,
-  gi.source_op_block
-FROM get_impacted gi
+-- convert balances depending on hardforks
+get_impacted_bal AS (
+  SELECT 
+    hive.get_impacted_balances(gib.body_binary, gib.source_op_block > 905693) AS get_impacted_balances,
+    gib.source_op,
+    gib.source_op_block 
+  FROM ops_in_range gib
 ),
-insert_balances AS MATERIALIZED (
-SELECT
-  git.source_op,
-  git.source_op_block,
-  process_balances(git.account_id, git.nai, git.balance, git.source_op, git.source_op_block)
+convert_parameters AS (
+  SELECT 
 
-FROM get_impacted_two git
-ORDER BY git.source_op, git.source_op_block
+    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_balances).account_name) AS account_id,
+    (gi.get_impacted_balances).asset_symbol_nai AS nai,
+    (gi.get_impacted_balances).amount AS balance,
+    gi.source_op,
+    gi.source_op_block
+  FROM get_impacted_bal gi
+),
+
+-- prepare accounts that were impacted by the operations
+group_by_account_nai AS (
+  SELECT 
+    cp.account_id,
+    cp.nai
+  FROM convert_parameters cp
+  GROUP BY cp.account_id, cp.nai
+),
+get_latest_balance AS (
+  SELECT 
+    gan.account_id,
+    gan.nai,
+    COALESCE(cab.balance, 0) as balance,
+    0 AS source_op,
+    0 AS source_op_block
+--    (CASE WHEN cab.balance IS NULL THEN FALSE ELSE TRUE END) AS prev_balance_exists
+  FROM group_by_account_nai gan
+  LEFT JOIN current_account_balances cab ON cab.account = gan.account_id AND cab.nai = gan.nai
+),
+
+-- prepare balances (sum balances for each account)
+union_latest_balance_with_impacted_balances AS (
+  SELECT 
+    cp.account_id, 
+    cp.nai,
+    cp.balance,
+    cp.source_op,
+    cp.source_op_block
+  FROM convert_parameters cp
+
+  UNION ALL
+
+-- latest stored balance is needed to replecate balance history
+  SELECT 
+    glb.account_id,
+    glb.nai,
+    glb.balance,
+    glb.source_op,
+    glb.source_op_block
+  FROM get_latest_balance glb
+),
+
+/*
+sum previous balances
+
+ id  | balance | sum-balance
+  2       10     10 + 5 + 1
+  1       5        5 + 1
+  0       1          1
+
+*/
+
+prepare_balance_history AS MATERIALIZED (
+  SELECT 
+    ulb.account_id,
+    ulb.nai,
+    SUM(ulb.balance) OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS balance,
+    ulb.source_op,
+    ulb.source_op_block
+  FROM union_latest_balance_with_impacted_balances ulb
+),
+
+-- find the new latest balance
+prepare_newest_balance AS (
+  SELECT
+    account_id,
+    nai,
+    MAX(source_op) AS source_op
+  FROM prepare_balance_history 
+  GROUP BY account_id, nai
+),
+
+remove_duplicate_transfers_in_current_balance AS MATERIALIZED (
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+  -- choose the maximum balance for the case when has made transfer to itself
+    MAX(pbh.balance) AS balance
+  FROM prepare_newest_balance nw 
+  JOIN prepare_balance_history pbh ON pbh.account_id = nw.account_id AND pbh.nai = nw.nai AND pbh.source_op = nw.source_op
+  -- this group by is needed to avoid duplicate entries (account can make a transfer to itself)
+  GROUP BY pbh.account_id, pbh.nai, pbh.source_op, pbh.source_op_block
+),
+insert_current_account_balances AS (
+  INSERT INTO current_account_balances AS acc_balances
+    (account, nai, source_op, source_op_block, balance)
+  SELECT 
+    rd.account_id,
+    rd.nai,
+    rd.source_op,
+    rd.source_op_block,
+    rd.balance
+  FROM remove_duplicate_transfers_in_current_balance rd 
+  ON CONFLICT ON CONSTRAINT pk_current_account_balances DO
+  UPDATE SET 
+    balance = EXCLUDED.balance,
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block
+  RETURNING (xmax = 0) as is_new_entry, acc_balances.account
+),
+
+remove_latest_stored_balance_record AS MATERIALIZED (
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.balance
+  FROM prepare_balance_history pbh
+  -- remove with prepared previous balance
+  WHERE pbh.source_op > 0
+  ORDER BY pbh.source_op
+),
+insert_account_balance_history AS (
+  INSERT INTO account_balance_history AS acc_history
+    (account, nai, source_op, source_op_block, balance)
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.balance
+  FROM remove_latest_stored_balance_record pbh
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
 )
 
-SELECT COUNT(*) INTO _result
-FROM insert_balances;
-	--	if __balance_change.source_op_block = 199701 then
-	--	RAISE NOTICE 'Balance change data: account: %, amount change: %, source_op: %, source_block: %, current_balance: %', __balance_change.account, __balance_change.balance, __balance_change.source_op, __balance_change.source_op_block, COALESCE(__current_balance, 0);
-	--	end if;
+SELECT
+  (SELECT count(*) FROM insert_account_balance_history) as balance_history,
+  (SELECT count(*) FROM insert_current_account_balances) AS current_balances
+INTO __balance_history, __current_balances;
 
-  --IF __balance_change.source_op_block % _report_step = 0 AND __last_reported_block != __balance_change.source_op_block THEN
-  --  RAISE NOTICE 'Processed data for block: %', __balance_change.source_op_block;
-  --  __last_reported_block := __balance_change.source_op_block;
-  --END IF;
 END
 $$;
 
@@ -272,43 +392,6 @@ BEGIN
   END CASE;
 
 END
-$$;
-
-CREATE OR REPLACE FUNCTION process_balances(
-    _account_id INT,
-    _nai INT,
-    _balance BIGINT,
-    _source_op BIGINT,
-    _source_op_block INT
-)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-DECLARE
-  __current_balance BIGINT;
-BEGIN
-
-INSERT INTO current_account_balances
-  (account, nai, source_op, source_op_block, balance)
-SELECT 
-  _account_id,
-  _nai, 
-  _source_op, 
-  _source_op_block, 
-  _balance
-ON CONFLICT ON CONSTRAINT pk_current_account_balances DO
-  UPDATE SET balance = current_account_balances.balance + EXCLUDED.balance,
-              source_op = EXCLUDED.source_op,
-              source_op_block = EXCLUDED.source_op_block
-RETURNING balance into __current_balance;
-
-INSERT INTO account_balance_history
-  (account, nai, source_op, source_op_block, balance)
-SELECT 
-_account_id, _nai, _source_op, _source_op_block, COALESCE(__current_balance, 0);
-
-END 
 $$;
 
 RESET ROLE;
