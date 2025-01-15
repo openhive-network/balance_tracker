@@ -39,6 +39,7 @@ COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
 COPY db /app/db
+COPY backend /app/backend
 COPY endpoints /app/endpoints
 COPY dump_accounts /app/dump_accounts
 COPY balance-tracker.sh /app/balance-tracker.sh

@@ -171,7 +171,7 @@ docker-ci-runner-build:
   extends: .docker-build-template
   variables:
     BASE_REPO_NAME: ""
-    BASE_TAG: "docker-24.0.1-8"
+    BASE_TAG: "docker-24.0.1-9"
     NAME: "ci-runner"
     TARGET: "ci-runner-ci"
 
@@ -188,7 +188,7 @@ docker-setup-docker-image-build:
 sync:
   extends: .docker_image_builder_job_template
   stage: sync
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-8
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-9
   needs:
   - prepare_haf_image
   - prepare_haf_data
@@ -303,7 +303,7 @@ sync:
     HEALTHCHECK_TCP_PORT: 3000
 
 regression-test:
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-8
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-9
   stage: test
   needs:
   - job: sync
@@ -332,7 +332,7 @@ regression-test:
   - data-cache-storage
 
 setup-scripts-test:
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-8
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-9
   stage: test
   needs:
   - job: sync
@@ -357,7 +357,7 @@ setup-scripts-test:
   - data-cache-storage
 
 performance-test:
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-8
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-9
   stage: test
   needs:
   - job: sync
