@@ -272,8 +272,10 @@ BEGIN
     __start_ts := clock_timestamp();
   END IF;
 
-  PERFORM btracker_block_range_data_a(_from, _to);
-  PERFORM btracker_block_range_data_b(_from, _to);
+  PERFORM process_block_range_balances(_from, _to);
+  PERFORM process_block_range_data(_from, _to);
+  PERFORM process_block_range_savings(_from, _to);
+
 
   IF _logs THEN
     __end_ts := clock_timestamp();
@@ -301,8 +303,9 @@ BEGIN
     __start_ts := clock_timestamp();
   END IF;
 
-  PERFORM btracker_block_range_data_a(_block, _block);
-  PERFORM btracker_block_range_data_b(_block, _block);
+  PERFORM process_block_range_balances(_block, _block);
+  PERFORM process_block_range_data(_block, _block);
+  PERFORM process_block_range_savings(_block, _block);
 
   IF _logs THEN
     __end_ts := clock_timestamp();

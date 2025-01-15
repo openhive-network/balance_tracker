@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_block_range_data_a(
+CREATE OR REPLACE FUNCTION process_block_range_balances(
     IN _from INT, IN _to INT
 )
 RETURNS VOID
@@ -97,7 +97,7 @@ union_latest_balance_with_impacted_balances AS (
 ),
 
 /*
-sum previous balances
+whole table is inserted into history (without id = 0) and the newest record is used to update current balance table
 
  id  | balance | sum-balance
   2       10     10 + 5 + 1
@@ -190,7 +190,7 @@ INTO __balance_history, __current_balances;
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_block_range_data_b(IN _from INT, IN _to INT, IN _report_step INT = 1000)
+CREATE OR REPLACE FUNCTION process_block_range_data(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
@@ -217,7 +217,7 @@ SELECT
   ov.op_type_id 
 FROM operations_view ov
 WHERE 
- ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68,51,63,55) AND 
+ ov.op_type_id IN (40,41,62,39,4,20,56,60,52,53,77,70,68,51,63) AND 
  ov.block_num BETWEEN _from AND _to
 ),
 filter_ops AS 
@@ -229,8 +229,7 @@ SELECT
   ov.op_type_id 
 FROM process_block_range_data_b ov
 WHERE 
-  (ov.op_type_id IN (40,41,62,32,33,34,59,39,4,20,56,60,52,53,77,70,68) or
-  (ov.op_type_id = 55 and (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)  or
+  (ov.op_type_id IN (40,41,62,39,4,20,56,60,52,53,77,70,68) or
   (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
 ),
 insert_balance AS MATERIALIZED 
@@ -247,21 +246,6 @@ SELECT
 
   WHEN pbr.op_type_id = 62 THEN
     process_return_vesting_delegation_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 32 THEN
-    process_transfer_to_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 33 THEN
-    process_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 34 THEN
-    process_cancel_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 59 THEN
-    process_fill_transfer_from_savings_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 55 THEN
-    process_interest_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
   WHEN pbr.op_type_id = 39 THEN
     process_claim_reward_balance_operation(pbr.body, pbr.source_op, pbr.source_op_block)
@@ -305,91 +289,6 @@ ORDER BY pbr.source_op_block, pbr.source_op
 
 SELECT COUNT(*) INTO _result 
 FROM insert_balance;
-
-END
-$$;
-
-CREATE OR REPLACE FUNCTION process_hardfork_hive_operation(body JSONB)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-WITH hardfork_hive_operation AS MATERIALIZED
-(
-  SELECT 
-    (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'account') AS _account
-),
-balances AS (
-  UPDATE current_account_balances SET
-    balance = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account
-),
-rewards AS (
-  UPDATE account_rewards SET
-    balance = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account
-),
-delegations AS (
-  UPDATE account_delegations SET
-    delegated_vests = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account
-),
-savings AS (
-  UPDATE account_savings SET
-    saving_balance = 0,
-    savings_withdraw_requests = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account
-)
-  UPDATE account_withdraws SET
-    vesting_withdraw_rate = 0,
-    to_withdraw = 0,
-    withdrawn = 0,
-    delayed_vests = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account;
-
-END
-$$;
-
-CREATE OR REPLACE FUNCTION process_hardfork(_hardfork_id INT)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-
-  CASE 
-
-  WHEN _hardfork_id = 1 THEN
-  WITH account_withdraws AS MATERIALIZED 
-  (
-  SELECT 
-    account as account_id, 
-    (to_withdraw * 1000000) AS _to_withdraw,
-    ((to_withdraw * 1000000)/ 104) AS _vesting_withdraw_rate,
-    (withdrawn * 1000000) AS _withdrawn
-  FROM account_withdraws
-  )
-  UPDATE account_withdraws SET
-    vesting_withdraw_rate = ad._vesting_withdraw_rate,
-    to_withdraw = ad._to_withdraw,
-    withdrawn = ad._withdrawn 
-  FROM account_withdraws ad
-  WHERE account = ad.account_id;
-
-  WHEN _hardfork_id = 16 THEN
-  UPDATE btracker_app_status SET withdraw_rate = 13;
-
-  WHEN _hardfork_id = 24 THEN
-  UPDATE btracker_app_status SET start_delayed_vests = TRUE;
-
-  ELSE
-  END CASE;
 
 END
 $$;
