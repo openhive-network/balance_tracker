@@ -1,310 +1,188 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION process_claim_reward_balance_operation(
-    body jsonb, _source_op bigint, _source_op_block int
-)
-RETURNS void
-LANGUAGE 'plpgsql' VOLATILE
+DROP TYPE IF EXISTS impacted_info_rewards_return CASCADE;
+CREATE TYPE impacted_info_rewards_return AS
+(
+    account_name VARCHAR,
+    posting_reward BIGINT,
+    curation_reward BIGINT
+);
+
+DROP TYPE IF EXISTS impacted_rewards_return CASCADE;
+CREATE TYPE impacted_rewards_return AS
+(
+    account_name VARCHAR,
+    hbd_payout BIGINT,
+    hive_payout BIGINT,
+    vesting_payout BIGINT
+);
+
+CREATE OR REPLACE FUNCTION get_impacted_reward_balances(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+RETURNS impacted_rewards_return
+LANGUAGE plpgsql
+STABLE
+AS
+$BODY$
+BEGIN
+  RETURN (
+    CASE 
+      WHEN _op_type_id = 39 THEN
+        process_claim_reward_balance_operation(_operation_body)
+
+      WHEN _op_type_id = 51 OR _op_type_id = 63 THEN
+        process_author_or_benefactor_reward_operation(_operation_body, _source_op_block, _op_type_id)
+
+      WHEN _op_type_id = 52 THEN
+        process_curation_reward_operation(_operation_body, _source_op_block)
+    END
+  );
+
+END;
+$BODY$;
+
+
+CREATE OR REPLACE FUNCTION get_impacted_info_reward_balances(IN _operation_body JSONB, IN _op_type_id INT)
+RETURNS impacted_info_rewards_return
+LANGUAGE plpgsql
+STABLE
+AS
+$BODY$
+BEGIN
+  RETURN (
+    CASE 
+      WHEN _op_type_id = 52 THEN
+        process_curation_rewards(_operation_body)
+
+      WHEN _op_type_id = 53 THEN
+        process_posting_rewards(_operation_body)
+    END
+  );
+
+END;
+$BODY$;
+
+CREATE OR REPLACE FUNCTION process_posting_rewards(IN _operation_body JSONB)
+RETURNS impacted_info_rewards_return
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
-WITH claim_reward_balance_operation AS 
-(
-  SELECT 
-    (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'account') AS _account,
-    ((body)->'value'->'reward_hive'->>'amount')::BIGINT AS _hive_payout,
-    ((body)->'value'->'reward_hbd'->>'amount')::BIGINT AS _hbd_payout,
-    ((body)->'value'->'reward_vests'->>'amount')::numeric AS _vesting_payout
-)
-  INSERT INTO account_rewards
-  (
-  account,
-  nai,
-  balance,
-  source_op,
-  source_op_block
-  ) 
-  SELECT
-    _account,
-    13,
-    _hbd_payout,
-    _source_op,
-    _source_op_block
-  FROM claim_reward_balance_operation
-  WHERE _hbd_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    21,
-    _hive_payout,
-    _source_op,
-    _source_op_block
-  FROM claim_reward_balance_operation
-  WHERE _hive_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    37,
-    _vesting_payout,
-    _source_op,
-    _source_op_block
-  FROM claim_reward_balance_operation
-  WHERE _vesting_payout > 0
-  UNION ALL
-  SELECT
-    crbo._account,
-    38,
-  (SELECT ROUND(caar.balance * crbo._vesting_payout / car.balance, 3)
-  FROM account_rewards car
-  JOIN account_rewards caar ON caar.nai = 38 AND caar.account = car.account
-  WHERE car.nai = 37 and car.account = crbo._account),
-    _source_op,
-    _source_op_block
-  FROM claim_reward_balance_operation crbo
-  WHERE crbo._vesting_payout > 0
-  ON CONFLICT ON CONSTRAINT pk_account_rewards
-  DO UPDATE SET
-      balance = account_rewards.balance - EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block;
-
+  RETURN (
+    ((_operation_body)->'value'->>'author')::TEXT,
+    ((_operation_body)->'value'->>'author_rewards')::BIGINT,
+    0
+  )::impacted_info_rewards_return;
+  
 END
 $$;
 
-
-CREATE OR REPLACE FUNCTION process_author_reward_operation(
-    body jsonb,
-    _source_op bigint,
-    _source_op_block int
-)
-
-RETURNS void
-LANGUAGE 'plpgsql' VOLATILE
+CREATE OR REPLACE FUNCTION process_curation_rewards(IN _operation_body JSONB)
+RETURNS impacted_info_rewards_return
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
-  WITH author_reward_operation AS 
-  (
+  RETURN (
+    ((_operation_body)->'value'->>'curator')::TEXT,
+    0,
+    ((_operation_body)->'value'->'reward'->>'amount')::BIGINT
+
+  )::impacted_info_rewards_return;
+  
+END
+$$;
+
+CREATE OR REPLACE FUNCTION process_author_or_benefactor_reward_operation(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+RETURNS impacted_rewards_return
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+RETURN (
+  WITH author_reward_operation AS (
     SELECT
-      (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'author') AS _account,
-      ((body)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
-      ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
-      ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
-  )
-  INSERT INTO account_rewards (
-    account,
-    nai,
-    balance,
-    source_op,
-    source_op_block
-  )
-  SELECT
-    _account,
-    13,
-    _hbd_payout,
-    _source_op,
-    _source_op_block
-  FROM author_reward_operation
-  WHERE _hbd_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    21,
-    _hive_payout,
-    _source_op,
-    _source_op_block
-  FROM author_reward_operation
-  WHERE _hive_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    37,
-    _vesting_payout,
-    _source_op,
-    _source_op_block
-  FROM author_reward_operation
-  WHERE _vesting_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    38,
-    (SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout)),
-    _source_op,
-    _source_op_block
-  FROM author_reward_operation
-  WHERE _vesting_payout > 0
-  ON CONFLICT ON CONSTRAINT pk_account_rewards
-  DO UPDATE SET
-    balance = account_rewards.balance + EXCLUDED.balance,
-    source_op = EXCLUDED.source_op,
-    source_op_block = EXCLUDED.source_op_block;
-  
-END
-$$;
-
-CREATE OR REPLACE FUNCTION process_curation_reward_operation(
-    body jsonb,
-    _source_op bigint,
-    _source_op_block int
-)
-
-RETURNS void
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-  WITH curation_reward_operation AS 
-  (
-    SELECT 
-      (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'curator') AS _account,
-      ((body)->'value'->'reward'->>'amount')::BIGINT AS _reward,
-      (SELECT hive.get_vesting_balance(_source_op_block, ((body)->'value'->'reward'->>'amount')::BIGINT)) AS _reward_hive,
-      ((body)->'value'->>'payout_must_be_claimed')::BOOLEAN AS _payout_must_be_claimed
+      (CASE 
+        WHEN _op_type_id = 51 THEN
+          (_operation_body)->'value'->>'author'
+        ELSE
+          (_operation_body)->'value'->>'benefactor'
+        END
+      )::TEXT AS account_name,
+      ((_operation_body)->'value'->'hbd_payout'->>'amount')::BIGINT AS hbd_payout,
+      ((_operation_body)->'value'->'hive_payout'->>'amount')::BIGINT AS hive_payout,
+      ((_operation_body)->'value'->'vesting_payout'->>'amount')::BIGINT AS vesting_payout
   ),
-  insert_balance AS
-  (
-INSERT INTO account_rewards (
-    account,
-    nai,
-    balance,
-    source_op,
-    source_op_block
+  add_vesting_balance AS (
+    SELECT 
+      account_name, 
+      hbd_payout,
+      hive_payout,
+      vesting_payout
+    FROM author_reward_operation
   )
-  SELECT
-    _account,
-    37,
-    _reward,
-    _source_op,
-    _source_op_block
-    FROM curation_reward_operation
-    WHERE _payout_must_be_claimed = TRUE
+  SELECT 
+    (
+      account_name, 
+      hbd_payout,
+      hive_payout,
+      vesting_payout
+    )::impacted_rewards_return
+  FROM add_vesting_balance
+);
 
-  UNION ALL
-  SELECT
-    _account,
-    38,
-    _reward_hive,
-    _source_op,
-    _source_op_block
-    FROM curation_reward_operation
-    WHERE _payout_must_be_claimed = TRUE
+END
+$$;
 
-  ON CONFLICT ON CONSTRAINT pk_account_rewards
-  DO UPDATE SET
-      balance = account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block
-  )
-
-  INSERT INTO account_info_rewards (
-    account,
-    curation_rewards
-  )
-  SELECT
-    _account,
-    _reward_hive
-    FROM curation_reward_operation
-
-  ON CONFLICT ON CONSTRAINT pk_account_info_rewards
-  DO UPDATE SET
-    curation_rewards = account_info_rewards.curation_rewards + EXCLUDED.curation_rewards;
+CREATE OR REPLACE FUNCTION process_curation_reward_operation(IN _operation_body JSONB, IN _source_op_block INT)
+RETURNS impacted_rewards_return
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+RETURN (
+  WITH author_curation_operation AS (
+    SELECT
+      ((_operation_body)->'value'->>'curator')::TEXT AS account_name,
+      0 AS hbd_payout,
+      0 AS hive_payout,
+      ((_operation_body)->'value'->'reward'->>'amount')::BIGINT AS vesting_payout
+  )  
+  SELECT 
+    (
+      account_name, 
+      hbd_payout,
+      hive_payout,
+      vesting_payout
+    )::impacted_rewards_return
+  FROM author_curation_operation
+);
   
 END
 $$;
 
-CREATE OR REPLACE FUNCTION process_comment_benefactor_reward_operation(
-    body jsonb, _source_op bigint, _source_op_block int
-)
-RETURNS void
-LANGUAGE 'plpgsql' VOLATILE
+CREATE OR REPLACE FUNCTION process_claim_reward_balance_operation(IN _operation_body JSONB)
+RETURNS impacted_rewards_return
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
-WITH comment_benefactor_reward_operation AS 
-(
-  SELECT 
-    (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'benefactor') AS _account,
-    ((body)->'value'->'hbd_payout'->>'amount')::BIGINT AS _hbd_payout,
-    ((body)->'value'->'hive_payout'->>'amount')::BIGINT AS _hive_payout,
-    ((body)->'value'->'vesting_payout'->>'amount')::BIGINT AS _vesting_payout
-)
-INSERT INTO account_rewards (
-    account,
-    nai,
-    balance,
-    source_op,
-    source_op_block
+RETURN (
+  WITH author_claim_reward_operation AS (
+    SELECT
+      ((_operation_body)->'value'->>'account')::TEXT AS account_name,
+      - ((_operation_body)->'value'->'reward_hbd'->>'amount')::BIGINT AS claim_hbd,
+      - ((_operation_body)->'value'->'reward_hive'->>'amount')::BIGINT AS claim_hive,
+      - ((_operation_body)->'value'->'reward_vests'->>'amount')::BIGINT AS claim_vests
   )
-  SELECT
-    _account,
-    13,
-    _hbd_payout,
-    _source_op,
-    _source_op_block
-  FROM comment_benefactor_reward_operation
-  WHERE _hbd_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    21,
-    _hive_payout,
-    _source_op,
-    _source_op_block
-  FROM comment_benefactor_reward_operation
-  WHERE _hive_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    37,
-    _vesting_payout,
-    _source_op,
-    _source_op_block
-  FROM comment_benefactor_reward_operation
-  WHERE _vesting_payout > 0
-  UNION ALL
-  SELECT
-    _account,
-    38,
-    (SELECT hive.get_vesting_balance(_source_op_block, _vesting_payout)),
-    _source_op,
-    _source_op_block
-  FROM comment_benefactor_reward_operation
-  WHERE _vesting_payout > 0
-  ON CONFLICT ON CONSTRAINT pk_account_rewards
-  DO UPDATE SET
-    balance = account_rewards.balance + EXCLUDED.balance,
-    source_op = EXCLUDED.source_op,
-    source_op_block = EXCLUDED.source_op_block;
-END
-$$;
-
-CREATE OR REPLACE FUNCTION process_comment_reward_operation(
-    body jsonb
-)
-RETURNS void
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-
-WITH comment_reward_operation AS
-(
   SELECT 
-    (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'author') AS _account,
-    ((body)->'value'->>'author_rewards')::BIGINT AS _author_rewards
-)
-INSERT INTO account_info_rewards (
-    account,
-    posting_rewards
-  )
-  SELECT
-    _account,
-    _author_rewards
-  FROM comment_reward_operation
-
-  ON CONFLICT ON CONSTRAINT pk_account_info_rewards
-  DO UPDATE SET
-    posting_rewards = account_info_rewards.posting_rewards + EXCLUDED.posting_rewards;
+    (
+      account_name, 
+      claim_hbd,
+      claim_hive,
+      claim_vests
+    )::impacted_rewards_return
+  FROM author_claim_reward_operation
+);
 
 END
 $$;

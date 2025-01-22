@@ -14,7 +14,7 @@ CREATE TYPE impacted_savings_return AS
 CREATE OR REPLACE FUNCTION get_impacted_saving_balances(IN _operation_body JSONB, IN _op_type_id INT)
 RETURNS impacted_savings_return
 LANGUAGE plpgsql
-VOLATILE
+STABLE
 AS
 $BODY$
 BEGIN
@@ -42,7 +42,7 @@ $BODY$;
 
 CREATE OR REPLACE FUNCTION process_transfer_to_savings_operation(IN _operation_body JSONB)
 RETURNS impacted_savings_return
-LANGUAGE 'plpgsql' VOLATILE
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
@@ -59,7 +59,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION process_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS impacted_savings_return
-LANGUAGE 'plpgsql' VOLATILE
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
@@ -76,7 +76,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION process_fill_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS impacted_savings_return
-LANGUAGE 'plpgsql' VOLATILE
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
@@ -93,7 +93,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION process_interest_operation(IN _operation_body JSONB)
 RETURNS impacted_savings_return
-LANGUAGE 'plpgsql' VOLATILE
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
@@ -110,7 +110,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION process_cancel_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS impacted_savings_return
-LANGUAGE 'plpgsql' VOLATILE
+LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN

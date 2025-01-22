@@ -275,7 +275,7 @@ BEGIN
   PERFORM process_block_range_balances(_from, _to);
   PERFORM process_block_range_data(_from, _to);
   PERFORM process_block_range_savings(_from, _to);
-
+  PERFORM process_block_range_rewards(_from, _to);
 
   IF _logs THEN
     __end_ts := clock_timestamp();
@@ -306,6 +306,7 @@ BEGIN
   PERFORM process_block_range_balances(_block, _block);
   PERFORM process_block_range_data(_block, _block);
   PERFORM process_block_range_savings(_block, _block);
+  PERFORM process_block_range_rewards(_block, _block);
 
   IF _logs THEN
     __end_ts := clock_timestamp();

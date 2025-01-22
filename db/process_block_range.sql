@@ -217,20 +217,8 @@ SELECT
   ov.op_type_id 
 FROM operations_view ov
 WHERE 
- ov.op_type_id IN (40,41,62,39,4,20,56,60,52,53,77,70,68,51,63) AND 
+ ov.op_type_id IN (40,41,62,4,20,56,60,77,70,68) AND 
  ov.block_num BETWEEN _from AND _to
-),
-filter_ops AS 
-(
-SELECT 
-  ov.body,
-  ov.source_op,
-  ov.source_op_block,
-  ov.op_type_id 
-FROM process_block_range_data_b ov
-WHERE 
-  (ov.op_type_id IN (40,41,62,39,4,20,56,60,52,53,77,70,68) or
-  (ov.op_type_id IN (51,63) and (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true))
 ),
 insert_balance AS MATERIALIZED 
 (
@@ -247,18 +235,6 @@ SELECT
   WHEN pbr.op_type_id = 62 THEN
     process_return_vesting_delegation_operation(pbr.body, pbr.source_op, pbr.source_op_block)
 
-  WHEN pbr.op_type_id = 39 THEN
-    process_claim_reward_balance_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 51 THEN
-    process_author_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 52 THEN
-    process_curation_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
-  WHEN pbr.op_type_id = 63 THEN
-    process_comment_benefactor_reward_operation(pbr.body, pbr.source_op, pbr.source_op_block)
-
   WHEN pbr.op_type_id = 4 THEN
     process_withdraw_vesting_operation(pbr.body, (SELECT withdraw_rate FROM btracker_app_status))
 
@@ -267,9 +243,6 @@ SELECT
 
   WHEN pbr.op_type_id = 56 THEN
     process_fill_vesting_withdraw_operation(pbr.body, (SELECT start_delayed_vests FROM btracker_app_status))
-
-  WHEN pbr.op_type_id = 53 THEN
-    process_comment_reward_operation(pbr.body)
 
   WHEN pbr.op_type_id = 77 AND (SELECT start_delayed_vests FROM btracker_app_status) = TRUE THEN
     process_transfer_to_vesting_completed_operation(pbr.body)
@@ -283,7 +256,7 @@ SELECT
   WHEN pbr.op_type_id = 60 THEN
     process_hardfork(((pbr.body)->'value'->>'hardfork_id')::INT)
   END)
-FROM filter_ops pbr
+FROM process_block_range_data_b pbr
 ORDER BY pbr.source_op_block, pbr.source_op
 )
 
