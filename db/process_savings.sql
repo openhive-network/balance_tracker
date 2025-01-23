@@ -13,7 +13,7 @@ DECLARE
   __insert_transfer_requests INT;
   __upsert_transfers INT;
 BEGIN
-WITH process_block_range_data_b AS MATERIALIZED 
+WITH process_block_range_data_b AS  
 (
   SELECT 
     ov.body_binary::jsonb AS body,
@@ -60,6 +60,7 @@ convert_parameters AS (
   FROM get_impacted_bal gi
   order by source_op
 ),
+---------------------------------------------------------------------------------------
 -- views for specific operation types
 cancel_and_fill_transfers AS (
   SELECT  
@@ -96,13 +97,11 @@ income_transfers AS (
     request_id,  
     op_type_id,
     source_op,
-    source_op_block,
-    FALSE AS delete_transfer_id_from_table,
-    FALSE AS insert_transfer_id_to_table
+    source_op_block
   FROM convert_parameters
   WHERE op_type_id IN (32,55)
 ),
-
+---------------------------------------------------------------------------------------
 -- find if transfer from savings happened in same batch of blocks as cancel or fill
 join_canceled_transfers_in_query AS (
   SELECT  
@@ -117,23 +116,25 @@ join_canceled_transfers_in_query AS (
 	  (SELECT tf.source_op FROM transfers_from tf WHERE tf.account_id = cpo.account_id AND tf.request_id = cpo.request_id AND tf.source_op < cpo.source_op ORDER BY tf.source_op DESC LIMIT 1) AS last_transfer_id
   FROM cancel_and_fill_transfers cpo
 ),
-prepare_canceled_transfers_in_query AS (
+prepare_canceled_transfers_in_query AS MATERIALIZED (
   SELECT  
     jct.account_id,
     (CASE WHEN jct.op_type_id = 34 THEN tf.nai ELSE jct.nai END) AS nai,
-    (CASE WHEN jct.op_type_id = 34 THEN tf.balance ELSE jct.balance END) AS balance,
+    (CASE WHEN jct.op_type_id = 34 THEN (- tf.balance) ELSE jct.balance END) AS balance,
     jct.savings_withdraw_request,
     jct.request_id,  
     jct.op_type_id,
     jct.source_op,
     jct.source_op_block,
 	  jct.last_transfer_id,
+-- if transfer wasn't found in join_canceled_transfers_in_query, it has to be removed from transfer_saving_id table
 	  (CASE WHEN jct.last_transfer_id IS NULL THEN TRUE ELSE FALSE END) AS delete_transfer_id_from_table,
 	  FALSE AS insert_transfer_id_to_table
   FROM join_canceled_transfers_in_query jct
   LEFT JOIN transfers_from tf ON tf.source_op = jct.last_transfer_id
 ),
--- 1/2 cancels
+----------------------------------------
+-- 1/2 cancels (found in same batch of blocks as transfers - request_id doesn't require removing from transfer_saving_id table)
 canceled_transfers_in_query AS (
   SELECT  
     account_id,
@@ -150,8 +151,7 @@ canceled_transfers_in_query AS (
   FROM prepare_canceled_transfers_in_query 
   WHERE NOT delete_transfer_id_from_table
 ),
-
--- if transfer wasn't found in above query, it has to be removed from transfer_saving_id table
+----------------------------------------
 prepare_canceled_transfers_already_inserted AS (
   SELECT  
     account_id,
@@ -167,12 +167,12 @@ prepare_canceled_transfers_already_inserted AS (
   FROM prepare_canceled_transfers_in_query 
   WHERE delete_transfer_id_from_table
 ),
--- 2/2 cancels
+-- 2/2 cancels (transfer happened in diffrent batch of blocks - request_id must be removed from transfer_saving_id table)
 canceled_transfers_already_inserted AS (
   SELECT  
     pct.account_id,
     (CASE WHEN pct.op_type_id = 34 THEN tsi.nai ELSE pct.nai END) AS nai,
-    (CASE WHEN pct.op_type_id = 34 THEN tsi.balance ELSE pct.balance END) AS balance,
+    (CASE WHEN pct.op_type_id = 34 THEN (- tsi.balance) ELSE pct.balance END) AS balance,
     pct.savings_withdraw_request,
     pct.request_id,  
     pct.op_type_id,
@@ -183,6 +183,8 @@ canceled_transfers_already_inserted AS (
   FROM prepare_canceled_transfers_already_inserted pct
   JOIN transfer_saving_id tsi ON tsi.request_id = pct.request_id AND tsi.account = pct.account_id
 ),
+----------------------------------------
+---------------------------------------------------------------------------------------
 transfers_from_canceled_in_query AS (
   SELECT  
     cp.account_id,
@@ -194,12 +196,15 @@ transfers_from_canceled_in_query AS (
     cp.source_op,
     cp.source_op_block,
 	  FALSE AS delete_transfer_id_from_table,
+-- if transfer was cancelled in the same batch of block it doen't require to be inserted into transfer_saving_id table
 	  (NOT EXISTS (SELECT 1 FROM canceled_transfers_in_query cti WHERE cti.last_transfer_id = cp.source_op)) AS insert_transfer_id_to_table
   FROM transfers_from cp
 ),
-
+---------------------------------------------------------------------------------------
 -- union all transfer operations 
 union_operations AS (
+
+-- transfers from savings
   SELECT  
     account_id,
     nai,
@@ -215,6 +220,24 @@ union_operations AS (
 
   UNION ALL
 
+-- transfers to savings
+  SELECT  
+    account_id,
+    nai,
+    balance,
+    savings_withdraw_request,
+    request_id,  
+    op_type_id,
+    source_op,
+    source_op_block,
+	  FALSE AS delete_transfer_id_from_table,
+    FALSE AS insert_transfer_id_to_table
+  FROM income_transfers
+
+  UNION ALL
+
+---------------------------------------------------------------------------------------
+-- cancel / filled transfers
   SELECT  
     account_id,
     nai,
@@ -242,21 +265,7 @@ union_operations AS (
 	  delete_transfer_id_from_table,
 	  insert_transfer_id_to_table
   FROM canceled_transfers_already_inserted
-
-  UNION ALL
-
-  SELECT  
-    account_id,
-    nai,
-    balance,
-    savings_withdraw_request,
-    request_id,  
-    op_type_id,
-    source_op,
-    source_op_block,
-	  delete_transfer_id_from_table,
-	  insert_transfer_id_to_table
-  FROM income_transfers
+---------------------------------------------------------------------------------------
 ),
 sum_all_transfers AS (
   SELECT 
@@ -269,7 +278,7 @@ sum_all_transfers AS (
   FROM union_operations uo
   GROUP BY uo.account_id, uo.nai
 ),
-
+---------------------------------------------------------------------------------------
 delete_all_canceled_or_filled_transfers AS (
   DELETE FROM transfer_saving_id tsi
   USING union_operations uo
