@@ -12,10 +12,7 @@ DECLARE
   __insert_rewards INT;
   __insert_info_rewards INT;
 BEGIN
-
-
-
-WITH process_block_range_data_b AS  
+WITH process_block_range_data_b AS MATERIALIZED
 (
   SELECT 
     ov.body,
@@ -37,43 +34,84 @@ filter_reward_ops AS (
   FROM process_block_range_data_b ov
   WHERE 
     ov.op_type_id = 39 OR
-    (ov.op_type_id = ANY(ARRAY[51,63,52]) AND (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
-),
-filter_info_reward_ops AS 
-(
-  SELECT 
-    ov.body,
-    ov.source_op,
-    ov.source_op_block,
-    ov.op_type_id 
-  FROM process_block_range_data_b ov
-  WHERE 
-    ov.op_type_id = ANY(ARRAY[52,53])
+    (ov.op_type_id = ANY(ARRAY[51,63]) AND (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
 ),
 ------------------------------------------------------------------------------
 --prepare info rewards data
-get_impacted_info_rewards AS (
+get_impacted_posting AS (
   SELECT 
-    get_impacted_info_reward_balances(fio.body, fio.op_type_id) AS get_impacted_info_reward_balances,
+    process_posting_rewards(fio.body) AS get_posting,
     fio.op_type_id,
     fio.source_op,
     fio.source_op_block 
-  FROM filter_info_reward_ops fio
+  FROM process_block_range_data_b fio
+  WHERE fio.op_type_id = 53
 ),
-convert_info_rewards_parameters AS (
+get_impacted_curation AS (
   SELECT 
-	  (gi.get_impacted_info_reward_balances).account_name AS account_name,
-    (gi.get_impacted_info_reward_balances).posting_reward AS posting,
-    (gi.get_impacted_info_reward_balances).curation_reward AS curation
-  FROM get_impacted_info_rewards gi
+    process_curation_rewards(fio.body) AS get_curation,
+    fio.op_type_id,
+    fio.source_op,
+    fio.source_op_block 
+  FROM process_block_range_data_b fio
+  WHERE fio.op_type_id = 52
+),
+prepare_curation AS (
+  SELECT 
+    (gi.get_curation).account_name AS account_name,
+    (gi.get_curation).reward AS reward,
+    (gi.get_curation).payout_must_be_claimed AS payout_must_be_claimed,
+    gi.op_type_id,
+    gi.source_op,
+    gi.source_op_block 
+  FROM get_impacted_curation gi
+),
+prepare_posting AS (
+  SELECT 
+    (gi.get_posting).account_name AS account_name,
+    (gi.get_posting).reward AS posting_reward,
+    gi.op_type_id,
+    gi.source_op,
+    gi.source_op_block 
+  FROM get_impacted_posting gi
+),
+------------------------------------------------------------------------------
+-- calculate curation_reward into hive
+calculate_vests_from_curation AS MATERIALIZED (
+  SELECT 
+    pc.account_name,
+    pc.reward,
+    (pc.reward * bv.total_vesting_fund_hive::NUMERIC / NULLIF(bv.total_vesting_shares, 0)::NUMERIC)::BIGINT AS curation_reward,
+    pc.payout_must_be_claimed,
+    pc.op_type_id,
+    pc.source_op,
+    pc.source_op_block 
+  FROM prepare_curation pc
+  JOIN hive.blocks_view bv ON bv.num = pc.source_op_block
+),
+------------------------------------------------------------------------------
+get_impacted_info_rewards AS (
+  SELECT 
+    account_name,
+    posting_reward,
+    0 AS curation_reward
+  FROM prepare_posting
+
+  UNION ALL
+
+  SELECT 
+    account_name,
+    0 AS posting_reward,
+    curation_reward
+  FROM calculate_vests_from_curation 
 ),
 -- prepare info rewards data
 group_by_account_info AS (
   SELECT 
     account_name,
-    SUM(posting) AS posting,
-    SUM(curation) AS curation
-  FROM convert_info_rewards_parameters
+    SUM(posting_reward) AS posting,
+    SUM(curation_reward) AS curation
+  FROM get_impacted_info_rewards
   GROUP BY account_name
 ),
 posting_and_curations_account_id AS (
@@ -147,6 +185,20 @@ union_operations_with_vesting_balance AS (
     source_op_block
   FROM convert_params
   WHERE op_type_id = 39
+
+  UNION ALL
+
+  SELECT 
+    account_name,
+    0 AS reward_hbd,
+    0 AS reward_hive,  
+    reward AS reward_vests,  
+    curation_reward AS reward_vest_balance,
+    op_type_id,
+    source_op,
+    source_op_block
+  FROM calculate_vests_from_curation
+  WHERE payout_must_be_claimed
 
 ),
 ------------------------------------------------------------------------------
@@ -252,7 +304,7 @@ sum_prev_vests_without_current_row AS (
     cp.is_claim
   FROM join_prev_balances cp
 ),
-sum_vests_add_row_number AS  (
+sum_vests_add_row_number AS MATERIALIZED (
   SELECT 
     cp.account_name,
     cp.reward_hbd,
