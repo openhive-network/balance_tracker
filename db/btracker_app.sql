@@ -264,6 +264,7 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
+  __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
 BEGIN
   PERFORM set_config('synchronous_commit', 'OFF', false);
 
@@ -272,10 +273,39 @@ BEGIN
     __start_ts := clock_timestamp();
   END IF;
 
-  PERFORM process_block_range_balances(_from, _to);
-  PERFORM process_block_range_data(_from, _to);
-  PERFORM process_block_range_savings(_from, _to);
-  PERFORM process_block_range_rewards(_from, _to);
+  -- TODO: remove this hack after the hardfork_hive_operation is fixed
+
+  -- harfork_hive_operation lacks informations about rewards, savings and balances
+  -- to use rewards, savings and balances processed in query rather by insterting every operation to table
+  -- hf_23 accounts needs to be processed manually
+  
+  -- Check if the block number hf_23 is within the range
+  IF __hardfork_23_block BETWEEN _from AND _to THEN
+    -- Enter a loop iterating from _from to hf_23
+    PERFORM process_block_range_balances(_from, __hardfork_23_block);
+    PERFORM process_block_range_data(_from, __hardfork_23_block);
+    PERFORM process_block_range_savings(_from, __hardfork_23_block);
+    PERFORM process_block_range_rewards(_from, __hardfork_23_block);
+    
+    -- Manually process hardfork_hive_operation for balance, rewards, savings
+    PERFORM process_hf_23(__hardfork_23_block);
+    RAISE NOTICE 'Btracker processed hardfork 23 successfully';
+
+    IF __hardfork_23_block != _to THEN 
+      -- Continue the loop from hf_23 to _to
+      PERFORM process_block_range_balances(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_data(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
+    END IF;
+
+  ELSE
+    -- If 41818752 is not in range, process the full range normally
+    PERFORM process_block_range_balances(_from, _to);
+    PERFORM process_block_range_data(_from, _to);
+    PERFORM process_block_range_savings(_from, _to);
+    PERFORM process_block_range_rewards(_from, _to);
+  END IF;
 
   IF _logs THEN
     __end_ts := clock_timestamp();
