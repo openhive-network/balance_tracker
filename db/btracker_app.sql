@@ -283,10 +283,12 @@ BEGIN
   IF __hardfork_23_block BETWEEN _from AND _to THEN
     -- Enter a loop iterating from _from to hf_23
     PERFORM process_block_range_balances(_from, __hardfork_23_block);
-    PERFORM process_block_range_data(_from, __hardfork_23_block);
+    PERFORM process_block_range_withdrawals(_from, __hardfork_23_block);
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
-    
+    PERFORM process_block_range_delegations(_from, __hardfork_23_block);
+
+
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM process_hf_23(__hardfork_23_block);
     RAISE NOTICE 'Btracker processed hardfork 23 successfully';
@@ -294,17 +296,20 @@ BEGIN
     IF __hardfork_23_block != _to THEN 
       -- Continue the loop from hf_23 to _to
       PERFORM process_block_range_balances(__hardfork_23_block + 1, _to);
-      PERFORM process_block_range_data(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_withdrawals(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
     END IF;
 
   ELSE
     -- If 41818752 is not in range, process the full range normally
     PERFORM process_block_range_balances(_from, _to);
-    PERFORM process_block_range_data(_from, _to);
+    PERFORM process_block_range_withdrawals(_from, _to);
     PERFORM process_block_range_savings(_from, _to);
     PERFORM process_block_range_rewards(_from, _to);
+    PERFORM process_block_range_delegations(_from, _to);
+
   END IF;
 
   IF _logs THEN
@@ -334,9 +339,10 @@ BEGIN
   END IF;
 
   PERFORM process_block_range_balances(_block, _block);
-  PERFORM process_block_range_data(_block, _block);
+  PERFORM process_block_range_withdrawals(_block, _block);
   PERFORM process_block_range_savings(_block, _block);
   PERFORM process_block_range_rewards(_block, _block);
+  PERFORM process_block_range_delegations(_block, _block);
 
   IF _logs THEN
     __end_ts := clock_timestamp();
