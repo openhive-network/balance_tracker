@@ -10,12 +10,6 @@ WITH hardfork_hive_operation AS MATERIALIZED
 (
   SELECT 
     (SELECT id FROM accounts_view WHERE name = (body)->'value'->>'account') AS _account
-),
-delegations AS (
-  UPDATE account_delegations SET
-    delegated_vests = 0
-  FROM hardfork_hive_operation
-  WHERE account = _account
 )
   UPDATE account_withdraws SET
     vesting_withdraw_rate = 0,
