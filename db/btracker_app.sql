@@ -33,15 +33,13 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
 CREATE TABLE IF NOT EXISTS btracker_app_status
 (
   continue_processing BOOLEAN NOT NULL,
-  withdraw_rate INT NOT NULL,
-  start_delayed_vests BOOLEAN NOT NULL,
   is_indexes_created BOOLEAN NOT NULL
 );
 
 INSERT INTO btracker_app_status
-(continue_processing, withdraw_rate, start_delayed_vests, is_indexes_created)
+(continue_processing, is_indexes_created)
 VALUES
-(True, 104, False, False)
+(True, False)
 ;
 
 --ACCOUNT BALANCES
@@ -135,7 +133,8 @@ CREATE TABLE IF NOT EXISTS account_withdraws
   to_withdraw BIGINT DEFAULT 0,
   withdrawn BIGINT DEFAULT 0,          
   withdraw_routes BIGINT DEFAULT 0,
-  delayed_vests BIGINT DEFAULT 0,  
+  delayed_vests BIGINT DEFAULT 0,
+  source_op BIGINT,
 
   CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
 );
@@ -146,6 +145,7 @@ CREATE TABLE IF NOT EXISTS account_routes
   account INT NOT NULL,
   to_account INT NOT NULL,     
   percent INT NOT NULL,
+  source_op BIGINT NOT NULL,
     
   CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
 );
@@ -223,7 +223,7 @@ BEGIN
   RETURN EXISTS(
       SELECT true FROM pg_index WHERE indexrelid = 
       (
-        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_history_account_source_op_idx'
+        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_history_account_source_op_idx' LIMIT 1
       )
     );
 END
@@ -287,7 +287,6 @@ BEGIN
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
-
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM process_hf_23(__hardfork_23_block);
