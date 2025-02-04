@@ -177,6 +177,10 @@ DECLARE
   _ops_count INT;
   _calculate_total_pages INT;
 BEGIN
+  PERFORM validate_limit("page-size", 1000);
+  PERFORM validate_negative_limit("page-size");
+  PERFORM validate_negative_page("page");
+
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
@@ -221,6 +225,8 @@ BEGIN
       ELSE ((_ops_count/"page-size") + 1) 
       END
     )::INT INTO _calculate_total_pages;
+
+  PERFORM validate_page("page", _calculate_total_pages);
 
   RETURN (
     SELECT json_build_object(

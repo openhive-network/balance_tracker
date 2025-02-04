@@ -16,3 +16,5 @@ $$;
 --- Allow to create schemas
 GRANT btracker_owner TO haf_admin;
 GRANT btracker_user TO btracker_owner;
+
+ALTER ROLE btracker_user SET statement_timeout = '10s';
