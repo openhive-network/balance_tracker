@@ -5,43 +5,21 @@ set -o pipefail
 
 SCRIPTDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit 1; pwd -P )"
 
-haf_dir="../haf"
-endpoints="endpoints"
-rewrite_dir="${endpoints}_openapi"
-input_file="rewrite_rules.conf"
-temp_output_file=$(mktemp)
+haf_dir="${SCRIPTDIR}/../haf"
+endpoints="${SCRIPTDIR}/../openapi-gen-input/endpoints"
+
+DEPLOY="${SCRIPTDIR}/../"
+OUTPUT="$SCRIPTDIR/output"
 
 # Default directories with fixed order if none provided
-OUTPUT="$SCRIPTDIR/output"
-ENDPOINTS_IN_ORDER="
-../$endpoints/endpoint_schema.sql
-../$endpoints/types/coin_type.sql
-../$endpoints/types/sort_direction.sql
-../$endpoints/account-balances/get_account_balances.sql
-../$endpoints/account-balances/get_balance_history.sql"
 
-# Function to reverse the lines
-reverse_lines() {
-    awk '
-    BEGIN {
-        RS = ""
-        FS = "\n"
-    }
-    {
-        for (i = 1; i <= NF; i++) {
-            if ($i ~ /^#/) {
-                comment = $i
-            } else if ($i ~ /^rewrite/) {
-                rewrite = $i
-            }
-        }
-        if (NR > 1) {
-            print ""
-        }
-        print comment
-        print rewrite
-    }' "$input_file" | tac
-}
+ENDPOINTS_IN_ORDER=(
+"$endpoints/endpoint_schema.sql"
+"$endpoints/types/coin_type.sql"
+"$endpoints/types/sort_direction.sql"
+"$endpoints/account-balances/get_account_balances.sql"
+"$endpoints/account-balances/get_balance_history.sql"
+)
 
 # Function to install pip3
 install_pip() {
@@ -83,20 +61,19 @@ else
     echo "jsonpointer has been installed."
 fi
 
-echo "Using endpoints directories"
-echo "$ENDPOINTS_IN_ORDER"
+echo "Using endpoints sources:"
+echo "${ENDPOINTS_IN_ORDER[@]}"
+
+rm -rfv "${OUTPUT}"
+
+pushd "${SCRIPTDIR}"
 
 # run openapi rewrite script
 # shellcheck disable=SC2086
-python3 $haf_dir/scripts/process_openapi.py $OUTPUT $ENDPOINTS_IN_ORDER
+python3 "${haf_dir}/scripts/process_openapi.py" "$@" "${OUTPUT}" "${ENDPOINTS_IN_ORDER[@]}"
 
-# Create rewrite_rules.conf
-reverse_lines > "$temp_output_file"
-mv "$temp_output_file" "../$input_file"
-rm "$input_file"
+echo "Rewritten endpoint scripts and rewrite_rules.conf file saved in ${OUTPUT}"
+echo "Copying generated sources from ${OUTPUT}/openapi-gen-input/ into expected location by installation scripts: ${DEPLOY}"
+cp -vrf "${OUTPUT}"/openapi-gen-input/* "${OUTPUT}"/swagger-doc.json "${DEPLOY}"/
 
-# Move rewriten directory to /postgrest
-rm -rf "$SCRIPTDIR/../$rewrite_dir"
-mv "$OUTPUT/../$endpoints" "$SCRIPTDIR/../$rewrite_dir"
-rm -rf "$SCRIPTDIR/output"
-echo "Rewritten scripts saved in $rewrite_dir"
+popd
