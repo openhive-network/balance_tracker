@@ -313,28 +313,28 @@ CREATE OR REPLACE PROCEDURE btracker_massive_processing(
     IN _logs BOOLEAN
 )
 LANGUAGE 'plpgsql'
-AS
-$$
+AS $$
 DECLARE
-  __start_ts timestamptz;
-  __end_ts   timestamptz;
+    __current_time TIMESTAMP;
+    __block INT;
 BEGIN
-  PERFORM set_config('synchronous_commit', 'OFF', false);
+    PERFORM set_config('synchronous_commit', 'OFF', false);
 
-  IF _logs THEN
-    RAISE NOTICE 'Btracker is attempting to process a block range: <%, %>', _from, _to;
-    __start_ts := clock_timestamp();
-  END IF;
+    IF _logs THEN
+        RAISE NOTICE 'Btracker is attempting to process a block range: <%, %>', _from, _to;
+    END IF;
 
-  PERFORM btracker_block_range_data_a(_from, _to);
-  PERFORM btracker_block_range_data_b(_from, _to);
-
-  IF _logs THEN
-    __end_ts := clock_timestamp();
-    RAISE NOTICE 'Btracker processed block range: <%, %> successfully in % s
-    ', _from, _to, (extract(epoch FROM __end_ts - __start_ts));
-  END IF;
-END
+    PERFORM btracker_block_range_data_a(_from, _to);
+    PERFORM btracker_block_range_data_b(_from, _to);
+    
+    FOR __block IN _from.._to LOOP
+        SELECT created_at INTO __current_time FROM hive.blocks WHERE num = __block;
+        PERFORM process_limit_orders_for_block(__block, __current_time);
+        PERFORM process_escrow_transfers_for_block(__block, __current_time);
+        PERFORM process_conversions_for_block(__block, __current_time);
+        PERFORM remove_completed_operations(__block, __current_time);
+    END LOOP;
+END;
 $$;
 
 CREATE OR REPLACE PROCEDURE btracker_single_processing(
@@ -347,7 +347,7 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
-  __current_time timestamp;  -- Add this line
+  __current_time timestamp;
 BEGIN
   PERFORM set_config('synchronous_commit', 'ON', false);
 
@@ -359,75 +359,23 @@ BEGIN
   PERFORM btracker_block_range_data_a(_block, _block);
   PERFORM btracker_block_range_data_b(_block, _block);
 
-  -- getting the current current blockchain time from block timestamp
   SELECT created_at INTO __current_time 
   FROM hive.blocks 
   WHERE num = _block;
 
-  -- processing added balances (ones added by hasan)
+  PERFORM process_limit_orders_for_block(_block, __current_time);
+  PERFORM process_escrow_transfers_for_block(_block, __current_time);
+  PERFORM process_conversions_for_block(_block, __current_time);
+  
   PERFORM remove_completed_operations(_block, __current_time);
-
-  -- processing new operations for this block
-  -- limit orders
-  INSERT INTO account_open_orders
-  SELECT 
-    op.value->>'account' as account,
-    CASE (op.value->>'order_type')::int 
-      WHEN 0 THEN 13
-      ELSE 37
-    END as nai,
-    (op.value->>'amount')::bigint,
-    (op.value->>'price')::numeric,
-    (op.value->>'order_type')::smallint,
-    __current_time,
-    operations.id,
-    operations.id,
-    _block
-  FROM hive.operations_view operations
-  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
-  WHERE operations.block_num = _block
-  AND op.key = 'limit_order_create';
-
-  -- escrow transfers
-  INSERT INTO account_escrow_transfers
-  SELECT
-    op.value->>'from' as account,
-    op.value->>'to' as to_account,
-    op.value->>'agent' as agent,
-    (op.value->>'hbd_amount')::bigint,
-    (op.value->>'hive_amount')::bigint,
-    (op.value->>'escrow_id')::bigint,
-    (__current_time + (op.value->>'ratification_deadline')::interval),
-    (__current_time + (op.value->>'escrow_expiration')::interval),
-    operations.id,
-    _block
-  FROM hive.operations_view operations
-  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
-  WHERE operations.block_num = _block
-  AND op.key = 'escrow_transfer';
-
-  -- conversions
-  INSERT INTO account_pending_conversions
-  SELECT
-    op.value->>'owner' as account,
-    (op.value->>'amount')::bigint,
-    (__current_time + INTERVAL '3.5 days'),
-    operations.id,
-    operations.id,
-    _block
-  FROM hive.operations_view operations
-  CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
-  WHERE operations.block_num = _block
-  AND op.key = 'convert';
 
   IF _logs THEN
     __end_ts := clock_timestamp();
-    RAISE NOTICE 'Btracker processed block % successfully in % s
-    ', _block, (extract(epoch FROM __end_ts - __start_ts));
+    RAISE NOTICE 'Btracker processed block % successfully in % s', 
+      _block, (extract(epoch FROM __end_ts - __start_ts));
   END IF;
 END
 $$;
-
 CREATE OR REPLACE FUNCTION raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
@@ -496,7 +444,17 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,source_op DESC);
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx 
+    ON account_balance_history(account,nai,source_op DESC);
+  
+  CREATE INDEX IF NOT EXISTS idx_account_open_orders_account 
+    ON account_open_orders(account);
+  CREATE INDEX IF NOT EXISTS idx_account_escrow_transfers_account 
+    ON account_escrow_transfers(account);
+  CREATE INDEX IF NOT EXISTS idx_account_pending_conversions_account 
+    ON account_pending_conversions(account);
+  CREATE INDEX IF NOT EXISTS idx_transfer_saving_id_account 
+    ON transfer_saving_id(account);
 END
 $$;
 

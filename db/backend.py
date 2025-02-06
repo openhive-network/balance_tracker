@@ -181,3 +181,59 @@ class BalanceTracker:
         """.format(_account_name=_account_name, _coin_type=_coin_type, _start_time=_start_time, _end_time=_end_time, __time_increment=__time_increment)
 
         return self.Db.query(psql_cmd)
+
+    def get_account_special_balances(self, _account_name):
+        psql_cmd = """
+        WITH account_id AS (
+            SELECT id FROM hive.accounts_view WHERE name = '{_account_name}'
+        ),
+        open_orders AS (
+            SELECT 
+                SUM(CASE WHEN nai = 13 THEN amount END) as hive_in_orders,
+                SUM(CASE WHEN nai = 37 THEN amount END) as hbd_in_orders
+            FROM btracker_app.account_open_orders
+            WHERE account = (SELECT id FROM account_id)
+        ),
+        escrow_transfers AS (
+            SELECT 
+                SUM(hive_amount) as hive_in_escrow,
+                SUM(hbd_amount) as hbd_in_escrow
+            FROM btracker_app.account_escrow_transfers
+            WHERE account = (SELECT id FROM account_id)
+        ),
+        pending_conversions AS (
+            SELECT 
+                SUM(amount) as pending_conversion_amount
+            FROM btracker_app.account_pending_conversions
+            WHERE account = (SELECT id FROM account_id)
+        ),
+        pending_savings AS (
+            SELECT 
+                SUM(CASE WHEN nai = 13 THEN balance END) as hive_pending_savings,
+                SUM(CASE WHEN nai = 37 THEN balance END) as hbd_pending_savings
+            FROM btracker_app.transfer_saving_id
+            WHERE account = (SELECT id FROM account_id)
+            AND complete_date IS NULL
+        )
+        SELECT json_build_object(
+            'open_orders', json_build_object(
+                'hive', COALESCE(o.hive_in_orders, 0),
+                'hbd', COALESCE(o.hbd_in_orders, 0)
+            ),
+            'escrow_transfers', json_build_object(
+                'hive', COALESCE(e.hive_in_escrow, 0),
+                'hbd', COALESCE(e.hbd_in_escrow, 0)
+            ),
+            'pending_conversions', COALESCE(p.pending_conversion_amount, 0),
+            'pending_savings_withdrawals', json_build_object(
+                'hive', COALESCE(s.hive_pending_savings, 0),
+                'hbd', COALESCE(s.hbd_pending_savings, 0)
+            )
+        )
+        FROM open_orders o
+        CROSS JOIN escrow_transfers e
+        CROSS JOIN pending_conversions p
+        CROSS JOIN pending_savings s;
+        """.format(_account_name=_account_name)
+
+        return self.Db.query(psql_cmd)

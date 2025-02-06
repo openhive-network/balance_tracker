@@ -185,4 +185,104 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION process_limit_orders_for_block(
+    _block INT,
+    _current_time TIMESTAMP
+)
+RETURNS VOID 
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO account_open_orders
+    SELECT 
+        av.id,
+        CASE (op.value->>'order_type')::int WHEN 0 THEN 13 ELSE 37 END,
+        (op.value->>'amount')::bigint,
+        (op.value->>'price')::numeric,
+        (op.value->>'order_type')::smallint,
+        _current_time,
+        operations.id,
+        operations.id,
+        _block
+    FROM hive.operations_view operations
+    CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+    JOIN hive.accounts_view av ON av.name = op.value->>'account'
+    WHERE operations.block_num = _block
+    AND op.key = 'limit_order_create';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION process_escrow_transfers_for_block(
+    _block INT,
+    _current_time TIMESTAMP
+)
+RETURNS VOID 
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO account_escrow_transfers
+    SELECT
+        av.id,
+        av2.id,
+        av3.id,
+        (op.value->>'hbd_amount')::bigint,
+        (op.value->>'hive_amount')::bigint,
+        (op.value->>'escrow_id')::bigint,
+        (_current_time + (op.value->>'ratification_deadline')::interval),
+        (_current_time + (op.value->>'escrow_expiration')::interval),
+        operations.id,
+        _block
+    FROM hive.operations_view operations
+    CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+    JOIN hive.accounts_view av ON av.name = op.value->>'from'
+    JOIN hive.accounts_view av2 ON av2.name = op.value->>'to'
+    JOIN hive.accounts_view av3 ON av3.name = op.value->>'agent'
+    WHERE operations.block_num = _block
+    AND op.key = 'escrow_transfer';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION process_conversions_for_block(
+    _block INT,
+    _current_time TIMESTAMP
+)
+RETURNS VOID 
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO account_pending_conversions
+    SELECT
+        av.id,
+        (op.value->>'amount')::bigint,
+        (_current_time + INTERVAL '3.5 days'),
+        operations.id,
+        operations.id,
+        _block
+    FROM hive.operations_view operations
+    CROSS JOIN LATERAL jsonb_each(operations.body) op(key, value)
+    JOIN hive.accounts_view av ON av.name = op.value->>'owner'
+    WHERE operations.block_num = _block
+    AND op.key = 'convert';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION find_accounts_with_special_balances() 
+RETURNS TABLE (
+    account_name TEXT, 
+    has_orders BOOLEAN,
+    has_escrow BOOLEAN,
+    has_conversions BOOLEAN
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT DISTINCT 
+        av.name,
+        EXISTS (SELECT 1 FROM account_open_orders WHERE account = av.id),
+        EXISTS (SELECT 1 FROM account_escrow_transfers WHERE account = av.id),
+        EXISTS (SELECT 1 FROM account_pending_conversions WHERE account = av.id)
+    FROM hive.accounts_view av
+    WHERE EXISTS (SELECT 1 FROM account_open_orders WHERE account = av.id)
+       OR EXISTS (SELECT 1 FROM account_escrow_transfers WHERE account = av.id)
+       OR EXISTS (SELECT 1 FROM account_pending_conversions WHERE account = av.id)
+    LIMIT 10;
+END;
+$$;
+
 RESET ROLE;
