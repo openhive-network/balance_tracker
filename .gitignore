@@ -13,7 +13,12 @@ shellcheck-*.*
 **/test-results.jtl
 **/local.env
 **/ci.env
-endpoints_openapi
+# Generated files by openapi_rewrite.sh
+scripts/output
+endpoints
+swagger-doc.json
+rewrite_rules.conf
+
 build
 
 # Docker deployment
