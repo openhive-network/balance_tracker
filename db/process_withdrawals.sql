@@ -18,53 +18,39 @@ DECLARE
   __reset_filled_withdrawals  INT;
 BEGIN
 -----------------------------------------WITHDRAWALS---------------------------------------------
-WITH process_block_range_data_b AS 
+WITH process_block_range_data_b AS MATERIALIZED
 (
   SELECT 
-    ov.body_binary::jsonb AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id 
+    impacted_withdraws.account_name,
+    impacted_withdraws.withdrawn,
+    impacted_withdraws.vesting_withdraw_rate,
+    impacted_withdraws.to_withdraw,
+    ov.id AS source_op
   FROM operations_view ov
+  CROSS JOIN get_impacted_withdraws(ov.body, ov.op_type_id, ov.block_num) AS impacted_withdraws
   WHERE 
     ov.op_type_id IN (4,68) AND 
     ov.block_num BETWEEN _from AND _to
 ),
--- convert withdraws depending on operation type
-get_impacted_withdraw_balances AS (
-  SELECT 
-    get_impacted_withdraws(fio.body, fio.op_type_id, fio.source_op_block) AS impacted_withdraws,
-    fio.op_type_id,
-    fio.source_op,
-    fio.source_op_block 
-  FROM process_block_range_data_b fio
-),
-convert_parameters_withdraws AS MATERIALIZED (
-  SELECT 
-    (gi.impacted_withdraws).account_name AS account_name,
-    (gi.impacted_withdraws).withdrawn AS withdrawn,
-    (gi.impacted_withdraws).vesting_withdraw_rate AS vesting_withdraw_rate,
-    (gi.impacted_withdraws).to_withdraw AS to_withdraw,
-    gi.source_op,
-    gi.source_op_block
-  FROM get_impacted_withdraw_balances gi
-),
 group_by_account AS (
   SELECT 
     account_name,
-    MAX(source_op) AS source_op
-  FROM convert_parameters_withdraws
-  GROUP BY account_name
+    withdrawn,
+    vesting_withdraw_rate,
+    to_withdraw,
+    source_op,
+    ROW_NUMBER() OVER (PARTITION BY account_name ORDER BY source_op DESC) AS row_num
+  FROM process_block_range_data_b
 ),
 join_latest_withdraw AS (
   SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = cpfd.account_name) AS account_id,
-    cpfd.withdrawn,
-    cpfd.vesting_withdraw_rate,
-    cpfd.to_withdraw,
-    cpfd.source_op
-  FROM convert_parameters_withdraws cpfd
-  JOIN group_by_account gba ON cpfd.source_op = gba.source_op
+    (SELECT av.id FROM accounts_view av WHERE av.name = account_name) AS account_id,
+    withdrawn,
+    vesting_withdraw_rate,
+    to_withdraw,
+    source_op
+  FROM group_by_account
+  WHERE row_num = 1
 )
 INSERT INTO account_withdraws
   (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
@@ -85,46 +71,33 @@ DO UPDATE SET
 -----------------------------------------WITHDRAWAL ROUTES---------------------------------------------
 WITH process_block_range_data_b AS (
   SELECT 
-    ov.body_binary::jsonb AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id 
+    withdraw_vesting_route.from_account,
+    withdraw_vesting_route.to_account,
+    withdraw_vesting_route.percent,
+    ov.id AS source_op
   FROM operations_view ov
+  CROSS JOIN process_set_withdraw_vesting_route_operation(ov.body) AS withdraw_vesting_route
   WHERE 
     ov.op_type_id = 20 AND 
     ov.block_num BETWEEN _from AND _to
-),
--- convert vesting_route 
-get_impacted_vesting_route AS (
-  SELECT 
-    process_set_withdraw_vesting_route_operation(fio.body) AS withdraw_vesting_route,
-    fio.source_op
-  FROM process_block_range_data_b fio
-),
-convert_parameters_withdraw_routes AS MATERIALIZED (
-  SELECT 
-    (gi.withdraw_vesting_route).from_account AS from_account,
-    (gi.withdraw_vesting_route).to_account AS to_account,
-    (gi.withdraw_vesting_route).percent AS percent,
-    gi.source_op
-  FROM get_impacted_vesting_route gi
 ),
 group_by_account AS (
   SELECT 
     from_account,
     to_account,
-    MAX(source_op) AS source_op
-  FROM convert_parameters_withdraw_routes
-  GROUP BY from_account, to_account
+    percent,
+    source_op,
+    ROW_NUMBER() OVER (PARTITION BY from_account, to_account ORDER BY source_op DESC) AS row_num
+  FROM process_block_range_data_b
 ),
 join_latest_withdraw_routes AS (
   SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = cpfd.from_account) AS from_account,
-    (SELECT av.id FROM accounts_view av WHERE av.name = cpfd.to_account) AS to_account,
-    cpfd.percent,
-    cpfd.source_op
-  FROM convert_parameters_withdraw_routes cpfd
-  JOIN group_by_account gba ON cpfd.source_op = gba.source_op
+    (SELECT av.id FROM accounts_view av WHERE av.name = from_account) AS from_account,
+    (SELECT av.id FROM accounts_view av WHERE av.name = to_account) AS to_account,
+    percent,
+    source_op
+  FROM group_by_account 
+  WHERE row_num = 1
 ),
 join_prev_route AS (
   SELECT 
@@ -210,28 +183,19 @@ INTO __insert_routes, __delete_routes, __insert_sum_of_routes;
 -- delete routes for hf23 accounts (it will be triggered only once - in hf23 block range)
 WITH process_block_range_data_b AS (
   SELECT 
-    ov.body_binary::jsonb AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id 
+    (SELECT av.id FROM accounts_view av WHERE av.name = (ov.body->'value'->>'account')) AS account_id,
+    ov.id AS source_op
   FROM operations_view ov
   WHERE 
     ov.op_type_id = 68 AND 
     ov.block_num BETWEEN _from AND _to
-),
--- convert vesting_route 
-get_impacted_vesting_route AS (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (fio.body->'value'->>'account')) AS account_id,
-    fio.source_op
-  FROM process_block_range_data_b fio
 ),
 join_current_routes_for_hf23_accounts AS MATERIALIZED (
   SELECT 
     ar.account,
     ar.to_account
   FROM account_routes ar
-  JOIN get_impacted_vesting_route gi ON ar.account = gi.account_id
+  JOIN process_block_range_data_b gi ON ar.account = gi.account_id
   WHERE gi.source_op > ar.source_op
 ),
 count_deleted_routes AS (
@@ -268,42 +232,23 @@ INTO __delete_hf23_routes_count, __delete_hf23_routes;
 
 -----------------------------------------FILL WITHDRAWS---------------------------------------------
 
-WITH process_block_range_data_b AS 
+WITH process_block_range_data_b AS MATERIALIZED
 (
   SELECT 
-    ov.body_binary::jsonb AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id 
+    (SELECT av.id FROM accounts_view av WHERE av.name = fill_vesting_withdraw_operation.account_name) AS account_id,
+    fill_vesting_withdraw_operation.withdrawn,
+    ov.id AS source_op
   FROM operations_view ov
+  JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
+  CROSS JOIN process_fill_vesting_withdraw_operation(ov.body, ov.block_num > ah.block_num) AS fill_vesting_withdraw_operation
   WHERE 
     ov.op_type_id IN (56) AND 
     ov.block_num BETWEEN _from AND _to
 ),
 --------------------------------------------------------------------------------------
--- convert withdraws
-get_impacted_fills AS (
-  SELECT 
-    process_fill_vesting_withdraw_operation(
-      fio.body,
-      (SELECT (ah.block_num < fio.source_op_block) FROM hafd.applied_hardforks ah WHERE ah.hardfork_num = 1)
-    ) AS fill_vesting_withdraw_operation,
-    fio.source_op
-  FROM process_block_range_data_b fio
-),
-convert_parameters_for_delegations AS MATERIALIZED (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.fill_vesting_withdraw_operation).account_name) AS account_id,
-    (gi.fill_vesting_withdraw_operation).withdrawn AS withdrawn,
-    gi.source_op
-  FROM get_impacted_fills gi
-),
---------------------------------------------------------------------------------------
 group_by_account AS (
-  SELECT 
-    account_id
-  FROM convert_parameters_for_delegations
-  GROUP BY account_id
+  SELECT DISTINCT account_id
+  FROM process_block_range_data_b
 ),
 join_current_withdraw AS (
   SELECT 
@@ -320,7 +265,7 @@ get_fills_conserning_current_withdrawal AS MATERIALIZED (
     cp.account_id,
     SUM(cp.withdrawn) + aw.withdrawn AS withdrawn,
     MAX(aw.to_withdraw) AS to_withdraw
-  FROM convert_parameters_for_delegations cp
+  FROM process_block_range_data_b cp
   JOIN join_current_withdraw aw ON aw.account = cp.account_id
   WHERE cp.source_op > aw.source_op
   GROUP BY cp.account_id, aw.withdrawn
@@ -362,36 +307,21 @@ INTO __insert_not_yet_filled_withdrawals, __reset_filled_withdrawals;
 
 -----------------------------------------DELAYS---------------------------------------------
 
-WITH process_block_range_data_b AS 
+WITH process_block_range_data_b AS MATERIALIZED
 (
   SELECT 
-    ov.body_binary::jsonb AS body,
-    ov.id AS source_op,
-    ov.block_num as source_op_block,
-    ov.op_type_id 
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delayed_balances.from_account) AS from_account,
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delayed_balances.to_account) AS to_account,
+    get_impacted_delayed_balances.withdrawn,
+    get_impacted_delayed_balances.deposited,
+    ov.id AS source_op
   FROM operations_view ov
   -- start calculations from the first block after the 24 hardfork
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 24 AND ah.block_num < ov.block_num
+  CROSS JOIN get_impacted_delayed_balances(ov.body, ov.op_type_id) AS get_impacted_delayed_balances
   WHERE 
     ov.op_type_id IN (56,77,70) AND 
     ov.block_num BETWEEN _from AND _to
-),
-
---------------------------------------------------------------------------------------
--- convert balances depending on operation type
-get_impacted_delays AS (
-  SELECT get_impacted_delayed_balances(fio.body, fio.op_type_id) AS get_impacted_delayed_balances,
-    fio.source_op
-  FROM process_block_range_data_b fio
-),
-convert_parameters AS MATERIALIZED (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_delayed_balances).from_account) AS from_account,
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_delayed_balances).to_account) AS to_account,
-    (gi.get_impacted_delayed_balances).withdrawn AS withdrawn,
-    (gi.get_impacted_delayed_balances).deposited AS deposited,
-    gi.source_op
-  FROM get_impacted_delays gi
 ),
 --------------------------------------------------------------------------------------
 -- prepare and sum all delayed vests
@@ -400,7 +330,7 @@ union_delays AS MATERIALIZED (
     from_account AS account_id,
     withdrawn AS balance,
     source_op
-  FROM convert_parameters
+  FROM process_block_range_data_b
 
   UNION ALL
 
@@ -408,14 +338,12 @@ union_delays AS MATERIALIZED (
     to_account AS account_id,
     deposited AS balance,
     source_op
-  FROM convert_parameters
+  FROM process_block_range_data_b
   WHERE to_account IS NOT NULL
 ),
 group_by_account AS (
-  SELECT
-    account_id 
+  SELECT DISTINCT account_id 
   FROM union_delays
-  GROUP BY account_id
 ),
 join_prev_delays AS (
   SELECT 
