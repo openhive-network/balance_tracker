@@ -13,37 +13,20 @@ DECLARE
   __delete_canceled_delegations INT;
   __insert_delegations INT;
 BEGIN
-WITH process_block_range_data_b AS 
+WITH process_block_range_data_b AS MATERIALIZED
 (
   SELECT 
-    ov.body_binary::jsonb AS body,
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delegation_balances.delegator) AS delegator,
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delegation_balances.delegatee) AS delegatee,
+    get_impacted_delegation_balances.amount AS balance,
     ov.id AS source_op,
     ov.block_num as source_op_block,
     ov.op_type_id 
   FROM operations_view ov
+  CROSS JOIN get_impacted_delegation_balances(ov.body, ov.op_type_id) AS get_impacted_delegation_balances
   WHERE 
     ov.op_type_id IN (40,41,62,68) AND 
     ov.block_num BETWEEN _from AND _to
-),
----------------------------------------------------------------------------------------
--- convert balances depending on operation type
-get_impacted_delegations AS (
-  SELECT 
-    get_impacted_delegation_balances(fio.body, fio.op_type_id) AS get_impacted_delegation_balances,
-    fio.op_type_id,
-    fio.source_op,
-    fio.source_op_block 
-  FROM process_block_range_data_b fio
-),
-convert_parameters_for_delegations AS MATERIALIZED (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_delegation_balances).delegator) AS delegator,
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_delegation_balances).delegatee) AS delegatee,
-    (gi.get_impacted_delegation_balances).amount AS balance,
-    gi.op_type_id,
-    gi.source_op,
-    gi.source_op_block
-  FROM get_impacted_delegations gi
 ),
 ---------------------------------------------------------------------------------------
 -- prepare hf23 data
@@ -56,7 +39,7 @@ join_prev_balance_to_hf23_accounts AS MATERIALIZED (
     cpfd.source_op,
     cpfd.source_op_block
   FROM current_accounts_delegations prev
-  JOIN convert_parameters_for_delegations cpfd ON prev.delegator = cpfd.delegator AND cpfd.op_type_id = 68
+  JOIN process_block_range_data_b cpfd ON prev.delegator = cpfd.delegator AND cpfd.op_type_id = 68
 ),
 
 -- contains all delegation RESETS that were made by hf23 (in query)
@@ -68,8 +51,8 @@ find_delegations_of_hf23_account_in_query AS (
     0 AS balance,
     MAX(cpfd.source_op) as source_op,
     MAX(cpfd.source_op_block) as source_op_block
-  FROM convert_parameters_for_delegations cp
-  JOIN convert_parameters_for_delegations cpfd ON cp.delegator = cpfd.delegator AND cpfd.op_type_id = 68 AND cp.source_op < cpfd.source_op
+  FROM process_block_range_data_b cp
+  JOIN process_block_range_data_b cpfd ON cp.delegator = cpfd.delegator AND cpfd.op_type_id = 68 AND cp.source_op < cpfd.source_op
   WHERE 
     cp.op_type_id IN (40,41) AND
   --exclude already reset delegations
@@ -107,7 +90,7 @@ delegations_in_query AS MATERIALIZED (
     balance,
     source_op,
     source_op_block
-  FROM convert_parameters_for_delegations 
+  FROM process_block_range_data_b 
   WHERE op_type_id IN (40,41)
 
   UNION ALL
@@ -187,7 +170,7 @@ union_delegations AS (
     -- for every account found in hf23 - we need to lower its delegation by the amount that was delegated before hf23 (normally there is return operation for returned delegation)
     (
       CASE 
-        WHEN NOT EXISTS (SELECT 1 FROM convert_parameters_for_delegations gl WHERE gl.delegator = dd.delegator AND gl.op_type_id = 68 AND gl.source_op = dd.source_op) THEN
+        WHEN NOT EXISTS (SELECT 1 FROM process_block_range_data_b gl WHERE gl.delegator = dd.delegator AND gl.op_type_id = 68 AND gl.source_op = dd.source_op) THEN
           GREATEST(dd.balance_delta, 0)
         ELSE
           dd.balance_delta
@@ -211,7 +194,7 @@ union_delegations AS (
     delegator,
     0 AS received_vests,
     balance
-  FROM convert_parameters_for_delegations
+  FROM process_block_range_data_b
   WHERE op_type_id = 62
 ),
 sum_delegations AS (

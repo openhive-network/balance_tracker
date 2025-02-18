@@ -16,7 +16,7 @@ BEGIN
 WITH process_block_range_data_b AS  
 (
   SELECT 
-    ov.body_binary::jsonb AS body,
+    ov.body,
     ov.id AS source_op,
     ov.block_num as source_op_block,
     ov.op_type_id 
@@ -28,37 +28,19 @@ WITH process_block_range_data_b AS
 filter_interest_ops AS 
 (
   SELECT 
-    ov.body,
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_saving_balances.account_name) AS account_id,
+    get_impacted_saving_balances.asset_symbol_nai AS nai,
+    get_impacted_saving_balances.amount AS balance,
+    get_impacted_saving_balances.savings_withdraw_request,
+    get_impacted_saving_balances.request_id,  
     ov.source_op,
     ov.source_op_block,
     ov.op_type_id 
   FROM process_block_range_data_b ov
+  CROSS JOIN get_impacted_saving_balances(ov.body, ov.op_type_id) AS get_impacted_saving_balances
   WHERE 
     ov.op_type_id IN (32,33,34,59) OR
     (ov.op_type_id = 55 AND (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)
-  
-),
--- convert balances depending on operation type
-get_impacted_bal AS (
-  SELECT 
-    get_impacted_saving_balances(fio.body, fio.op_type_id) AS get_impacted_saving_balances,
-    fio.op_type_id,
-    fio.source_op,
-    fio.source_op_block 
-  FROM filter_interest_ops fio
-),
-convert_parameters AS (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_saving_balances).account_name) AS account_id,
-    (gi.get_impacted_saving_balances).asset_symbol_nai AS nai,
-    (gi.get_impacted_saving_balances).amount AS balance,
-    (gi.get_impacted_saving_balances).savings_withdraw_request AS savings_withdraw_request,
-    (gi.get_impacted_saving_balances).request_id AS request_id,  
-    gi.op_type_id,
-    gi.source_op,
-    gi.source_op_block
-  FROM get_impacted_bal gi
-  order by source_op
 ),
 ---------------------------------------------------------------------------------------
 -- views for specific operation types
@@ -72,7 +54,7 @@ cancel_and_fill_transfers AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM convert_parameters
+  FROM filter_interest_ops
   WHERE op_type_id in (34,59)
 ),
 transfers_from AS (
@@ -85,7 +67,7 @@ transfers_from AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM convert_parameters
+  FROM filter_interest_ops
   WHERE op_type_id = 33
 ),
 income_transfers AS (
@@ -98,7 +80,7 @@ income_transfers AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM convert_parameters
+  FROM filter_interest_ops
   WHERE op_type_id IN (32,55)
 ),
 ---------------------------------------------------------------------------------------

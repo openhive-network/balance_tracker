@@ -24,56 +24,45 @@ WITH process_block_range_data_b AS MATERIALIZED
   ov.op_type_id = ANY(ARRAY[39,51,52,63,53]) AND 
   ov.block_num BETWEEN _from AND _to
 ),
-filter_reward_ops AS (
-
+get_impacted_bal AS (
   SELECT 
-    ov.body,
-    ov.source_op,
-    ov.source_op_block,
-    ov.op_type_id 
-  FROM process_block_range_data_b ov
+    get_impacted_reward_balances.account_name,
+    get_impacted_reward_balances.hbd_payout AS reward_hbd,
+    get_impacted_reward_balances.hive_payout AS reward_hive,  
+    get_impacted_reward_balances.vesting_payout AS reward_vests,    
+    fio.op_type_id,
+    fio.source_op,
+    fio.source_op_block 
+  FROM process_block_range_data_b fio
+  CROSS JOIN get_impacted_reward_balances(fio.body, fio.source_op_block, fio.op_type_id) AS get_impacted_reward_balances
   WHERE 
-    ov.op_type_id = 39 OR
-    (ov.op_type_id = ANY(ARRAY[51,63]) AND (ov.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
+    fio.op_type_id = 39 OR
+    (fio.op_type_id IN (51,63) AND (fio.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
 ),
 ------------------------------------------------------------------------------
 --prepare info rewards data
 get_impacted_posting AS (
   SELECT 
-    process_posting_rewards(fio.body) AS get_posting,
+    get_posting.account_name,
+    get_posting.reward AS posting_reward,
     fio.op_type_id,
     fio.source_op,
     fio.source_op_block 
   FROM process_block_range_data_b fio
+  CROSS JOIN process_posting_rewards(fio.body) AS get_posting
   WHERE fio.op_type_id = 53
 ),
 get_impacted_curation AS (
   SELECT 
-    process_curation_rewards(fio.body) AS get_curation,
+    get_curation.account_name,
+    get_curation.reward,
+    get_curation.payout_must_be_claimed,
     fio.op_type_id,
     fio.source_op,
     fio.source_op_block 
   FROM process_block_range_data_b fio
+  CROSS JOIN process_curation_rewards(fio.body) AS get_curation
   WHERE fio.op_type_id = 52
-),
-prepare_curation AS (
-  SELECT 
-    (gi.get_curation).account_name AS account_name,
-    (gi.get_curation).reward AS reward,
-    (gi.get_curation).payout_must_be_claimed AS payout_must_be_claimed,
-    gi.op_type_id,
-    gi.source_op,
-    gi.source_op_block 
-  FROM get_impacted_curation gi
-),
-prepare_posting AS (
-  SELECT 
-    (gi.get_posting).account_name AS account_name,
-    (gi.get_posting).reward AS posting_reward,
-    gi.op_type_id,
-    gi.source_op,
-    gi.source_op_block 
-  FROM get_impacted_posting gi
 ),
 ------------------------------------------------------------------------------
 -- calculate curation_reward into hive
@@ -86,7 +75,7 @@ calculate_vests_from_curation AS MATERIALIZED (
     pc.op_type_id,
     pc.source_op,
     pc.source_op_block 
-  FROM prepare_curation pc
+  FROM get_impacted_curation pc
   JOIN hive.blocks_view bv ON bv.num = pc.source_op_block
 ),
 ------------------------------------------------------------------------------
@@ -95,7 +84,7 @@ get_impacted_info_rewards AS (
     account_name,
     posting_reward,
     0 AS curation_reward
-  FROM prepare_posting
+  FROM get_impacted_posting
 
   UNION ALL
 
@@ -122,27 +111,6 @@ posting_and_curations_account_id AS (
   FROM group_by_account_info 
 ),
 ------------------------------------------------------------------------------
--- prepare rewards data
-get_impacted_bal AS (
-  SELECT 
-    get_impacted_reward_balances(fio.body, fio.source_op_block, fio.op_type_id) AS get_impacted_reward_balances,
-    fio.op_type_id,
-    fio.source_op,
-    fio.source_op_block 
-  FROM filter_reward_ops fio
-),
-convert_params AS (
-  SELECT 
-    (gi.get_impacted_reward_balances).account_name AS account_name,
-    (gi.get_impacted_reward_balances).hbd_payout AS reward_hbd,
-    (gi.get_impacted_reward_balances).hive_payout AS reward_hive,  
-    (gi.get_impacted_reward_balances).vesting_payout AS reward_vests,  
-    gi.op_type_id,
-    gi.source_op,
-    gi.source_op_block
-  FROM get_impacted_bal gi
-),
-------------------------------------------------------------------------------
 --vesting balance must be calculated for all operations except claim operation (can't be aggregated)
 calculate_vesting_balance AS (
   SELECT 
@@ -154,7 +122,7 @@ calculate_vesting_balance AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM convert_params
+  FROM get_impacted_bal
   -- we use hive view because of performance issues during live sync  
   JOIN hive.blocks_view bv ON bv.num = source_op_block
   WHERE op_type_id != 39
@@ -183,7 +151,7 @@ union_operations_with_vesting_balance AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM convert_params
+  FROM get_impacted_bal
   WHERE op_type_id = 39
 
   UNION ALL
