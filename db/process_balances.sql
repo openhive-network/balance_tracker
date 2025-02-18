@@ -24,42 +24,31 @@ WITH balance_impacting_ops AS MATERIALIZED
   FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
-ops_in_range AS  
+ops_in_range AS MATERIALIZED
 (
   SELECT 
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
+    get_impacted_balances.asset_symbol_nai AS nai,
+    get_impacted_balances.amount AS balance,
     ho.id AS source_op,
     ho.block_num AS source_op_block,
     ho.body_binary
   FROM operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
-  WHERE ho.op_type_id = ANY(SELECT id FROM balance_impacting_ops) AND ho.block_num BETWEEN _from AND _to
-  ORDER BY ho.block_num, ho.id
+  JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
+  CROSS JOIN hive.get_impacted_balances(
+    ho.body_binary, 
+    ho.block_num > ah.block_num
+  ) AS get_impacted_balances
+  WHERE 
+    ho.op_type_id IN (SELECT id FROM balance_impacting_ops) AND 
+    ho.block_num BETWEEN _from AND _to
 ),
-
--- convert balances depending on hardforks
-get_impacted_bal AS (
-  SELECT 
-    hive.get_impacted_balances(gib.body_binary, gib.source_op_block > 905693) AS get_impacted_balances,
-    gib.source_op,
-    gib.source_op_block 
-  FROM ops_in_range gib
-),
-convert_parameters AS (
-  SELECT 
-
-    (SELECT av.id FROM accounts_view av WHERE av.name = (gi.get_impacted_balances).account_name) AS account_id,
-    (gi.get_impacted_balances).asset_symbol_nai AS nai,
-    (gi.get_impacted_balances).amount AS balance,
-    gi.source_op,
-    gi.source_op_block
-  FROM get_impacted_bal gi
-),
-
 -- prepare accounts that were impacted by the operations
 group_by_account_nai AS (
   SELECT 
     cp.account_id,
     cp.nai
-  FROM convert_parameters cp
+  FROM ops_in_range cp
   GROUP BY cp.account_id, cp.nai
 ),
 get_latest_balance AS (
@@ -82,7 +71,7 @@ union_latest_balance_with_impacted_balances AS (
     cp.balance,
     cp.source_op,
     cp.source_op_block
-  FROM convert_parameters cp
+  FROM ops_in_range cp
 
   UNION ALL
 
