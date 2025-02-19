@@ -420,6 +420,9 @@ AS
 $$
 BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,source_op DESC);
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_block_idx ON account_balance_history(account,nai,source_op_block);
+
+  CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
 END
 $$;
 
