@@ -1,6 +1,16 @@
 # syntax=docker/dockerfile:1.5
-ARG PSQL_CLIENT_VERSION=14-1
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
+FROM timescale/timescaledb:latest-pg17 AS psql
+
+# Install necessary packages and create user
+RUN <<EOF
+    set -e
+    apk add --no-cache sudo git bash \
+    && adduser -s /bin/bash -G users -D "haf_admin" \
+    && echo "haf_admin ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
+EOF
+
+USER haf_admin
+WORKDIR /home/haf_admin
 
 FROM psql AS full
 
@@ -26,12 +36,6 @@ LABEL io.hive.image.commit.author="$GIT_LAST_COMMITTER"
 LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
 
 USER root
-
-RUN apk add --no-cache curl \
-    && curl -sSL https://packagecloud.io/timescale/timescaledb/gpgkey | apk add --no-cache --allow-untrusted - \
-    && echo "https://packagecloud.io/timescale/timescaledb/ubuntu/alpine/main" >> /etc/apk/repositories \
-    && apk update \
-    && apk add --no-cache timescaledb-2-postgresql-17
 
 RUN <<EOF
   set -e
