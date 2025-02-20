@@ -32,6 +32,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 48h #time for replay to finish
+  timescaledb-setup:
+    image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker}:${BACKEND_VERSION:-latest}
+    working_dir: /app
+    command: "install_timescaledb"
+    environment:
+      POSTGRES_HOST: haf
+    networks:
+      haf-network:
+    depends_on:
+      haf:
+        condition: service_healthy
   backend-setup:
     image: ${BACKEND_REGISTRY:-registry.gitlab.syncad.com/hive/balance_tracker}:${BACKEND_VERSION:-latest}
     working_dir: /app

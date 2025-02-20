@@ -26,8 +26,6 @@ BEGIN
     _stages => synchronization_stages
   );
 
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
 CREATE TABLE IF NOT EXISTS btracker_app_status
