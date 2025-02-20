@@ -27,6 +27,12 @@ LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
 
 USER root
 
+RUN apk add --no-cache curl \
+    && curl -sSL https://packagecloud.io/timescale/timescaledb/gpgkey | apk add --no-cache --allow-untrusted - \
+    && echo "https://packagecloud.io/timescale/timescaledb/ubuntu/alpine/main" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache timescaledb-2-postgresql-17
+
 RUN <<EOF
   set -e
   mkdir /app

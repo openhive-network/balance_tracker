@@ -7,7 +7,7 @@ tests/performance/.~lock.log.jtl#
 tests/account_balances/accounts_dump.json
 db/__pycache__
 server/__pycache__
-btracker_sync.log
+btracker_sync.*
 shellcheck-*.*
 **/test-results.xml
 **/test-results.jtl

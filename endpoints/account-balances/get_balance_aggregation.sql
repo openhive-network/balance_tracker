@@ -75,30 +75,6 @@ DECLARE
 BEGIN
   RETURN  (
     SELECT to_json(array_agg(row)) FROM (
-      WITH block_intervals AS (
-        SELECT
-          source_op_block / "aggregation-step" AS block_interval,
-          MAX(balance) AS max_balance,
-          MIN(balance) AS min_balance,
-          AVG(balance)::BIGINT AS avg_balance
-        FROM
-          btracker_app.account_balance_history
-        WHERE
-          account = _account_id AND
-          nai = _coin_type
-        GROUP BY
-          block_interval
-      )
-      SELECT
-        block_interval * "aggregation-step" + 1 AS start_block,
-        (block_interval + 1) * "aggregation-step" AS end_block,
-        max_balance,
-        min_balance,
-        avg_balance
-      FROM 
-        block_intervals
-      ORDER BY
-        block_interval
     ) row
   ); 
 END
