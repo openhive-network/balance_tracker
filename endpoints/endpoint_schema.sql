@@ -66,6 +66,14 @@ declare
   ],
   "components": {
     "schemas": {
+      "btracker_endpoints.granularity": {
+        "type": "string",
+        "enum": [
+          "daily",
+          "monthly",
+          "yearly"
+        ]
+      },
       "btracker_endpoints.nai_type": {
         "type": "string",
         "enum": [
@@ -355,6 +363,136 @@ declare
                     ]
                   }
                 ]
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/aggregated-history": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Historical balance change",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_aggregation(''blocktrades'', ''VESTS'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/aggregated-history?coin-type=VESTS''`\n",
+        "operationId": "btracker_endpoints.get_balance_aggregation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "coin-type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_endpoints.nai_type"
+            },
+            "description": "Coin types:\n\n* HBD\n\n* HIVE\n\n* VESTS\n"
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_endpoints.granularity",
+              "default": "yearly"
+            },
+            "description": "granularity types:\n\n* daily\n\n* monthly\n\n* yearly\n"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_endpoints.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance change\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "x-sql-datatype": "JSON"
+                },
+                "example": [
+                  {
+                    "date": "2016-12-31T23:59:59",
+                    "balance": "8172549681941451",
+                    "block": 4999992
+                  }
+                ]
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/delegations": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Historical balance change",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/delegations''`\n",
+        "operationId": "btracker_endpoints.get_balance_delegations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance change\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "x-sql-datatype": "JSON"
+                }
               }
             }
           },
