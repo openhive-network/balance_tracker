@@ -232,7 +232,7 @@ BEGIN
     SELECT json_build_object(
       'total_operations', _ops_count,
       'total_pages', _calculate_total_pages,
-      'operations_result', (
+      'operations_result', COALESCE((
         SELECT to_json(array_agg(row)) FROM (
           WITH ranked_rows AS
           (
@@ -331,7 +331,7 @@ BEGIN
           FROM add_prevbal_to_row_over_range ab
           JOIN hive.blocks_view bv ON bv.num = ab.source_op_block
           JOIN hive.operations_view ov ON ov.id = ab.source_op
-      ) row)
+      ) row), '[]')
     )
   ); 
 END
