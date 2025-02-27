@@ -146,8 +146,7 @@ BEGIN
     SELECT to_json(array_agg(row)) FROM (
       SELECT 
         fb.date,
-        fb.balance::TEXT,
-        fb.block
+        fb.balance::TEXT
       FROM get_balance_history_aggregation(
         _account_id,
         _coin_type,

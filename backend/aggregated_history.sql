@@ -3,8 +3,7 @@ SET ROLE btracker_owner;
 DROP TYPE IF EXISTS balance_history_aggregation CASCADE;
 CREATE TYPE balance_history_aggregation AS (
     date TIMESTAMP,
-    balance BIGINT,
-    block INT
+    balance BIGINT
 );
 
 CREATE OR REPLACE VIEW balance_history_by_year AS
@@ -63,8 +62,7 @@ BEGIN
     RETURN QUERY (
       SELECT 
         fb.date,
-        fb.balance,
-        fb.block
+        fb.balance
       FROM get_balance_history_by_day(
         _account_id,
         _coin_type,
@@ -77,8 +75,7 @@ BEGIN
     RETURN QUERY (
       SELECT 
         fb.date,
-        fb.balance,
-        fb.block
+        fb.balance
       FROM get_balance_history_by_month(
         _account_id,
         _coin_type,
@@ -91,8 +88,7 @@ BEGIN
     RETURN QUERY (
       SELECT 
         fb.date,
-        fb.balance,
-        fb.block
+        fb.balance
       FROM get_balance_history_by_year(
         _account_id,
         _coin_type,
@@ -182,8 +178,7 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 day' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.source_op_block
+    fb.balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -266,8 +261,7 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 month' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.source_op_block
+    fb.balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -350,8 +344,7 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 year' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.source_op_block
+    fb.balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
