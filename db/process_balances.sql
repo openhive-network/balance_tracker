@@ -14,6 +14,8 @@ DECLARE
  _result INT;
  __balance_history INT;
  __current_balances INT;
+ __balance_history_by_day INT;
+ __balance_history_by_month INT;
 BEGIN
 --RAISE NOTICE 'Processing balances';
 
@@ -24,7 +26,7 @@ WITH balance_impacting_ops AS MATERIALIZED
   FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
-ops_in_range AS MATERIALIZED
+ops_in_range AS MATERIALIZED 
 (
   SELECT 
     (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
@@ -101,33 +103,11 @@ prepare_balance_history AS MATERIALIZED (
     ulb.nai,
     SUM(ulb.balance) OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS balance,
     ulb.source_op,
-    ulb.source_op_block
+    ulb.source_op_block,
+    ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
   FROM union_latest_balance_with_impacted_balances ulb
 ),
 
--- find the new latest balance
-prepare_newest_balance AS (
-  SELECT
-    account_id,
-    nai,
-    MAX(source_op) AS source_op
-  FROM prepare_balance_history 
-  GROUP BY account_id, nai
-),
-
-remove_duplicate_transfers_in_current_balance AS MATERIALIZED (
-  SELECT 
-    pbh.account_id,
-    pbh.nai,
-    pbh.source_op,
-    pbh.source_op_block,
-  -- choose the maximum balance for the case when has made transfer to itself
-    MAX(pbh.balance) AS balance
-  FROM prepare_newest_balance nw 
-  JOIN prepare_balance_history pbh ON pbh.account_id = nw.account_id AND pbh.nai = nw.nai AND pbh.source_op = nw.source_op
-  -- this group by is needed to avoid duplicate entries (account can make a transfer to itself)
-  GROUP BY pbh.account_id, pbh.nai, pbh.source_op, pbh.source_op_block
-),
 insert_current_account_balances AS (
   INSERT INTO current_account_balances AS acc_balances
     (account, nai, source_op, source_op_block, balance)
@@ -137,7 +117,8 @@ insert_current_account_balances AS (
     rd.source_op,
     rd.source_op_block,
     rd.balance
-  FROM remove_duplicate_transfers_in_current_balance rd 
+  FROM prepare_balance_history rd 
+  WHERE rd.rn = 1
   ON CONFLICT ON CONSTRAINT pk_current_account_balances DO
   UPDATE SET 
     balance = EXCLUDED.balance,
@@ -169,12 +150,72 @@ insert_account_balance_history AS (
     pbh.balance
   FROM remove_latest_stored_balance_record pbh
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+join_created_at_to_balance_history AS (
+  SELECT 
+    rls.account_id,
+    rls.nai,
+    rls.source_op,
+    rls.source_op_block,
+    rls.balance,
+    date_trunc('day', bv.created_at) AS by_day,
+    date_trunc('month', bv.created_at) AS by_month
+  FROM remove_latest_stored_balance_record rls
+  JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
+),
+get_latest_updates AS MATERIALIZED (
+  SELECT 
+    account_id,
+    nai,
+    source_op_block,
+    balance,
+    by_day,
+    by_month,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
+  FROM join_created_at_to_balance_history 
+),
+insert_account_balance_history_by_day AS (
+  INSERT INTO balance_history_by_day AS acc_history
+    (account, nai, source_op_block, updated_at, balance)
+  SELECT 
+    account_id,
+    nai,
+    source_op_block,
+    by_day,
+    balance
+  FROM get_latest_updates
+  WHERE rn_by_day = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO 
+  UPDATE SET 
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+insert_account_balance_history_by_month AS (
+  INSERT INTO balance_history_by_month AS acc_history
+    (account, nai, source_op_block, updated_at, balance)
+  SELECT 
+    account_id,
+    nai,
+    source_op_block,
+    by_month,
+    balance
+  FROM get_latest_updates
+  WHERE rn_by_month = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO 
+  UPDATE SET 
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
 )
 
 SELECT
   (SELECT count(*) FROM insert_account_balance_history) as balance_history,
-  (SELECT count(*) FROM insert_current_account_balances) AS current_balances
-INTO __balance_history, __current_balances;
+  (SELECT count(*) FROM insert_current_account_balances) AS current_balances,
+  (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
+  (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month
+INTO __balance_history, __current_balances, __balance_history_by_day,__balance_history_by_month;
 
 END
 $$;
