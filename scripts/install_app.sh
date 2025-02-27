@@ -70,6 +70,11 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POS
 echo "Installing app..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -f "$SCRIPTPATH/../db/builtin_roles.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;CREATE SCHEMA IF NOT EXISTS ${BTRACKER_SCHEMA} AUTHORIZATION btracker_owner;"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.swagger_url = '$SWAGGER_URL'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/endpoint_schema.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/coin_type.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/granularity.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/sort_direction.sql"
+
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_balances.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_savings.sql"
@@ -77,6 +82,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_delegations.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_withdrawals.sql"
 
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/aggregated_history.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/delays.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/delegations.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/hardforks.sql"
@@ -85,11 +91,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/withdrawals.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/exceptions.sql"
 
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.swagger_url = '$SWAGGER_URL'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/endpoint_schema.sql"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/coin_type.sql"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/sort_direction.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_balance_history.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_account_balances.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_history_aggregation.sql"
+
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../dump_accounts/account_dump_schema.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../dump_accounts/account_stats_btracker.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../dump_accounts/compare_accounts.sql"
