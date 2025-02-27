@@ -108,7 +108,8 @@ SET ROLE btracker_owner;
               - {
                   "date":"2016-12-31T23:59:59",
                   "balance":"8172549681941451",
-                  "block":4999992
+                  "min_balance":"1000000000000",
+                  "max_balance":"8436182707535769"
                 }
             
       '404':
@@ -146,7 +147,9 @@ BEGIN
     SELECT to_json(array_agg(row)) FROM (
       SELECT 
         fb.date,
-        fb.balance::TEXT
+        fb.balance::TEXT,
+        fb.min_balance::TEXT,
+        fb.max_balance::TEXT
       FROM get_balance_history_aggregation(
         _account_id,
         _coin_type,

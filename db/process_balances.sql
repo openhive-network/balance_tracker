@@ -151,7 +151,7 @@ insert_account_balance_history AS (
   FROM remove_latest_stored_balance_record pbh
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
 ),
-join_created_at_to_balance_history AS (
+join_created_at_to_balance_history AS MATERIALIZED (
   SELECT 
     rls.account_id,
     rls.nai,
@@ -167,6 +167,7 @@ get_latest_updates AS MATERIALIZED (
   SELECT 
     account_id,
     nai,
+    source_op,
     source_op_block,
     balance,
     by_day,
@@ -175,38 +176,78 @@ get_latest_updates AS MATERIALIZED (
     ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
   FROM join_created_at_to_balance_history 
 ),
-insert_account_balance_history_by_day AS (
-  INSERT INTO balance_history_by_day AS acc_history
-    (account, nai, source_op_block, updated_at, balance)
+get_min_max_balances_by_day AS (
   SELECT 
     account_id,
     nai,
-    source_op_block,
     by_day,
-    balance
-  FROM get_latest_updates
-  WHERE rn_by_day = 1
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_day
+),
+get_min_max_balances_by_month AS (
+  SELECT 
+    account_id,
+    nai,
+    by_month,
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_month
+),
+insert_account_balance_history_by_day AS (
+  INSERT INTO balance_history_by_day AS acc_history
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+  SELECT 
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_day,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_day gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_day = gl.by_day
+  WHERE gl.rn_by_day = 1
   ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO 
   UPDATE SET 
+    source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block,
-    balance = EXCLUDED.balance
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
 ),
 insert_account_balance_history_by_month AS (
   INSERT INTO balance_history_by_month AS acc_history
-    (account, nai, source_op_block, updated_at, balance)
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
   SELECT 
-    account_id,
-    nai,
-    source_op_block,
-    by_month,
-    balance
-  FROM get_latest_updates
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_month,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_month gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_month = gl.by_month
   WHERE rn_by_month = 1
   ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO 
-  UPDATE SET 
+  UPDATE SET
+    source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block,
-    balance = EXCLUDED.balance
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
 )
 

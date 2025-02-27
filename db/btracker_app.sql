@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS balance_history_by_month
   account INT NOT NULL,
   nai     INT NOT NULL,
   balance BIGINT NOT NULL,
+  min_balance BIGINT NOT NULL,
+  max_balance BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
   source_op_block INT NOT NULL,
   updated_at TIMESTAMP NOT NULL,
 
@@ -92,6 +95,9 @@ CREATE TABLE IF NOT EXISTS balance_history_by_day
   account INT NOT NULL,
   nai     INT NOT NULL, 
   balance BIGINT NOT NULL,
+  min_balance BIGINT NOT NULL,
+  max_balance BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
   source_op_block INT NOT NULL,
   updated_at TIMESTAMP NOT NULL,
 
