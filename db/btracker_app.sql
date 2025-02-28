@@ -1,5 +1,3 @@
--- noqa: disable=CP03
-
 SET ROLE btracker_owner;
 
 DO $$
@@ -402,7 +400,7 @@ $$;
 */
 CREATE OR REPLACE PROCEDURE main(
     IN _appContext hive.context_name,
-    IN _maxBlockLimit INT = NULL
+    IN _maxBlockLimit INT = null
 )
 LANGUAGE 'plpgsql'
 AS

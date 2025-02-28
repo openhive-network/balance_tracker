@@ -1,3 +1,5 @@
+-- noqa: disable=AL01, AM05
+
 SET ROLE btracker_owner;
 
 DROP TYPE IF EXISTS balance_history_aggregation CASCADE;
@@ -10,38 +12,41 @@ CREATE TYPE balance_history_aggregation AS (
 
 CREATE OR REPLACE VIEW balance_history_by_year AS
 WITH get_year AS (
-  SELECT
-    account,
-    nai,
-    balance,
-    min_balance,
-    max_balance,
-    source_op_block,
-    date_trunc('year', updated_at) AS by_year,
-    updated_at
-  FROM balance_history_by_month 
+    SELECT
+        account,
+        nai,
+        balance,
+        min_balance,
+        max_balance,
+        source_op_block,
+        updated_at,
+        DATE_TRUNC('year', updated_at) AS by_year
+    FROM balance_history_by_month 
 ),
+
 get_latest_updates AS (
-  SELECT
-    account,
-    nai,
-    balance,
-    source_op_block,
-    by_year,
-    ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
-  FROM get_year bh
+    SELECT
+        account,
+        nai,
+        balance,
+        source_op_block,
+        by_year,
+        ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
+    FROM get_year
 ),
+
 get_min_max_balances_by_year AS (
-  SELECT
-    account,
-    nai,
-    by_year,
-    MAX(max_balance) AS max_balance,
-    MIN(min_balance) AS min_balance
-  FROM get_year
-  GROUP BY account, nai, by_year
+    SELECT
+        account,
+        nai,
+        by_year,
+        MAX(max_balance) AS max_balance,
+        MIN(min_balance) AS min_balance
+    FROM get_year
+    GROUP BY account, nai, by_year
 )
-  SELECT
+
+SELECT
     gl.account,
     gl.nai,
     gl.balance,
@@ -49,17 +54,17 @@ get_min_max_balances_by_year AS (
     gm.max_balance,
     gl.source_op_block,
     gl.by_year AS updated_at
-  FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
-  WHERE rn_by_year = 1;
+FROM get_latest_updates gl
+JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
+WHERE gl.rn_by_year = 1;
 
 CREATE OR REPLACE FUNCTION get_balance_history_aggregation(
-  _account_id INT,
-  _coin_type INT,
-  _granularity btracker_endpoints.granularity,
-  _direction btracker_endpoints.sort_direction,
-  _from_block INT,
-  _to_block INT
+    _account_id INT,
+    _coin_type INT,
+    _granularity btracker_endpoints.granularity,
+    _direction btracker_endpoints.sort_direction,
+    _from_block INT,
+    _to_block INT
 )
 RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -127,11 +132,11 @@ END
 $$;
 
 CREATE OR REPLACE FUNCTION get_balance_history_by_day(
-  _account_id INT,
-  _coin_type INT,
-  _direction btracker_endpoints.sort_direction,
-  _from_block INT,
-  _to_block INT
+    _account_id INT,
+    _coin_type INT,
+    _direction btracker_endpoints.sort_direction,
+    _from_block INT,
+    _to_block INT
 )
 RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -139,8 +144,8 @@ STABLE
 AS
 $$
 DECLARE
-  _from_timestamp TIMESTAMP := date_trunc('day',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
-  _to_timestamp TIMESTAMP := date_trunc('day', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
+  _from_timestamp TIMESTAMP := DATE_TRUNC('day',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
+  _to_timestamp TIMESTAMP := DATE_TRUNC('day', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
 BEGIN
 
 RETURN QUERY (
@@ -221,11 +226,11 @@ END
 $$;
 
 CREATE OR REPLACE FUNCTION get_balance_history_by_month(
-  _account_id INT,
-  _coin_type INT,
-  _direction btracker_endpoints.sort_direction,
-  _from_block INT,
-  _to_block INT
+    _account_id INT,
+    _coin_type INT,
+    _direction btracker_endpoints.sort_direction,
+    _from_block INT,
+    _to_block INT
 )
 RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -233,8 +238,8 @@ STABLE
 AS
 $$
 DECLARE
-  _from_timestamp TIMESTAMP := date_trunc('month',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
-  _to_timestamp TIMESTAMP := date_trunc('month', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
+  _from_timestamp TIMESTAMP := DATE_TRUNC('month',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
+  _to_timestamp TIMESTAMP := DATE_TRUNC('month', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
 BEGIN
 RETURN QUERY (
   WITH date_series AS (
@@ -314,11 +319,11 @@ END
 $$;
 
 CREATE OR REPLACE FUNCTION get_balance_history_by_year(
-  _account_id INT,
-  _coin_type INT,
-  _direction btracker_endpoints.sort_direction,
-  _from_block INT,
-  _to_block INT
+    _account_id INT,
+    _coin_type INT,
+    _direction btracker_endpoints.sort_direction,
+    _from_block INT,
+    _to_block INT
 )
 RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -326,8 +331,8 @@ STABLE
 AS
 $$
 DECLARE
-  _from_timestamp TIMESTAMP := date_trunc('year',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
-  _to_timestamp TIMESTAMP := date_trunc('year', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
+  _from_timestamp TIMESTAMP := DATE_TRUNC('year',(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from_block)::TIMESTAMP);
+  _to_timestamp TIMESTAMP := DATE_TRUNC('year', (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to_block)::TIMESTAMP);
 BEGIN
 RETURN QUERY (
   WITH date_series AS (
