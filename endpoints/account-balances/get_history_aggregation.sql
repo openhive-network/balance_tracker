@@ -5,7 +5,7 @@ SET ROLE btracker_owner;
   get:
     tags:
       - Accounts
-    summary: Historical balance change
+    summary: Aggregated account balance history
     description: |
       History of change of `coin-type` balance in given block range
 
@@ -107,6 +107,7 @@ SET ROLE btracker_owner;
             example: 
               - {
                   "date":"2016-12-31T23:59:59",
+                  "prev_balance":"0",
                   "balance":"8172549681941451",
                   "min_balance":"1000000000000",
                   "max_balance":"8436182707535769"
@@ -147,6 +148,7 @@ BEGIN
     SELECT to_json(array_agg(row)) FROM (
       SELECT 
         fb.date,
+        fb.prev_balance::TEXT,
         fb.balance::TEXT,
         fb.min_balance::TEXT,
         fb.max_balance::TEXT

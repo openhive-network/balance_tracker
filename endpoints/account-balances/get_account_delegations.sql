@@ -5,7 +5,7 @@ SET ROLE btracker_owner;
   get:
     tags:
       - Accounts
-    summary: Historical balance change
+    summary: Account delegations
     description: |
       History of change of `coin-type` balance in given block range
 

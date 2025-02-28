@@ -377,7 +377,7 @@ declare
         "tags": [
           "Accounts"
         ],
-        "summary": "Historical balance change",
+        "summary": "Aggregated account balance history",
         "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_aggregation(''blocktrades'', ''VESTS'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/aggregated-history?coin-type=VESTS''`\n",
         "operationId": "btracker_endpoints.get_balance_aggregation",
         "parameters": [
@@ -452,6 +452,7 @@ declare
                 "example": [
                   {
                     "date": "2016-12-31T23:59:59",
+                    "prev_balance": "0",
                     "balance": "8172549681941451",
                     "min_balance": "1000000000000",
                     "max_balance": "8436182707535769"
@@ -471,7 +472,7 @@ declare
         "tags": [
           "Accounts"
         ],
-        "summary": "Historical balance change",
+        "summary": "Account delegations",
         "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/delegations''`\n",
         "operationId": "btracker_endpoints.get_balance_delegations",
         "parameters": [
