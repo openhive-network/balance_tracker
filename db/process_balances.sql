@@ -151,7 +151,7 @@ insert_account_balance_history AS (
   FROM remove_latest_stored_balance_record pbh
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
 ),
-join_created_at_to_balance_history AS MATERIALIZED (
+join_created_at_to_balance_history AS (
   SELECT 
     rls.account_id,
     rls.nai,
@@ -163,7 +163,7 @@ join_created_at_to_balance_history AS MATERIALIZED (
   FROM remove_latest_stored_balance_record rls
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
 ),
-get_latest_updates AS MATERIALIZED (
+get_latest_updates AS (
   SELECT 
     account_id,
     nai,

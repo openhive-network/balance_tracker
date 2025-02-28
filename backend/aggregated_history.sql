@@ -6,6 +6,7 @@ DROP TYPE IF EXISTS balance_history_aggregation CASCADE;
 CREATE TYPE balance_history_aggregation AS (
     date TIMESTAMP,
     balance BIGINT,
+    prev_balance BIGINT,
     min_balance BIGINT,
     max_balance BIGINT
 );
@@ -85,6 +86,7 @@ BEGIN
       SELECT 
         fb.date,
         fb.balance,
+        fb.prev_balance,
         fb.min_balance,
         fb.max_balance
       FROM get_balance_history_by_day(
@@ -100,6 +102,7 @@ BEGIN
       SELECT 
         fb.date,
         fb.balance,
+        fb.prev_balance,
         fb.min_balance,
         fb.max_balance
       FROM get_balance_history_by_month(
@@ -115,6 +118,7 @@ BEGIN
       SELECT 
         fb.date,
         fb.balance,
+        fb.prev_balance,
         fb.min_balance,
         fb.max_balance
       FROM get_balance_history_by_year(
@@ -178,6 +182,7 @@ RETURN QUERY (
         ds.date,
         ds.row_num,
         COALESCE(ds.balance, prev_balance.balance, 0) AS balance,
+        COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
@@ -204,6 +209,7 @@ RETURN QUERY (
         next_b.date,
         next_b.row_num,
         COALESCE(next_b.balance, prev_b.balance, 0) AS balance,
+        COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
@@ -215,6 +221,7 @@ RETURN QUERY (
   SELECT 
     LEAST(fb.date + INTERVAL '1 day' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
     fb.balance,
+    fb.prev_balance,
     fb.min_balance,
     fb.max_balance
   FROM filled_balances fb
@@ -271,6 +278,7 @@ RETURN QUERY (
         ds.date,
         ds.row_num,
         COALESCE(ds.balance, prev_balance.balance, 0) AS balance,
+        COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
@@ -297,6 +305,7 @@ RETURN QUERY (
         next_b.date,
         next_b.row_num,
         COALESCE(next_b.balance, prev_b.balance, 0) AS balance,
+        COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
@@ -308,6 +317,7 @@ RETURN QUERY (
   SELECT 
     LEAST(fb.date + INTERVAL '1 month' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
     fb.balance,
+    fb.prev_balance,
     fb.min_balance,
     fb.max_balance
   FROM filled_balances fb
@@ -364,6 +374,7 @@ RETURN QUERY (
         ds.date,
         ds.row_num,
         COALESCE(ds.balance, prev_balance.balance, 0) AS balance,
+        COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
@@ -390,6 +401,7 @@ RETURN QUERY (
         next_b.date,
         next_b.row_num,
         COALESCE(next_b.balance, prev_b.balance, 0) AS balance,
+        COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
@@ -401,6 +413,7 @@ RETURN QUERY (
   SELECT 
     LEAST(fb.date + INTERVAL '1 year' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
     fb.balance,
+    fb.prev_balance,
     fb.min_balance,
     fb.max_balance
   FROM filled_balances fb
