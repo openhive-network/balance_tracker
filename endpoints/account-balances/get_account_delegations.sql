@@ -31,6 +31,11 @@ SET ROLE btracker_owner;
             schema:
               type: string
               x-sql-datatype: JSON
+            example: 
+              - {
+                  "outgoing_delegations": [],
+                  "incoming_delegations": []
+                }
       '404':
         description: No such account in the database
  */

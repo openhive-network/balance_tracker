@@ -494,7 +494,13 @@ declare
                 "schema": {
                   "type": "string",
                   "x-sql-datatype": "JSON"
-                }
+                },
+                "example": [
+                  {
+                    "outgoing_delegations": [],
+                    "incoming_delegations": []
+                  }
+                ]
               }
             }
           },
