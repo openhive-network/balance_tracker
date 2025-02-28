@@ -48,10 +48,9 @@ $$
 DECLARE
   _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
-
   RETURN (
     SELECT json_build_object(
-      'outgoing_delegations', (
+      'outgoing_delegations', COALESCE((
         SELECT to_json(array_agg(row)) FROM (
           SELECT 
             (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.delegatee) AS delegatee,
@@ -61,8 +60,8 @@ BEGIN
           FROM current_accounts_delegations d
           WHERE delegator = _account_id
         ) row
-      ),
-      'incoming_delegations', (
+      ), '[]'::JSON),
+      'incoming_delegations', COALESCE((
         SELECT to_json(array_agg(row)) FROM (
           SELECT 
             (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.delegator) AS delegator,
@@ -72,7 +71,7 @@ BEGIN
           FROM current_accounts_delegations d
           WHERE delegatee = _account_id
         ) row
-      )
+      ), '[]'::JSON)
     )
   ); 
 END
