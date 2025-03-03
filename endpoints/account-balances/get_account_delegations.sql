@@ -31,8 +31,7 @@ SET ROLE btracker_owner;
             schema:
               type: string
               x-sql-datatype: JSON
-            example: 
-              - {
+            example: {
                   "outgoing_delegations": [],
                   "incoming_delegations": []
                 }

@@ -116,8 +116,7 @@ CREATE TYPE btracker_endpoints.balance_history AS (
             schema:
               type: string
               x-sql-datatype: JSON
-            example: 
-              - {
+            example: {
                   "total_operations": 188291,
                   "total_pages": 94146,
                   "operations_result": [

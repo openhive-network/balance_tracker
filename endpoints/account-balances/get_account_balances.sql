@@ -156,28 +156,29 @@ CREATE TYPE btracker_endpoints.balances AS (
           application/json:
             schema:
               $ref: '#/components/schemas/btracker_endpoints.balances'
-            example:
-              - hbd_balance: 77246982
-                hive_balance: 29594875
-                vesting_shares: "8172549681941451"
-                vesting_balance_hive: 2720696229
-                post_voting_power_vests: "8172549681941451"
-                delegated_vests: "0"
-                received_vests: "0"
-                curation_rewards: "196115157"
-                posting_rewards: "65916519"
-                hbd_rewards: 0
-                hive_rewards: 0
-                vests_rewards: "0"
-                hive_vesting_rewards: 0
-                hbd_savings: 0
-                hive_savings: 0
-                savings_withdraw_requests: 0
-                vesting_withdraw_rate: "80404818220529"
-                to_withdraw: "8362101094935031"
-                withdrawn: "804048182205290"
-                withdraw_routes: 4
-                delayed_vests: "0"
+            example: {
+              "hbd_balance": 77246982,
+              "hive_balance": 29594875,
+              "vesting_shares": "8172549681941451",
+              "vesting_balance_hive": 2720696229,
+              "post_voting_power_vests": "8172549681941451",
+              "delegated_vests": "0",
+              "received_vests": "0",
+              "curation_rewards": "196115157",
+              "posting_rewards": "65916519",
+              "hbd_rewards": 0,
+              "hive_rewards": 0,
+              "vests_rewards": "0",
+              "hive_vesting_rewards": 0,
+              "hbd_savings": 0,
+              "hive_savings": 0,
+              "savings_withdraw_requests": 0,
+              "vesting_withdraw_rate": "80404818220529",
+              "to_withdraw": "8362101094935031",
+              "withdrawn": "804048182205290",
+              "withdraw_routes": 4,
+              "delayed_vests": "0"
+            }
       '404':
         description: No such account in the database
  */
