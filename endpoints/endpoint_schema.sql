@@ -216,31 +216,29 @@ declare
                 "schema": {
                   "$ref": "#/components/schemas/btracker_endpoints.balances"
                 },
-                "example": [
-                  {
-                    "hbd_balance": 77246982,
-                    "hive_balance": 29594875,
-                    "vesting_shares": "8172549681941451",
-                    "vesting_balance_hive": 2720696229,
-                    "post_voting_power_vests": "8172549681941451",
-                    "delegated_vests": "0",
-                    "received_vests": "0",
-                    "curation_rewards": "196115157",
-                    "posting_rewards": "65916519",
-                    "hbd_rewards": 0,
-                    "hive_rewards": 0,
-                    "vests_rewards": "0",
-                    "hive_vesting_rewards": 0,
-                    "hbd_savings": 0,
-                    "hive_savings": 0,
-                    "savings_withdraw_requests": 0,
-                    "vesting_withdraw_rate": "80404818220529",
-                    "to_withdraw": "8362101094935031",
-                    "withdrawn": "804048182205290",
-                    "withdraw_routes": 4,
-                    "delayed_vests": "0"
-                  }
-                ]
+                "example": {
+                  "hbd_balance": 77246982,
+                  "hive_balance": 29594875,
+                  "vesting_shares": "8172549681941451",
+                  "vesting_balance_hive": 2720696229,
+                  "post_voting_power_vests": "8172549681941451",
+                  "delegated_vests": "0",
+                  "received_vests": "0",
+                  "curation_rewards": "196115157",
+                  "posting_rewards": "65916519",
+                  "hbd_rewards": 0,
+                  "hive_rewards": 0,
+                  "vests_rewards": "0",
+                  "hive_vesting_rewards": 0,
+                  "hbd_savings": 0,
+                  "hive_savings": 0,
+                  "savings_withdraw_requests": 0,
+                  "vesting_withdraw_rate": "80404818220529",
+                  "to_withdraw": "8362101094935031",
+                  "withdrawn": "804048182205290",
+                  "withdraw_routes": 4,
+                  "delayed_vests": "0"
+                }
               }
             }
           },
@@ -337,32 +335,30 @@ declare
                   "type": "string",
                   "x-sql-datatype": "JSON"
                 },
-                "example": [
-                  {
-                    "total_operations": 188291,
-                    "total_pages": 94146,
-                    "operations_result": [
-                      {
-                        "block_num": 4999992,
-                        "operation_id": "21474802120262208",
-                        "op_type_id": 64,
-                        "balance": "8172549681941451",
-                        "prev_balance": "8172546678091286",
-                        "balance_change": "3003850165",
-                        "timestamp": "2016-09-15T19:46:57"
-                      },
-                      {
-                        "block_num": 4999959,
-                        "operation_id": "21474660386343488",
-                        "op_type_id": 64,
-                        "balance": "8172546678091286",
-                        "prev_balance": "8172543674223181",
-                        "balance_change": "3003868105",
-                        "timestamp": "2016-09-15T19:45:12"
-                      }
-                    ]
-                  }
-                ]
+                "example": {
+                  "total_operations": 188291,
+                  "total_pages": 94146,
+                  "operations_result": [
+                    {
+                      "block_num": 4999992,
+                      "operation_id": "21474802120262208",
+                      "op_type_id": 64,
+                      "balance": "8172549681941451",
+                      "prev_balance": "8172546678091286",
+                      "balance_change": "3003850165",
+                      "timestamp": "2016-09-15T19:46:57"
+                    },
+                    {
+                      "block_num": 4999959,
+                      "operation_id": "21474660386343488",
+                      "op_type_id": 64,
+                      "balance": "8172546678091286",
+                      "prev_balance": "8172543674223181",
+                      "balance_change": "3003868105",
+                      "timestamp": "2016-09-15T19:45:12"
+                    }
+                  ]
+                }
               }
             }
           },
@@ -495,12 +491,10 @@ declare
                   "type": "string",
                   "x-sql-datatype": "JSON"
                 },
-                "example": [
-                  {
-                    "outgoing_delegations": [],
-                    "incoming_delegations": []
-                  }
-                ]
+                "example": {
+                  "outgoing_delegations": [],
+                  "incoming_delegations": []
+                }
               }
             }
           },
