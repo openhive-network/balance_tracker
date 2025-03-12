@@ -188,6 +188,18 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
+  get_daily_aggregation AS MATERIALIZED (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM balance_history_by_day bh
+    WHERE bh.account = _account_id AND bh.nai = _coin_type
+  ),
   balance_records AS (
     SELECT 
       ds.date,
@@ -197,10 +209,7 @@ RETURN QUERY (
       bh.max_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
-    LEFT JOIN balance_history_by_day bh ON 
-      bh.account = _account_id AND 
-      bh.nai = _coin_type AND 
-      ds.date = bh.updated_at
+    LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -219,11 +228,8 @@ RETURN QUERY (
           bh.min_balance,
           bh.max_balance,
           bh.source_op_block 
-        FROM balance_history_by_day bh
-        WHERE 
-          bh.account = _account_id AND 
-          bh.nai = _coin_type AND 
-          bh.updated_at < ds.date
+        FROM get_daily_aggregation bh
+        WHERE bh.updated_at < ds.date
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
@@ -284,6 +290,18 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
+  get_montly_aggregation AS MATERIALIZED (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM balance_history_by_month bh
+    WHERE bh.account = _account_id AND bh.nai = _coin_type
+  ),
   balance_records AS (
     SELECT 
       ds.date,
@@ -293,10 +311,7 @@ RETURN QUERY (
       bh.max_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
-    LEFT JOIN balance_history_by_month bh ON 
-      bh.account = _account_id AND 
-      bh.nai = _coin_type AND 
-      ds.date = bh.updated_at
+    LEFT JOIN get_montly_aggregation bh ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -315,11 +330,8 @@ RETURN QUERY (
           bh.min_balance,
           bh.max_balance,
           bh.source_op_block 
-        FROM balance_history_by_month bh
-        WHERE 
-          bh.account = _account_id AND 
-          bh.nai = _coin_type AND 
-          bh.updated_at < ds.date
+        FROM get_montly_aggregation bh
+        WHERE bh.updated_at < ds.date
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
