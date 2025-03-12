@@ -11,53 +11,79 @@ CREATE TYPE balance_history_aggregation AS (
     max_balance BIGINT
 );
 
-CREATE OR REPLACE VIEW balance_history_by_year AS
-WITH get_year AS (
-    SELECT
-        account,
-        nai,
-        balance,
-        min_balance,
-        max_balance,
-        source_op_block,
-        updated_at,
-        DATE_TRUNC('year', updated_at) AS by_year
-    FROM balance_history_by_month 
-),
+DROP TYPE IF EXISTS balance_history_by_year_return CASCADE;
+CREATE TYPE balance_history_by_year_return AS (
+    account INT,
+    nai INT,
+    balance BIGINT,
+    min_balance BIGINT,
+    max_balance BIGINT,
+    source_op_block INT,
+    updated_at TIMESTAMP
+);
 
-get_latest_updates AS (
-    SELECT
-        account,
-        nai,
-        balance,
-        source_op_block,
-        by_year,
-        ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
-    FROM get_year
-),
-
-get_min_max_balances_by_year AS (
-    SELECT
-        account,
-        nai,
-        by_year,
-        MAX(max_balance) AS max_balance,
-        MIN(min_balance) AS min_balance
-    FROM get_year
-    GROUP BY account, nai, by_year
+CREATE OR REPLACE FUNCTION balance_history_by_year(
+    _account_id INT,
+    _coin_type INT
 )
+RETURNS SETOF balance_history_by_year_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  RETURN QUERY (
+    WITH get_year AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            min_balance,
+            max_balance,
+            source_op_block,
+            updated_at,
+            DATE_TRUNC('year', updated_at) AS by_year
+        FROM balance_history_by_month
+        WHERE account = _account_id AND nai = _coin_type 
+    ),
 
-SELECT
-    gl.account,
-    gl.nai,
-    gl.balance,
-    gm.min_balance,
-    gm.max_balance,
-    gl.source_op_block,
-    gl.by_year AS updated_at
-FROM get_latest_updates gl
-JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
-WHERE gl.rn_by_year = 1;
+    get_latest_updates AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            source_op_block,
+            by_year,
+            ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
+        FROM get_year
+    ),
+
+    get_min_max_balances_by_year AS (
+        SELECT
+            account,
+            nai,
+            by_year,
+            MAX(max_balance) AS max_balance,
+            MIN(min_balance) AS min_balance
+        FROM get_year
+        GROUP BY account, nai, by_year
+    )
+
+    SELECT
+        gl.account,
+        gl.nai,
+        gl.balance,
+        gm.min_balance,
+        gm.max_balance,
+        gl.source_op_block,
+        gl.by_year AS updated_at
+    FROM get_latest_updates gl
+    JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
+    WHERE gl.rn_by_year = 1
+  );
+
+END
+$$;
 
 CREATE OR REPLACE FUNCTION get_balance_history_aggregation(
     _account_id INT,
@@ -354,6 +380,17 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
+  get_yearly_aggregation AS MATERIALIZED (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM balance_history_by_year(_account_id,_coin_type) bh
+  ),
   balance_records AS (
     SELECT 
       ds.date,
@@ -363,10 +400,7 @@ RETURN QUERY (
       bh.max_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
-    LEFT JOIN balance_history_by_year bh ON 
-      bh.account = _account_id AND 
-      bh.nai = _coin_type AND 
-      ds.date = bh.updated_at
+    LEFT JOIN get_yearly_aggregation bh ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -385,11 +419,8 @@ RETURN QUERY (
           bh.min_balance,
           bh.max_balance,
           bh.source_op_block 
-        FROM balance_history_by_year bh
-        WHERE 
-          bh.account = _account_id AND 
-          bh.nai = _coin_type AND 
-          bh.updated_at < ds.date
+        FROM get_yearly_aggregation bh
+        WHERE bh.updated_at < ds.date
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
