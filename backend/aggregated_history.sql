@@ -188,7 +188,7 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
-  get_daily_aggregation AS MATERIALIZED (
+  get_daily_aggregation AS (
     SELECT 
       bh.account,
       bh.nai,
@@ -290,7 +290,7 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
-  get_montly_aggregation AS MATERIALIZED (
+  get_montly_aggregation AS (
     SELECT 
       bh.account,
       bh.nai,
