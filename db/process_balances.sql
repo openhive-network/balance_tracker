@@ -26,7 +26,7 @@ WITH balance_impacting_ops AS MATERIALIZED
   FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
-ops_in_range 
+ops_in_range AS
 (
   SELECT 
     (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
