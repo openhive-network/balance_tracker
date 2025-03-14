@@ -20,13 +20,13 @@ BEGIN
 --RAISE NOTICE 'Processing balances';
 
 -- get all operations that can impact balances
-WITH balance_impacting_ops
+WITH balance_impacting_ops AS MATERIALIZED
 (
   SELECT ot.id
   FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
-ops_in_range AS MATERIALIZED 
+ops_in_range 
 (
   SELECT 
     (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
