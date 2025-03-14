@@ -20,7 +20,7 @@ BEGIN
 --RAISE NOTICE 'Processing balances';
 
 -- get all operations that can impact balances
-WITH balance_impacting_ops AS MATERIALIZED
+WITH balance_impacting_ops
 (
   SELECT ot.id
   FROM hafd.operation_types ot
