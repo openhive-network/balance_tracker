@@ -151,11 +151,12 @@ CREATE TYPE btracker_endpoints.balances AS (
           Account balances 
           (VEST balances are represented as string due to json limitations)
 
-          * Returns `btracker_endpoints.balances`
+          * Returns `JSON`
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_endpoints.balances'
+              type: string
+              x-sql-datatype: JSON
             example: {
               "hbd_balance": 77246982,
               "hive_balance": 29594875,
@@ -187,22 +188,24 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_balances;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(
     "account-name" TEXT
 )
-RETURNS btracker_endpoints.balances 
+RETURNS JSON 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
+DECLARE
+  _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
   PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
+  IF _account_id IS NULL THEN
+    RETURN '{}'::JSON;
+  END IF;
+
   --balance
   RETURN (
-    WITH get_account_id AS MATERIALIZED
-    (
-      SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name" 
-    ),
-    get_delegations AS
+    WITH get_delegations AS
     (
       SELECT 
         COALESCE(ad.delegated_vests::TEXT, '0') AS delegated_vests,
@@ -212,8 +215,7 @@ BEGIN
           NULL::TEXT AS delegated_vests,
           NULL::TEXT AS received_vests
       ) default_values
-      LEFT JOIN get_account_id gai ON true
-      LEFT JOIN account_delegations ad ON ad.account = gai.id
+      LEFT JOIN account_delegations ad ON ad.account = _account_id
     ),
     get_balances AS MATERIALIZED
     (
@@ -222,7 +224,7 @@ BEGIN
         MAX(CASE WHEN cab.nai = 21 THEN cab.balance END) AS hive_balance, 
         MAX(CASE WHEN cab.nai = 37 THEN cab.balance END) AS vesting_shares 
       FROM current_account_balances cab
-      WHERE cab.account= (SELECT id FROM get_account_id)
+      WHERE cab.account= _account_id
     ),
     get_vest_balance AS
     (
@@ -249,8 +251,7 @@ BEGIN
           NULL::TEXT AS curation_rewards,
           NULL::TEXT AS posting_rewards
       ) default_values
-      LEFT JOIN get_account_id gai ON true
-      LEFT JOIN account_info_rewards air ON air.account = gai.id
+      LEFT JOIN account_info_rewards air ON air.account = _account_id
     ),
     calculate_rewards AS MATERIALIZED
     (
@@ -260,7 +261,7 @@ BEGIN
         MAX(CASE WHEN ar.nai = 37 THEN ar.balance END) AS vests_rewards,
         MAX(CASE WHEN ar.nai = 38 THEN ar.balance END) AS hive_vesting_rewards
       FROM account_rewards ar
-      WHERE ar.account= (SELECT id FROM get_account_id)
+      WHERE ar.account= _account_id
     ),
     get_rewards AS 
     (
@@ -278,13 +279,13 @@ BEGIN
         MAX(CASE WHEN ats.nai = 13 THEN ats.saving_balance END) AS hbd_savings,
         MAX(CASE WHEN ats.nai = 21 THEN ats.saving_balance END) AS hive_savings
       FROM account_savings ats
-      WHERE ats.account= (SELECT id FROM get_account_id)
+      WHERE ats.account= _account_id
     ),
     get_withdraw_requests AS
     (
       SELECT SUM(ats.savings_withdraw_requests) AS total
       FROM account_savings ats
-      WHERE ats.account= (SELECT id FROM get_account_id)
+      WHERE ats.account= _account_id
     ),
     get_savings AS
     (
@@ -312,33 +313,31 @@ BEGIN
           NULL::INT AS withdraw_routes,
           NULL::TEXT AS delayed_vests
       ) default_values
-      LEFT JOIN get_account_id gai ON true
-      LEFT JOIN account_withdraws aw ON aw.account = gai.id
+      LEFT JOIN account_withdraws aw ON aw.account = _account_id
     )
-    SELECT 
-    (
-      COALESCE(gb.hbd_balance,0),
-      COALESCE(gb.hive_balance ,0),
-      COALESCE(gb.vesting_shares::TEXT ,'0'),
-      COALESCE(gvb.vesting_balance_hive ,0),
-      COALESCE(gpvp.post_voting_power_vests::TEXT ,'0'),
-      gd.delegated_vests,
-      gd.received_vests,
-      gir.curation_rewards,
-      gir.posting_rewards,
-      gr.hbd_rewards,
-      gr.hive_rewards,
-      gr.vests_rewards,
-      gr.hive_vesting_rewards,
-      gs.hbd_savings,
-      gs.hive_savings,
-      gs.total,
-      gw.vesting_withdraw_rate,
-      gw.to_withdraw,
-      gw.withdrawn,
-      gw.withdraw_routes,
-      gw.delayed_vests
-    )::btracker_endpoints.balances
+    SELECT json_build_object(
+      'hbd_balance', COALESCE(gb.hbd_balance,0),
+      'hive_balance', COALESCE(gb.hive_balance ,0),
+      'vesting_shares', COALESCE(gb.vesting_shares::TEXT ,'0'),
+      'vesting_balance_hive', COALESCE(gvb.vesting_balance_hive ,0),
+      'post_voting_power_vests', COALESCE(gpvp.post_voting_power_vests::TEXT ,'0'),
+      'delegated_vests', gd.delegated_vests,
+      'received_vests', gd.received_vests,
+      'curation_rewards', gir.curation_rewards,
+      'posting_rewards', gir.posting_rewards,
+      'hbd_rewards', gr.hbd_rewards,
+      'hive_rewards', gr.hive_rewards,
+      'vests_rewards', gr.vests_rewards,
+      'hive_vesting_rewards', gr.hive_vesting_rewards,
+      'hbd_savings', gs.hbd_savings,
+      'hive_savings', gs.hive_savings,
+      'savings_withdraw_requests', gs.total,
+      'vesting_withdraw_rate', gw.vesting_withdraw_rate,
+      'to_withdraw', gw.to_withdraw,
+      'withdrawn', gw.withdrawn,
+      'withdraw_routes', gw.withdraw_routes,
+      'delayed_vests', gw.delayed_vests
+    )
     FROM 
       get_balances gb,
       get_vest_balance gvb,

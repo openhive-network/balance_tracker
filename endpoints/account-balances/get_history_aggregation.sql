@@ -144,6 +144,10 @@ BEGIN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
+  IF _account_id IS NULL THEN
+    RETURN '[]'::JSON;
+  END IF;
+
   RETURN COALESCE((
     SELECT to_json(array_agg(row)) FROM (
       SELECT 

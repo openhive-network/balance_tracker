@@ -210,11 +210,12 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.balances`\n",
+            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `JSON`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.balances"
+                  "type": "string",
+                  "x-sql-datatype": "JSON"
                 },
                 "example": {
                   "hbd_balance": 77246982,
