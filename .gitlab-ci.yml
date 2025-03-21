@@ -392,6 +392,37 @@ performance-test:
   tags:
   - data-cache-storage
 
+pattern-test:
+  extends: .pytest_based_template
+  stage: test
+  needs:
+  - job: sync
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: prepare_haf_image
+    artifacts: true
+  services:
+  - *hfm-only-service
+  - *postgrest-service
+  variables:
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
+    PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
+    POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
+    BTRACKER_ADDRESS: postgrest-server
+    BTRACKER_PORT: 3000
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
+  script:
+  - |
+    cd $CI_PROJECT_DIR/tests/tavern
+    pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
+  artifacts:
+    paths:
+    - "**/*.out.json"
+  tags:
+  - data-cache-storage
+
 build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
