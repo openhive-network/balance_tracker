@@ -27,7 +27,7 @@ WITH process_block_range_data_b AS MATERIALIZED
     impacted_withdraws.to_withdraw,
     ov.id AS source_op
   FROM operations_view ov
-  CROSS JOIN get_impacted_withdraws(ov.body, ov.op_type_id, ov.block_num) AS impacted_withdraws
+  CROSS JOIN btracker_backend.get_impacted_withdraws(ov.body, ov.op_type_id, ov.block_num) AS impacted_withdraws
   WHERE 
     ov.op_type_id IN (4,68) AND 
     ov.block_num BETWEEN _from AND _to
@@ -76,7 +76,7 @@ WITH process_block_range_data_b AS (
     withdraw_vesting_route.percent,
     ov.id AS source_op
   FROM operations_view ov
-  CROSS JOIN process_set_withdraw_vesting_route_operation(ov.body) AS withdraw_vesting_route
+  CROSS JOIN btracker_backend.process_set_withdraw_vesting_route_operation(ov.body) AS withdraw_vesting_route
   WHERE 
     ov.op_type_id = 20 AND 
     ov.block_num BETWEEN _from AND _to
@@ -240,7 +240,7 @@ WITH process_block_range_data_b AS MATERIALIZED
     ov.id AS source_op
   FROM operations_view ov
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
-  CROSS JOIN process_fill_vesting_withdraw_operation(ov.body, ov.block_num > ah.block_num) AS fill_vesting_withdraw_operation
+  CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation(ov.body, ov.block_num > ah.block_num) AS fill_vesting_withdraw_operation
   WHERE 
     ov.op_type_id IN (56) AND 
     ov.block_num BETWEEN _from AND _to
@@ -318,7 +318,7 @@ WITH process_block_range_data_b AS MATERIALIZED
   FROM operations_view ov
   -- start calculations from the first block after the 24 hardfork
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 24 AND ah.block_num < ov.block_num
-  CROSS JOIN get_impacted_delayed_balances(ov.body, ov.op_type_id) AS get_impacted_delayed_balances
+  CROSS JOIN btracker_backend.get_impacted_delayed_balances(ov.body, ov.op_type_id) AS get_impacted_delayed_balances
   WHERE 
     ov.op_type_id IN (56,77,70) AND 
     ov.block_num BETWEEN _from AND _to

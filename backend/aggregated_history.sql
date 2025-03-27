@@ -2,17 +2,8 @@
 
 SET ROLE btracker_owner;
 
-DROP TYPE IF EXISTS balance_history_aggregation CASCADE;
-CREATE TYPE balance_history_aggregation AS (
-    date TIMESTAMP,
-    balance BIGINT,
-    prev_balance BIGINT,
-    min_balance BIGINT,
-    max_balance BIGINT
-);
-
-DROP TYPE IF EXISTS balance_history_by_year_return CASCADE;
-CREATE TYPE balance_history_by_year_return AS (
+DROP TYPE IF EXISTS btracker_backend.balance_history_by_year_return CASCADE;
+CREATE TYPE btracker_backend.balance_history_by_year_return AS (
     account INT,
     nai INT,
     balance BIGINT,
@@ -22,11 +13,11 @@ CREATE TYPE balance_history_by_year_return AS (
     updated_at TIMESTAMP
 );
 
-CREATE OR REPLACE FUNCTION balance_history_by_year(
+CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year(
     _account_id INT,
     _coin_type INT
 )
-RETURNS SETOF balance_history_by_year_return -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.balance_history_by_year_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -85,15 +76,15 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_history_aggregation(
+CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_aggregation(
     _account_id INT,
     _coin_type INT,
-    _granularity btracker_endpoints.granularity,
-    _direction btracker_endpoints.sort_direction,
+    _granularity btracker_backend.granularity,
+    _direction btracker_backend.sort_direction,
     _from_block INT,
     _to_block INT
 )
-RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -115,7 +106,7 @@ BEGIN
         fb.prev_balance,
         fb.min_balance,
         fb.max_balance
-      FROM get_balance_history_by_day(
+      FROM btracker_backend.get_balance_history_by_day(
         _account_id,
         _coin_type,
         _direction,
@@ -131,7 +122,7 @@ BEGIN
         fb.prev_balance,
         fb.min_balance,
         fb.max_balance
-      FROM get_balance_history_by_month(
+      FROM btracker_backend.get_balance_history_by_month(
         _account_id,
         _coin_type,
         _direction,
@@ -147,7 +138,7 @@ BEGIN
         fb.prev_balance,
         fb.min_balance,
         fb.max_balance
-      FROM get_balance_history_by_year(
+      FROM btracker_backend.get_balance_history_by_year(
         _account_id,
         _coin_type,
         _direction,
@@ -161,14 +152,14 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_history_by_day(
+CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_by_day(
     _account_id INT,
     _coin_type INT,
-    _direction btracker_endpoints.sort_direction,
+    _direction btracker_backend.sort_direction,
     _from_block INT,
     _to_block INT
 )
-RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -252,10 +243,10 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 day' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.prev_balance,
-    fb.min_balance,
-    fb.max_balance
+    fb.balance::TEXT,
+    fb.prev_balance::TEXT,
+    fb.min_balance::TEXT,
+    fb.max_balance::TEXT
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -264,14 +255,14 @@ RETURN QUERY (
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_history_by_month(
+CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_by_month(
     _account_id INT,
     _coin_type INT,
-    _direction btracker_endpoints.sort_direction,
+    _direction btracker_backend.sort_direction,
     _from_block INT,
     _to_block INT
 )
-RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -354,10 +345,10 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 month' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.prev_balance,
-    fb.min_balance,
-    fb.max_balance
+    fb.balance::TEXT,
+    fb.prev_balance::TEXT,
+    fb.min_balance::TEXT,
+    fb.max_balance::TEXT
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -366,14 +357,14 @@ RETURN QUERY (
 END
 $$;
 
-CREATE OR REPLACE FUNCTION get_balance_history_by_year(
+CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_by_year(
     _account_id INT,
     _coin_type INT,
-    _direction btracker_endpoints.sort_direction,
+    _direction btracker_backend.sort_direction,
     _from_block INT,
     _to_block INT
 )
-RETURNS SETOF balance_history_aggregation -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -401,7 +392,7 @@ RETURN QUERY (
       bh.max_balance,
       bh.source_op_block,
       bh.updated_at
-    FROM balance_history_by_year(_account_id,_coin_type) bh
+    FROM btracker_backend.balance_history_by_year(_account_id,_coin_type) bh
   ),
   balance_records AS (
     SELECT 
@@ -455,10 +446,10 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 year' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance,
-    fb.prev_balance,
-    fb.min_balance,
-    fb.max_balance
+    fb.balance::TEXT,
+    fb.prev_balance::TEXT,
+    fb.min_balance::TEXT,
+    fb.max_balance::TEXT
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,

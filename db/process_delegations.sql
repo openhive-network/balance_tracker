@@ -23,7 +23,7 @@ WITH process_block_range_data_b AS MATERIALIZED
     ov.block_num as source_op_block,
     ov.op_type_id 
   FROM operations_view ov
-  CROSS JOIN get_impacted_delegation_balances(ov.body, ov.op_type_id) AS get_impacted_delegation_balances
+  CROSS JOIN btracker_backend.get_impacted_delegation_balances(ov.body, ov.op_type_id) AS get_impacted_delegation_balances
   WHERE 
     ov.op_type_id IN (40,41,62,68) AND 
     ov.block_num BETWEEN _from AND _to

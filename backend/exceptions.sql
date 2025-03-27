@@ -1,9 +1,9 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION validate_limit(given_limit BIGINT, expected_limit INT,given_limit_name TEXT DEFAULT 'page-size')
+CREATE OR REPLACE FUNCTION btracker_backend.validate_limit(given_limit BIGINT, expected_limit INT,given_limit_name TEXT DEFAULT 'page-size')
 RETURNS VOID -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
-STABLE
+IMMUTABLE
 AS
 $$
 BEGIN
@@ -15,10 +15,10 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION validate_page(given_page BIGINT, max_page INT)
+CREATE OR REPLACE FUNCTION btracker_backend.validate_page(given_page BIGINT, max_page INT)
 RETURNS VOID -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
-STABLE
+IMMUTABLE
 AS
 $$
 BEGIN
@@ -31,10 +31,10 @@ END
 $$;
 
 
-CREATE OR REPLACE FUNCTION validate_negative_limit(given_limit BIGINT, given_limit_name TEXT DEFAULT 'page-size')
+CREATE OR REPLACE FUNCTION btracker_backend.validate_negative_limit(given_limit BIGINT, given_limit_name TEXT DEFAULT 'page-size')
 RETURNS VOID -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
-STABLE
+IMMUTABLE
 AS
 $$
 BEGIN
@@ -46,10 +46,10 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION validate_negative_page(given_page BIGINT)
+CREATE OR REPLACE FUNCTION btracker_backend.validate_negative_page(given_page BIGINT)
 RETURNS VOID -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
-STABLE
+IMMUTABLE
 AS
 $$
 BEGIN
@@ -60,5 +60,17 @@ BEGIN
   RETURN;
 END
 $$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.rest_raise_missing_account(_account_name TEXT)
+RETURNS VOID
+LANGUAGE 'plpgsql'
+IMMUTABLE
+AS
+$$
+BEGIN
+  RAISE EXCEPTION 'Account ''%'' does not exist', _account_name;
+END
+$$
+;
 
 RESET ROLE;
