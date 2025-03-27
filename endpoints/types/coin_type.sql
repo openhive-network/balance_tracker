@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_endpoints.nai_type:
+btracker_backend.nai_type:
   type: string
   enum:
     - HBD
@@ -9,8 +9,8 @@ btracker_endpoints.nai_type:
     - VESTS
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_endpoints.nai_type CASCADE;
-CREATE TYPE btracker_endpoints.nai_type AS ENUM (
+DROP TYPE IF EXISTS btracker_backend.nai_type CASCADE;
+CREATE TYPE btracker_backend.nai_type AS ENUM (
     'HBD',
     'HIVE',
     'VESTS'

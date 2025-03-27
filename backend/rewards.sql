@@ -17,7 +17,11 @@ CREATE TYPE btracker_backend.impacted_rewards_return AS
     vesting_payout BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_reward_balances(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_reward_balances(
+    IN _operation_body JSONB,
+    IN _source_op_block INT,
+    IN _op_type_id INT
+)
 RETURNS btracker_backend.impacted_rewards_return
 LANGUAGE plpgsql
 STABLE
@@ -68,7 +72,11 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_backend.process_author_or_benefactor_reward_operation(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+CREATE OR REPLACE FUNCTION btracker_backend.process_author_or_benefactor_reward_operation(
+    IN _operation_body JSONB,
+    IN _source_op_block INT,
+    IN _op_type_id INT
+)
 RETURNS btracker_backend.impacted_rewards_return
 LANGUAGE 'plpgsql' STABLE
 AS
