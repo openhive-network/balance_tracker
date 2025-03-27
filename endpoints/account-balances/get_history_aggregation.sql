@@ -1,5 +1,12 @@
 SET ROLE btracker_owner;
 
+/** openapi:components:schemas
+btracker_backend.array_of_aggregated_history:
+  type: array
+  items:
+    $ref: '#/components/schemas/btracker_backend.aggregated_history'
+*/
+
 /** openapi:paths
 /accounts/{account-name}/aggregated-history:
   get:
@@ -26,7 +33,7 @@ SET ROLE btracker_owner;
         name: coin-type
         required: true
         schema:
-          $ref: '#/components/schemas/btracker_endpoints.nai_type'
+          $ref: '#/components/schemas/btracker_backend.nai_type'
         description: |
           Coin types:
 
@@ -39,7 +46,7 @@ SET ROLE btracker_owner;
         name: granularity
         required: false
         schema:
-          $ref: '#/components/schemas/btracker_endpoints.granularity'
+          $ref: '#/components/schemas/btracker_backend.granularity'
           default: yearly
         description: |
           granularity types:
@@ -53,7 +60,7 @@ SET ROLE btracker_owner;
         name: direction
         required: false
         schema:
-          $ref: '#/components/schemas/btracker_endpoints.sort_direction'
+          $ref: '#/components/schemas/btracker_backend.sort_direction'
           default: desc
         description: |
           Sort order:
@@ -99,11 +106,12 @@ SET ROLE btracker_owner;
       '200':
         description: |
           Balance change
+
+          * Returns array of `btracker_backend.aggregated_history`
         content:
           application/json:
             schema:
-              type: string
-              x-sql-datatype: JSON
+              $ref: '#/components/schemas/btracker_backend.array_of_aggregated_history'
             example: 
               - {
                   "date":"2016-12-31T23:59:59",
@@ -120,15 +128,17 @@ SET ROLE btracker_owner;
 DROP FUNCTION IF EXISTS btracker_endpoints.get_balance_aggregation;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_aggregation(
     "account-name" TEXT,
-    "coin-type" btracker_endpoints.nai_type,
-    "granularity" btracker_endpoints.granularity = 'yearly',
-    "direction" btracker_endpoints.sort_direction = 'desc',
+    "coin-type" btracker_backend.nai_type,
+    "granularity" btracker_backend.granularity = 'yearly',
+    "direction" btracker_backend.sort_direction = 'desc',
     "from-block" TEXT = NULL,
     "to-block" TEXT = NULL
 )
-RETURNS JSON 
+RETURNS SETOF btracker_backend.aggregated_history 
 -- openapi-generated-code-end
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' STABLE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
 SET jit = OFF
 AS
 $$
@@ -137,6 +147,9 @@ DECLARE
   _coin_type INT := (CASE WHEN "coin-type" = 'HBD' THEN 13 WHEN "coin-type" = 'HIVE' THEN 21 ELSE 37 END);
   _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
 BEGIN
+  IF _account_id IS NULL THEN
+    PERFORM btracker_backend.rest_raise_missing_account("account-name");
+  END IF;
 
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
@@ -144,24 +157,22 @@ BEGIN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
-  RETURN COALESCE((
-    SELECT to_json(array_agg(row)) FROM (
-      SELECT 
-        fb.date,
-        fb.prev_balance::TEXT,
-        fb.balance::TEXT,
-        fb.min_balance::TEXT,
-        fb.max_balance::TEXT
-      FROM get_balance_history_aggregation(
-        _account_id,
-        _coin_type,
-        "granularity",
-        "direction",
-        _block_range.first_block,
-        _block_range.last_block
-      ) fb
-    ) row
-  ), '[]'); 
+  RETURN QUERY
+  SELECT 
+    ah.date,
+    ah.balance,
+    ah.prev_balance,
+    ah.min_balance,
+    ah.max_balance
+  FROM btracker_backend.get_balance_history_aggregation(
+    _account_id,
+    _coin_type,
+    "granularity",
+    "direction",
+    _block_range.first_block,
+    _block_range.last_block
+  ) ah;
+
 END
 $$;
 

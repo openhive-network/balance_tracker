@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_endpoints.granularity:
+btracker_backend.granularity:
   type: string
   enum:
     - daily
@@ -9,8 +9,8 @@ btracker_endpoints.granularity:
     - yearly
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_endpoints.granularity CASCADE;
-CREATE TYPE btracker_endpoints.granularity AS ENUM (
+DROP TYPE IF EXISTS btracker_backend.granularity CASCADE;
+CREATE TYPE btracker_backend.granularity AS ENUM (
     'daily',
     'monthly',
     'yearly'

@@ -70,7 +70,6 @@ $$
 BEGIN
   RAISE EXCEPTION 'Account ''%'' does not exist', _account_name;
 END
-$$
-;
+$$;
 
 RESET ROLE;
