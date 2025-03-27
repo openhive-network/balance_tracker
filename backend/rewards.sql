@@ -1,15 +1,15 @@
 SET ROLE btracker_owner;
 
-DROP TYPE IF EXISTS impacted_info_rewards_return CASCADE;
-CREATE TYPE impacted_info_rewards_return AS
+DROP TYPE IF EXISTS btracker_backend.impacted_info_rewards_return CASCADE;
+CREATE TYPE btracker_backend.impacted_info_rewards_return AS
 (
     account_name VARCHAR,
     reward BIGINT,
     payout_must_be_claimed BOOLEAN
 );
 
-DROP TYPE IF EXISTS impacted_rewards_return CASCADE;
-CREATE TYPE impacted_rewards_return AS
+DROP TYPE IF EXISTS btracker_backend.impacted_rewards_return CASCADE;
+CREATE TYPE btracker_backend.impacted_rewards_return AS
 (
     account_name VARCHAR,
     hbd_payout BIGINT,
@@ -17,8 +17,8 @@ CREATE TYPE impacted_rewards_return AS
     vesting_payout BIGINT
 );
 
-CREATE OR REPLACE FUNCTION get_impacted_reward_balances(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
-RETURNS impacted_rewards_return
+CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_reward_balances(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+RETURNS btracker_backend.impacted_rewards_return
 LANGUAGE plpgsql
 STABLE
 AS
@@ -27,10 +27,10 @@ BEGIN
   RETURN (
     CASE 
       WHEN _op_type_id = 39 THEN
-        process_claim_reward_balance_operation(_operation_body)
+        btracker_backend.process_claim_reward_balance_operation(_operation_body)
 
       WHEN _op_type_id = 51 OR _op_type_id = 63 THEN
-        process_author_or_benefactor_reward_operation(_operation_body, _source_op_block, _op_type_id)
+        btracker_backend.process_author_or_benefactor_reward_operation(_operation_body, _source_op_block, _op_type_id)
     END
   );
 
@@ -38,8 +38,8 @@ END;
 $BODY$;
 
 
-CREATE OR REPLACE FUNCTION process_posting_rewards(IN _operation_body JSONB)
-RETURNS impacted_info_rewards_return
+CREATE OR REPLACE FUNCTION btracker_backend.process_posting_rewards(IN _operation_body JSONB)
+RETURNS btracker_backend.impacted_info_rewards_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
@@ -48,13 +48,13 @@ BEGIN
     ((_operation_body)->'value'->>'author')::TEXT,
     ((_operation_body)->'value'->>'author_rewards')::BIGINT,
     TRUE
-  )::impacted_info_rewards_return;
+  )::btracker_backend.impacted_info_rewards_return;
   
 END
 $$;
 
-CREATE OR REPLACE FUNCTION process_curation_rewards(IN _operation_body JSONB)
-RETURNS impacted_info_rewards_return
+CREATE OR REPLACE FUNCTION btracker_backend.process_curation_rewards(IN _operation_body JSONB)
+RETURNS btracker_backend.impacted_info_rewards_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
@@ -63,13 +63,13 @@ BEGIN
     ((_operation_body)->'value'->>'curator')::TEXT,
     ((_operation_body)->'value'->'reward'->>'amount')::BIGINT,
     ((_operation_body)->'value'->>'payout_must_be_claimed')::BOOLEAN
-  )::impacted_info_rewards_return;
+  )::btracker_backend.impacted_info_rewards_return;
   
 END
 $$;
 
-CREATE OR REPLACE FUNCTION process_author_or_benefactor_reward_operation(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
-RETURNS impacted_rewards_return
+CREATE OR REPLACE FUNCTION btracker_backend.process_author_or_benefactor_reward_operation(IN _operation_body JSONB, IN _source_op_block INT, IN _op_type_id INT)
+RETURNS btracker_backend.impacted_rewards_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
@@ -102,15 +102,15 @@ RETURN (
       hbd_payout,
       hive_payout,
       vesting_payout
-    )::impacted_rewards_return
+    )::btracker_backend.impacted_rewards_return
   FROM add_vesting_balance
 );
 
 END
 $$;
 
-CREATE OR REPLACE FUNCTION process_claim_reward_balance_operation(IN _operation_body JSONB)
-RETURNS impacted_rewards_return
+CREATE OR REPLACE FUNCTION btracker_backend.process_claim_reward_balance_operation(IN _operation_body JSONB)
+RETURNS btracker_backend.impacted_rewards_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
@@ -129,7 +129,7 @@ RETURN (
       claim_hbd,
       claim_hive,
       claim_vests
-    )::impacted_rewards_return
+    )::btracker_backend.impacted_rewards_return
   FROM author_claim_reward_operation
 );
 

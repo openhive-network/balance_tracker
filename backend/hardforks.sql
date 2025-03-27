@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 --this function won't be necessary after changes in hardfork_hive_operation
-CREATE OR REPLACE FUNCTION process_hf_23(__hardfork_23_block INT)
+CREATE OR REPLACE FUNCTION btracker_backend.process_hf_23(__hardfork_23_block INT)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS

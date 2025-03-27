@@ -31,6 +31,7 @@ BEGIN
   __swagger_url := current_setting('custom.swagger_url')::TEXT;
 
 CREATE SCHEMA IF NOT EXISTS btracker_endpoints AUTHORIZATION btracker_owner;
+CREATE SCHEMA IF NOT EXISTS btracker_backend AUTHORIZATION btracker_owner;
 
 EXECUTE FORMAT(
 'create or replace function btracker_endpoints.root() returns json as $_$
@@ -66,7 +67,7 @@ declare
   ],
   "components": {
     "schemas": {
-      "btracker_endpoints.granularity": {
+      "btracker_backend.granularity": {
         "type": "string",
         "enum": [
           "daily",
@@ -74,7 +75,7 @@ declare
           "yearly"
         ]
       },
-      "btracker_endpoints.nai_type": {
+      "btracker_backend.nai_type": {
         "type": "string",
         "enum": [
           "HBD",
@@ -82,14 +83,14 @@ declare
           "VESTS"
         ]
       },
-      "btracker_endpoints.sort_direction": {
+      "btracker_backend.sort_direction": {
         "type": "string",
         "enum": [
           "asc",
           "desc"
         ]
       },
-      "btracker_endpoints.balances": {
+      "btracker_backend.balances": {
         "type": "object",
         "properties": {
           "hbd_balance": {
@@ -185,6 +186,153 @@ declare
             "description": "blocked VESTS by a withdrawal"
           }
         }
+      },
+      "btracker_backend.aggregated_history": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "date of the balance aggregation"
+          },
+          "balance": {
+            "type": "string",
+            "description": "aggregated account''s VEST balance"
+          },
+          "prev_balance": {
+            "type": "string",
+            "description": "aggregated account''s VEST balance from the previous day/month/year"
+          },
+          "min_balance": {
+            "type": "string",
+            "description": "minimum account''s VEST balance in the aggregation period"
+          },
+          "max_balance": {
+            "type": "string",
+            "description": "maximum account''s VEST balance in the aggregation period"
+          }
+        }
+      },
+      "btracker_backend.balance_history_type": {
+        "type": "object",
+        "properties": {
+          "block_num": {
+            "type": "integer",
+            "description": "block number"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with an encoded block number and operation type id"
+          },
+          "op_type_id": {
+            "type": "integer",
+            "description": "operation type identifier"
+          },
+          "balance": {
+            "type": "string",
+            "description": "The closing balance"
+          },
+          "prev_balance": {
+            "type": "string",
+            "description": "Balance in previous day/month/year"
+          },
+          "balance_change": {
+            "type": "string",
+            "description": "Diffrence between balance and prev_balance"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation date"
+          }
+        }
+      },
+      "btracker_backend.operation_history": {
+        "type": "object",
+        "properties": {
+          "total_operations": {
+            "type": "integer",
+            "description": "Total number of operations"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "operations_result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.balance_history_type"
+            },
+            "description": "List of operation results"
+          }
+        }
+      },
+      "btracker_backend.incoming_delegations": {
+        "type": "object",
+        "properties": {
+          "delegator": {
+            "type": "string",
+            "description": "account name of the delegator"
+          },
+          "amount": {
+            "type": "string",
+            "description": "amount of vests delegated"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "block number"
+          }
+        }
+      },
+      "btracker_backend.outgoing_delegations": {
+        "type": "object",
+        "properties": {
+          "delegatee": {
+            "type": "string",
+            "description": "account name of the delegatee"
+          },
+          "amount": {
+            "type": "string",
+            "description": "amount of vests delegated"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "block number"
+          }
+        }
+      },
+      "btracker_backend.delegations": {
+        "type": "object",
+        "properties": {
+          "outgoing_delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.outgoing_delegations"
+            },
+            "description": "List of outgoing delegations from the account"
+          },
+          "incoming_delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.incoming_delegations"
+            },
+            "description": "List of incoming delegations to the account"
+          }
+        }
+      },
+      "btracker_backend.array_of_aggregated_history": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.aggregated_history"
+        }
       }
     }
   },
@@ -210,11 +358,11 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_endpoints.balances`\n",
+            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_backend.balances`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_endpoints.balances"
+                  "$ref": "#/components/schemas/btracker_backend.balances"
                 },
                 "example": {
                   "hbd_balance": 77246982,
@@ -271,7 +419,7 @@ declare
             "name": "coin-type",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/btracker_endpoints.nai_type"
+              "$ref": "#/components/schemas/btracker_backend.nai_type"
             },
             "description": "Coin types:\n\n* HBD\n\n* HIVE\n\n* VESTS\n"
           },
@@ -300,7 +448,7 @@ declare
             "name": "direction",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/btracker_endpoints.sort_direction",
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
               "default": "desc"
             },
             "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
@@ -328,12 +476,11 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Balance change\n",
+            "description": "Balance change\n\n* Returns `btracker_backend.operation_history`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "x-sql-datatype": "JSON"
+                  "$ref": "#/components/schemas/btracker_backend.operation_history"
                 },
                 "example": {
                   "total_operations": 188291,
@@ -391,7 +538,7 @@ declare
             "name": "coin-type",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/btracker_endpoints.nai_type"
+              "$ref": "#/components/schemas/btracker_backend.nai_type"
             },
             "description": "Coin types:\n\n* HBD\n\n* HIVE\n\n* VESTS\n"
           },
@@ -400,7 +547,7 @@ declare
             "name": "granularity",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/btracker_endpoints.granularity",
+              "$ref": "#/components/schemas/btracker_backend.granularity",
               "default": "yearly"
             },
             "description": "granularity types:\n\n* daily\n\n* monthly\n\n* yearly\n"
@@ -410,7 +557,7 @@ declare
             "name": "direction",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/btracker_endpoints.sort_direction",
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
               "default": "desc"
             },
             "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
@@ -438,12 +585,11 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Balance change\n",
+            "description": "Balance change\n\n* Returns array of `btracker_backend.aggregated_history`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "x-sql-datatype": "JSON"
+                  "$ref": "#/components/schemas/btracker_backend.array_of_aggregated_history"
                 },
                 "example": [
                   {
@@ -484,12 +630,11 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Balance change\n",
+            "description": "Balance change\n\n* Returns `btracker_backend.delegations`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "x-sql-datatype": "JSON"
+                  "$ref": "#/components/schemas/btracker_backend.delegations"
                 },
                 "example": {
                   "outgoing_delegations": [],

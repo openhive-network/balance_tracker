@@ -319,7 +319,7 @@ BEGIN
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
-    PERFORM process_hf_23(__hardfork_23_block);
+    PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
     RAISE NOTICE 'Btracker processed hardfork 23 successfully';
 
     IF __hardfork_23_block != _to THEN 

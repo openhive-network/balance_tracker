@@ -34,7 +34,7 @@ get_impacted_bal AS (
     fio.source_op,
     fio.source_op_block 
   FROM process_block_range_data_b fio
-  CROSS JOIN get_impacted_reward_balances(fio.body, fio.source_op_block, fio.op_type_id) AS get_impacted_reward_balances
+  CROSS JOIN btracker_backend.get_impacted_reward_balances(fio.body, fio.source_op_block, fio.op_type_id) AS get_impacted_reward_balances
   WHERE 
     fio.op_type_id = 39 OR
     (fio.op_type_id IN (51,63) AND (fio.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
@@ -49,7 +49,7 @@ get_impacted_posting AS (
     fio.source_op,
     fio.source_op_block 
   FROM process_block_range_data_b fio
-  CROSS JOIN process_posting_rewards(fio.body) AS get_posting
+  CROSS JOIN btracker_backend.process_posting_rewards(fio.body) AS get_posting
   WHERE fio.op_type_id = 53
 ),
 get_impacted_curation AS (
@@ -61,7 +61,7 @@ get_impacted_curation AS (
     fio.source_op,
     fio.source_op_block 
   FROM process_block_range_data_b fio
-  CROSS JOIN process_curation_rewards(fio.body) AS get_curation
+  CROSS JOIN btracker_backend.process_curation_rewards(fio.body) AS get_curation
   WHERE fio.op_type_id = 52
 ),
 ------------------------------------------------------------------------------

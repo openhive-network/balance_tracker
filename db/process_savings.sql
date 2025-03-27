@@ -37,7 +37,7 @@ filter_interest_ops AS
     ov.source_op_block,
     ov.op_type_id 
   FROM process_block_range_data_b ov
-  CROSS JOIN get_impacted_saving_balances(ov.body, ov.op_type_id) AS get_impacted_saving_balances
+  CROSS JOIN btracker_backend.get_impacted_saving_balances(ov.body, ov.op_type_id) AS get_impacted_saving_balances
   WHERE 
     ov.op_type_id IN (32,33,34,59) OR
     (ov.op_type_id = 55 AND (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)
