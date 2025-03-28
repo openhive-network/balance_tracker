@@ -42,14 +42,21 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+pushd "../$script_dir"
+
+echo "Test 1. Generate version..."
+./scripts/generate_version_sql.sh 
+echo "Generate version completed successfully"
+
+popd
 
 pushd "$script_dir"
 
-echo "Test 1. Reinstall app..."
+echo "Test 2. Reinstall app..."
 ./install_app.sh --postgres-host="$POSTGRES_HOST"
 echo "Reinstall completed successfully"
 
-echo "Test 2. Uninstall app..."
+echo "Test 3. Uninstall app..."
 ./uninstall_app.sh --host="$POSTGRES_HOST"
 echo "Uninstall app completed successfully"
 

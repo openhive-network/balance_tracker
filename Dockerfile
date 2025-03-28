@@ -2,6 +2,12 @@
 ARG PSQL_CLIENT_VERSION=14-1
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
+FROM psql as version-calculcation
+
+COPY --chown=haf_admin:users . /home/haf_admin/src
+WORKDIR /home/haf_admin/src
+RUN scripts/generate_version_sql.sh $(pwd)
+
 FROM psql AS full
 
 ARG BUILD_TIME
@@ -44,6 +50,7 @@ COPY endpoints /app/endpoints
 COPY dump_accounts /app/dump_accounts
 COPY balance-tracker.sh /app/balance-tracker.sh
 COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
-COPY docker/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker/scripts/docker_entrypoint.sh /app/docker_entrypoint.sh
+COPY --from=version-calculcation --chown=haf_admin:users /home/haf_admin/src/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/docker_entrypoint.sh"]
