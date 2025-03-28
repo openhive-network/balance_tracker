@@ -40,6 +40,11 @@ VALUES
 (True, False)
 ;
 
+CREATE TABLE IF NOT EXISTS version(
+  git_hash TEXT
+);
+
+INSERT INTO version VALUES('unspecified (generate and apply set_version_in_sql.pgsql)');
 --ACCOUNT BALANCES
 
 CREATE TABLE IF NOT EXISTS current_account_balances

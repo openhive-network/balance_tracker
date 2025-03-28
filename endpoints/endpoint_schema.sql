@@ -17,7 +17,8 @@ externalDocs:
 tags:
   - name: Accounts
     description: Informations about account balances
-
+  - name: Other
+    description: General API information
 servers:
   - url: /balance-api
  */
@@ -58,6 +59,10 @@ declare
     {
       "name": "Accounts",
       "description": "Informations about account balances"
+    },
+    {
+      "name": "Other",
+      "description": "General API information"
     }
   ],
   "servers": [
@@ -213,7 +218,7 @@ declare
           }
         }
       },
-      "btracker_backend.balance_history_type": {
+      "btracker_backend.balance_history": {
         "type": "object",
         "properties": {
           "block_num": {
@@ -261,7 +266,7 @@ declare
           "operations_result": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/btracker_backend.balance_history_type"
+              "$ref": "#/components/schemas/btracker_backend.balance_history"
             },
             "description": "List of operation results"
           }
@@ -645,6 +650,58 @@ declare
           },
           "404": {
             "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": [
+          "Other"
+        ],
+        "summary": "Get Balance tracker''s version",
+        "description": "Get Balance tracker''s last commit hash (versions set by by hash value).\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_version();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/version''`\n",
+        "operationId": "btracker_endpoints.get_btracker_version",
+        "responses": {
+          "200": {
+            "description": "Balance tracker version\n\n* Returns `TEXT`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "c2fed8958584511ef1a66dab3dbac8c40f3518f0"
+              }
+            }
+          },
+          "404": {
+            "description": "App not installed"
+          }
+        }
+      }
+    },
+    "/last-synced-block": {
+      "get": {
+        "tags": [
+          "Other"
+        ],
+        "summary": "Get last block number synced by balance tracker",
+        "description": "Get the block number of the last block synced by balance tracker.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_last_synced_block();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/last-synced-block''`\n",
+        "operationId": "btracker_endpoints.get_btracker_last_synced_block",
+        "responses": {
+          "200": {
+            "description": "Last synced block by balance tracker\n\n* Returns `INT`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer"
+                },
+                "example": 5000000
+              }
+            }
+          },
+          "404": {
+            "description": "No blocks synced"
           }
         }
       }

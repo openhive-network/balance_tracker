@@ -23,7 +23,10 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/account-balances/get_account_balances.sql
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
-../$endpoints/account-balances/get_account_delegations.sql"
+../$endpoints/account-balances/get_account_delegations.sql
+../$endpoints/other/get_btracker_version.sql
+../$endpoints/other/get_btracker_last_synced_block.sql"
+
 
 # Function to reverse the lines
 reverse_lines() {
