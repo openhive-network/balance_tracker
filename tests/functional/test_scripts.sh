@@ -42,10 +42,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-pushd "../$script_dir"
+
+pushd "$script_dir/.."
 
 echo "Test 1. Generate version..."
-./scripts/generate_version_sql.sh 
+./scripts/generate_version_sql.sh  "$script_dir/.."
 echo "Generate version completed successfully"
 
 popd
