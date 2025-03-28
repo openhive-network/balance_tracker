@@ -201,7 +201,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.balance_history(
     _from_op BIGINT,
     _to_op BIGINT
 )
-RETURNS SETOF btracker_backend.balance_history_type
+RETURNS SETOF btracker_backend.balance_history
 LANGUAGE 'plpgsql' STABLE
 AS
 $$

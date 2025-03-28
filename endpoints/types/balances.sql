@@ -157,7 +157,7 @@ CREATE TYPE btracker_backend.aggregated_history AS (
 
 
 /** openapi:components:schemas
-btracker_backend.balance_history_type:
+btracker_backend.balance_history:
   type: object
   properties:
     block_num:
@@ -186,8 +186,8 @@ btracker_backend.balance_history_type:
       description: Creation date
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_backend.balance_history_type CASCADE;
-CREATE TYPE btracker_backend.balance_history_type AS (
+DROP TYPE IF EXISTS btracker_backend.balance_history CASCADE;
+CREATE TYPE btracker_backend.balance_history AS (
     "block_num" INT,
     "operation_id" TEXT,
     "op_type_id" INT,
@@ -211,7 +211,7 @@ btracker_backend.operation_history:
     operations_result:
       type: array
       items:
-        $ref: '#/components/schemas/btracker_backend.balance_history_type'
+        $ref: '#/components/schemas/btracker_backend.balance_history'
       description: List of operation results
  */
 -- openapi-generated-code-begin
@@ -219,7 +219,7 @@ DROP TYPE IF EXISTS btracker_backend.operation_history CASCADE;
 CREATE TYPE btracker_backend.operation_history AS (
     "total_operations" INT,
     "total_pages" INT,
-    "operations_result" btracker_backend.balance_history_type[]
+    "operations_result" btracker_backend.balance_history[]
 );
 -- openapi-generated-code-end
 

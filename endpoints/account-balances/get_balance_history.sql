@@ -157,7 +157,7 @@ DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
   _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
   _coin_type INT := (CASE WHEN "coin-type" = 'HBD' THEN 13 WHEN "coin-type" = 'HIVE' THEN 21 ELSE 37 END);
-  _result btracker_backend.balance_history_type[];
+  _result btracker_backend.balance_history[];
 
   _ops_count INT;
   _from_op BIGINT;
@@ -224,7 +224,7 @@ BEGIN
   RETURN (
     COALESCE(_ops_count, 0),
     COALESCE(__total_pages, 0),
-    COALESCE(_result, '{}'::btracker_backend.balance_history_type[])
+    COALESCE(_result, '{}'::btracker_backend.balance_history[])
   )::btracker_backend.operation_history;
 
 END
