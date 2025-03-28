@@ -5,6 +5,7 @@ tests/performance/junit-result.xml
 tests/performance/*.tar.gz
 tests/performance/.~lock.log.jtl#
 tests/account_balances/accounts_dump.json
+set_version_in_sql.pgsql
 db/__pycache__
 server/__pycache__
 btracker_sync.*
