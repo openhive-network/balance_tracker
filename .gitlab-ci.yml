@@ -7,11 +7,6 @@ stages:
 - publish
 
 variables:
-  # Variables required by Common CI jobs
-  CI_COMMON_JOB_VERSION: "6b9e9e75ec5263939450936a4f8348dfbca3666d"
-  DOCKER_BUILDER_TAG: "$CI_COMMON_JOB_VERSION"
-  DOCKER_DIND_TAG: "$CI_COMMON_JOB_VERSION"
-  IMAGE_REMOVER_TAG: "$CI_COMMON_JOB_VERSION"
   # Git configuration
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: recursive
@@ -22,7 +17,8 @@ variables:
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
-  BUILDER_IMAGE_TAG: "@sha256:834e666ee84fb78d66a695b274b87f75535f96fda98e51726a23eab60812813b"
+  # uses registry.gitlab.syncad.com/hive/haf/ci-base-image:ubuntu24.04-1
+  BUILDER_IMAGE_TAG: "@sha256:fc149082a4ee91ed622a14d283ae7fe44d13b123f2927d2e71a2167bbe63fab0"
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
 
 include:
@@ -30,14 +26,7 @@ include:
 - project: hive/haf
   ref: 18f105eecfb3e47cd4f995801ad65c430d568cbb   # develop
   file: /scripts/ci-helpers/prepare_data_image_job.yml
-- project: 'hive/common-ci-configuration'
-  ref: 6b9e9e75ec5263939450936a4f8348dfbca3666d
-  file:
-  - '/templates/test_jobs.gitlab-ci.yml'
-  - '/templates/python_projects.gitlab-ci.yml'
-  - '/templates/docker_image_jobs.gitlab-ci.yml'
-  - '/templates/cache_cleanup.gitlab-ci.yml'
-  - '/templates/npm_projects.gitlab-ci.yml'
+  # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
 .lint_job:
   stage: lint
