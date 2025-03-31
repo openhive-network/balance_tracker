@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.5
+# syntax=registry.gitlab.syncad.com/hive/common-ci-configuration/dockerfile:1.5
 # When updating docker-builder and benchmark-test-runner use the images built from latest develop commit
 # from repository registry.gitlab.syncad.com/hive/common-ci-configuration
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/docker-builder:7ea99b10bbf0f9b1fbb88f52a78ead4c82f15d75
