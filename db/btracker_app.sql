@@ -383,6 +383,7 @@ BEGIN
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
+    PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -395,6 +396,7 @@ BEGIN
       PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
     END IF;
 
   ELSE
@@ -404,6 +406,7 @@ BEGIN
     PERFORM process_block_range_savings(_from, _to);
     PERFORM process_block_range_rewards(_from, _to);
     PERFORM process_block_range_delegations(_from, _to);
+    PERFORM process_block_range_recurrent_transfers(_from, _to);
 
   END IF;
 
@@ -519,6 +522,7 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,source_op DESC);
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_source_op_idx ON account_savings_history(account,nai,source_op DESC);
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
+  CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
 END
 $$;
 
