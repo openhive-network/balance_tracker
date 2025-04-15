@@ -7,7 +7,7 @@ SET ROLE btracker_owner;
       - Accounts
     summary: Account delegations
     description: |
-      History of change of `coin-type` balance in given block range
+      List of incoming and outgoing delegations
 
       SQL example
       * `SELECT * FROM btracker_endpoints.get_balance_delegations(''blocktrades'');`
@@ -25,7 +25,7 @@ SET ROLE btracker_owner;
     responses:
       '200':
         description: |
-          Balance change
+          Incoming and outgoing delegations
 
           * Returns `btracker_backend.delegations`
         content:
