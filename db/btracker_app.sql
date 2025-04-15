@@ -438,6 +438,7 @@ BEGIN
   PERFORM process_block_range_savings(_block, _block);
   PERFORM process_block_range_rewards(_block, _block);
   PERFORM process_block_range_delegations(_block, _block);
+  PERFORM process_block_range_recurrent_transfers(_block, _block);
 
   IF _logs THEN
     __end_ts := clock_timestamp();
