@@ -20,10 +20,12 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/types/sort_direction.sql
 ../$endpoints/types/balances.sql
 ../$endpoints/types/delegations.sql
+../$endpoints/types/recurrent_transfers.sql
 ../$endpoints/account-balances/get_account_balances.sql
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
 ../$endpoints/account-balances/get_account_delegations.sql
+../$endpoints/account-balances/get_recurrent_transfers.sql
 ../$endpoints/other/get_btracker_version.sql
 ../$endpoints/other/get_btracker_last_synced_block.sql"
 
