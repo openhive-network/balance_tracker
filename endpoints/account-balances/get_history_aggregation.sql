@@ -14,7 +14,7 @@ btracker_backend.array_of_aggregated_history:
       - Accounts
     summary: Aggregated account balance history
     description: |
-      History of change of `coin-type` balance in given block range
+      History of change of `coin-type` balance in given block range with granularity of day/month/year
 
       SQL example
       * `SELECT * FROM btracker_endpoints.get_balance_aggregation(''blocktrades'', ''VESTS'');`
