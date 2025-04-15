@@ -192,6 +192,56 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.incoming_recurrent_transfers(IN _account_id INT)
+RETURNS SETOF btracker_backend.incoming_recurrent_transfers
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN QUERY (
+    SELECT 
+      (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.from_account)::TEXT AS from,
+      d.transfer_id AS pair_id,
+      btracker_backend.amount_object(d.nai, d.amount) AS amount,
+      d.consecutive_failures AS consecutive_failures,
+      d.remaining_executions AS remaining_executions,
+      d.recurrence AS recurrence,
+      d.memo AS memo,
+      bv.created_at + (d.recurrence::TEXT || 'hour')::INTERVAL  AS trigger_date,
+      d.source_op::TEXT AS operation_id,
+      d.source_op_block AS block_num 
+    FROM recurrent_transfers d
+    JOIN hive.blocks_view bv ON bv.num = d.source_op_block
+    WHERE to_account = _account_id
+  );
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.outgoing_recurrent_transfers(IN _account_id INT)
+RETURNS SETOF btracker_backend.outgoing_recurrent_transfers
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN QUERY (
+    SELECT 
+      (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.to_account)::TEXT AS to,
+      d.transfer_id AS pair_id,
+      btracker_backend.amount_object(d.nai, d.amount) AS amount,
+      d.consecutive_failures AS consecutive_failures,
+      d.remaining_executions AS remaining_executions,
+      d.recurrence AS recurrence,
+      d.memo AS memo,
+      bv.created_at + (d.recurrence::TEXT || 'hour')::INTERVAL  AS trigger_date,
+      d.source_op::TEXT AS operation_id,
+      d.source_op_block AS block_num 
+    FROM recurrent_transfers d
+    JOIN hive.blocks_view bv ON bv.num = d.source_op_block
+    WHERE from_account = _account_id
+  );
+END
+$$;
+
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history(
     _account_id INT,
     _coin_type INT,
