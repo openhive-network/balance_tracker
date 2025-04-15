@@ -353,6 +353,131 @@ declare
           }
         }
       },
+      "btracker_backend.amount": {
+        "type": "object",
+        "properties": {
+          "nai": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "precision": {
+            "type": "integer"
+          }
+        }
+      },
+      "btracker_backend.incoming_recurrent_transfers": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Account name of the sender"
+          },
+          "pair_id": {
+            "type": "integer",
+            "description": "ID of the pair of accounts"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "Amount of the transfer with NAI and precision"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "description": "amount of consecutive failures"
+          },
+          "remaining_executions": {
+            "type": "integer",
+            "description": "Remaining executions"
+          },
+          "recurrence": {
+            "type": "integer",
+            "description": "Recurrence in hours"
+          },
+          "memo": {
+            "type": "string",
+            "description": "Memo message"
+          },
+          "trigger_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of the next trigger of the transfer"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "Unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "Block number"
+          }
+        }
+      },
+      "btracker_backend.outgoing_recurrent_transfers": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Account name of the receiver"
+          },
+          "pair_id": {
+            "type": "integer",
+            "description": "ID of the pair of accounts"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "Amount of the transfer with NAI and precision"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "description": "amount of consecutive failures"
+          },
+          "remaining_executions": {
+            "type": "integer",
+            "description": "Remaining executions"
+          },
+          "recurrence": {
+            "type": "integer",
+            "description": "Recurrence in hours"
+          },
+          "memo": {
+            "type": "string",
+            "description": "Memo message"
+          },
+          "trigger_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of the next trigger of the transfer"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "Unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "Block number"
+          }
+        }
+      },
+      "btracker_backend.recurrent_transfers": {
+        "type": "object",
+        "properties": {
+          "outgoing_recurrent_transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.outgoing_recurrent_transfers"
+            },
+            "description": "List of outgoing recurrent transfers from the account"
+          },
+          "incoming_recurrent_transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.incoming_recurrent_transfers"
+            },
+            "description": "List of incoming recurrent transfers to the account"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
@@ -556,7 +681,7 @@ declare
           "Accounts"
         ],
         "summary": "Aggregated account balance history",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_aggregation(''blocktrades'', ''VESTS'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/aggregated-history?coin-type=VESTS''`\n",
+        "description": "History of change of `coin-type` balance in given block range with granularity of day/month/year\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_aggregation(''blocktrades'', ''VESTS'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/aggregated-history?coin-type=VESTS''`\n",
         "operationId": "btracker_endpoints.get_balance_aggregation",
         "parameters": [
           {
@@ -662,7 +787,7 @@ declare
           "Accounts"
         ],
         "summary": "Account delegations",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/delegations''`\n",
+        "description": "List of incoming and outgoing delegations\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/delegations''`\n",
         "operationId": "btracker_endpoints.get_balance_delegations",
         "parameters": [
           {
@@ -677,7 +802,7 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Balance change\n\n* Returns `btracker_backend.delegations`\n",
+            "description": "Incoming and outgoing delegations\n\n* Returns `btracker_backend.delegations`\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -686,6 +811,46 @@ declare
                 "example": {
                   "outgoing_delegations": [],
                   "incoming_delegations": []
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/recurrent-transfers": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Account recurrent transfers",
+        "description": "List of incoming and outgoing recurrent transfers\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_recurrent_transfers(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/recurrent-transfers''`\n",
+        "operationId": "btracker_endpoints.get_recurrent_transfers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incoming and outgoing recurrent transfers\n\n* Returns `btracker_backend.recurrent_transfers`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.recurrent_transfers"
+                },
+                "example": {
+                  "outgoing_recurrent_transfers": [],
+                  "incoming_recurrent_transfers": []
                 }
               }
             }
