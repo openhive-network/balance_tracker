@@ -149,6 +149,24 @@ CREATE TABLE IF NOT EXISTS current_accounts_delegations
 );
 PERFORM hive.app_register_table( __schema_name, 'current_accounts_delegations', __schema_name );
 
+CREATE TABLE IF NOT EXISTS recurrent_transfers
+(
+  from_account         INT NOT NULL,
+  to_account           INT NOT NULL,
+  transfer_id          INT NOT NULL,
+  nai                  INT NOT NULL,  
+  amount               BIGINT NOT NULL,
+  consecutive_failures INT NOT NULL,
+  remaining_executions INT NOT NULL,
+  recurrence           INT NOT NULL,
+  memo                 TEXT NOT NULL,
+  source_op            BIGINT NOT NULL,
+  source_op_block      INT NOT NULL, 
+
+  CONSTRAINT pk_recurrent_transfers PRIMARY KEY (from_account, to_account, transfer_id)
+);
+PERFORM hive.app_register_table( __schema_name, 'recurrent_transfers', __schema_name );
+
 CREATE TABLE IF NOT EXISTS account_delegations
 (
   account INT NOT NULL,
