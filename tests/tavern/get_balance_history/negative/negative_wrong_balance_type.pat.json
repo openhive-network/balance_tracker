@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "The selected balance type 'savings_balance' does not support 'VESTS' option. Please choose a different balance type."
+}
