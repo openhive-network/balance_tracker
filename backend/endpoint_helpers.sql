@@ -312,4 +312,126 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.savings_history(
+    _account_id INT,
+    _coin_type INT,
+    _page INT,
+    _page_size INT,
+    _order_is btracker_backend.sort_direction,
+    _from_op BIGINT,
+    _to_op BIGINT
+)
+RETURNS SETOF btracker_backend.balance_history
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  _offset INT := (((_page - 1) * _page_size) + 1);
+BEGIN
+  RETURN QUERY (
+    WITH ranked_rows AS
+    (
+    ---------paging----------
+      SELECT 
+        source_op_block,
+        source_op, 
+        ROW_NUMBER() OVER ( ORDER BY
+          (CASE WHEN _order_is = 'desc' THEN source_op ELSE NULL END) DESC,
+          (CASE WHEN _order_is = 'asc' THEN source_op ELSE NULL END) ASC
+        ) as row_num
+      FROM account_savings_history
+      WHERE 
+        account = _account_id AND nai = _coin_type AND
+        source_op < _to_op AND
+        source_op >= _from_op
+    ),
+    filter_params AS MATERIALIZED
+    (
+      SELECT 
+        source_op AS filter_op
+      FROM ranked_rows
+      WHERE row_num = _offset
+    ),
+    --------------------------
+    --history with extra row--
+    gather_page AS MATERIALIZED
+    (
+      SELECT 
+        ab.account,
+        ab.nai,
+        ab.saving_balance,
+        ab.source_op,
+        ab.source_op_block,
+        ROW_NUMBER() OVER (ORDER BY
+          (CASE WHEN _order_is = 'desc' THEN ab.source_op ELSE NULL END) DESC,
+          (CASE WHEN _order_is = 'asc' THEN ab.source_op ELSE NULL END) ASC
+        ) as row_num
+      FROM
+        account_savings_history ab, filter_params fp
+      WHERE 
+        ab.account = _account_id AND 
+        ab.nai = _coin_type AND
+        (_order_is = 'asc' OR ab.source_op <= fp.filter_op) AND
+        (_order_is = 'desc' OR ab.source_op >= fp.filter_op) AND
+        ab.source_op < _to_op AND
+        ab.source_op >= _from_op
+      LIMIT _page_size + 1
+    ),
+    --------------------------
+    --calculate prev balance--
+    join_prev_balance AS MATERIALIZED
+    (
+      SELECT 
+        ab.source_op_block,
+        ab.source_op,
+        ab.saving_balance,
+        jab.saving_balance AS prev_balance
+      FROM gather_page ab
+      LEFT JOIN gather_page jab ON 
+        (CASE WHEN _order_is = 'desc' THEN jab.row_num - 1 ELSE jab.row_num + 1 END) = ab.row_num
+      LIMIT _page_size 
+    ),
+    add_prevbal_to_row_over_range AS
+    (
+      SELECT 
+        jpb.source_op_block,
+        jpb.source_op,
+        jpb.saving_balance,
+        COALESCE(
+          (
+            CASE WHEN jpb.prev_balance IS NULL THEN
+              (
+                SELECT abh.saving_balance FROM account_savings_history abh
+                WHERE 
+                  abh.source_op < jpb.source_op AND
+                  abh.account = _account_id AND 
+                  abh.nai = _coin_type 
+                ORDER BY abh.source_op DESC
+                LIMIT 1
+              )
+            ELSE
+              jpb.prev_balance
+            END
+          ), 0
+        ) AS prev_balance
+      FROM join_prev_balance jpb
+    )
+    --------------------------
+    SELECT 
+      ab.source_op_block,
+      ab.source_op::TEXT,
+      ov.op_type_id,
+      ab.saving_balance::TEXT,
+      ab.prev_balance::TEXT,
+      (ab.saving_balance - ab.prev_balance)::TEXT,
+      bv.created_at
+    FROM add_prevbal_to_row_over_range ab
+    JOIN hive.blocks_view bv ON bv.num = ab.source_op_block
+    JOIN hive.operations_view ov ON ov.id = ab.source_op
+  );
+END
+$$;
+
+
+
 RESET ROLE;

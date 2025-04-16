@@ -72,4 +72,19 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.rest_raise_vest_saving_balance(
+    _balance_type btracker_backend.balance_type,
+    _nai_type btracker_backend.nai_type
+)
+RETURNS VOID
+LANGUAGE 'plpgsql'
+IMMUTABLE
+AS
+$$
+BEGIN
+  RAISE EXCEPTION 'The selected balance type ''%'' does not support ''%'' option. Please choose a different balance type.',
+   _balance_type::TEXT, _nai_type::TEXT;
+END
+$$;
+
 RESET ROLE;
