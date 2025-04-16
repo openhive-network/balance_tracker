@@ -11,6 +11,7 @@ CREATE TYPE btracker_backend.balance_history_range_return AS
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_range(
     _account_id INT,
     _coin_type INT,
+    _balance_type btracker_backend.balance_type,
     _from INT, 
     _to INT
 )
@@ -43,16 +44,29 @@ BEGIN
 		LIMIT 1
   );
 
-  __count := (
-      SELECT COUNT(*)
-      FROM account_balance_history 
-      WHERE 
-        account = _account_id AND 
-        nai = _coin_type AND
-        source_op < __to_op AND
-        source_op >= __from_op
-  );
-  
+    __count := CASE 
+      WHEN _balance_type = 'balance' THEN
+        (
+          SELECT COUNT(*)
+          FROM account_balance_history 
+          WHERE 
+            account = _account_id AND 
+            nai = _coin_type AND
+            source_op < __to_op AND
+            source_op >= __from_op
+        )
+      ELSE
+        (
+          SELECT COUNT(*)
+          FROM account_savings_history 
+          WHERE 
+            account = _account_id AND 
+            nai = _coin_type AND
+            source_op < __to_op AND
+            source_op >= __from_op
+        )
+      END;
+    
   RETURN (__count, __from_op, __to_op)::btracker_backend.balance_history_range_return;
 END
 $$;
