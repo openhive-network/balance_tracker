@@ -76,6 +76,80 @@ BEGIN
 END
 $$;
 
+DROP TYPE IF EXISTS btracker_backend.saving_history_by_year_return CASCADE;
+CREATE TYPE btracker_backend.saving_history_by_year_return AS (
+    account INT,
+    nai INT,
+    balance BIGINT,
+    min_balance BIGINT,
+    max_balance BIGINT,
+    source_op_block INT,
+    updated_at TIMESTAMP
+);
+
+CREATE OR REPLACE FUNCTION btracker_backend.saving_history_by_year(
+    _account_id INT,
+    _coin_type INT
+)
+RETURNS SETOF btracker_backend.saving_history_by_year_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  RETURN QUERY (
+    WITH get_year AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            min_balance,
+            max_balance,
+            source_op_block,
+            updated_at,
+            DATE_TRUNC('year', updated_at) AS by_year
+        FROM saving_history_by_month
+        WHERE account = _account_id AND nai = _coin_type 
+    ),
+
+    get_latest_updates AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            source_op_block,
+            by_year,
+            ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
+        FROM get_year
+    ),
+
+    get_min_max_balances_by_year AS (
+        SELECT
+            account,
+            nai,
+            by_year,
+            MAX(max_balance) AS max_balance,
+            MIN(min_balance) AS min_balance
+        FROM get_year
+        GROUP BY account, nai, by_year
+    )
+
+    SELECT
+        gl.account,
+        gl.nai,
+        gl.balance,
+        gm.min_balance,
+        gm.max_balance,
+        gl.source_op_block,
+        gl.by_year AS updated_at
+    FROM get_latest_updates gl
+    JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
+    WHERE gl.rn_by_year = 1
+  );
+
+END
+$$;
+
 CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_aggregation(
     _account_id INT,
     _coin_type INT,
@@ -191,6 +265,18 @@ RETURN QUERY (
     FROM balance_history_by_day bh
     WHERE bh.account = _account_id AND bh.nai = _coin_type
   ),
+  get_daily_savings_aggregation AS (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM saving_history_by_day bh
+    WHERE bh.account = _account_id AND bh.nai = _coin_type
+  ),
   balance_records AS (
     SELECT 
       ds.date,
@@ -198,9 +284,13 @@ RETURN QUERY (
       bh.balance,
       bh.min_balance,
       bh.max_balance,
+      sa.balance AS savings_balance,
+      sa.min_balance AS min_savings_balance,
+      sa.max_balance AS max_savings_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
     LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
+    LEFT JOIN get_daily_savings_aggregation sa ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -211,6 +301,12 @@ RETURN QUERY (
         COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
+
+        COALESCE(ds.savings_balance, savings_prev_balance.balance, 0) AS savings_balance,
+        COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,
+        COALESCE(ds.min_savings_balance, savings_prev_balance.min_balance, 0) AS min_savings_balance,
+        COALESCE(ds.max_savings_balance, savings_prev_balance.max_balance, 0) AS max_savings_balance,
+
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
       FROM balance_records ds
       LEFT JOIN LATERAL (
@@ -224,6 +320,17 @@ RETURN QUERY (
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT 
+          bh.balance,
+          bh.min_balance,
+          bh.max_balance,
+          bh.source_op_block 
+        FROM get_daily_savings_aggregation bh
+        WHERE bh.updated_at < ds.date
+        ORDER BY bh.updated_at DESC
+        LIMIT 1
+      ) savings_prev_balance ON TRUE
       WHERE ds.row_num = 1
     
       UNION ALL
@@ -235,6 +342,12 @@ RETURN QUERY (
         COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
+
+        COALESCE(next_b.savings_balance, prev_b.savings_balance, 0) AS savings_balance,
+        COALESCE(prev_b.prev_savings_balance, 0) AS prev_savings_balance,
+        COALESCE(next_b.min_savings_balance, prev_b.min_savings_balance, 0) AS min_savings_balance,
+        COALESCE(next_b.max_savings_balance, prev_b.max_savings_balance, 0) AS max_savings_balance,
+
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
       FROM agg_history prev_b
       JOIN balance_records next_b ON next_b.row_num = prev_b.row_num + 1
@@ -243,10 +356,22 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 day' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance::TEXT,
-    fb.prev_balance::TEXT,
-    fb.min_balance::TEXT,
-    fb.max_balance::TEXT
+    (
+      fb.balance::TEXT,
+      fb.savings_balance::TEXT
+    )::btracker_backend.balance_type AS balance,
+    (
+      fb.prev_balance::TEXT,
+      fb.prev_savings_balance::TEXT
+    )::btracker_backend.balance_type AS prev_balance,
+    (
+      fb.min_balance::TEXT,
+      fb.min_savings_balance::TEXT
+    )::btracker_backend.balance_type AS min_balance,
+    (
+      fb.max_balance::TEXT,
+      fb.max_savings_balance::TEXT
+    )::btracker_backend.balance_type AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -281,7 +406,7 @@ RETURN QUERY (
       ROW_NUMBER() OVER (ORDER BY date) AS row_num
     FROM date_series
   ),
-  get_montly_aggregation AS (
+  get_monthly_aggregation AS (
     SELECT 
       bh.account,
       bh.nai,
@@ -293,6 +418,18 @@ RETURN QUERY (
     FROM balance_history_by_month bh
     WHERE bh.account = _account_id AND bh.nai = _coin_type
   ),
+  get_monthly_savings_aggregation AS (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM saving_history_by_month bh
+    WHERE bh.account = _account_id AND bh.nai = _coin_type
+  ),
   balance_records AS (
     SELECT 
       ds.date,
@@ -300,9 +437,13 @@ RETURN QUERY (
       bh.balance,
       bh.min_balance,
       bh.max_balance,
+      sa.balance AS savings_balance,
+      sa.min_balance AS min_savings_balance,
+      sa.max_balance AS max_savings_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
-    LEFT JOIN get_montly_aggregation bh ON ds.date = bh.updated_at
+    LEFT JOIN get_monthly_aggregation bh ON ds.date = bh.updated_at
+    LEFT JOIN get_monthly_savings_aggregation sa ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -313,6 +454,12 @@ RETURN QUERY (
         COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
+
+        COALESCE(ds.savings_balance, savings_prev_balance.balance, 0) AS savings_balance,
+        COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,
+        COALESCE(ds.min_savings_balance, savings_prev_balance.min_balance, 0) AS min_savings_balance,
+        COALESCE(ds.max_savings_balance, savings_prev_balance.max_balance, 0) AS max_savings_balance,
+
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
       FROM balance_records ds
       LEFT JOIN LATERAL (
@@ -321,11 +468,22 @@ RETURN QUERY (
           bh.min_balance,
           bh.max_balance,
           bh.source_op_block 
-        FROM get_montly_aggregation bh
+        FROM get_monthly_aggregation bh
         WHERE bh.updated_at < ds.date
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT 
+          bh.balance,
+          bh.min_balance,
+          bh.max_balance,
+          bh.source_op_block 
+        FROM get_monthly_savings_aggregation bh
+        WHERE bh.updated_at < ds.date
+        ORDER BY bh.updated_at DESC
+        LIMIT 1
+      ) savings_prev_balance ON TRUE
       WHERE ds.row_num = 1
     
       UNION ALL
@@ -337,6 +495,12 @@ RETURN QUERY (
         COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
+
+        COALESCE(next_b.savings_balance, prev_b.savings_balance, 0) AS savings_balance,
+        COALESCE(prev_b.prev_savings_balance, 0) AS prev_savings_balance,
+        COALESCE(next_b.min_savings_balance, prev_b.min_savings_balance, 0) AS min_savings_balance,
+        COALESCE(next_b.max_savings_balance, prev_b.max_savings_balance, 0) AS max_savings_balance,
+
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
       FROM agg_history prev_b
       JOIN balance_records next_b ON next_b.row_num = prev_b.row_num + 1
@@ -345,10 +509,22 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 month' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance::TEXT,
-    fb.prev_balance::TEXT,
-    fb.min_balance::TEXT,
-    fb.max_balance::TEXT
+    (
+      fb.balance::TEXT,
+      fb.savings_balance::TEXT
+    )::btracker_backend.balance_type AS balance,
+    (
+      fb.prev_balance::TEXT,
+      fb.prev_savings_balance::TEXT
+    )::btracker_backend.balance_type AS prev_balance,
+    (
+      fb.min_balance::TEXT,
+      fb.min_savings_balance::TEXT
+    )::btracker_backend.balance_type AS min_balance,
+    (
+      fb.max_balance::TEXT,
+      fb.max_savings_balance::TEXT
+    )::btracker_backend.balance_type AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -393,6 +569,18 @@ RETURN QUERY (
       bh.source_op_block,
       bh.updated_at
     FROM btracker_backend.balance_history_by_year(_account_id,_coin_type) bh
+
+  ),
+  get_yearly_savings_aggregation AS (
+    SELECT 
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    FROM btracker_backend.saving_history_by_year(_account_id,_coin_type) bh
   ),
   balance_records AS (
     SELECT 
@@ -401,9 +589,13 @@ RETURN QUERY (
       bh.balance,
       bh.min_balance,
       bh.max_balance,
+      sa.balance AS savings_balance,
+      sa.min_balance AS min_savings_balance,
+      sa.max_balance AS max_savings_balance,
       bh.source_op_block
     FROM add_row_num_to_series ds
     LEFT JOIN get_yearly_aggregation bh ON ds.date = bh.updated_at
+    LEFT JOIN get_yearly_savings_aggregation sa ON ds.date = bh.updated_at
   ),
   filled_balances AS (
     WITH RECURSIVE agg_history AS (
@@ -414,6 +606,12 @@ RETURN QUERY (
         COALESCE(prev_balance.balance, 0) AS prev_balance,
         COALESCE(ds.min_balance, prev_balance.min_balance, 0) AS min_balance,
         COALESCE(ds.max_balance, prev_balance.max_balance, 0) AS max_balance,
+
+        COALESCE(ds.savings_balance, savings_prev_balance.balance, 0) AS savings_balance,
+        COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,
+        COALESCE(ds.min_savings_balance, savings_prev_balance.min_balance, 0) AS min_savings_balance,
+        COALESCE(ds.max_savings_balance, savings_prev_balance.max_balance, 0) AS max_savings_balance,
+
         COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
       FROM balance_records ds
       LEFT JOIN LATERAL (
@@ -427,6 +625,17 @@ RETURN QUERY (
         ORDER BY bh.updated_at DESC
         LIMIT 1
       ) prev_balance ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT 
+          bh.balance,
+          bh.min_balance,
+          bh.max_balance,
+          bh.source_op_block 
+        FROM get_yearly_savings_aggregation bh
+        WHERE bh.updated_at < ds.date
+        ORDER BY bh.updated_at DESC
+        LIMIT 1
+      ) savings_prev_balance ON TRUE
       WHERE ds.row_num = 1
     
       UNION ALL
@@ -438,6 +647,12 @@ RETURN QUERY (
         COALESCE(prev_b.balance, 0) AS prev_balance,
         COALESCE(next_b.min_balance, prev_b.min_balance, 0) AS min_balance,
         COALESCE(next_b.max_balance, prev_b.max_balance, 0) AS max_balance,
+
+        COALESCE(next_b.savings_balance, prev_b.savings_balance, 0) AS savings_balance,
+        COALESCE(prev_b.prev_savings_balance, 0) AS prev_savings_balance,
+        COALESCE(next_b.min_savings_balance, prev_b.min_savings_balance, 0) AS min_savings_balance,
+        COALESCE(next_b.max_savings_balance, prev_b.max_savings_balance, 0) AS max_savings_balance,
+
         COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
       FROM agg_history prev_b
       JOIN balance_records next_b ON next_b.row_num = prev_b.row_num + 1
@@ -446,10 +661,22 @@ RETURN QUERY (
   )
   SELECT 
     LEAST(fb.date + INTERVAL '1 year' - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
-    fb.balance::TEXT,
-    fb.prev_balance::TEXT,
-    fb.min_balance::TEXT,
-    fb.max_balance::TEXT
+    (
+      fb.balance::TEXT,
+      fb.savings_balance::TEXT
+    )::btracker_backend.balance_type AS balance,
+    (
+      fb.prev_balance::TEXT,
+      fb.prev_savings_balance::TEXT
+    )::btracker_backend.balance_type AS prev_balance,
+    (
+      fb.min_balance::TEXT,
+      fb.min_savings_balance::TEXT
+    )::btracker_backend.balance_type AS min_balance,
+    (
+      fb.max_balance::TEXT,
+      fb.max_savings_balance::TEXT
+    )::btracker_backend.balance_type AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
