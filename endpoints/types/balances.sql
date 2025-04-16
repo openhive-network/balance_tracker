@@ -124,6 +124,25 @@ CREATE TYPE btracker_backend.balances AS (
 -- openapi-generated-code-end
 
 /** openapi:components:schemas
+btracker_backend.balance_type:
+  type: object
+  properties:
+    savings_balance:
+      type: string
+      description: aggregated account''s savings balance
+    balance:
+      type: string
+      description: aggregated account''s balance
+ */
+-- openapi-generated-code-begin
+DROP TYPE IF EXISTS btracker_backend.balance_type CASCADE;
+CREATE TYPE btracker_backend.balance_type AS (
+    "savings_balance" TEXT,
+    "balance" TEXT
+);
+-- openapi-generated-code-end
+
+/** openapi:components:schemas
 btracker_backend.aggregated_history:
   type: object
   properties:
@@ -132,26 +151,26 @@ btracker_backend.aggregated_history:
       format: date-time
       description: date of the balance aggregation
     balance:
-      type: string
-      description: aggregated account''s VEST balance
+      $ref: '#/components/schemas/btracker_backend.balance_type'
+      description: aggregated account''s balance
     prev_balance:
-      type: string
-      description: aggregated account''s VEST balance from the previous day/month/year
+      $ref: '#/components/schemas/btracker_backend.balance_type'
+      description: aggregated account''s balance from the previous day/month/year
     min_balance:
-      type: string
-      description: minimum account''s VEST balance in the aggregation period
+      $ref: '#/components/schemas/btracker_backend.balance_type'
+      description: minimum account''s balance in the aggregation period
     max_balance:
-      type: string
-      description: maximum account''s VEST balance in the aggregation period
+      $ref: '#/components/schemas/btracker_backend.balance_type'
+      description: maximum account''s balance in the aggregation period
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.aggregated_history CASCADE;
 CREATE TYPE btracker_backend.aggregated_history AS (
     "date" TIMESTAMP,
-    "balance" TEXT,
-    "prev_balance" TEXT,
-    "min_balance" TEXT,
-    "max_balance" TEXT
+    "balance" btracker_backend.balance_type,
+    "prev_balance" btracker_backend.balance_type,
+    "min_balance" btracker_backend.balance_type,
+    "max_balance" btracker_backend.balance_type
 );
 -- openapi-generated-code-end
 
