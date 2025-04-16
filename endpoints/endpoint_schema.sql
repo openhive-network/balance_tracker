@@ -88,6 +88,13 @@ declare
           "VESTS"
         ]
       },
+      "btracker_backend.balance_type": {
+        "type": "string",
+        "enum": [
+          "balance",
+          "savings_balance"
+        ]
+      },
       "btracker_backend.sort_direction": {
         "type": "string",
         "enum": [
@@ -95,7 +102,7 @@ declare
           "desc"
         ]
       },
-      "btracker_backend.balances": {
+      "btracker_backend.balance": {
         "type": "object",
         "properties": {
           "hbd_balance": {
@@ -192,6 +199,19 @@ declare
           }
         }
       },
+      "btracker_backend.balances": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "aggregated account''s balance"
+          },
+          "savings_balance": {
+            "type": "string",
+            "description": "aggregated account''s savings balance"
+          }
+        }
+      },
       "btracker_backend.aggregated_history": {
         "type": "object",
         "properties": {
@@ -201,20 +221,20 @@ declare
             "description": "date of the balance aggregation"
           },
           "balance": {
-            "type": "string",
-            "description": "aggregated account''s VEST balance"
+            "$ref": "#/components/schemas/btracker_backend.balances",
+            "description": "aggregated account''s balance"
           },
           "prev_balance": {
-            "type": "string",
-            "description": "aggregated account''s VEST balance from the previous day/month/year"
+            "$ref": "#/components/schemas/btracker_backend.balances",
+            "description": "aggregated account''s balance from the previous day/month/year"
           },
           "min_balance": {
-            "type": "string",
-            "description": "minimum account''s VEST balance in the aggregation period"
+            "$ref": "#/components/schemas/btracker_backend.balances",
+            "description": "minimum account''s balance in the aggregation period"
           },
           "max_balance": {
-            "type": "string",
-            "description": "maximum account''s VEST balance in the aggregation period"
+            "$ref": "#/components/schemas/btracker_backend.balances",
+            "description": "maximum account''s balance in the aggregation period"
           }
         }
       },
@@ -363,11 +383,11 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_backend.balances`\n",
+            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_backend.balance`\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_backend.balances"
+                  "$ref": "#/components/schemas/btracker_backend.balance"
                 },
                 "example": {
                   "hbd_balance": 77246982,
@@ -427,6 +447,16 @@ declare
               "$ref": "#/components/schemas/btracker_backend.nai_type"
             },
             "description": "Coin types:\n\n* HBD\n\n* HIVE\n\n* VESTS\n"
+          },
+          {
+            "in": "query",
+            "name": "balance-type",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.balance_type",
+              "default": "balance"
+            },
+            "description": "Balance types:\n\n* balance\n\n* savings_balance\n"
           },
           {
             "in": "query",
@@ -599,10 +629,22 @@ declare
                 "example": [
                   {
                     "date": "2016-12-31T23:59:59",
-                    "prev_balance": "0",
-                    "balance": "8172549681941451",
-                    "min_balance": "1000000000000",
-                    "max_balance": "8436182707535769"
+                    "balance": {
+                      "balance": "8172549681941451",
+                      "savings_balance": "0"
+                    },
+                    "prev_balance": {
+                      "balance": "0",
+                      "savings_balance": "0"
+                    },
+                    "min_balance": {
+                      "balance": "1000000000000",
+                      "savings_balance": "0"
+                    },
+                    "max_balance": {
+                      "balance": "8436182707535769",
+                      "savings_balance": "0"
+                    }
                   }
                 ]
               }

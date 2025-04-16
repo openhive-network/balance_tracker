@@ -38,7 +38,7 @@ SET ROLE btracker_owner;
 
       - in: query
         name: balance-type
-        required: true
+        required: false
         schema:
           $ref: '#/components/schemas/btracker_backend.balance_type'
           default: balance
@@ -217,58 +217,58 @@ BEGIN
 
   PERFORM btracker_backend.validate_page("page", __total_pages);
 
-    _result := CASE 
-      WHEN "balance-type" = 'balance' THEN
-        (
-          SELECT array_agg(row ORDER BY
-            (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
-            (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
-          ) FROM (
-            SELECT 
-              ba.block_num,
-              ba.operation_id,
-              ba.op_type_id,
-              ba.balance,
-              ba.prev_balance,
-              ba.balance_change,
-              ba.timestamp
-            FROM btracker_backend.balance_history(
-              _account_id,
-              _coin_type,
-              "page",
-              "page-size",
-              "direction",
-              _from_op,
-              _to_op
-            ) ba
-          ) row
-        )
-      ELSE
-        (
-          SELECT array_agg(row ORDER BY
-            (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
-            (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
-          ) FROM (
-            SELECT 
-              ba.block_num,
-              ba.operation_id,
-              ba.op_type_id,
-              ba.balance,
-              ba.prev_balance,
-              ba.balance_change,
-              ba.timestamp
-            FROM btracker_backend.savings_history(
-              _account_id,
-              _coin_type,
-              "page",
-              "page-size",
-              "direction",
-              _from_op,
-              _to_op
-            ) ba
-          ) row
-        )
-      END;
+  _result := CASE 
+    WHEN "balance-type" = 'balance' THEN
+      (
+        SELECT array_agg(row ORDER BY
+          (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
+          (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
+        ) FROM (
+          SELECT 
+            ba.block_num,
+            ba.operation_id,
+            ba.op_type_id,
+            ba.balance,
+            ba.prev_balance,
+            ba.balance_change,
+            ba.timestamp
+          FROM btracker_backend.balance_history(
+            _account_id,
+            _coin_type,
+            "page",
+            "page-size",
+            "direction",
+            _from_op,
+            _to_op
+          ) ba
+        ) row
+      )
+    ELSE
+      (
+        SELECT array_agg(row ORDER BY
+          (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
+          (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
+        ) FROM (
+          SELECT 
+            ba.block_num,
+            ba.operation_id,
+            ba.op_type_id,
+            ba.balance,
+            ba.prev_balance,
+            ba.balance_change,
+            ba.timestamp
+          FROM btracker_backend.savings_history(
+            _account_id,
+            _coin_type,
+            "page",
+            "page-size",
+            "direction",
+            _from_op,
+            _to_op
+          ) ba
+        ) row
+      )
+    END;
 
   RETURN (
     COALESCE(_ops_count, 0),

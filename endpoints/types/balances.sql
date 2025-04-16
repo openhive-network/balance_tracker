@@ -127,12 +127,12 @@ CREATE TYPE btracker_backend.balance AS (
 btracker_backend.balances:
   type: object
   properties:
-    savings_balance:
-      type: string
-      description: aggregated account''s savings balance
     balance:
       type: string
       description: aggregated account''s balance
+    savings_balance:
+      type: string
+      description: aggregated account''s savings balance
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.balances CASCADE;
