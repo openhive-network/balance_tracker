@@ -115,10 +115,22 @@ btracker_backend.array_of_aggregated_history:
             example: 
               - {
                   "date":"2016-12-31T23:59:59",
-                  "prev_balance":"0",
-                  "balance":"8172549681941451",
-                  "min_balance":"1000000000000",
-                  "max_balance":"8436182707535769"
+                  "balance": {
+                    "balance": "8172549681941451",
+                    "savings_balance": "0"
+                  },
+                  "prev_balance": {
+                    "balance": "0",
+                    "savings_balance": "0"
+                  },
+                  "min_balance": {
+                    "balance": "1000000000000",
+                    "savings_balance": "0"
+                  },
+                  "max_balance": {
+                    "balance": "8436182707535769",
+                    "savings_balance": "0"
+                  }
                 }
             
       '404':

@@ -28,11 +28,11 @@ SET ROLE btracker_owner;
           Account balances 
           (VEST balances are represented as string due to json limitations)
 
-          * Returns `btracker_backend.balances`
+          * Returns `btracker_backend.balance`
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_backend.balances'
+              $ref: '#/components/schemas/btracker_backend.balance'
             example: {
               "hbd_balance": 77246982,
               "hive_balance": 29594875,
@@ -64,7 +64,7 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_balances;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(
     "account-name" TEXT
 )
-RETURNS btracker_backend.balance
+RETURNS btracker_backend.balance 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
