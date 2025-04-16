@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 /** openapi:components:schemas
-btracker_backend.balances:
+btracker_backend.balance:
   type: object
   properties:
     hbd_balance:
@@ -97,8 +97,8 @@ btracker_backend.balances:
       description: blocked VESTS by a withdrawal
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_backend.balances CASCADE;
-CREATE TYPE btracker_backend.balances AS (
+DROP TYPE IF EXISTS btracker_backend.balance CASCADE;
+CREATE TYPE btracker_backend.balance AS (
     "hbd_balance" BIGINT,
     "hive_balance" BIGINT,
     "vesting_shares" TEXT,
@@ -124,7 +124,7 @@ CREATE TYPE btracker_backend.balances AS (
 -- openapi-generated-code-end
 
 /** openapi:components:schemas
-btracker_backend.balance_type:
+btracker_backend.balances:
   type: object
   properties:
     savings_balance:
@@ -135,10 +135,10 @@ btracker_backend.balance_type:
       description: aggregated account''s balance
  */
 -- openapi-generated-code-begin
-DROP TYPE IF EXISTS btracker_backend.balance_type CASCADE;
-CREATE TYPE btracker_backend.balance_type AS (
-    "savings_balance" TEXT,
-    "balance" TEXT
+DROP TYPE IF EXISTS btracker_backend.balances CASCADE;
+CREATE TYPE btracker_backend.balances AS (
+    "balance" TEXT,
+    "savings_balance" TEXT
 );
 -- openapi-generated-code-end
 
@@ -151,26 +151,26 @@ btracker_backend.aggregated_history:
       format: date-time
       description: date of the balance aggregation
     balance:
-      $ref: '#/components/schemas/btracker_backend.balance_type'
+      $ref: '#/components/schemas/btracker_backend.balances'
       description: aggregated account''s balance
     prev_balance:
-      $ref: '#/components/schemas/btracker_backend.balance_type'
+      $ref: '#/components/schemas/btracker_backend.balances'
       description: aggregated account''s balance from the previous day/month/year
     min_balance:
-      $ref: '#/components/schemas/btracker_backend.balance_type'
+      $ref: '#/components/schemas/btracker_backend.balances'
       description: minimum account''s balance in the aggregation period
     max_balance:
-      $ref: '#/components/schemas/btracker_backend.balance_type'
+      $ref: '#/components/schemas/btracker_backend.balances'
       description: maximum account''s balance in the aggregation period
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.aggregated_history CASCADE;
 CREATE TYPE btracker_backend.aggregated_history AS (
     "date" TIMESTAMP,
-    "balance" btracker_backend.balance_type,
-    "prev_balance" btracker_backend.balance_type,
-    "min_balance" btracker_backend.balance_type,
-    "max_balance" btracker_backend.balance_type
+    "balance" btracker_backend.balances,
+    "prev_balance" btracker_backend.balances,
+    "min_balance" btracker_backend.balances,
+    "max_balance" btracker_backend.balances
 );
 -- openapi-generated-code-end
 
