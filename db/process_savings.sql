@@ -12,6 +12,9 @@ DECLARE
   __delete_transfer_requests INT;
   __insert_transfer_requests INT;
   __upsert_transfers INT;
+  __savings_history INT;
+  __savings_history_by_day INT;
+  __savings_history_by_month INT;
 BEGIN
 WITH process_block_range_data_b AS  
 (
@@ -82,6 +85,26 @@ income_transfers AS (
     source_op_block
   FROM filter_interest_ops
   WHERE op_type_id IN (32,55)
+),
+group_by_account_nai AS (
+  SELECT 
+    cp.account_id,
+    cp.nai
+  FROM filter_interest_ops cp
+  GROUP BY cp.account_id, cp.nai
+),
+get_latest_balance AS (
+  SELECT 
+    gan.account_id,
+    gan.nai,
+    COALESCE(cab.saving_balance, 0) as balance,
+    COALESCE(cab.savings_withdraw_requests, 0) AS savings_withdraw_request,
+    0 AS request_id,  
+    0 AS op_type_id,
+    0 AS source_op,
+    0 AS source_op_block
+  FROM group_by_account_nai gan
+  LEFT JOIN account_savings cab ON cab.account = gan.account_id AND cab.nai = gan.nai
 ),
 ---------------------------------------------------------------------------------------
 -- find if transfer from savings happened in same batch of blocks as cancel or fill
@@ -186,6 +209,21 @@ transfers_from_canceled_in_query AS (
 -- union all transfer operations 
 union_operations AS (
 
+  SELECT  
+    account_id,
+    nai,
+    balance,
+    savings_withdraw_request,
+    request_id,  
+    op_type_id,
+    source_op,
+    source_op_block,
+	  FALSE AS delete_transfer_id_from_table,
+    FALSE AS insert_transfer_id_to_table
+  FROM get_latest_balance
+
+  UNION ALL
+
 -- transfers from savings
   SELECT  
     account_id,
@@ -249,16 +287,26 @@ union_operations AS (
   FROM canceled_transfers_already_inserted
 ---------------------------------------------------------------------------------------
 ),
-sum_all_transfers AS (
+prepare_savings_history AS MATERIALIZED (
   SELECT 
     uo.account_id,
     uo.nai,
-    SUM(balance) AS balance,
-    SUM(savings_withdraw_request) AS savings_withdraw_request,
-    MAX(source_op) AS source_op,
-    MAX(source_op_block) AS source_op_block
+    SUM(uo.balance) OVER 
+      (
+        PARTITION BY uo.account_id, uo.nai 
+        ORDER BY uo.source_op, uo.balance 
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) AS balance,
+    SUM(uo.savings_withdraw_request) OVER 
+      ( 
+        PARTITION BY uo.account_id, uo.nai 
+        ORDER BY uo.source_op, uo.balance 
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) AS savings_withdraw_request,
+    uo.source_op,
+    uo.source_op_block,
+    ROW_NUMBER() OVER (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC) AS rn
   FROM union_operations uo
-  GROUP BY uo.account_id, uo.nai
 ),
 ---------------------------------------------------------------------------------------
 delete_all_canceled_or_filled_transfers AS (
@@ -283,30 +331,150 @@ insert_all_new_registered_transfers_from_savings AS (
   RETURNING tsi.account AS new_transfer
 ),
 insert_sum_of_transfers AS (
-  INSERT INTO account_savings
+  INSERT INTO account_savings AS acc_history
     (account, nai, saving_balance, source_op, source_op_block, savings_withdraw_requests)
   SELECT
-    sat.account_id,
-    sat.nai,
-    sat.balance,
-    sat.source_op,
-    sat.source_op_block,
-    sat.savings_withdraw_request
-  FROM sum_all_transfers sat
+    ps.account_id,
+    ps.nai,
+    ps.balance,
+    ps.source_op,
+    ps.source_op_block,
+    ps.savings_withdraw_request
+  FROM prepare_savings_history ps
+  WHERE rn = 1
   ON CONFLICT ON CONSTRAINT pk_account_savings
   DO UPDATE SET
-      saving_balance = account_savings.saving_balance + EXCLUDED.saving_balance,
+      saving_balance = EXCLUDED.saving_balance,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block,
-      savings_withdraw_requests = account_savings.savings_withdraw_requests + EXCLUDED.savings_withdraw_requests
-  RETURNING account AS new_updated_acccounts
+      savings_withdraw_requests = EXCLUDED.savings_withdraw_requests
+  RETURNING acc_history.account
+),
+insert_saving_balance_history AS (
+  INSERT INTO account_savings_history AS acc_history
+    (account, nai, source_op, source_op_block, saving_balance)
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.balance
+  FROM prepare_savings_history pbh
+  WHERE pbh.source_op > 0
+  ORDER BY pbh.source_op
+  RETURNING acc_history.account
+),
+join_created_at_to_balance_history AS (
+  SELECT 
+    rls.account_id,
+    rls.nai,
+    rls.source_op,
+    rls.source_op_block,
+    rls.balance,
+    date_trunc('day', bv.created_at) AS by_day,
+    date_trunc('month', bv.created_at) AS by_month
+  FROM prepare_savings_history rls
+  JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
+  WHERE rls.source_op > 0
+  ORDER BY rls.source_op
+),
+get_latest_updates AS (
+  SELECT 
+    account_id,
+    nai,
+    source_op,
+    source_op_block,
+    balance,
+    by_day,
+    by_month,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
+  FROM join_created_at_to_balance_history 
+),
+get_min_max_balances_by_day AS (
+  SELECT 
+    account_id,
+    nai,
+    by_day,
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_day
+),
+get_min_max_balances_by_month AS (
+  SELECT 
+    account_id,
+    nai,
+    by_month,
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_month
+),
+insert_saving_balance_history_by_day AS (
+  INSERT INTO saving_history_by_day AS acc_history
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+  SELECT 
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_day,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_day gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_day = gl.by_day
+  WHERE gl.rn_by_day = 1
+  ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO 
+  UPDATE SET 
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+insert_saving_balance_history_by_month AS (
+  INSERT INTO saving_history_by_month AS acc_history
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+  SELECT 
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_month,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_month gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_month = gl.by_month
+  WHERE rn_by_month = 1
+  ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO 
+  UPDATE SET
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
 )
 
 SELECT
   (SELECT count(*) FROM delete_all_canceled_or_filled_transfers) AS delete_transfer_requests,
   (SELECT count(*) FROM insert_all_new_registered_transfers_from_savings) AS insert_transfer_requests,
-  (SELECT count(*) FROM insert_sum_of_transfers) AS upsert_transfers
-INTO __delete_transfer_requests, __insert_transfer_requests, __upsert_transfers;
+  (SELECT count(*) FROM insert_sum_of_transfers) AS upsert_transfers,
+  (SELECT count(*) FROM insert_saving_balance_history) as savings_history,
+  (SELECT count(*) FROM insert_saving_balance_history_by_day) as savings_history_by_day,
+  (SELECT count(*) FROM insert_saving_balance_history_by_month) AS savings_history_by_month
+INTO __delete_transfer_requests, __insert_transfer_requests, __upsert_transfers, 
+  __savings_history, __savings_history_by_day, __savings_history_by_month;
 
 END
 $$;
