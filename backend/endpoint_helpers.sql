@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(IN _account_id INT)
-RETURNS btracker_backend.balances
+RETURNS btracker_backend.balance
 LANGUAGE plpgsql
 STABLE
 AS
@@ -141,7 +141,7 @@ BEGIN
       gw.withdrawn,
       gw.withdraw_routes,
       gw.delayed_vests
-    )::btracker_backend.balances
+    )::btracker_backend.balance
     FROM 
       get_balances gb,
       get_vest_balance gvb,

@@ -359,19 +359,19 @@ RETURN QUERY (
     (
       fb.balance::TEXT,
       fb.savings_balance::TEXT
-    )::btracker_backend.balance_type AS balance,
+    )::btracker_backend.balances AS balance,
     (
       fb.prev_balance::TEXT,
       fb.prev_savings_balance::TEXT
-    )::btracker_backend.balance_type AS prev_balance,
+    )::btracker_backend.balances AS prev_balance,
     (
       fb.min_balance::TEXT,
       fb.min_savings_balance::TEXT
-    )::btracker_backend.balance_type AS min_balance,
+    )::btracker_backend.balances AS min_balance,
     (
       fb.max_balance::TEXT,
       fb.max_savings_balance::TEXT
-    )::btracker_backend.balance_type AS max_balance
+    )::btracker_backend.balances AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -512,19 +512,19 @@ RETURN QUERY (
     (
       fb.balance::TEXT,
       fb.savings_balance::TEXT
-    )::btracker_backend.balance_type AS balance,
+    )::btracker_backend.balances AS balance,
     (
       fb.prev_balance::TEXT,
       fb.prev_savings_balance::TEXT
-    )::btracker_backend.balance_type AS prev_balance,
+    )::btracker_backend.balances AS prev_balance,
     (
       fb.min_balance::TEXT,
       fb.min_savings_balance::TEXT
-    )::btracker_backend.balance_type AS min_balance,
+    )::btracker_backend.balances AS min_balance,
     (
       fb.max_balance::TEXT,
       fb.max_savings_balance::TEXT
-    )::btracker_backend.balance_type AS max_balance
+    )::btracker_backend.balances AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
@@ -664,19 +664,19 @@ RETURN QUERY (
     (
       fb.balance::TEXT,
       fb.savings_balance::TEXT
-    )::btracker_backend.balance_type AS balance,
+    )::btracker_backend.balances AS balance,
     (
       fb.prev_balance::TEXT,
       fb.prev_savings_balance::TEXT
-    )::btracker_backend.balance_type AS prev_balance,
+    )::btracker_backend.balances AS prev_balance,
     (
       fb.min_balance::TEXT,
       fb.min_savings_balance::TEXT
-    )::btracker_backend.balance_type AS min_balance,
+    )::btracker_backend.balances AS min_balance,
     (
       fb.max_balance::TEXT,
       fb.max_savings_balance::TEXT
-    )::btracker_backend.balance_type AS max_balance
+    )::btracker_backend.balances AS max_balance
   FROM filled_balances fb
   ORDER BY
     (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,

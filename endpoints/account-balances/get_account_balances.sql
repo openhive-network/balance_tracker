@@ -64,7 +64,7 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_account_balances;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(
     "account-name" TEXT
 )
-RETURNS btracker_backend.balances 
+RETURNS btracker_backend.balance
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE
