@@ -287,7 +287,7 @@ union_operations AS (
   FROM canceled_transfers_already_inserted
 ---------------------------------------------------------------------------------------
 ),
-prepare_savings_history AS MATERIALIZED (
+prepare_savings_history AS (
   SELECT 
     uo.account_id,
     uo.nai,
@@ -330,6 +330,20 @@ insert_all_new_registered_transfers_from_savings AS (
   WHERE uo.insert_transfer_id_to_table
   RETURNING tsi.account AS new_transfer
 ),
+remove_latest_stored_balance_record AS MATERIALIZED (
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.balance,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.savings_withdraw_request,
+    pbh.rn
+  FROM prepare_savings_history pbh
+  -- remove with prepared previous balance
+  WHERE pbh.source_op > 0
+  ORDER BY pbh.source_op
+),
 insert_sum_of_transfers AS (
   INSERT INTO account_savings AS acc_history
     (account, nai, saving_balance, source_op, source_op_block, savings_withdraw_requests)
@@ -340,7 +354,7 @@ insert_sum_of_transfers AS (
     ps.source_op,
     ps.source_op_block,
     ps.savings_withdraw_request
-  FROM prepare_savings_history ps
+  FROM remove_latest_stored_balance_record ps
   WHERE rn = 1
   ON CONFLICT ON CONSTRAINT pk_account_savings
   DO UPDATE SET
@@ -359,9 +373,7 @@ insert_saving_balance_history AS (
     pbh.source_op,
     pbh.source_op_block,
     pbh.balance
-  FROM prepare_savings_history pbh
-  WHERE pbh.source_op > 0
-  ORDER BY pbh.source_op
+  FROM remove_latest_stored_balance_record pbh
   RETURNING acc_history.account
 ),
 join_created_at_to_balance_history AS (
@@ -373,10 +385,8 @@ join_created_at_to_balance_history AS (
     rls.balance,
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
-  FROM prepare_savings_history rls
+  FROM remove_latest_stored_balance_record rls
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
-  WHERE rls.source_op > 0
-  ORDER BY rls.source_op
 ),
 get_latest_updates AS (
   SELECT 
