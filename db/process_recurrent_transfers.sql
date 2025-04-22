@@ -110,7 +110,7 @@ BEGIN
         dt.transfer_id  = lrt.transfer_id
     )
   ),
-  recursive_transfers AS (
+  recursive_transfers AS MATERIALIZED (
     WITH RECURSIVE calculated_transfers AS (
       SELECT 
         ed.from_account_id,
@@ -156,6 +156,7 @@ BEGIN
     WHERE rn_per_transfer_desc = 1
   ),
   ---------------------------------------------------------------------------------------
+  -- insert or upsert transfers
   insert_transfers AS (
     INSERT INTO recurrent_transfers AS rt
       (
@@ -184,7 +185,7 @@ BEGIN
       source_op,
       source_op_block
     FROM recursive_transfers
-    WHERE recurrence IS NOT NULL
+    WHERE nai IS NOT NULL
     ON CONFLICT ON CONSTRAINT pk_recurrent_transfers
     DO UPDATE SET
         nai = EXCLUDED.nai,
@@ -198,37 +199,23 @@ BEGIN
     RETURNING rt.from_account AS from_account
   ),
   ---------------------------------------------------------------------------------------
+  -- update failures and remaining executions for transfers that were not deleted or replaced by another transfer
   update_transfers AS (
-    INSERT INTO recurrent_transfers AS rt
-      (
-        from_account,
-        to_account,
-        transfer_id,
-        consecutive_failures,
-        remaining_executions,
-        source_op,
-        source_op_block
-      )
-    SELECT 
-      from_account_id,
-      to_account_id,
-      transfer_id,
-      consecutive_failures,
-      remaining_executions,
-      source_op,
-      source_op_block
-    FROM recursive_transfers
-    WHERE recurrence IS NULL
-    ON CONFLICT ON CONSTRAINT pk_recurrent_transfers
-    DO UPDATE SET
-        consecutive_failures = EXCLUDED.consecutive_failures,
-        remaining_executions = EXCLUDED.remaining_executions,
-        source_op = EXCLUDED.source_op,
-        source_op_block = EXCLUDED.source_op_block
-    RETURNING rt.from_account AS from_account
-
+    UPDATE recurrent_transfers rt SET
+      consecutive_failures = rvt.consecutive_failures,
+      remaining_executions = rvt.remaining_executions,
+      source_op = rvt.source_op,
+      source_op_block = rvt.source_op_block
+    FROM recursive_transfers rvt
+    WHERE 
+      rt.from_account = rvt.from_account_id AND
+      rt.to_account = rvt.to_account_id AND
+      rt.transfer_id = rvt.transfer_id AND
+      rvt.nai IS NULL
+    RETURNING rt.from_account AS updated_account_id
   ),
   ---------------------------------------------------------------------------------------
+  -- delete transfers if amount is 0 and remaining executions is 0 or consecutive failures is 10
   delete_canceled_transfers AS (
     DELETE FROM recurrent_transfers rt
     USING delete_transfer dt
