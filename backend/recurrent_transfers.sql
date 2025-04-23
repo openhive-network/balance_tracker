@@ -216,6 +216,7 @@ AS
 $$
 DECLARE 
   _pair_id INT;
+  _delete BOOLEAN;
 BEGIN
   WITH json_data AS (
     SELECT (_operation_body)->'value'->'extensions' AS extension_data
@@ -225,6 +226,16 @@ BEGIN
   LATERAL jsonb_array_elements(extension_data) AS outer_elem,
   LATERAL jsonb_array_elements(outer_elem) AS inner_elem
   WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
+
+  -- FIX for a bug in failed_recurrent_transfer_operation - delete is not set when remaining_executions = 0
+  _delete := (
+    CASE
+      WHEN ((_operation_body)->'value'->>'deleted')::BOOLEAN = TRUE OR ((_operation_body)->'value'->>'remaining_executions')::INT = 0 THEN
+        TRUE
+      ELSE
+        FALSE
+    END
+  );
 
   RETURN (
     ((_operation_body)->'value'->>'from')::TEXT,
@@ -236,7 +247,7 @@ BEGIN
     ((_operation_body)->'value'->>'remaining_executions')::INT,
     NULL,
     NULL,
-    ((_operation_body)->'value'->>'deleted')::BOOLEAN
+    _delete
   )::btracker_backend.recurrent_transfer_return;
 END
 $$;
@@ -248,7 +259,7 @@ AS
 $$
 DECLARE 
   __precision INT;
-  __nai TEXT := '@@0000000' || nai;
+  __nai TEXT := '@@0000000' || _nai;
 BEGIN
   IF _nai = 13 THEN
     __precision := 3;
