@@ -35,24 +35,6 @@ BEGIN
       ov.block_num BETWEEN _from AND _to
   ),
   ---------------------------------------------------------------------------------------
-  add_row_num AS (
-    SELECT 
-      bp.from_account,
-      bp.to_account,
-      bp.transfer_id,
-      bp.nai,
-      bp.amount,
-      bp.consecutive_failures,
-      bp.remaining_executions,
-      bp.recurrence,
-      bp.memo,
-      bp.delete_transfer,
-      bp.source_op,
-      bp.source_op_block,
-      bp.op_type_id,
-      ROW_NUMBER() OVER (PARTITION BY bp.from_account, bp.to_account, bp.transfer_id, bp.op_type_id ORDER BY bp.source_op DESC) AS rn
-    FROM process_block_range_data_b bp
-  ),
   latest_rec_transfers AS (
     SELECT 
       ar.from_account,
@@ -69,8 +51,7 @@ BEGIN
       ar.source_op_block,
       ar.op_type_id,
       ROW_NUMBER() OVER (PARTITION BY ar.from_account, ar.to_account, ar.transfer_id ORDER BY ar.source_op DESC) AS rn_per_transfer_desc
-    FROM add_row_num ar
-    WHERE ar.rn = 1
+    FROM process_block_range_data_b ar
   ),
   delete_transfer AS MATERIALIZED (
     SELECT 
@@ -82,6 +63,7 @@ BEGIN
     FROM latest_rec_transfers lrt
     WHERE lrt.delete_transfer = TRUE AND lrt.rn_per_transfer_desc = 1
   ),
+  -- exclude records related to deleted transfers
   excluded_deleted_transfers AS MATERIALIZED (
     SELECT 
       lrt.from_account,
@@ -95,6 +77,7 @@ BEGIN
       lrt.remaining_executions,
       lrt.recurrence,
       lrt.memo,
+      lrt.delete_transfer,
       lrt.source_op,
       lrt.source_op_block,
       lrt.op_type_id,
@@ -110,6 +93,69 @@ BEGIN
         dt.transfer_id  = lrt.transfer_id
     )
   ),
+  latest_transfers_in_table AS (
+    SELECT 
+      edt.from_account_id,
+      edt.to_account_id,
+      edt.transfer_id,
+      rt.nai,
+      rt.amount,
+      rt.consecutive_failures,
+      rt.remaining_executions,
+      rt.recurrence,
+      rt.memo,
+      FALSE AS delete_transfer,
+      rt.source_op,
+      rt.source_op_block,
+      49 AS op_type_id,
+      0 as rn_per_transfer_desc,
+      0 AS rn_per_transfer_asc
+    FROM excluded_deleted_transfers edt
+    LEFT JOIN recurrent_transfers rt ON 
+      rt.from_account = edt.from_account_id AND 
+      rt.to_account = edt.to_account_id AND 
+      rt.transfer_id = edt.transfer_id
+    WHERE edt.rn_per_transfer_desc = 1
+  ),
+  union_total_transfers AS MATERIALIZED (
+    SELECT
+      ltin.from_account_id,
+      ltin.to_account_id,
+      ltin.transfer_id,
+      ltin.nai,
+      ltin.amount,
+      ltin.consecutive_failures,
+      ltin.remaining_executions,
+      ltin.recurrence,
+      ltin.memo,
+      ltin.delete_transfer,
+      ltin.source_op,
+      ltin.source_op_block,
+      ltin.op_type_id,
+      ltin.rn_per_transfer_desc,
+      ltin.rn_per_transfer_asc
+    FROM latest_transfers_in_table ltin
+
+    UNION ALL
+
+    SELECT 
+      edt.from_account_id,
+      edt.to_account_id,
+      edt.transfer_id,
+      edt.nai,
+      edt.amount,
+      edt.consecutive_failures,
+      edt.remaining_executions,
+      edt.recurrence,
+      edt.memo,
+      edt.delete_transfer,
+      edt.source_op,
+      edt.source_op_block,
+      edt.op_type_id,
+      edt.rn_per_transfer_desc,
+      edt.rn_per_transfer_asc
+    FROM excluded_deleted_transfers edt
+  ),
   recursive_transfers AS MATERIALIZED (
     WITH RECURSIVE calculated_transfers AS (
       SELECT 
@@ -122,12 +168,13 @@ BEGIN
         ed.remaining_executions,
         ed.recurrence,
         ed.memo,
+        ed.delete_transfer,
         ed.source_op,
         ed.source_op_block,
         ed.rn_per_transfer_asc,
         ed.rn_per_transfer_desc
-      FROM excluded_deleted_transfers ed
-      WHERE ed.rn_per_transfer_asc = 1
+      FROM union_total_transfers ed
+      WHERE ed.rn_per_transfer_asc = 0
 
       UNION ALL
 
@@ -141,12 +188,24 @@ BEGIN
         next_cp.remaining_executions,
         (CASE WHEN next_cp.op_type_id = 49 THEN next_cp.recurrence ELSE prev.recurrence END) AS recurrence,
         (CASE WHEN next_cp.op_type_id = 49 THEN next_cp.memo ELSE prev.memo END) AS memo,
+        next_cp.delete_transfer,
         next_cp.source_op,
-        next_cp.source_op_block,
+        -- if the transfer is an update of previous transfer
+        -- and between them there is no deletion of the transfer
+        -- the block number that is used to update trigger date must not be changed
+        -- so we need to use the block number from the previous transfer
+        (
+          CASE 
+            WHEN next_cp.op_type_id = 49 AND next_cp.recurrence = prev.recurrence AND NOT prev.delete_transfer THEN 
+              prev.source_op_block 
+            ELSE 
+              next_cp.source_op_block 
+          END
+        ) AS source_op_block,
         next_cp.rn_per_transfer_asc,
         next_cp.rn_per_transfer_desc
       FROM calculated_transfers prev
-      JOIN excluded_deleted_transfers next_cp ON 
+      JOIN union_total_transfers next_cp ON 
         prev.from_account_id          = next_cp.from_account_id AND 
         prev.to_account_id            = next_cp.to_account_id AND 
         prev.transfer_id              = next_cp.transfer_id AND 
@@ -185,7 +244,6 @@ BEGIN
       source_op,
       source_op_block
     FROM recursive_transfers
-    WHERE nai IS NOT NULL
     ON CONFLICT ON CONSTRAINT pk_recurrent_transfers
     DO UPDATE SET
         nai = EXCLUDED.nai,
@@ -197,22 +255,6 @@ BEGIN
         source_op = EXCLUDED.source_op,
         source_op_block = EXCLUDED.source_op_block
     RETURNING rt.from_account AS from_account
-  ),
-  ---------------------------------------------------------------------------------------
-  -- update failures and remaining executions for transfers that were not deleted or replaced by another transfer
-  update_transfers AS (
-    UPDATE recurrent_transfers rt SET
-      consecutive_failures = rvt.consecutive_failures,
-      remaining_executions = rvt.remaining_executions,
-      source_op = rvt.source_op,
-      source_op_block = rvt.source_op_block
-    FROM recursive_transfers rvt
-    WHERE 
-      rt.from_account = rvt.from_account_id AND
-      rt.to_account = rvt.to_account_id AND
-      rt.transfer_id = rvt.transfer_id AND
-      rvt.nai IS NULL
-    RETURNING rt.from_account AS updated_account_id
   ),
   ---------------------------------------------------------------------------------------
   -- delete transfers if amount is 0 and remaining executions is 0 or consecutive failures is 10
@@ -228,7 +270,6 @@ BEGIN
 
   SELECT
     (SELECT count(*) FROM insert_transfers) AS insert_transfers,
-    (SELECT count(*) FROM update_transfers) AS update_transfers,
     (SELECT count(*) FROM delete_canceled_transfers) AS delete_canceled_transfers
   INTO __insert_transfers, __update_transfers, __delete_canceled_transfers;
 
