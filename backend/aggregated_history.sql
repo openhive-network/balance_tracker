@@ -2,8 +2,8 @@
 
 SET ROLE btracker_owner;
 
-DROP TYPE IF EXISTS btracker_backend.balance_history_by_year_return CASCADE;
-CREATE TYPE btracker_backend.balance_history_by_year_return AS (
+DROP TYPE IF EXISTS btracker_backend.balance_history_return CASCADE;
+CREATE TYPE btracker_backend.balance_history_return AS (
     account INT,
     nai INT,
     balance BIGINT,
@@ -15,9 +15,11 @@ CREATE TYPE btracker_backend.balance_history_by_year_return AS (
 
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year(
     _account_id INT,
-    _coin_type INT
+    _coin_type INT,
+    _from TIMESTAMP,
+    _to TIMESTAMP
 )
-RETURNS SETOF btracker_backend.balance_history_by_year_return -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -35,7 +37,8 @@ BEGIN
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM balance_history_by_month
-        WHERE account = _account_id AND nai = _coin_type 
+        WHERE account = _account_id AND nai = _coin_type AND
+              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
     ),
 
     get_latest_updates AS (
@@ -76,22 +79,82 @@ BEGIN
 END
 $$;
 
-DROP TYPE IF EXISTS btracker_backend.saving_history_by_year_return CASCADE;
-CREATE TYPE btracker_backend.saving_history_by_year_return AS (
-    account INT,
-    nai INT,
-    balance BIGINT,
-    min_balance BIGINT,
-    max_balance BIGINT,
-    source_op_block INT,
-    updated_at TIMESTAMP
-);
+CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year_last_record(
+    _account_id INT,
+    _coin_type INT,
+    _from TIMESTAMP
+)
+RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  RETURN (
+    WITH get_year AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            min_balance,
+            max_balance,
+            source_op_block,
+            updated_at,
+            DATE_TRUNC('year', updated_at) AS by_year
+        FROM balance_history_by_month
+        WHERE account = _account_id AND nai = _coin_type AND
+              updated_at < _from 
+    ),
+
+    get_latest_updates AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            source_op_block,
+            by_year,
+            ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
+        FROM get_year
+    ),
+
+    get_min_max_balances_by_year AS (
+        SELECT
+            account,
+            nai,
+            by_year,
+            MAX(max_balance) AS max_balance,
+            MIN(min_balance) AS min_balance
+        FROM get_year
+        GROUP BY account, nai, by_year
+    )
+
+    SELECT (
+        gl.account,
+        gl.nai,
+        gl.balance,
+        gm.min_balance,
+        gm.max_balance,
+        gl.source_op_block,
+        gl.by_year
+    )::btracker_backend.balance_history_return
+    FROM get_latest_updates gl
+    JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
+    WHERE gl.rn_by_year = 1
+    ORDER BY gl.by_year DESC
+    LIMIT 1
+  );
+
+END
+$$;
+
 
 CREATE OR REPLACE FUNCTION btracker_backend.saving_history_by_year(
     _account_id INT,
-    _coin_type INT
+    _coin_type INT,
+    _from TIMESTAMP,
+    _to TIMESTAMP
 )
-RETURNS SETOF btracker_backend.saving_history_by_year_return -- noqa: LT01, CP05
+RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
 STABLE
 AS
@@ -109,7 +172,8 @@ BEGIN
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM saving_history_by_month
-        WHERE account = _account_id AND nai = _coin_type 
+        WHERE account = _account_id AND nai = _coin_type AND
+              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to 
     ),
 
     get_latest_updates AS (
@@ -147,6 +211,299 @@ BEGIN
     WHERE gl.rn_by_year = 1
   );
 
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.saving_history_by_year_last_record(
+    _account_id INT,
+    _coin_type INT,
+    _from TIMESTAMP
+)
+RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  RETURN (
+    WITH get_year AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            min_balance,
+            max_balance,
+            source_op_block,
+            updated_at,
+            DATE_TRUNC('year', updated_at) AS by_year
+        FROM saving_history_by_month
+        WHERE account = _account_id AND nai = _coin_type AND
+              updated_at < _from  
+    ),
+
+    get_latest_updates AS (
+        SELECT
+            account,
+            nai,
+            balance,
+            source_op_block,
+            by_year,
+            ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
+        FROM get_year
+    ),
+
+    get_min_max_balances_by_year AS (
+        SELECT
+            account,
+            nai,
+            by_year,
+            MAX(max_balance) AS max_balance,
+            MIN(min_balance) AS min_balance
+        FROM get_year
+        GROUP BY account, nai, by_year
+    )
+
+    SELECT (
+        gl.account,
+        gl.nai,
+        gl.balance,
+        gm.min_balance,
+        gm.max_balance,
+        gl.source_op_block,
+        gl.by_year
+    )::btracker_backend.balance_history_return
+    FROM get_latest_updates gl
+    JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
+    WHERE gl.rn_by_year = 1
+    ORDER BY gl.by_year DESC
+    LIMIT 1
+  );
+
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.balance_history(
+    _account_id INT,
+    _coin_type INT,
+    _granularity btracker_backend.granularity,
+    _balance_type btracker_backend.balance_type,
+    _from TIMESTAMP,
+    _to TIMESTAMP
+)
+RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  IF _balance_type = 'balance' THEN
+    RETURN QUERY
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh
+      WHERE _granularity = 'yearly'
+
+      UNION ALL
+
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM balance_history_by_day bh
+      WHERE 
+        bh.account = _account_id AND 
+        bh.nai = _coin_type AND
+        bh.updated_at BETWEEN _from AND _to AND
+        _granularity = 'daily'
+
+      UNION ALL
+
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM balance_history_by_month bh
+      WHERE 
+        bh.account = _account_id AND 
+        bh.nai = _coin_type AND
+        bh.updated_at BETWEEN _from AND _to AND
+        _granularity = 'monthly';
+  ELSE
+    RETURN QUERY
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh
+      WHERE _granularity = 'yearly'
+
+      UNION ALL
+
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM saving_history_by_day bh
+      WHERE 
+        bh.account = _account_id AND 
+        bh.nai = _coin_type AND
+        bh.updated_at BETWEEN _from AND _to AND
+        _granularity = 'daily'
+
+      UNION ALL
+
+      SELECT 
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        bh.source_op_block,
+        bh.updated_at
+      FROM saving_history_by_month bh
+      WHERE 
+        bh.account = _account_id AND 
+        bh.nai = _coin_type AND
+        bh.updated_at BETWEEN _from AND _to AND
+        _granularity = 'monthly';
+  END IF;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.balance_history_last_record(
+    _account_id INT,
+    _coin_type INT,
+    _granularity btracker_backend.granularity,
+    _balance_type btracker_backend.balance_type,
+    _from TIMESTAMP
+)
+RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
+BEGIN
+  IF _balance_type = 'balance' AND _granularity = 'yearly' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM btracker_backend.balance_history_by_year_last_record(_account_id, _coin_type, _from) bh;
+
+  ELSEIF _balance_type = 'balance' AND _granularity = 'monthly' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM balance_history_by_month bh
+    WHERE 
+      bh.account = _account_id AND 
+      bh.nai = _coin_type AND
+      bh.updated_at < _from
+    ORDER BY bh.updated_at DESC
+    LIMIT 1;
+
+  ELSEIF _balance_type = 'balance' AND _granularity = 'daily' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM balance_history_by_day bh
+    WHERE 
+      bh.account = _account_id AND 
+      bh.nai = _coin_type AND
+      bh.updated_at < _from
+    ORDER BY bh.updated_at DESC
+    LIMIT 1;
+
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'yearly' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM btracker_backend.saving_history_by_year_last_record(_account_id, _coin_type, _from) bh;
+
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'monthly' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM saving_history_by_month bh
+    WHERE 
+      bh.account = _account_id AND 
+      bh.nai = _coin_type AND
+      bh.updated_at < _from 
+    ORDER BY bh.updated_at DESC
+    LIMIT 1;
+
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'daily' THEN
+    RETURN (
+      bh.account,
+      bh.nai,
+      bh.balance,
+      bh.min_balance,
+      bh.max_balance,
+      bh.source_op_block,
+      bh.updated_at
+    )::btracker_backend.balance_history_return
+    FROM saving_history_by_day bh
+    WHERE 
+      bh.account = _account_id AND 
+      bh.nai = _coin_type AND
+      bh.updated_at < _from 
+    ORDER BY bh.updated_at DESC
+    LIMIT 1;
+
+  ELSE
+    RAISE EXCEPTION 'Invalid granularity: %, balance-type: %', _granularity, _balance_type;
+  END IF;
 END
 $$;
 
@@ -213,7 +570,7 @@ BEGIN
         ROW_NUMBER() OVER (ORDER BY date) AS row_num
       FROM date_series
     ),
-    get_balance_aggregation AS MATERIALIZED (
+    get_balance_aggregation AS (
       SELECT 
         bh.account,
         bh.nai,
@@ -222,43 +579,16 @@ BEGIN
         bh.max_balance,
         bh.source_op_block,
         bh.updated_at
-      FROM btracker_backend.balance_history_by_year(_account_id,_coin_type) bh
-      WHERE _granularity = 'yearly'
-
-      UNION ALL
-
-      SELECT 
-        bh.account,
-        bh.nai,
-        bh.balance,
-        bh.min_balance,
-        bh.max_balance,
-        bh.source_op_block,
-        bh.updated_at
-      FROM balance_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        _granularity = 'daily'
-
-      UNION ALL
-
-      SELECT 
-        bh.account,
-        bh.nai,
-        bh.balance,
-        bh.min_balance,
-        bh.max_balance,
-        bh.source_op_block,
-        bh.updated_at
-      FROM balance_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        _granularity = 'monthly'
-
+      FROM btracker_backend.balance_history(
+        _account_id,
+        _coin_type,
+        _granularity,
+        'balance',
+        _from_timestamp,
+        _to_timestamp
+      ) bh
     ),
-    get_savings_aggregation AS MATERIALIZED (
+    get_savings_aggregation AS (
       SELECT 
         bh.account,
         bh.nai,
@@ -267,40 +597,14 @@ BEGIN
         bh.max_balance,
         bh.source_op_block,
         bh.updated_at
-      FROM btracker_backend.saving_history_by_year(_account_id,_coin_type) bh
-      WHERE _granularity = 'yearly'
-
-      UNION ALL
-
-      SELECT 
-        bh.account,
-        bh.nai,
-        bh.balance,
-        bh.min_balance,
-        bh.max_balance,
-        bh.source_op_block,
-        bh.updated_at
-      FROM saving_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        _granularity = 'daily'
-
-      UNION ALL
-
-      SELECT 
-        bh.account,
-        bh.nai,
-        bh.balance,
-        bh.min_balance,
-        bh.max_balance,
-        bh.source_op_block,
-        bh.updated_at
-      FROM saving_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        _granularity = 'monthly'
+      FROM btracker_backend.balance_history(
+        _account_id,
+        _coin_type,
+        _granularity,
+        'savings_balance',
+        _from_timestamp,
+        _to_timestamp
+      ) bh
     ),
     balance_records AS MATERIALIZED (
       SELECT 
@@ -340,10 +644,13 @@ BEGIN
             bh.min_balance,
             bh.max_balance,
             bh.source_op_block 
-          FROM get_balance_aggregation bh
-          WHERE bh.updated_at < ds.date
-          ORDER BY bh.updated_at DESC
-          LIMIT 1
+          FROM btracker_backend.balance_history_last_record(
+            _account_id,
+            _coin_type,
+            _granularity,
+            'balance',
+            _from_timestamp
+          ) bh
         ) prev_balance ON TRUE
         LEFT JOIN LATERAL (
           SELECT 
@@ -351,10 +658,13 @@ BEGIN
             bh.min_balance,
             bh.max_balance,
             bh.source_op_block 
-          FROM get_savings_aggregation bh
-          WHERE bh.updated_at < ds.date
-          ORDER BY bh.updated_at DESC
-          LIMIT 1
+          FROM btracker_backend.balance_history_last_record(
+            _account_id,
+            _coin_type,
+            _granularity,
+            'savings_balance',
+            _from_timestamp
+          ) bh
         ) savings_prev_balance ON TRUE
         WHERE ds.row_num = 1
       
