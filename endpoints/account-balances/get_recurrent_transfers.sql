@@ -63,7 +63,7 @@ BEGIN
     PERFORM btracker_backend.rest_raise_missing_account("account-name");
   END IF;
 
-  _incoming_recurrent_transfers := array_agg(row ORDER BY row.from) FROM (
+  _incoming_recurrent_transfers := array_agg(row ORDER BY row.trigger_date) FROM (
       SELECT 
         ba.from,
         ba.pair_id,
@@ -78,7 +78,7 @@ BEGIN
       FROM btracker_backend.incoming_recurrent_transfers(_account_id) ba
   ) row;
 
-  _outgoing_recurrent_transfers := array_agg(row ORDER BY row.to) FROM (
+  _outgoing_recurrent_transfers := array_agg(row ORDER BY row.trigger_date) FROM (
       SELECT 
         ba.to,
         ba.pair_id,
