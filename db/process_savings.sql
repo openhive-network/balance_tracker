@@ -86,26 +86,6 @@ income_transfers AS (
   FROM filter_interest_ops
   WHERE op_type_id IN (32,55)
 ),
-group_by_account_nai AS (
-  SELECT 
-    cp.account_id,
-    cp.nai
-  FROM filter_interest_ops cp
-  GROUP BY cp.account_id, cp.nai
-),
-get_latest_balance AS (
-  SELECT 
-    gan.account_id,
-    gan.nai,
-    COALESCE(cab.saving_balance, 0) as balance,
-    COALESCE(cab.savings_withdraw_requests, 0) AS savings_withdraw_request,
-    0 AS request_id,  
-    0 AS op_type_id,
-    0 AS source_op,
-    0 AS source_op_block
-  FROM group_by_account_nai gan
-  LEFT JOIN account_savings cab ON cab.account = gan.account_id AND cab.nai = gan.nai
-),
 ---------------------------------------------------------------------------------------
 -- find if transfer from savings happened in same batch of blocks as cancel or fill
 join_canceled_transfers_in_query AS (
@@ -125,6 +105,8 @@ prepare_canceled_transfers_in_query AS MATERIALIZED (
   SELECT  
     jct.account_id,
     (CASE WHEN jct.op_type_id = 34 THEN tf.nai ELSE jct.nai END) AS nai,
+    -- we change sign of balance for cancel operation - we take the value from transfer_from_savings operation which is negative
+    -- so we need to change it to positive (we want to give it back to savings)
     (CASE WHEN jct.op_type_id = 34 THEN (- tf.balance) ELSE jct.balance END) AS balance,
     jct.savings_withdraw_request,
     jct.request_id,  
@@ -177,6 +159,8 @@ canceled_transfers_already_inserted AS (
   SELECT  
     pct.account_id,
     (CASE WHEN pct.op_type_id = 34 THEN tsi.nai ELSE pct.nai END) AS nai,
+    -- we change sign of balance for cancel operation - we take the value from transfer_saving_id table which is negative
+    -- so we need to change it to positive (we want to give it back to savings)
     (CASE WHEN pct.op_type_id = 34 THEN (- tsi.balance) ELSE pct.balance END) AS balance,
     pct.savings_withdraw_request,
     pct.request_id,  
@@ -207,23 +191,7 @@ transfers_from_canceled_in_query AS (
 ),
 ---------------------------------------------------------------------------------------
 -- union all transfer operations 
-union_operations AS (
-
-  SELECT  
-    account_id,
-    nai,
-    balance,
-    savings_withdraw_request,
-    request_id,  
-    op_type_id,
-    source_op,
-    source_op_block,
-	  FALSE AS delete_transfer_id_from_table,
-    FALSE AS insert_transfer_id_to_table
-  FROM get_latest_balance
-
-  UNION ALL
-
+union_operations AS MATERIALIZED (
 -- transfers from savings
   SELECT  
     account_id,
@@ -287,6 +255,57 @@ union_operations AS (
   FROM canceled_transfers_already_inserted
 ---------------------------------------------------------------------------------------
 ),
+group_by_account_nai AS (
+  SELECT 
+    cp.account_id,
+    cp.nai
+  FROM union_operations cp
+  GROUP BY cp.account_id, cp.nai
+),
+get_latest_balance AS (
+  SELECT 
+    gan.account_id,
+    gan.nai,
+    COALESCE(cab.saving_balance, 0) as balance,
+    COALESCE(cab.savings_withdraw_requests, 0) AS savings_withdraw_request,
+    0 AS request_id,  
+    0 AS op_type_id,
+    0 AS source_op,
+    0 AS source_op_block
+  FROM group_by_account_nai gan
+  LEFT JOIN account_savings cab ON cab.account = gan.account_id AND cab.nai = gan.nai
+),
+---------------------------------------------------------------------------------------
+union_operations_with_latest_balance AS (
+  SELECT  
+    account_id,
+    nai,
+    balance,
+    savings_withdraw_request,
+    request_id,  
+    op_type_id,
+    source_op,
+    source_op_block,
+	  FALSE AS delete_transfer_id_from_table,
+    FALSE AS insert_transfer_id_to_table
+  FROM get_latest_balance
+
+  UNION ALL
+
+  SELECT  
+    account_id,
+    nai,
+    balance,
+    savings_withdraw_request,
+    request_id,  
+    op_type_id,
+    source_op,
+    source_op_block,
+	  delete_transfer_id_from_table,
+	  insert_transfer_id_to_table
+  FROM union_operations
+---------------------------------------------------------------------------------------
+),
 prepare_savings_history AS (
   SELECT 
     uo.account_id,
@@ -306,12 +325,12 @@ prepare_savings_history AS (
     uo.source_op,
     uo.source_op_block,
     ROW_NUMBER() OVER (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC) AS rn
-  FROM union_operations uo
+  FROM union_operations_with_latest_balance uo
 ),
 ---------------------------------------------------------------------------------------
 delete_all_canceled_or_filled_transfers AS (
   DELETE FROM transfer_saving_id tsi
-  USING union_operations uo
+  USING union_operations_with_latest_balance uo
   WHERE 
     tsi.request_id = uo.request_id AND 
     tsi.account = uo.account_id AND
@@ -326,7 +345,7 @@ insert_all_new_registered_transfers_from_savings AS (
     uo.nai,
     uo.balance,
     uo.request_id
-  FROM union_operations uo
+  FROM union_operations_with_latest_balance uo
   WHERE uo.insert_transfer_id_to_table
   RETURNING tsi.account AS new_transfer
 ),
