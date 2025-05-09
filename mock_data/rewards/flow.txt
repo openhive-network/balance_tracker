@@ -1,0 +1,37 @@
+39	"hive::protocol::claim_reward_balance_operation"	    false
+51	"hive::protocol::author_reward_operation"	            true
+63	"hive::protocol::comment_benefactor_reward_operation"	true
+
+***balance***
+blocktrades: {
+    "hbd_balance": 77238982,
+    "hive_balance": 29588875,
+    "vesting_shares": "8172549681941451",
+    "hbd_rewards": 0,
+    "hive_rewards": 0,
+    "vests_rewards": "0",
+}
+
+***block 5000006***
+author_reward_operation(account:`blocktrades`, hbd_rewards:`10000`, hive_rewards:`10000`, vests_rewards:`10000`)
+comment_benefactor_reward_operation(account:`blocktrades`, hbd_rewards:`10000`, hive_rewards:`10000`, vests_rewards:`10000`)
+claim_reward_balance_operation(account:`blocktrades`, hbd_rewards:`15000`, hive_rewards:`15000`, vests_rewards:`15000`)
+
+***block 5000007***
+author_reward_operation(account:`blocktrades`, hbd_rewards:`1000`, hive_rewards:`1000`, vests_rewards:`1000`)
+
+***block 5000008***
+comment_benefactor_reward_operation(account:`blocktrades`, hbd_rewards:`1000`, hive_rewards:`1000`, vests_rewards:`1000`)
+
+***block 5000009***
+claim_reward_balance_operation(account:`blocktrades`, hbd_rewards:`1000`, hive_rewards:`1000`, vests_rewards:`1000`)
+
+***balance***
+blocktrades: {
+    "hbd_balance": 77254982,
+    "hive_balance": 29604875,
+    "vesting_shares": "8172549681957451",
+    "hbd_rewards": 6000,
+    "hive_rewards": 6000,
+    "vests_rewards": "6000",
+}
