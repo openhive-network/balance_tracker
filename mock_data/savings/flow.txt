@@ -1,0 +1,42 @@
+32	"hive::protocol::transfer_to_savings_operation"			    false
+33	"hive::protocol::transfer_from_savings_operation"			false
+34	"hive::protocol::cancel_transfer_from_savings_operation"	false
+55	"hive::protocol::interest_operation"						true
+59	"hive::protocol::fill_transfer_from_savings_operation"		true
+
+***balance***
+blocktrades: {
+    "hbd_balance": 77246982,
+    "hive_balance": 29594875,
+    "hbd_savings": 0,
+    "hive_savings": 0
+}
+
+***block 5000001***
+transfer_to_savings_operation(account:`blocktrades`, nai:`13`, amount:`10000`)
+transfer_to_savings_operation(account:`blocktrades`, nai:`21`, amount:`10000`)
+interest_operation(`blocktrades`, nai:`13`, amount:`100`)
+transfer_from_savings_operation(`blocktrades`, nai:`13`, amount:`1000`, transfer_id:`123`)
+transfer_from_savings_operation(`blocktrades`, nai:`13`, amount:`2000`, transfer_id:`321`)
+cancel_transfer_from_savings_operation(`blocktrades`, transfer_id:`123`)
+fill_transfer_from_savings_operation(`blocktrades`, transfer_id:`321`)
+
+***block 5000002***
+transfer_from_savings_operation(`blocktrades`, nai:`21`, amount:`3000`, transfer_id:`123`)
+
+***block 5000003***
+transfer_from_savings_operation(`blocktrades`, nai:`21`, amount:`4000`, transfer_id:`321`)
+
+***block 5000004***
+cancel_transfer_from_savings_operation(`blocktrades`, transfer_id:`123`)
+
+***block 5000005***
+fill_transfer_from_savings_operation(`blocktrades`, transfer_id:`321`)
+
+***balance***
+blocktrades: {
+    "hbd_balance": 77238982,
+    "hive_balance": 29588875,
+    "hbd_savings": 8100,
+    "hive_savings": 6000
+}
