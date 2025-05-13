@@ -17,15 +17,15 @@ steem: {
 }
 
 1.delay vests by power up and cancel it by delayed_voting_operation
-***block 90000000***
+***block 90000028***
 transfer_to_vesting_completed_operation(to_account:`steem`, hive_vested:`100`, vesting_shares_received:`1000000`)
 delayed_voting_operation(voter:`steem`, votes:`1000000`)
 
 2.delay vests by power up and partially reduce delayed vests by power down
-***block 90000001***
+***block 90000029***
 transfer_to_vesting_completed_operation(to_account:`blocktrades`, hive_vested:`10000`, vesting_shares_received:`90404818220529`)
 
-***block 90000002***
+***block 90000030***
 fill_vesting_withdraw_operation(to_account:`blocktrades`, deposited:`9000`, withdrawn:`80404818220529`)
 
 ***balance***
