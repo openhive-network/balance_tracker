@@ -12,23 +12,23 @@ gtg: {
 }
 
 1.completed cancel delegation
-***block 5000023***
+***block 90000023***
 delegate_vesting_shares_operation(delegator:`blocktrades`, delegatee:`gtg`, amount:`10000`)
 delegate_vesting_shares_operation(delegator:`blocktrades`, delegatee:`gtg`, amount:`0`)
 return_vesting_delegation_operation(delegator:`blocktrades`, amount:`10000`)
 
 2.change amout of delegation
-***block 5000024***
+***block 90000024***
 delegate_vesting_shares_operation(delegator:`blocktrades`, delegatee:`gtg`, amount:`10000`)
 
-***block 5000025***
+***block 90000025***
 delegate_vesting_shares_operation(delegator:`blocktrades`, delegatee:`gtg`, amount:`100000`)
 
 3.canceled delegation but the cancel is not yet completed
-***block 5000026***
+***block 90000026***
 delegate_vesting_shares_operation(delegator:`gtg`, delegatee:`blocktrades`, amount:`10000`)
 
-***block 5000027***
+***block 90000027***
 delegate_vesting_shares_operation(delegator:`gtg`, delegatee:`blocktrades`, amount:`0`)
 
 blocktrades: {
