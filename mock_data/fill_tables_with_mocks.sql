@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-DROP TYPE btracker_backend.operation_type CASCADE;
+DROP TYPE IF EXISTS btracker_backend.operation_type CASCADE;
 CREATE TYPE btracker_backend.operation_type AS (
     block_num INT,
     op_type_id INT,
@@ -9,7 +9,7 @@ CREATE TYPE btracker_backend.operation_type AS (
     body_binary hafd.operation
 );
 
-DROP TYPE btracker_backend.block_type CASCADE;
+DROP TYPE IF EXISTS btracker_backend.block_type CASCADE;
 CREATE TYPE btracker_backend.block_type AS (
     block_num INT,
     hash TEXT,

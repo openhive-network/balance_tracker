@@ -8,10 +8,10 @@ Usage: $0 [OPTION[=VALUE]]...
 
 Script for mocking data in the balance tracker database
 OPTIONS:
-    --postgres-host=HOSTNAME              PostgreSQL hostname (default: localhost)
-    --postgres-port=PORT                  PostgreSQL port (default: 5432)
-    --postgres-user=USERNAME              PostgreSQL user name (default: haf_admin)
-    --postgres-url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
+    --host=HOSTNAME              PostgreSQL hostname (default: localhost)
+    --port=PORT                  PostgreSQL port (default: 5432)
+    --user=USERNAME              PostgreSQL user name (default: haf_admin)
+    --url=URL                    PostgreSQL URL (if set, overrides three previous options, empty by default)
     --help,-h,-?                          Displays this help message
 EOF
 }
@@ -23,13 +23,13 @@ POSTGRES_URL=${POSTGRES_URL:-""}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --postgres-host=*)
+    --host=*)
         POSTGRES_HOST="${1#*=}"
         ;;
-    --postgres-port=*)
+    --port=*)
         POSTGRES_PORT="${1#*=}"
         ;;
-    --postgres-user=*)
+    --user=*)
         POSTGRES_USER="${1#*=}"
         ;;
     --postgres-url=*)
