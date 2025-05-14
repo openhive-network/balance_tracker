@@ -56,7 +56,7 @@ done
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_mocks"}
 
 # Load mock data from JSON files
-MOCKED_BLOCKS=$(cat "$SCRIPTPATH/mock_blocks.json")
+MOCKED_BLOCKS=$(cat "$SCRIPTPATH/blocks/mock_blocks.json")
 MOCKED_SAVINGS=$(cat "$SCRIPTPATH/savings/mock_savings.json")
 MOCK_START=90000000
 MOCK_END=90000030
