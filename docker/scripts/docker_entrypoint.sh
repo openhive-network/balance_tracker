@@ -11,7 +11,11 @@ elif [ "$1" = "process_blocks" ]; then
 elif [ "$1" = "uninstall_app" ]; then
   shift
   exec ./uninstall_app.sh --host="${POSTGRES_HOST:-haf}" --user="${POSTGRES_USER:-haf_admin}" "$@"
+elif [ "$1" = "install_mocks" ]; then
+  cd /app/mock_data
+  shift
+  exec ./add_mocks_to_db.sh --host="${POSTGRES_HOST:-haf}" --user="${POSTGRES_USER:-haf_admin}" "$@"
 else
-  echo "usage: $0 install_app|process_blocks|uninstall_app"
+  echo "usage: $0 install_app|process_blocks|uninstall_app|install_mocks"
   exit 1
 fi
