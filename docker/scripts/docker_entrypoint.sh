@@ -12,7 +12,6 @@ elif [ "$1" = "uninstall_app" ]; then
   shift
   exec ./uninstall_app.sh --host="${POSTGRES_HOST:-haf}" --user="${POSTGRES_USER:-haf_admin}" "$@"
 elif [ "$1" = "install_mocks" ]; then
-  cd /app/mock_data
   shift
   exec ./add_mocks_to_db.sh --host="${POSTGRES_HOST:-haf}" --user="${POSTGRES_USER:-haf_admin}" "$@"
 else

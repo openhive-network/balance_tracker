@@ -56,13 +56,13 @@ done
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_mocks"}
 
 # Load mock data from JSON files
-MOCKED_BLOCKS=$(cat "$SCRIPTPATH/blocks/mock_blocks.json")
-MOCKED_SAVINGS=$(cat "$SCRIPTPATH/savings/mock_savings.json")
+MOCKED_BLOCKS=$(cat "$SCRIPTPATH/../mock_data/blocks/mock_blocks.json")
+MOCKED_SAVINGS=$(cat "$SCRIPTPATH/../mock_data/savings/mock_savings.json")
 MOCK_START=90000000
 MOCK_END=90000030
 
 # Execute SQL scripts and functions
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/fill_tables_with_mocks.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../mock_data/fill_tables_with_mocks.sql"
 
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_blocks('$MOCKED_BLOCKS')"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_operations('$MOCKED_SAVINGS')"
