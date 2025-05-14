@@ -44,6 +44,7 @@ USER haf_admin
 COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
+COPY scripts/add_mocks_to_db.sh /app/scripts/add_mocks_to_db.sh
 COPY db /app/db
 COPY backend /app/backend
 COPY endpoints /app/endpoints
