@@ -31,7 +31,7 @@ recurrent_transfer_operation(from_account:`blocktrades`, to_account:`steem`, nai
 failed_recurrent_transfer_operation(from_account:`blocktrades`, to_account:`steem`)
 fill_recurrent_transfer_operation(from_account:`blocktrades`, to_account:`steem`)
 
-3.overwritten transfer with a currency change (the trigger date changes) ---------------------------------------------------
+3.overwritten transfer with a currency change (the trigger date not changes) ---------------------------------------------------
 ***block 90000012***
 recurrent_transfer_operation(from_account:`steem`, to_account:`blocktrades`, nai:`13`, amount:`10000`, recurrence:`24`, executions:`10`)
 
@@ -68,6 +68,13 @@ recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`, nai:`13`, a
 ***block 90000022***
 recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`, nai:`13`, amount:`0`, recurrence:`24`, executions:`10`)
 
+7.Remove transfers (remaining_executions = 0) -----------------------------------------------------------------------------------------------
+***block 90000023***
+recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`, nai:`13`, amount:`1`, recurrence:`24`, executions:`1`)
+
+***block 90000024***
+fill_recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`)
+
 ***balance***
 blocktrades: {
     "hbd_balance": 77255982
@@ -75,7 +82,7 @@ blocktrades: {
     "vesting_shares": "8172549681957451"
 }
 gtg: {
-    "hbd_balance": 22465
+    "hbd_balance": 22464
     "hive_balance": 0,
     "vesting_shares": "17579100476774"
 }
