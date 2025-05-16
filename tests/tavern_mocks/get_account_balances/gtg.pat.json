@@ -1,0 +1,23 @@
+{
+  "hbd_balance": 3465,
+  "hive_balance": 0,
+  "vesting_shares": "17579100476774",
+  "vesting_balance_hive": 5852200,
+  "post_voting_power_vests": "17579100476774",
+  "delegated_vests": "0",
+  "received_vests": "0",
+  "curation_rewards": "19888",
+  "posting_rewards": "1972916",
+  "hbd_rewards": 0,
+  "hive_rewards": 0,
+  "vests_rewards": "0",
+  "hive_vesting_rewards": 0,
+  "hbd_savings": 0,
+  "hive_savings": 0,
+  "savings_withdraw_requests": 0,
+  "vesting_withdraw_rate": "0",
+  "to_withdraw": "0",
+  "withdrawn": "0",
+  "withdraw_routes": 0,
+  "delayed_vests": "0"
+}

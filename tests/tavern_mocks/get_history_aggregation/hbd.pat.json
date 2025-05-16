@@ -1,0 +1,21 @@
+[
+  {
+    "date": "2016-12-31T23:59:59",
+    "balance": {
+      "balance": "77246982",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "0",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "0",
+      "savings_balance": "0"
+    },
+    "max_balance": {
+      "balance": "77246982",
+      "savings_balance": "0"
+    }
+  }
+]
