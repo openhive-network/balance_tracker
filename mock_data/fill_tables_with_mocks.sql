@@ -118,6 +118,11 @@ BEGIN
   SET current_block_num = _mock_start_block_num,
     irreversible_block = _mock_start_block_num;
 
+  -- simulate 24th hardfork, required for delayed votes test
+  INSERT INTO hafd.applied_hardforks
+    (hardfork_num, block_num, hardfork_vop_id)
+  SELECT 24, 90000001, 386547060934967584;
+
 END;
 $BODY$;
 
