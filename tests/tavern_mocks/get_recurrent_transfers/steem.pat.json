@@ -1,0 +1,54 @@
+{
+  "incoming_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000021",
+        "precision": 3
+      },
+      "block_num": 90000011,
+      "consecutive_failures": 0,
+      "from": "blocktrades",
+      "memo": "",
+      "operation_id": "386547103884641107",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 8,
+      "trigger_date": "2016-09-16T19:47:57"
+    }
+  ],
+  "outgoing_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000021",
+        "precision": 3
+      },
+      "block_num": 90000013,
+      "consecutive_failures": 0,
+      "memo": "",
+      "operation_id": "386547116769542449",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 10,
+      "to": "blocktrades",
+      "trigger_date": "2016-09-16T19:48:03"
+    },
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000017,
+      "consecutive_failures": 0,
+      "memo": "",
+      "operation_id": "386547129654444337",
+      "pair_id": 0,
+      "recurrence": 48,
+      "remaining_executions": 10,
+      "to": "gtg",
+      "trigger_date": "2016-09-17T19:48:15"
+    }
+  ]
+}

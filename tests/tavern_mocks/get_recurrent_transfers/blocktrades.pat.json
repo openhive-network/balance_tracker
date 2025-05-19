@@ -1,0 +1,70 @@
+{
+  "incoming_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000021",
+        "precision": 3
+      },
+      "block_num": 90000013,
+      "consecutive_failures": 0,
+      "from": "steem",
+      "memo": "",
+      "operation_id": "386547116769542449",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 10,
+      "trigger_date": "2016-09-16T19:48:03"
+    },
+    {
+      "amount": {
+        "amount": "1000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000019,
+      "consecutive_failures": 0,
+      "from": "gtg",
+      "memo": "",
+      "operation_id": "386547142539346225",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 10,
+      "trigger_date": "2016-09-16T19:48:21"
+    }
+  ],
+  "outgoing_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000010,
+      "consecutive_failures": 1,
+      "memo": "",
+      "operation_id": "386547099589673812",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 8,
+      "to": "gtg",
+      "trigger_date": "2016-09-16T19:47:54"
+    },
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000021",
+        "precision": 3
+      },
+      "block_num": 90000011,
+      "consecutive_failures": 0,
+      "memo": "",
+      "operation_id": "386547103884641107",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 8,
+      "to": "steem",
+      "trigger_date": "2016-09-16T19:47:57"
+    }
+  ]
+}
