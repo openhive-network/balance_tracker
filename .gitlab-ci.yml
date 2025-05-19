@@ -236,19 +236,19 @@ sync:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
-    cp -a "${SHM_DIR}" "${DATADIR}/shm_dir"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log" "${DATADIR}/blockchain/block_log"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts" "${DATADIR}/blockchain/block_log.artifacts"
 
     mkdir -p "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
     sudo cp -a "${DATADIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
+    sudo cp -a "${SHM_DIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
 
     ls -lah "${DATADIR}"
     ls -lah "${DATADIR}/blockchain"
-    ls -lah "${DATADIR}/shm_dir"
 
     ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/blockchain"
+    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/datadir"
+    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/datadir/blockchain"
     ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/shm_dir"
 
     # Manually remove the copy of the repaly data to preserve disk space on the replay server
@@ -278,8 +278,8 @@ sync_with_mock_data:
     artifacts: true
   variables:
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
-    DATADIR: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
-    SHM_DIR: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/shm_dir
+    DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
+    SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
     HAF_SHM_DIRECTORY: ${SHM_DIR}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
@@ -328,20 +328,24 @@ sync_with_mock_data:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
-    cp -a "${SHM_DIR}" "${DATADIR}/shm_dir"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log" "${DATADIR}/blockchain/block_log"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts" "${DATADIR}/blockchain/block_log.artifacts"
 
     mkdir -p "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
     sudo cp -a "${DATADIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
+    sudo cp -a "${SHM_DIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
 
     ls -lah "${DATADIR}"
     ls -lah "${DATADIR}/blockchain"
-    ls -lah "${DATADIR}/shm_dir"
 
     ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/blockchain"
+    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/datadir"
+    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/datadir/blockchain"
     ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/shm_dir"
+
+    # Manually remove the copy of the repaly data to preserve disk space on the replay server
+    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
+    
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
     paths:
