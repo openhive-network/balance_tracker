@@ -1,0 +1,23 @@
+{
+  "curation_rewards": "19888",
+  "delayed_vests": "0",
+  "delegated_vests": "10000",
+  "hbd_balance": 22464,
+  "hbd_rewards": 0,
+  "hbd_savings": 0,
+  "hive_balance": 0,
+  "hive_rewards": 0,
+  "hive_savings": 0,
+  "hive_vesting_rewards": 0,
+  "post_voting_power_vests": "17579100566774",
+  "posting_rewards": "1972916",
+  "received_vests": "100000",
+  "savings_withdraw_requests": 0,
+  "to_withdraw": "0",
+  "vesting_balance_hive": 5852233,
+  "vesting_shares": "17579100476774",
+  "vesting_withdraw_rate": "0",
+  "vests_rewards": "0",
+  "withdraw_routes": 0,
+  "withdrawn": "0"
+}

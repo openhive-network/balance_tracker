@@ -1,0 +1,686 @@
+[
+  {
+    "balance": {
+      "balance": "29593875",
+      "savings_balance": "6000"
+    },
+    "date": "2016-09-15T23:59:59",
+    "max_balance": {
+      "balance": "32872416",
+      "savings_balance": "10000"
+    },
+    "min_balance": {
+      "balance": "29584875",
+      "savings_balance": "3000"
+    },
+    "prev_balance": {
+      "balance": "32842995",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "32842995",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-14T23:59:59",
+    "max_balance": {
+      "balance": "41103069",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "32842995",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "41038226",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "41038226",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-13T23:59:59",
+    "max_balance": {
+      "balance": "42227833",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "40767043",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "42228774",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "42228774",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-12T23:59:59",
+    "max_balance": {
+      "balance": "61878340",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "42228774",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "61927303",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "61927303",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-11T23:59:59",
+    "max_balance": {
+      "balance": "63692742",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "61927303",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "63707327",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "63707327",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-10T23:59:59",
+    "max_balance": {
+      "balance": "64346725",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "63025853",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "64350516",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "64350516",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-09T23:59:59",
+    "max_balance": {
+      "balance": "79745111",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "64350516",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "79838997",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "79838997",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-08T23:59:59",
+    "max_balance": {
+      "balance": "82472587",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "75558153",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "78343176",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "78343176",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-07T23:59:59",
+    "max_balance": {
+      "balance": "84201996",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "78343176",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "84181440",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "84181440",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-06T23:59:59",
+    "max_balance": {
+      "balance": "89788489",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "84163650",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "89753744",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "89753744",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-05T23:59:59",
+    "max_balance": {
+      "balance": "98286474",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "88971499",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "98286693",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "98286693",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-04T23:59:59",
+    "max_balance": {
+      "balance": "102730265",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "98286693",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "103139991",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "103139991",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-03T23:59:59",
+    "max_balance": {
+      "balance": "106015707",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "103139991",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "106029603",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "106029603",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-02T23:59:59",
+    "max_balance": {
+      "balance": "113031528",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "106029603",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "113060990",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "113060990",
+      "savings_balance": "0"
+    },
+    "date": "2016-09-01T23:59:59",
+    "max_balance": {
+      "balance": "122572588",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "113060990",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "122634710",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "122634710",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-31T23:59:59",
+    "max_balance": {
+      "balance": "126293930",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "122634710",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "126288758",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "126288758",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-30T23:59:59",
+    "max_balance": {
+      "balance": "131465625",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "105757593",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "108959410",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "108959410",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-29T23:59:59",
+    "max_balance": {
+      "balance": "116904060",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "108959410",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "116940517",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "116940517",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-28T23:59:59",
+    "max_balance": {
+      "balance": "127226112",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "116940517",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "127219644",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "127219644",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-27T23:59:59",
+    "max_balance": {
+      "balance": "135295031",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "127219644",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "135301399",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "135301399",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-26T23:59:59",
+    "max_balance": {
+      "balance": "142389103",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "135301399",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "142391761",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "142391761",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-25T23:59:59",
+    "max_balance": {
+      "balance": "149779011",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "142391761",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "149814854",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "149814854",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-24T23:59:59",
+    "max_balance": {
+      "balance": "158431930",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "149814854",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "158145541",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "158145541",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-23T23:59:59",
+    "max_balance": {
+      "balance": "165842227",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "142415088",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "145985998",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "145985998",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-22T23:59:59",
+    "max_balance": {
+      "balance": "154787818",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "145985998",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "155400446",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "155400446",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-21T23:59:59",
+    "max_balance": {
+      "balance": "161015146",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "155400446",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "161063545",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "161063545",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-20T23:59:59",
+    "max_balance": {
+      "balance": "193373033",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "161063545",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "193573146",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "193573146",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-19T23:59:59",
+    "max_balance": {
+      "balance": "214190477",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "193573146",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "214192403",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "214192403",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-18T23:59:59",
+    "max_balance": {
+      "balance": "228986082",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "214192403",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "228986263",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "228986263",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-17T23:59:59",
+    "max_balance": {
+      "balance": "229165659",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "29165659",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "39496160",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "39496160",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-16T23:59:59",
+    "max_balance": {
+      "balance": "57730929",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "35289024",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "38293433",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "38293433",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-15T23:59:59",
+    "max_balance": {
+      "balance": "47466591",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "38293433",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "47485338",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "47485338",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-14T23:59:59",
+    "max_balance": {
+      "balance": "54384624",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "47485338",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "54525946",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "54525946",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-13T23:59:59",
+    "max_balance": {
+      "balance": "66633500",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "54525946",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "66634373",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "66634373",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-12T23:59:59",
+    "max_balance": {
+      "balance": "83336521",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "66634373",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "83339290",
+      "savings_balance": "0"
+    }
+  },
+  {
+    "balance": {
+      "balance": "83339290",
+      "savings_balance": "0"
+    },
+    "date": "2016-08-11T23:59:59",
+    "max_balance": {
+      "balance": "97302627",
+      "savings_balance": "0"
+    },
+    "min_balance": {
+      "balance": "83339290",
+      "savings_balance": "0"
+    },
+    "prev_balance": {
+      "balance": "97339117",
+      "savings_balance": "0"
+    }
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "incoming_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000010,
+      "consecutive_failures": 1,
+      "from": "blocktrades",
+      "memo": "",
+      "operation_id": "386547099589673812",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 8,
+      "trigger_date": "2016-09-16T19:47:54"
+    },
+    {
+      "amount": {
+        "amount": "10000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000017,
+      "consecutive_failures": 0,
+      "from": "steem",
+      "memo": "",
+      "operation_id": "386547129654444337",
+      "pair_id": 0,
+      "recurrence": 48,
+      "remaining_executions": 10,
+      "trigger_date": "2016-09-17T19:48:15"
+    }
+  ],
+  "outgoing_recurrent_transfers": [
+    {
+      "amount": {
+        "amount": "1000",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000019,
+      "consecutive_failures": 0,
+      "memo": "",
+      "operation_id": "386547142539346225",
+      "pair_id": 0,
+      "recurrence": 24,
+      "remaining_executions": 10,
+      "to": "blocktrades",
+      "trigger_date": "2016-09-16T19:48:21"
+    }
+  ]
+}

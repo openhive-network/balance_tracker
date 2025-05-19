@@ -87,7 +87,7 @@ gtg: {
     "vesting_shares": "17579100476774"
 }
 steem: {
-    "hbd_balance": 480001,
+    "hbd_balance": 480002,
     "hive_balance": 29325310,
     "vesting_shares": "15636871956265"
 }
