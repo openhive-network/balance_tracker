@@ -8,123 +8,141 @@ AS
 $BODY$
 BEGIN
   RETURN (
-    WITH get_delegations AS
-    (
+    WITH
+    -- 1) Delegations
+    get_delegations AS (
       SELECT 
         COALESCE(ad.delegated_vests::TEXT, '0') AS delegated_vests,
-        COALESCE(ad.received_vests::TEXT, '0') AS received_vests
-      FROM (
-        SELECT 
-          NULL::TEXT AS delegated_vests,
-          NULL::TEXT AS received_vests
-      ) default_values
+        COALESCE(ad.received_vests::TEXT,  '0') AS received_vests
+      FROM (SELECT NULL::TEXT AS delegated_vests, NULL::TEXT AS received_vests) default_values
       LEFT JOIN account_delegations ad ON ad.account = _account_id
     ),
-    get_balances AS MATERIALIZED
-    (
+
+    -- 2) Core balances
+    get_balances AS MATERIALIZED (
       SELECT  
         MAX(CASE WHEN cab.nai = 13 THEN cab.balance END) AS hbd_balance,
         MAX(CASE WHEN cab.nai = 21 THEN cab.balance END) AS hive_balance, 
         MAX(CASE WHEN cab.nai = 37 THEN cab.balance END) AS vesting_shares 
       FROM current_account_balances cab
-      WHERE cab.account= _account_id
+      WHERE cab.account = _account_id
     ),
-    get_vest_balance AS
-    (
+
+    -- 3) Hive‐equivalent vesting
+    get_vest_balance AS (
       SELECT hive.get_vesting_balance(bv.num, gb.vesting_shares) AS vesting_balance_hive
       FROM get_balances gb
       JOIN LATERAL (
         SELECT num FROM hive.blocks_view ORDER BY num DESC LIMIT 1
       ) bv ON TRUE
     ),
-    get_post_voting_power AS
-    (
+
+    -- 4) Post‐voting‐power
+    get_post_voting_power AS (
       SELECT (
-        COALESCE(gb.vesting_shares, 0) - gad.delegated_vests::BIGINT + gad.received_vests::BIGINT
-      ) AS post_voting_power_vests
-      FROM get_balances gb, get_delegations gad
+        COALESCE(gb.vesting_shares, 0) 
+        - dg.delegated_vests::BIGINT 
+        + dg.received_vests::BIGINT
+      )::TEXT AS post_voting_power_vests
+      FROM get_balances gb
+      CROSS JOIN get_delegations dg
     ),
-    get_info_rewards AS
-    (
+
+    -- 5) Info rewards
+    get_info_rewards AS (
       SELECT 
         COALESCE(air.curation_rewards::TEXT, '0') AS curation_rewards,
         COALESCE(air.posting_rewards::TEXT, '0') AS posting_rewards
-      FROM (
-        SELECT 
-          NULL::TEXT AS curation_rewards,
-          NULL::TEXT AS posting_rewards
-      ) default_values
+      FROM (SELECT NULL::TEXT AS curation_rewards, NULL::TEXT AS posting_rewards) default_values
       LEFT JOIN account_info_rewards air ON air.account = _account_id
     ),
-    calculate_rewards AS MATERIALIZED
-    (
+
+    -- 6) Pending rewards
+    calculate_rewards AS MATERIALIZED (
       SELECT  
         MAX(CASE WHEN ar.nai = 13 THEN ar.balance END) AS hbd_rewards,
         MAX(CASE WHEN ar.nai = 21 THEN ar.balance END) AS hive_rewards,
         MAX(CASE WHEN ar.nai = 37 THEN ar.balance END) AS vests_rewards,
         MAX(CASE WHEN ar.nai = 38 THEN ar.balance END) AS hive_vesting_rewards
       FROM account_rewards ar
-      WHERE ar.account= _account_id
+      WHERE ar.account = _account_id
     ),
-    get_rewards AS 
-    (
+    get_rewards AS (
       SELECT 
-        COALESCE(gr.hbd_rewards,0) AS hbd_rewards,
-        COALESCE(gr.hive_rewards ,0) AS hive_rewards,
-        COALESCE(gr.vests_rewards::TEXT ,'0') AS vests_rewards,
-        COALESCE(gr.hive_vesting_rewards, 0) AS hive_vesting_rewards
-      FROM 
-        calculate_rewards gr
+        COALESCE(cr.hbd_rewards, 0)          AS hbd_rewards,
+        COALESCE(cr.hive_rewards, 0)         AS hive_rewards,
+        COALESCE(cr.vests_rewards::TEXT, '0') AS vests_rewards,
+        COALESCE(cr.hive_vesting_rewards, 0) AS hive_vesting_rewards
+      FROM calculate_rewards cr
     ),
-    calculate_savings AS MATERIALIZED
-    (
+
+    -- 7) Savings
+    calculate_savings AS MATERIALIZED (
       SELECT  
         MAX(CASE WHEN ats.nai = 13 THEN ats.saving_balance END) AS hbd_savings,
         MAX(CASE WHEN ats.nai = 21 THEN ats.saving_balance END) AS hive_savings
       FROM account_savings ats
-      WHERE ats.account= _account_id
+      WHERE ats.account = _account_id
     ),
-    get_withdraw_requests AS
-    (
+    get_withdraw_requests AS (
       SELECT SUM(ats.savings_withdraw_requests) AS total
       FROM account_savings ats
-      WHERE ats.account= _account_id
+      WHERE ats.account = _account_id
     ),
-    get_savings AS
-    (
+    get_savings AS (
       SELECT 
-        COALESCE(cs.hbd_savings,0) AS hbd_savings,
-        COALESCE(cs.hive_savings ,0) AS hive_savings,
-        COALESCE(gwr.total ,0) AS total
-      FROM 
-        calculate_savings cs,
-        get_withdraw_requests gwr
+        COALESCE(cs.hbd_savings, 0) AS hbd_savings,
+        COALESCE(cs.hive_savings, 0) AS hive_savings,
+        COALESCE(gwr.total,     0) AS total
+      FROM calculate_savings cs
+      CROSS JOIN get_withdraw_requests gwr
     ),
-    get_withdraws AS
-    (
+
+    -- 8) Withdrawals
+    get_withdraws AS (
       SELECT 
         COALESCE(aw.vesting_withdraw_rate::TEXT, '0') AS vesting_withdraw_rate,
-        COALESCE(aw.to_withdraw::TEXT, '0') AS to_withdraw,
-        COALESCE(aw.withdrawn::TEXT, '0') AS withdrawn,
-        COALESCE(aw.withdraw_routes, 0) AS withdraw_routes,
-        COALESCE(aw.delayed_vests::TEXT, '0') AS delayed_vests
-      FROM (
-        SELECT 
-          NULL::TEXT AS vesting_withdraw_rate,
-          NULL::TEXT AS to_withdraw,
-          NULL::TEXT AS withdrawn,
-          NULL::INT AS withdraw_routes,
-          NULL::TEXT AS delayed_vests
-      ) default_values
+        COALESCE(aw.to_withdraw::TEXT,             '0') AS to_withdraw,
+        COALESCE(aw.withdrawn::TEXT,              '0') AS withdrawn,
+        COALESCE(aw.withdraw_routes,               0) AS withdraw_routes,
+        COALESCE(aw.delayed_vests::TEXT,          '0') AS delayed_vests
+      FROM (SELECT NULL::TEXT AS vesting_withdraw_rate,
+                   NULL::TEXT AS to_withdraw,
+                   NULL::TEXT AS withdrawn,
+                   NULL::INT  AS withdraw_routes,
+                   NULL::TEXT AS delayed_vests) default_values
       LEFT JOIN account_withdraws aw ON aw.account = _account_id
+    ),
+
+    -- 9) Conversion‐pending from materialized table
+    conv_pivot AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN asset = 'HBD'  THEN total_amount END), 0)::NUMERIC AS conversion_pending_amount_hbd,
+        COALESCE(MAX(CASE WHEN asset = 'HBD'  THEN request_count END), 0)::INTEGER AS conversion_pending_count_hbd,
+        COALESCE(MAX(CASE WHEN asset = 'HIVE' THEN total_amount END), 0)::NUMERIC AS conversion_pending_amount_hive,
+        COALESCE(MAX(CASE WHEN asset = 'HIVE' THEN request_count END), 0)::INTEGER AS conversion_pending_count_hive
+      FROM btracker_app.account_pending_converts apc
+      WHERE apc.account_name = (SELECT name FROM hive.accounts_view WHERE id = _account_id)
+    ),
+
+    -- 10) Open‐orders summary from materialized table
+    open_orders AS (
+      SELECT
+        COALESCE(MAX(open_orders_hbd_count),  0) AS open_orders_hbd_count,
+        COALESCE(MAX(open_orders_hive_count), 0) AS open_orders_hive_count,
+        COALESCE(MAX(open_orders_hive_amount),0) AS open_orders_hive_amount,
+        COALESCE(MAX(open_orders_hbd_amount), 0) AS open_orders_hbd_amount
+      FROM btracker_app.account_open_orders_summary aoos
+      WHERE aoos.account_name = (SELECT name FROM hive.accounts_view WHERE id = _account_id)
     )
+
+    -- final RETURN pulling everything together
     SELECT
-    (
-      COALESCE(gb.hbd_balance,0),
-      COALESCE(gb.hive_balance ,0),
-      COALESCE(gb.vesting_shares::TEXT ,'0'),
-      COALESCE(gvb.vesting_balance_hive ,0),
-      COALESCE(gpvp.post_voting_power_vests::TEXT ,'0'),
+      gb.hbd_balance,
+      gb.hive_balance,
+      gb.vesting_shares::TEXT,
+      gvb.vesting_balance_hive,
+      gpvp.post_voting_power_vests::TEXT,
       gd.delegated_vests,
       gd.received_vests,
       gir.curation_rewards,
@@ -135,26 +153,37 @@ BEGIN
       gr.hive_vesting_rewards,
       gs.hbd_savings,
       gs.hive_savings,
-      gs.total,
+      gs.total AS savings_withdraw_requests,
       gw.vesting_withdraw_rate,
       gw.to_withdraw,
       gw.withdrawn,
       gw.withdraw_routes,
-      gw.delayed_vests
-    )::btracker_backend.balance
-    FROM 
-      get_balances gb,
-      get_vest_balance gvb,
-      get_post_voting_power gpvp,
-      get_delegations gd,
-      get_info_rewards gir,
-      get_rewards gr,
-      get_savings gs,
-      get_withdraws gw
+      gw.delayed_vests,
+      -- conversion-pending
+      cp.conversion_pending_amount_hbd,
+      cp.conversion_pending_count_hbd,
+      cp.conversion_pending_amount_hive,
+      cp.conversion_pending_count_hive,
+      -- open-orders
+      oo.open_orders_hbd_count,
+      oo.open_orders_hive_count,
+      oo.open_orders_hive_amount,
+      oo.open_orders_hbd_amount
+    FROM get_balances       gb
+    CROSS JOIN get_vest_balance      gvb
+    CROSS JOIN get_post_voting_power gpvp
+    CROSS JOIN get_delegations       gd
+    CROSS JOIN get_info_rewards      gir
+    CROSS JOIN get_rewards           gr
+    CROSS JOIN get_savings           gs
+    CROSS JOIN get_withdraws         gw
+    CROSS JOIN conv_pivot            cp
+    CROSS JOIN open_orders           oo
   );
-
 END;
 $BODY$;
+
+
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations
