@@ -284,14 +284,85 @@ BEGIN
     CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
   );
   PERFORM hive.app_register_table(__schema_name, 'account_withdraws', __schema_name);
+CREATE TABLE IF NOT EXISTS account_routes
+(
+  account INT NOT NULL,
+  to_account INT NOT NULL,     
+  percent INT NOT NULL,
+  source_op BIGINT NOT NULL,
+    
+  CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
+);
+PERFORM hive.app_register_table( __schema_name, 'account_routes', __schema_name );
 
-  -- … the rest of your table definitions …
-  CREATE TABLE IF NOT EXISTS account_routes    ( … ); PERFORM hive.app_register_table(__schema_name,'account_routes',__schema_name);
-  CREATE TABLE IF NOT EXISTS account_savings   ( … ); PERFORM …
-  CREATE TABLE IF NOT EXISTS account_savings_history ( … ); PERFORM …
-  CREATE TABLE IF NOT EXISTS saving_history_by_month  ( … ); PERFORM …
-  CREATE TABLE IF NOT EXISTS saving_history_by_day    ( … ); PERFORM …
-  CREATE TABLE IF NOT EXISTS transfer_saving_id       ( … ); PERFORM …
+--ACCOUNT SAVINGS
+
+CREATE TABLE IF NOT EXISTS account_savings
+(
+  account INT NOT NULL,
+  nai     INT NOT NULL, 
+  saving_balance BIGINT DEFAULT 0,         
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+  savings_withdraw_requests INT DEFAULT 0,
+
+  CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
+);
+PERFORM hive.app_register_table( __schema_name, 'account_savings', __schema_name );
+
+CREATE TABLE IF NOT EXISTS account_savings_history
+(
+  account INT NOT NULL, 
+  nai     INT NOT NULL, 
+  saving_balance BIGINT NOT NULL, 
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL 
+);
+
+PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __schema_name );
+
+CREATE TABLE IF NOT EXISTS saving_history_by_month
+(
+  account INT NOT NULL,
+  nai     INT NOT NULL,
+  balance BIGINT NOT NULL,
+  min_balance BIGINT NOT NULL,
+  max_balance BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+
+  CONSTRAINT pk_saving_history_by_month PRIMARY KEY (account, nai, updated_at)
+);
+
+PERFORM hive.app_register_table( __schema_name, 'saving_history_by_month', __schema_name );
+
+CREATE TABLE IF NOT EXISTS saving_history_by_day
+(
+  account INT NOT NULL,
+  nai     INT NOT NULL, 
+  balance BIGINT NOT NULL,
+  min_balance BIGINT NOT NULL,
+  max_balance BIGINT NOT NULL,
+  source_op BIGINT NOT NULL,
+  source_op_block INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+
+  CONSTRAINT pk_saving_history_by_day PRIMARY KEY (account, nai, updated_at)
+);
+
+PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schema_name );
+
+CREATE TABLE IF NOT EXISTS transfer_saving_id
+(
+  account INT NOT NULL,
+  nai     INT NOT NULL, 
+  balance BIGINT NOT NULL,
+  request_id  BIGINT NOT NULL, 
+
+  CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
+);
+PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
 END
 $$;
