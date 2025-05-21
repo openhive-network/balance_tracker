@@ -2,280 +2,299 @@ SET ROLE btracker_owner;
 
 DO $$
   DECLARE __schema_name VARCHAR;
-  DECLARE __context_table VARCHAR:='hive.';
+  DECLARE __context_table VARCHAR := 'hive.';
   synchronization_stages hive.application_stages;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
-  __context_table:=__context_table || __schema_name;
+  __context_table := __context_table || __schema_name;
 
-  synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
+  synchronization_stages := ARRAY[
+    hive.stage('MASSIVE_PROCESSING', 101, 10000, '20 seconds'),
+    hive.live_stage()
+  ]::hive.application_stages;
 
   RAISE NOTICE 'balance_tracker will be installed in schema % with context %', __schema_name, __schema_name;
 
   IF hive.app_context_exists(__schema_name) THEN
-      RAISE NOTICE 'Context % already exists, it means all tables are already created and data installing is skipped', __schema_name;
-      RETURN;
+    RAISE NOTICE 'Context % already exists, skipping table creation', __schema_name;
+    RETURN;
   END IF;
 
   PERFORM hive.app_create_context(
-    _name =>__schema_name,
-    _schema => __schema_name,
-    _is_forking => TRUE,
-    _stages => synchronization_stages
+    _name      => __schema_name,
+    _schema    => __schema_name,
+    _is_forking=> TRUE,
+    _stages    => synchronization_stages
   );
 
+  RAISE NOTICE 'Attempting to create an application schema tables...';
 
+  CREATE TABLE IF NOT EXISTS btracker_app_status
+  (
+    continue_processing BOOLEAN NOT NULL,
+    is_indexes_created  BOOLEAN NOT NULL
+  );
 
-RAISE NOTICE 'Attempting to create an application schema tables...';
+  INSERT INTO btracker_app_status (continue_processing, is_indexes_created)
+    VALUES (True, False);
 
-CREATE TABLE IF NOT EXISTS btracker_app_status
-(
-  continue_processing BOOLEAN NOT NULL,
-  is_indexes_created BOOLEAN NOT NULL
-);
+  CREATE TABLE IF NOT EXISTS version(
+    git_hash TEXT
+  );
+  INSERT INTO version VALUES('unspecified (generate and apply set_version_in_sql.pgsql)');
 
-INSERT INTO btracker_app_status
-(continue_processing, is_indexes_created)
-VALUES
-(True, False)
-;
+  -- ACCOUNT BALANCES
+  CREATE TABLE IF NOT EXISTS current_account_balances
+  (
+    account          INT     NOT NULL,
+    nai              INT     NOT NULL,
+    balance          BIGINT  NOT NULL,
+    source_op        BIGINT  NOT NULL,
+    source_op_block  INT     NOT NULL,
+    CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'current_account_balances', __schema_name);
 
-CREATE TABLE IF NOT EXISTS version(
-  git_hash TEXT
-);
+  CREATE TABLE IF NOT EXISTS account_balance_history
+  (
+    account         INT     NOT NULL,
+    nai             INT     NOT NULL,
+    balance         BIGINT  NOT NULL,
+    source_op       BIGINT  NOT NULL,
+    source_op_block INT     NOT NULL
+    -- no PK due to historical duplicates
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_balance_history', __schema_name);
 
-INSERT INTO version VALUES('unspecified (generate and apply set_version_in_sql.pgsql)');
---ACCOUNT BALANCES
+  CREATE TABLE IF NOT EXISTS balance_history_by_month
+  (
+    account          INT       NOT NULL,
+    nai              INT       NOT NULL,
+    balance          BIGINT    NOT NULL,
+    min_balance      BIGINT    NOT NULL,
+    max_balance      BIGINT    NOT NULL,
+    source_op        BIGINT    NOT NULL,
+    source_op_block  INT       NOT NULL,
+    updated_at       TIMESTAMP NOT NULL,
+    CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'balance_history_by_month', __schema_name);
 
-CREATE TABLE IF NOT EXISTS current_account_balances
-(
-  account INT NOT NULL, -- Balance owner account
-  nai     INT NOT NULL,     -- Balance type (currency)
-  balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
-  source_op BIGINT NOT NULL,-- The operation triggered last balance change
-  source_op_block INT NOT NULL, -- Block containing the source operation
+  CREATE TABLE IF NOT EXISTS balance_history_by_day
+  (
+    account          INT       NOT NULL,
+    nai              INT       NOT NULL,
+    balance          BIGINT    NOT NULL,
+    min_balance      BIGINT    NOT NULL,
+    max_balance      BIGINT    NOT NULL,
+    source_op        BIGINT    NOT NULL,
+    source_op_block  INT       NOT NULL,
+    updated_at       TIMESTAMP NOT NULL,
+    CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'balance_history_by_day', __schema_name);
 
-  CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
-);
+  -- ACCOUNT REWARDS
+  CREATE TABLE IF NOT EXISTS account_rewards
+  (
+    account         INT     NOT NULL,
+    nai             INT     NOT NULL,
+    balance         BIGINT  NOT NULL,
+    source_op       BIGINT  NOT NULL,
+    source_op_block INT     NOT NULL,
+    CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_rewards', __schema_name);
 
-PERFORM hive.app_register_table( __schema_name, 'current_account_balances', __schema_name );
+  CREATE TABLE IF NOT EXISTS account_info_rewards
+  (
+    account          INT     NOT NULL,
+    posting_rewards  BIGINT DEFAULT 0,
+    curation_rewards BIGINT DEFAULT 0,
+    CONSTRAINT pk_account_info_rewards PRIMARY KEY (account)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_info_rewards', __schema_name);
 
-CREATE TABLE IF NOT EXISTS account_balance_history
-(
-  account INT NOT NULL, -- Balance owner account
-  nai     INT NOT NULL,     -- Balance type (currency)
-  balance BIGINT NOT NULL,  -- Balance value after a change
-  source_op BIGINT NOT NULL,-- The operation triggered given balance change
-  source_op_block INT NOT NULL -- Block containing the source operation
-  
-  /** Because of bugs in blockchain at very begin, it was possible to make a transfer to self. See summon transfer in block 118570,
-      like also `register` transfer in block 818601
-      That's why constraint has been eliminated.
-  */
-  --CONSTRAINT pk_account_balance_history PRIMARY KEY (account, source_op_block, nai, source_op)
-);
+  -- ACCOUNT DELEGATIONS
+  CREATE TABLE IF NOT EXISTS current_accounts_delegations
+  (
+    delegator        INT     NOT NULL,
+    delegatee        INT     NOT NULL,
+    balance          BIGINT  NOT NULL,
+    source_op        BIGINT  NOT NULL,
+    source_op_block  INT     NOT NULL,
+    CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'current_accounts_delegations', __schema_name);
 
-PERFORM hive.app_register_table( __schema_name, 'account_balance_history', __schema_name );
+  CREATE TABLE IF NOT EXISTS recurrent_transfers
+  (
+    from_account         INT     NOT NULL,
+    to_account           INT     NOT NULL,
+    transfer_id          INT     NOT NULL,
+    nai                  INT     NOT NULL,
+    amount               BIGINT  NOT NULL,
+    consecutive_failures INT     NOT NULL,
+    remaining_executions INT     NOT NULL,
+    recurrence           INT     NOT NULL,
+    memo                 TEXT    NOT NULL,
+    source_op            BIGINT  NOT NULL,
+    source_op_block      INT     NOT NULL,
+    CONSTRAINT pk_recurrent_transfers PRIMARY KEY (from_account, to_account, transfer_id)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'recurrent_transfers', __schema_name);
 
-CREATE TABLE IF NOT EXISTS balance_history_by_month
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL,
-  balance BIGINT NOT NULL,
-  min_balance BIGINT NOT NULL,
-  max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  CREATE TABLE IF NOT EXISTS account_delegations
+  (
+    account          INT     NOT NULL,
+    received_vests   BIGINT  DEFAULT 0,
+    delegated_vests  BIGINT  DEFAULT 0,
+    CONSTRAINT pk_temp_vests PRIMARY KEY (account)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_delegations', __schema_name);
 
-  CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at)
-);
+  -- === Pending‐converts summary table ===
+  DROP TABLE IF EXISTS account_pending_converts;
+  CREATE TABLE IF NOT EXISTS account_pending_converts AS
+  WITH
+    filled AS (
+      SELECT
+        (ov.body::jsonb->'value'->>'owner')::TEXT     AS account_name,
+        (ov.body::jsonb->'value'->>'requestid')::BIGINT AS request_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
+      WHERE ot.name = 'hive::protocol::fill_convert_request_operation'
+    ),
+    pending AS (
+      SELECT
+        (ov.body::jsonb->'value'->>'owner')::TEXT    AS account_name,
+        (ov.body::jsonb->'value'->'amount'->>'nai')  AS nai,
+        ((ov.body::jsonb->'value'->'amount'->>'amount')::NUMERIC
+           / power(
+               10::NUMERIC,
+               (ov.body::jsonb->'value'->'amount'->>'precision')::INT
+             )
+        )                                          AS amount
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
+      WHERE ot.name = 'hive::protocol::convert_operation'
+        AND (ov.body::jsonb->'value'->>'requestid')::BIGINT
+            NOT IN (SELECT request_id FROM filled)
+    ),
+    conv_summary AS (
+      SELECT
+        p.account_name,
+        asset_map.asset,
+        COUNT(p.amount)  AS request_count,
+        SUM(p.amount)    AS total_amount
+      FROM (VALUES
+        ('@@000000013','HBD'),
+        ('@@000000021','HIVE')
+      ) AS asset_map(nai,asset)
+      LEFT JOIN pending p ON p.nai = asset_map.nai
+      GROUP BY p.account_name, asset_map.asset
+    )
+  SELECT * FROM conv_summary;
+  PERFORM hive.app_register_table(__schema_name, 'account_pending_converts', __schema_name);
 
-PERFORM hive.app_register_table( __schema_name, 'balance_history_by_month', __schema_name );
+  -- === Open‐orders summary table ===
+  DROP TABLE IF EXISTS account_open_orders_summary;
+  CREATE TABLE IF NOT EXISTS account_open_orders_summary AS
+  WITH
+    filled_orders AS (
+      SELECT DISTINCT
+        (ov.body::jsonb->'value'->>'open_owner')::TEXT AS account_name,
+        (v.id_text)::BIGINT                             AS order_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
+      CROSS JOIN LATERAL (VALUES
+        (ov.body::jsonb->'value'->>'open_orderid'),
+        (ov.body::jsonb->'value'->>'current_orderid')
+      ) AS v(id_text)
+      WHERE ot.name IN (
+        'hive::protocol::fill_order_operation',
+        'hive::protocol::limit_order_fill_virtual_operation'
+      )
+        AND v.id_text IS NOT NULL
+    ),
+    cancelled_orders AS (
+      SELECT DISTINCT
+        (ov.body::jsonb->'value'->>'owner')::TEXT     AS account_name,
+        (ov.body::jsonb->'value'->>'orderid')::BIGINT AS order_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
+      WHERE ot.name IN (
+        'hive::protocol::limit_order_cancel_operation',
+        'hive::protocol::limit_order_cancelled_operation'
+      )
+    ),
+    open_creates AS (
+      SELECT
+        (ov.body::jsonb->'value'->>'owner')::TEXT               AS account_name,
+        (ov.body::jsonb->'value'->>'orderid')::BIGINT           AS order_id,
+        (ov.body::jsonb->'value'->'amount_to_sell'->>'nai')     AS nai,
+        ((ov.body::jsonb->'value'->'amount_to_sell'->>'amount')::NUMERIC
+           / power(
+               10::NUMERIC,
+               (ov.body::jsonb->'value'->'amount_to_sell'->>'precision')::INT
+             )
+        )                                               AS amount,
+        (ov.body::jsonb->'value'->>'expiration')::timestamptz AS expiration
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
+      WHERE ot.name = 'hive::protocol::limit_order_create_operation'
+        AND (ov.body::jsonb->'value'->>'expiration')::timestamptz > NOW()
+        AND NOT EXISTS (
+          SELECT 1 FROM filled_orders fo
+          WHERE fo.order_id = (ov.body::jsonb->'value'->>'orderid')::BIGINT
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM cancelled_orders co
+          WHERE co.order_id = (ov.body::jsonb->'value'->>'orderid')::BIGINT
+        )
+    ),
+    open_orders_summary AS (
+      SELECT
+        oc.account_name,
+        COUNT(*) FILTER (WHERE am.asset='HBD')   AS open_orders_hbd_count,
+        COUNT(*) FILTER (WHERE am.asset='HIVE')  AS open_orders_hive_count,
+        SUM(oc.amount) FILTER (WHERE am.asset='HIVE') AS open_orders_hive_amount,
+        SUM(oc.amount) FILTER (WHERE am.asset='HBD')  AS open_orders_hbd_amount
+      FROM open_creates oc
+      CROSS JOIN LATERAL (VALUES
+        ('@@000000013','HBD'),
+        ('@@000000021','HIVE')
+      ) AS am(nai,asset)
+      WHERE oc.nai = am.nai
+      GROUP BY oc.account_name
+    )
+  SELECT * FROM open_orders_summary;
+  PERFORM hive.app_register_table(__schema_name, 'account_open_orders_summary', __schema_name);
 
-CREATE TABLE IF NOT EXISTS balance_history_by_day
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  balance BIGINT NOT NULL,
-  min_balance BIGINT NOT NULL,
-  max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  -- ACCOUNT WITHDRAWS
+  CREATE TABLE IF NOT EXISTS account_withdraws
+  (
+    account               INT     NOT NULL,
+    vesting_withdraw_rate BIGINT  DEFAULT 0,
+    to_withdraw           BIGINT  DEFAULT 0,
+    withdrawn             BIGINT  DEFAULT 0,
+    withdraw_routes       BIGINT  DEFAULT 0,
+    delayed_vests         BIGINT  DEFAULT 0,
+    source_op             BIGINT,
+    CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_withdraws', __schema_name);
 
-  CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at)
-);
-
-PERFORM hive.app_register_table( __schema_name, 'balance_history_by_day', __schema_name );
-
---ACCOUNT REWARDS
-
-CREATE TABLE IF NOT EXISTS account_rewards
-(
-  account INT NOT NULL, -- Balance owner account
-  nai     INT NOT NULL,     -- Balance type (currency)
-  balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
-  source_op BIGINT NOT NULL,-- The operation triggered last balance change
-  source_op_block INT NOT NULL, -- Block containing the source operation
-
-  CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai)
-);
-
-PERFORM hive.app_register_table( __schema_name, 'account_rewards', __schema_name );
-
-CREATE TABLE IF NOT EXISTS account_info_rewards
-(
-  account INT NOT NULL, 
-  posting_rewards BIGINT DEFAULT 0,
-  curation_rewards  BIGINT DEFAULT 0, 
-
-  CONSTRAINT pk_account_info_rewards PRIMARY KEY (account)
-);
-
-  PERFORM hive.app_register_table( __schema_name, 'account_info_rewards', __schema_name );
-
---ACCOUNT DELEGATIONS
-
-CREATE TABLE IF NOT EXISTS current_accounts_delegations
-(
-  delegator INT NOT NULL,
-  delegatee INT NOT NULL,     
-  balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL, 
-
-  CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
-);
-PERFORM hive.app_register_table( __schema_name, 'current_accounts_delegations', __schema_name );
-
-CREATE TABLE IF NOT EXISTS recurrent_transfers
-(
-  from_account         INT NOT NULL,
-  to_account           INT NOT NULL,
-  transfer_id          INT NOT NULL,
-  nai                  INT NOT NULL,  
-  amount               BIGINT NOT NULL,
-  consecutive_failures INT NOT NULL,
-  remaining_executions INT NOT NULL,
-  recurrence           INT NOT NULL,
-  memo                 TEXT NOT NULL,
-  source_op            BIGINT NOT NULL,
-  source_op_block      INT NOT NULL, 
-
-  CONSTRAINT pk_recurrent_transfers PRIMARY KEY (from_account, to_account, transfer_id)
-);
-PERFORM hive.app_register_table( __schema_name, 'recurrent_transfers', __schema_name );
-
-CREATE TABLE IF NOT EXISTS account_delegations
-(
-  account INT NOT NULL,
-  received_vests BIGINT DEFAULT 0,     
-  delegated_vests BIGINT DEFAULT 0,         
-
-  CONSTRAINT pk_temp_vests PRIMARY KEY (account)
-);
-PERFORM hive.app_register_table( __schema_name, 'account_delegations', __schema_name );
-
---ACCOUNT WITHDRAWS
-
-CREATE TABLE IF NOT EXISTS account_withdraws
-(
-  account INT NOT NULL,
-  vesting_withdraw_rate BIGINT DEFAULT 0,     
-  to_withdraw BIGINT DEFAULT 0,
-  withdrawn BIGINT DEFAULT 0,          
-  withdraw_routes BIGINT DEFAULT 0,
-  delayed_vests BIGINT DEFAULT 0,
-  source_op BIGINT,
-
-  CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
-);
-PERFORM hive.app_register_table( __schema_name, 'account_withdraws', __schema_name );
-
-CREATE TABLE IF NOT EXISTS account_routes
-(
-  account INT NOT NULL,
-  to_account INT NOT NULL,     
-  percent INT NOT NULL,
-  source_op BIGINT NOT NULL,
-    
-  CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
-);
-PERFORM hive.app_register_table( __schema_name, 'account_routes', __schema_name );
-
---ACCOUNT SAVINGS
-
-CREATE TABLE IF NOT EXISTS account_savings
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  saving_balance BIGINT DEFAULT 0,         
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  savings_withdraw_requests INT DEFAULT 0,
-
-  CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
-);
-PERFORM hive.app_register_table( __schema_name, 'account_savings', __schema_name );
-
-CREATE TABLE IF NOT EXISTS account_savings_history
-(
-  account INT NOT NULL, 
-  nai     INT NOT NULL, 
-  saving_balance BIGINT NOT NULL, 
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL 
-);
-
-PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __schema_name );
-
-CREATE TABLE IF NOT EXISTS saving_history_by_month
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL,
-  balance BIGINT NOT NULL,
-  min_balance BIGINT NOT NULL,
-  max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-
-  CONSTRAINT pk_saving_history_by_month PRIMARY KEY (account, nai, updated_at)
-);
-
-PERFORM hive.app_register_table( __schema_name, 'saving_history_by_month', __schema_name );
-
-CREATE TABLE IF NOT EXISTS saving_history_by_day
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  balance BIGINT NOT NULL,
-  min_balance BIGINT NOT NULL,
-  max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-
-  CONSTRAINT pk_saving_history_by_day PRIMARY KEY (account, nai, updated_at)
-);
-
-PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schema_name );
-
-CREATE TABLE IF NOT EXISTS transfer_saving_id
-(
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  balance BIGINT NOT NULL,
-  request_id  BIGINT NOT NULL, 
-
-  CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
-);
-PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
+  -- … the rest of your table definitions …
+  CREATE TABLE IF NOT EXISTS account_routes    ( … ); PERFORM hive.app_register_table(__schema_name,'account_routes',__schema_name);
+  CREATE TABLE IF NOT EXISTS account_savings   ( … ); PERFORM …
+  CREATE TABLE IF NOT EXISTS account_savings_history ( … ); PERFORM …
+  CREATE TABLE IF NOT EXISTS saving_history_by_month  ( … ); PERFORM …
+  CREATE TABLE IF NOT EXISTS saving_history_by_day    ( … ); PERFORM …
+  CREATE TABLE IF NOT EXISTS transfer_saving_id       ( … ); PERFORM …
 
 END
 $$;
-
 --- Helper function telling application main-loop to continue execution.
 CREATE OR REPLACE FUNCTION continueProcessing()
 RETURNS BOOLEAN
