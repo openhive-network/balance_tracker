@@ -95,33 +95,76 @@ btracker_backend.balance:
     delayed_vests:
       type: string
       description: blocked VESTS by a withdrawal
- */
+
+    # -- NEW FIELDS --
+    conversion_pending_amount_hbd:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: total HBD currently pending conversion
+    conversion_pending_count_hbd:
+      type: integer
+      description: number of HBD conversion requests
+    conversion_pending_amount_hive:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: total HIVE currently pending conversion
+    conversion_pending_count_hive:
+      type: integer
+      description: number of HIVE conversion requests
+    open_orders_hbd_count:
+      type: integer
+      description: count of open HBD orders
+    open_orders_hive_count:
+      type: integer
+      description: count of open HIVE orders
+    open_orders_hive_amount:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: total amount of HIVE in open orders
+    open_orders_hbd_amount:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: total amount of HBD in open orders
+*/
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.balance CASCADE;
 CREATE TYPE btracker_backend.balance AS (
-    "hbd_balance" BIGINT,
-    "hive_balance" BIGINT,
-    "vesting_shares" TEXT,
-    "vesting_balance_hive" BIGINT,
-    "post_voting_power_vests" TEXT,
-    "delegated_vests" TEXT,
-    "received_vests" TEXT,
-    "curation_rewards" TEXT,
-    "posting_rewards" TEXT,
-    "hbd_rewards" BIGINT,
-    "hive_rewards" BIGINT,
-    "vests_rewards" TEXT,
-    "hive_vesting_rewards" BIGINT,
-    "hbd_savings" BIGINT,
-    "hive_savings" BIGINT,
-    "savings_withdraw_requests" INT,
-    "vesting_withdraw_rate" TEXT,
-    "to_withdraw" TEXT,
-    "withdrawn" TEXT,
-    "withdraw_routes" INT,
-    "delayed_vests" TEXT
+    "hbd_balance"                  BIGINT,
+    "hive_balance"                 BIGINT,
+    "vesting_shares"               TEXT,
+    "vesting_balance_hive"         BIGINT,
+    "post_voting_power_vests"      TEXT,
+    "delegated_vests"              TEXT,
+    "received_vests"               TEXT,
+    "curation_rewards"             TEXT,
+    "posting_rewards"              TEXT,
+    "hbd_rewards"                  BIGINT,
+    "hive_rewards"                 BIGINT,
+    "vests_rewards"                TEXT,
+    "hive_vesting_rewards"         BIGINT,
+    "hbd_savings"                  BIGINT,
+    "hive_savings"                 BIGINT,
+    "savings_withdraw_requests"    INT,
+    "vesting_withdraw_rate"        TEXT,
+    "to_withdraw"                  TEXT,
+    "withdrawn"                    TEXT,
+    "withdraw_routes"              INT,
+    "delayed_vests"                TEXT,
+
+    -- conversion‐pending
+    "conversion_pending_amount_hbd"   NUMERIC,
+    "conversion_pending_count_hbd"    INTEGER,
+    "conversion_pending_amount_hive"  NUMERIC,
+    "conversion_pending_count_hive"   INTEGER,
+
+    -- open‐orders
+    "open_orders_hbd_count"        INTEGER,
+    "open_orders_hive_count"       INTEGER,
+    "open_orders_hive_amount"      NUMERIC,
+    "open_orders_hbd_amount"       NUMERIC
 );
 -- openapi-generated-code-end
+
 
 /** openapi:components:schemas
 btracker_backend.balances:
