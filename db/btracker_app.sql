@@ -11,10 +11,10 @@ BEGIN
   RAISE NOTICE 'Installing balance_tracker in schema %', __schema_name;
 
   -- fully-qualify the stage functions
-  synchronization_stages := ARRAY[
-    hafd.stage('MASSIVE_PROCESSING', 101, 10000, INTERVAL '20 seconds'),
+ synchronization_stages := ARRAY[
+    hafd.stage('MASSIVE_PROCESSING', 101, 10000, '20 seconds'),
     hafd.live_stage()
-  ]::hafd.application_stages;
+]::hafd.application_stages;
 
   IF hive.app_context_exists(__schema_name) THEN
     RAISE NOTICE 'Context % already exists, skipping', __schema_name;
