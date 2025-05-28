@@ -2,27 +2,21 @@ SET ROLE btracker_owner;
 
 DO $$
 DECLARE
-  __schema_name        VARCHAR;
-  synchronization_stages hive.application_stages;
+  __schema_name          VARCHAR;
+  synchronization_stages  hive.application_stages;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
 
+  -- build our two sync‐stages by hand:
   synchronization_stages := ARRAY[
-    -- explicitly cast the INTERVAL to TEXT:
-    hive.stage(
-      'MASSIVE_PROCESSING',
-      101,
-      10000,
-      (INTERVAL '20 seconds')::TEXT
-    ),
+    ROW('MASSIVE_PROCESSING', 101, 10000, INTERVAL '20 seconds')::hive.application_stage,
     hive.live_stage()
   ]::hive.application_stages;
 
-  RAISE NOTICE 'balance_tracker will be installed in schema % with context %',
-               __schema_name, __schema_name;
+  RAISE NOTICE 'Installing balance_tracker in schema % (context %)', __schema_name, __schema_name;
 
   IF hive.app_context_exists(__schema_name) THEN
-    RAISE NOTICE 'Context % already exists, skipping table creation', __schema_name;
+    RAISE NOTICE 'Context % already exists, skipping…', __schema_name;
     RETURN;
   END IF;
 
@@ -32,7 +26,7 @@ BEGIN
     _is_forking => TRUE,
     _stages     => synchronization_stages
   );
-
+  
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
   CREATE TABLE IF NOT EXISTS btracker_app_status (
