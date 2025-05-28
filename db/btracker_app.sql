@@ -1,38 +1,33 @@
 SET ROLE btracker_owner;
 
--- =====================================================================
--- Create application schema and all tables
--- =====================================================================
 DO $$
-DECLARE
-  __schema_name       VARCHAR;
+  DECLARE __schema_name VARCHAR;
+  DECLARE __context_table VARCHAR:='hive.';
   synchronization_stages hive.application_stages;
 BEGIN
-SHOW SEARCH_PATH INTO __schema_name;
+  SHOW SEARCH_PATH INTO __schema_name;
   __context_table:=__context_table || __schema_name;
 
   synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
 
   RAISE NOTICE 'balance_tracker will be installed in schema % with context %', __schema_name, __schema_name;
 
-
-  -- if we've already created the context, skip everything
   IF hive.app_context_exists(__schema_name) THEN
-    RAISE NOTICE 'Context % already exists, skipping table creation', __schema_name;
-    RETURN;
+      RAISE NOTICE 'Context % already exists, it means all tables are already created and data installing is skipped', __schema_name;
+      RETURN;
   END IF;
 
-  -- create the HAF application context
   PERFORM hive.app_create_context(
-    _name       => __schema_name,
-    _schema     => __schema_name,
+    _name =>__schema_name,
+    _schema => __schema_name,
     _is_forking => TRUE,
-    _stages     => synchronization_stages
+    _stages => synchronization_stages
   );
 
-  --------------------------------------------------------------------
-  -- Metadata tables
-  --------------------------------------------------------------------
+
+
+RAISE NOTICE 'Attempting to create an application schema tables...';
+
   CREATE TABLE IF NOT EXISTS btracker_app_status (
     continue_processing BOOLEAN NOT NULL,
     is_indexes_created  BOOLEAN NOT NULL
