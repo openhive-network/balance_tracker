@@ -3,21 +3,26 @@ SET ROLE btracker_owner;
 DO $$
 DECLARE
   __schema_name        VARCHAR;
-  synchronization_stages hafd.application_stages;
+  synchronization_stages hive.application_stages;
 BEGIN
-  -- figure out which schema we're installing into
   SHOW SEARCH_PATH INTO __schema_name;
 
-  RAISE NOTICE 'Installing balance_tracker in schema %', __schema_name;
+  synchronization_stages := ARRAY[
+    -- explicitly cast the INTERVAL to TEXT:
+    hive.stage(
+      'MASSIVE_PROCESSING',
+      101,
+      10000,
+      (INTERVAL '20 seconds')::TEXT
+    ),
+    hive.live_stage()
+  ]::hive.application_stages;
 
-  -- fully-qualify the stage functions
- synchronization_stages := ARRAY[
-    hafd.stage('MASSIVE_PROCESSING', 101, 10000, '20 seconds'),
-    hafd.live_stage()
-]::hafd.application_stages;
+  RAISE NOTICE 'balance_tracker will be installed in schema % with context %',
+               __schema_name, __schema_name;
 
   IF hive.app_context_exists(__schema_name) THEN
-    RAISE NOTICE 'Context % already exists, skipping', __schema_name;
+    RAISE NOTICE 'Context % already exists, skipping table creation', __schema_name;
     RETURN;
   END IF;
 
@@ -27,19 +32,6 @@ BEGIN
     _is_forking => TRUE,
     _stages     => synchronization_stages
   );
-
-  IF hive.app_context_exists(__schema_name) THEN
-    RAISE NOTICE 'Context % already exists, skipping', __schema_name;
-    RETURN;
-  END IF;
-
-  PERFORM hive.app_create_context(
-    _name       => __schema_name,
-    _schema     => __schema_name,
-    _is_forking => TRUE,
-    _stages     => synchronization_stages
-  );
-
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
