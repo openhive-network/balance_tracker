@@ -8,17 +8,13 @@ DECLARE
   __schema_name       VARCHAR;
   synchronization_stages hive.application_stages;
 BEGIN
-  -- determine the schema where we’re installing
-  SHOW SEARCH_PATH INTO __schema_name;
+SHOW SEARCH_PATH INTO __schema_name;
+  __context_table:=__context_table || __schema_name;
 
-  -- define our two sync stages
-  synchronization_stages := ARRAY[
-    hafd.stage('MASSIVE_PROCESSING'::text, 101, 10000, '20 seconds'),
-    hafd.live_stage()
-  ]::hive.application_stages;
+  synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
 
-  RAISE NOTICE 'balance_tracker will be installed in schema % with context %',
-               __schema_name, __schema_name;
+  RAISE NOTICE 'balance_tracker will be installed in schema % with context %', __schema_name, __schema_name;
+
 
   -- if we've already created the context, skip everything
   IF hive.app_context_exists(__schema_name) THEN
