@@ -13,8 +13,8 @@ BEGIN
 
   -- define our two sync stages
   synchronization_stages := ARRAY[
-    hive.stage('MASSIVE_PROCESSING', 101, 10000, INTERVAL '20 seconds'),
-    hive.live_stage()
+    hafd.stage('MASSIVE_PROCESSING'::text, 101, 10000, '20 seconds'),
+    hafd.live_stage()
   ]::hive.application_stages;
 
   RAISE NOTICE 'balance_tracker will be installed in schema % with context %',
