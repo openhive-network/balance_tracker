@@ -13,7 +13,7 @@ BEGIN
 
   -- define our two sync stages
   synchronization_stages := ARRAY[
-    hive.stage('MASSIVE_PROCESSING', 101, 10000, '20 seconds'),
+    hive.stage('MASSIVE_PROCESSING', 101, 10000, INTERVAL '20 seconds'),
     hive.live_stage()
   ]::hive.application_stages;
 
