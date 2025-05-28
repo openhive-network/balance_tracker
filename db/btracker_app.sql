@@ -2,24 +2,31 @@ SET ROLE btracker_owner;
 
 DO $$
 DECLARE
-  __schema_name       VARCHAR;
-  synchronization_stages hive.application_stages;
+  __schema_name        VARCHAR;
+  synchronization_stages hafd.application_stages;
 BEGIN
-  -- Make sure Postgres will look in hafd for stage() & live_stage()
-  PERFORM set_config(
-    'search_path',
-    current_setting('search_path') || ',hafd',
-    false
-  );
-
-  -- now your original code can remain unchanged
+  -- figure out which schema we're installing into
   SHOW SEARCH_PATH INTO __schema_name;
+
   RAISE NOTICE 'Installing balance_tracker in schema %', __schema_name;
 
+  -- fully-qualify the stage functions
   synchronization_stages := ARRAY[
-    hive.stage('MASSIVE_PROCESSING', 101, 10000, '20 seconds'),
-    hive.live_stage()
-  ]::hive.application_stages;
+    hafd.stage('MASSIVE_PROCESSING', 101, 10000, INTERVAL '20 seconds'),
+    hafd.live_stage()
+  ]::hafd.application_stages;
+
+  IF hive.app_context_exists(__schema_name) THEN
+    RAISE NOTICE 'Context % already exists, skipping', __schema_name;
+    RETURN;
+  END IF;
+
+  PERFORM hive.app_create_context(
+    _name       => __schema_name,
+    _schema     => __schema_name,
+    _is_forking => TRUE,
+    _stages     => synchronization_stages
+  );
 
   IF hive.app_context_exists(__schema_name) THEN
     RAISE NOTICE 'Context % already exists, skipping', __schema_name;
