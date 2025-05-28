@@ -517,32 +517,38 @@ BEGIN
   END IF;
 
   IF __hardfork_23_blk BETWEEN _from AND _to THEN
-    PERFORM process_block_range_balances(_from,        __hardfork_23_blk);
-    PERFORM process_block_range_withdrawals(_from,     __hardfork_23_blk);
-    PERFORM process_block_range_savings(_from,         __hardfork_23_blk);
-    PERFORM process_block_range_rewards(_from,         __hardfork_23_blk);
-    PERFORM process_block_range_delegations(_from,     __hardfork_23_blk);
-    PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_blk);
+    PERFORM process_block_range_balances       (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_withdrawals    (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_savings        (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_rewards        (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_delegations    (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_recurrent_transfers(_from,   __hardfork_23_blk);
+    PERFORM process_block_range_converts       (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_orders         (_from,        __hardfork_23_blk);
 
     PERFORM btracker_backend.process_hf_23(__hardfork_23_blk);
     RAISE NOTICE 'Hardfork 23 processed at block %', __hardfork_23_blk;
 
     IF __hardfork_23_blk < _to THEN
-      PERFORM process_block_range_balances(__hardfork_23_blk+1, _to);
-      PERFORM process_block_range_withdrawals(__hardfork_23_blk+1, _to);
-      PERFORM process_block_range_savings(__hardfork_23_blk+1, _to);
-      PERFORM process_block_range_rewards(__hardfork_23_blk+1, _to);
-      PERFORM process_block_range_delegations(__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_balances       (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_withdrawals    (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_savings        (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_rewards        (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_delegations    (__hardfork_23_blk+1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_converts       (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_orders         (__hardfork_23_blk+1, _to);
     END IF;
 
   ELSE
-    PERFORM process_block_range_balances(_from, _to);
-    PERFORM process_block_range_withdrawals(_from, _to);
-    PERFORM process_block_range_savings(_from, _to);
-    PERFORM process_block_range_rewards(_from, _to);
-    PERFORM process_block_range_delegations(_from, _to);
+    PERFORM process_block_range_balances       (_from, _to);
+    PERFORM process_block_range_withdrawals    (_from, _to);
+    PERFORM process_block_range_savings        (_from, _to);
+    PERFORM process_block_range_rewards        (_from, _to);
+    PERFORM process_block_range_delegations    (_from, _to);
     PERFORM process_block_range_recurrent_transfers(_from, _to);
+    PERFORM process_block_range_converts       (_from, _to);
+    PERFORM process_block_range_orders         (_from, _to);
   END IF;
 
   IF _logs THEN
@@ -552,6 +558,7 @@ BEGIN
   END IF;
 END;
 $$;
+
 
 -- incremental, per-block processing
 CREATE OR REPLACE PROCEDURE btracker_single_processing(
@@ -571,13 +578,14 @@ BEGIN
     __start_ts := clock_timestamp();
   END IF;
 
-  PERFORM process_block_range_balances(_block, _block);
-  PERFORM process_block_range_withdrawals(_block, _block);
-  PERFORM process_block_range_savings(_block, _block);
-  PERFORM process_block_range_rewards(_block, _block);
-  PERFORM process_block_range_delegations(_block, _block);
+  PERFORM process_block_range_balances       (_block, _block);
+  PERFORM process_block_range_withdrawals    (_block, _block);
+  PERFORM process_block_range_savings        (_block, _block);
+  PERFORM process_block_range_rewards        (_block, _block);
+  PERFORM process_block_range_delegations    (_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
-
+  PERFORM process_block_range_converts       (_block, _block);
+  PERFORM process_block_range_orders         (_block, _block);
   IF _logs THEN
     __end_ts := clock_timestamp();
     RAISE NOTICE 'Block % processed in % s',
