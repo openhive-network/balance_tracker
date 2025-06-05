@@ -26,7 +26,7 @@ BEGIN
   
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
-  CREATE TABLE IF NOT EXISTS btracker_app_status (
+   CREATE TABLE IF NOT EXISTS btracker_app_status (
     continue_processing BOOLEAN NOT NULL,
     is_indexes_created  BOOLEAN NOT NULL
   );
@@ -171,128 +171,36 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
   --------------------------------------------------------------------
   -- PENDING CONVERTS SUMMARY
   --------------------------------------------------------------------
-  DROP TABLE IF EXISTS account_pending_converts;
-  CREATE TABLE IF NOT EXISTS account_pending_converts AS
-  WITH
-    filled AS (
-      SELECT
-        (ov.body::jsonb->'value'->>'owner')::TEXT      AS account_name,
-        (ov.body::jsonb->'value'->>'requestid')::BIGINT AS request_id
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
-      WHERE ot.name = 'hive::protocol::fill_convert_request_operation'
-    ),
-    pending AS (
-      SELECT
-        (ov.body::jsonb->'value'->>'owner')::TEXT AS account_name,
-        (ov.body::jsonb->'value'->'amount'->>'nai') AS nai,
-        ((ov.body::jsonb->'value'->'amount'->>'amount')::NUMERIC
-          / power(
-              10::NUMERIC,
-              (ov.body::jsonb->'value'->'amount'->>'precision')::INT
-            )
-        ) AS amount
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
-      WHERE ot.name = 'hive::protocol::convert_operation'
-        AND (ov.body::jsonb->'value'->>'requestid')::BIGINT
-            NOT IN (SELECT request_id FROM filled)
-    ),
-    conv_summary AS (
-      SELECT
-        p.account_name,
-        asset_map.asset,
-        COUNT(p.amount)  AS request_count,
-        SUM(p.amount)    AS total_amount
-      FROM (VALUES
-        ('@@000000013','HBD'),
-        ('@@000000021','HIVE')
-      ) AS asset_map(nai, asset)
-      LEFT JOIN pending p ON p.nai = asset_map.nai
-      GROUP BY p.account_name, asset_map.asset
-    )
-  SELECT * FROM conv_summary;
-  PERFORM hive.app_register_table(__schema_name,
-                                 'account_pending_converts',
-                                 __schema_name);
+  CREATE TABLE IF NOT EXISTS account_pending_converts (
+  account_name   TEXT    NOT NULL,
+  asset          TEXT    NOT NULL,
+  request_count  BIGINT  NOT NULL,
+  total_amount   NUMERIC NOT NULL,
+  PRIMARY KEY (account_name, asset)
+);
+PERFORM hive.app_register_table(
+  __schema_name,
+  'account_pending_converts',
+  __schema_name
+);
 
   --------------------------------------------------------------------
-  -- OPEN ORDERS SUMMARY
+  -- Open Orders
   --------------------------------------------------------------------
-  DROP TABLE IF EXISTS account_open_orders_summary;
-  CREATE TABLE IF NOT EXISTS account_open_orders_summary AS
-  WITH
-    filled_orders AS (
-      SELECT DISTINCT
-        (ov.body::jsonb->'value'->>'open_owner')::TEXT AS account_name,
-        (v.id_text)::BIGINT                             AS order_id
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
-      CROSS JOIN LATERAL (VALUES
-        (ov.body::jsonb->'value'->>'open_orderid'),
-        (ov.body::jsonb->'value'->>'current_orderid')
-      ) AS v(id_text)
-      WHERE ot.name IN (
-        'hive::protocol::fill_order_operation',
-        'hive::protocol::limit_order_fill_virtual_operation'
-      )
-        AND v.id_text IS NOT NULL
-    ),
-    cancelled_orders AS (
-      SELECT DISTINCT
-        (ov.body::jsonb->'value'->>'owner')::TEXT     AS account_name,
-        (ov.body::jsonb->'value'->>'orderid')::BIGINT AS order_id
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
-      WHERE ot.name IN (
-        'hive::protocol::limit_order_cancel_operation',
-        'hive::protocol::limit_order_cancelled_operation'
-      )
-    ),
-    open_creates AS (
-      SELECT
-        (ov.body::jsonb->'value'->>'owner')::TEXT               AS account_name,
-        (ov.body::jsonb->'value'->>'orderid')::BIGINT           AS order_id,
-        (ov.body::jsonb->'value'->'amount_to_sell'->>'nai')     AS nai,
-        ((ov.body::jsonb->'value'->'amount_to_sell'->>'amount')::NUMERIC
-           / power(
-               10::NUMERIC,
-               (ov.body::jsonb->'value'->'amount_to_sell'->>'precision')::INT
-             )
-        )                                               AS amount,
-        (ov.body::jsonb->'value'->>'expiration')::timestamptz AS expiration
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ov.op_type_id = ot.id
-      WHERE ot.name = 'hive::protocol::limit_order_create_operation'
-        AND (ov.body::jsonb->'value'->>'expiration')::timestamptz > NOW()
-        AND NOT EXISTS (
-          SELECT 1 FROM filled_orders fo
-          WHERE fo.order_id = (ov.body::jsonb->'value'->>'orderid')::BIGINT
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM cancelled_orders co
-          WHERE co.order_id = (ov.body::jsonb->'value'->>'orderid')::BIGINT
-        )
-    ),
-    open_orders_summary AS (
-      SELECT
-        oc.account_name,
-        COUNT(*) FILTER (WHERE am.asset = 'HBD')   AS open_orders_hbd_count,
-        COUNT(*) FILTER (WHERE am.asset = 'HIVE')  AS open_orders_hive_count,
-        SUM(oc.amount) FILTER (WHERE am.asset = 'HIVE') AS open_orders_hive_amount,
-        SUM(oc.amount) FILTER (WHERE am.asset = 'HBD')  AS open_orders_hbd_amount
-      FROM open_creates oc
-      CROSS JOIN LATERAL (VALUES
-        ('@@000000013','HBD'),
-        ('@@000000021','HIVE')
-      ) AS am(nai, asset)
-      WHERE oc.nai = am.nai
-      GROUP BY oc.account_name
-    )
-  SELECT * FROM open_orders_summary;
-  PERFORM hive.app_register_table(__schema_name,
-                                 'account_open_orders_summary',
-                                 __schema_name);
+
+CREATE TABLE IF NOT EXISTS account_open_orders_summary (
+  account_name            TEXT    NOT NULL,
+  open_orders_hbd_count   BIGINT  NOT NULL,
+  open_orders_hive_count  BIGINT  NOT NULL,
+  open_orders_hive_amount NUMERIC NOT NULL,
+  open_orders_hbd_amount  NUMERIC NOT NULL,
+  PRIMARY KEY (account_name)
+);
+PERFORM hive.app_register_table(
+  __schema_name,
+  'account_open_orders_summary',
+  __schema_name
+);
 
   --------------------------------------------------------------------
   -- ACCOUNT WITHDRAWS & ROUTES
@@ -662,3 +570,4 @@ END;
 $$;
 
 RESET ROLE;
+
