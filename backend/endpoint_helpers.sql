@@ -1,7 +1,7 @@
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(
-  _account_id INT
+    _account_id INT
 )
 RETURNS btracker_backend.balance
 LANGUAGE plpgsql
