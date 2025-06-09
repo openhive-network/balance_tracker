@@ -570,4 +570,3 @@ END;
 $$;
 
 RESET ROLE;
-
