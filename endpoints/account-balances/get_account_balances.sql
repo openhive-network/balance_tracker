@@ -55,6 +55,14 @@ SET ROLE btracker_owner;
               "withdrawn": "804048182205290",
               "withdraw_routes": 4,
               "delayed_vests": "0"
+              "conversion_pending_amount_hbd": 0,
+              "conversion_pending_count_hbd": 0,
+              "conversion_pending_amount_hive": 0,
+              "conversion_pending_count_hive": 0,
+              "open_orders_hbd_count": 0,
+              "open_orders_hive_count": 0,
+              "open_orders_hive_amount": 0
+              "open_orders_hbd_amount": 0,
             }
       '404':
         description: No such account in the database
