@@ -12,7 +12,8 @@ SET join_collapse_limit = 16
 SET jit = OFF
 AS $$
 DECLARE
-  __insert_orders INT;
+  __inserted     INT;
+  __deleted_rows INT;
 BEGIN
   WITH
     -- 1) All fills in the DB
@@ -79,33 +80,29 @@ BEGIN
     open_summary AS (
       SELECT
         oc.account_name,
-        COUNT(*) FILTER (WHERE am.asset = 'HBD')  AS open_orders_hbd_count,
-        COUNT(*) FILTER (WHERE am.asset = 'HIVE') AS open_orders_hive_count,
+        COUNT(*) FILTER (WHERE oc.nai = '@@000000013') AS open_orders_hbd_count,
+        COUNT(*) FILTER (WHERE oc.nai = '@@000000021') AS open_orders_hive_count,
         COALESCE(
-          SUM(oc.amount) FILTER (WHERE am.asset = 'HIVE'),
+          SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000021'),
           0
         ) AS open_orders_hive_amount,
         COALESCE(
-          SUM(oc.amount) FILTER (WHERE am.asset = 'HBD'),
+          SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000013'),
           0
         ) AS open_orders_hbd_amount
       FROM open_creates oc
-      CROSS JOIN LATERAL (VALUES
-        ('@@000000013','HBD'),
-        ('@@000000021','HIVE')
-      ) AS am(nai, asset)
-      WHERE oc.nai = am.nai
       GROUP BY oc.account_name
     ),
 
-    -- 5) Upsert into summary table
-    insert_account_open_orders_summary AS (
-      INSERT INTO btracker_app.account_open_orders_summary
-        (account_name,
-         open_orders_hbd_count,
-         open_orders_hive_count,
-         open_orders_hive_amount,
-         open_orders_hbd_amount)
+    -- 5) Upsert everything that’s still open
+    upsert AS (
+      INSERT INTO btracker_app.account_open_orders_summary (
+        account_name,
+        open_orders_hbd_count,
+        open_orders_hive_count,
+        open_orders_hive_amount,
+        open_orders_hbd_amount
+      )
       SELECT
         account_name,
         open_orders_hbd_count,
@@ -118,13 +115,18 @@ BEGIN
             open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
             open_orders_hive_amount = EXCLUDED.open_orders_hive_amount,
             open_orders_hbd_amount  = EXCLUDED.open_orders_hbd_amount
-      RETURNING (xmax = 0) AS is_new_entry, account_name
+      RETURNING 1
+    ),
+
+    -- 6) Remove any account that no longer appears in open_summary
+    cleanup AS (
+      DELETE FROM btracker_app.account_open_orders_summary dst
+      WHERE NOT EXISTS (
+        SELECT 1
+          FROM open_summary os
+         WHERE os.account_name = dst.account_name
+      )
+      RETURNING 1
     )
-
-  -- 6) Count how many rows were upserted
-  SELECT COUNT(*) INTO __insert_orders
-    FROM insert_account_open_orders_summary;
-
-  -- Optional: RAISE NOTICE 'Upserted % rows', __insert_orders;
 END;
 $$;
