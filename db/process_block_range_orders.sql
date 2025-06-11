@@ -19,8 +19,8 @@ BEGIN
     -- 1) All fills in the DB
     filled_orders AS (
       SELECT DISTINCT
-        (ov.body::jsonb->'value'->>'open_owner')::TEXT  AS account_name,
-        (v.id_text)::BIGINT                              AS order_id
+        (ov.body::jsonb->'value'->>'open_owner')::TEXT AS account_name,
+        (v.id_text)::BIGINT                             AS order_id
       FROM hive.operations_view ov
       JOIN hafd.operation_types ot
         ON ot.id = ov.op_type_id
@@ -31,6 +31,7 @@ BEGIN
       ) AS v(id_text)
       WHERE ot.name = 'hive::protocol::fill_order_operation'
         AND v.id_text IS NOT NULL
+        AND ov.block_num BETWEEN _from AND _to
     ),
 
     -- 2) All cancels in the DB
@@ -45,6 +46,7 @@ BEGIN
         'hive::protocol::limit_order_cancel_operation',
         'hive::protocol::limit_order_cancelled_operation'
       )
+        AND ov.block_num BETWEEN _from AND _to
     ),
 
     -- 3) Creates that were neither filled nor cancelled
@@ -64,6 +66,7 @@ BEGIN
       JOIN hafd.operation_types ot
         ON ot.id = ov.op_type_id
       WHERE ot.name = 'hive::protocol::limit_order_create_operation'
+        AND ov.block_num BETWEEN _from AND _to
         AND NOT EXISTS (
           SELECT 1
           FROM filled_orders fo
@@ -82,14 +85,8 @@ BEGIN
         oc.account_name,
         COUNT(*) FILTER (WHERE oc.nai = '@@000000013') AS open_orders_hbd_count,
         COUNT(*) FILTER (WHERE oc.nai = '@@000000021') AS open_orders_hive_count,
-        COALESCE(
-          SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000021'),
-          0
-        ) AS open_orders_hive_amount,
-        COALESCE(
-          SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000013'),
-          0
-        ) AS open_orders_hbd_amount
+        COALESCE(SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000021'), 0) AS open_orders_hive_amount,
+        COALESCE(SUM(oc.amount) FILTER (WHERE oc.nai = '@@000000013'), 0) AS open_orders_hbd_amount
       FROM open_creates oc
       GROUP BY oc.account_name
     ),
@@ -123,10 +120,19 @@ BEGIN
       DELETE FROM btracker_app.account_open_orders_summary dst
       WHERE NOT EXISTS (
         SELECT 1
-          FROM open_summary os
-         WHERE os.account_name = dst.account_name
+        FROM open_summary os
+        WHERE os.account_name = dst.account_name
       )
       RETURNING 1
     )
+
+  -- 7) Execute the upsert and cleanup, capturing row counts
+  SELECT
+    (SELECT COUNT(*) FROM upsert),
+    (SELECT COUNT(*) FROM cleanup)
+  INTO __inserted, __deleted_rows;
+
+  -- Optional logging
+  RAISE NOTICE 'Upserted %, deleted %', __inserted, __deleted_rows;
 END;
 $$;
