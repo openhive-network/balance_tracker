@@ -1,6 +1,8 @@
-SET ROLE btracker_owner;
+-- 1) Drop any existing version
+DROP FUNCTION IF EXISTS btracker_app.process_block_range_orders(INT, INT) CASCADE;
 
-CREATE OR REPLACE FUNCTION process_block_range_orders(
+-- 2) Create the corrected “delta” version in place of the old function
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
     IN _from_block INT,
     IN _to_block   INT
 )
@@ -13,20 +15,21 @@ DECLARE
   __closed   INT;
 BEGIN
   WITH raw_ops AS (
-    SELECT ov.body::jsonb AS body,
-           ot.name        AS op_name
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot
-        ON ot.id = ov.op_type_id
-     WHERE ov.block_num BETWEEN _from_block AND _to_block
-       AND ot.name IN (
-         'hive::protocol::limit_order_create_operation',
-         'hive::protocol::fill_order_operation',
-         'hive::protocol::limit_order_cancelled_operation'
-       )
+    SELECT
+      ov.body  ::jsonb AS body,
+      ot.name         AS op_name
+    FROM hive.operations_view ov
+    JOIN hafd.operation_types ot
+      ON ot.id = ov.op_type_id
+    WHERE ov.block_num BETWEEN _from_block AND _to_block
+      AND ot.name IN (
+        'hive::protocol::limit_order_create_operation',
+        'hive::protocol::fill_order_operation',
+        'hive::protocol::limit_order_cancelled_operation'
+      )
   ),
 
-  -- 1) New creates in this slice that remain unfilled/un‐cancelled here
+  -- 1) New opens in this slice
   adds AS (
     SELECT
       (body->'value'->>'owner')::TEXT           AS account_name,
@@ -38,6 +41,7 @@ BEGIN
     FROM raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
+      -- exclude any that get closed in this same slice
       AND NOT EXISTS (
         SELECT 1
           FROM raw_ops r2
@@ -46,14 +50,14 @@ BEGIN
            'hive::protocol::limit_order_cancelled_operation'
          )
            AND (
-             (r2.body->'value'->>'open_orderid')    = (body->'value'->>'orderid')
-             OR (r2.body->'value'->>'current_orderid') = (body->'value'->>'orderid')
-             OR (r2.body->'value'->>'orderid')         = (body->'value'->>'orderid')
+             (r2.body->'value'->>'open_orderid')     = (body->'value'->>'orderid')
+             OR (r2.body->'value'->>'current_orderid')= (body->'value'->>'orderid')
+             OR (r2.body->'value'->>'orderid')        = (body->'value'->>'orderid')
            )
       )
   ),
 
-  -- 2) Any fills or cancels in this slice that close earlier orders
+  -- 2) All fills/cancels in this slice that close any order
   closes AS (
     SELECT
       COALESCE(
@@ -79,7 +83,7 @@ BEGIN
     )
   ),
 
-  -- 3) Compute the net delta per account
+  -- 3) Net delta per account
   delta AS (
     SELECT
       account_name,
@@ -95,7 +99,7 @@ BEGIN
     GROUP BY account_name
   ),
 
-  -- 4) Ensure every affected account has a row
+  -- 4) Ensure each account exists
   upsert AS (
     INSERT INTO btracker_app.account_open_orders_summary (
       account_name,
@@ -110,7 +114,7 @@ BEGIN
     RETURNING 1
   ),
 
-  -- 5) Apply the delta to counts & amounts
+  -- 5) Apply the delta
   apply AS (
     UPDATE btracker_app.account_open_orders_summary dst
       SET
@@ -123,7 +127,7 @@ BEGIN
     RETURNING 1
   )
 
-  -- 6) Capture how many new vs. updated rows
+  -- 6) Capture results into PL/pgSQL vars
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM apply)
