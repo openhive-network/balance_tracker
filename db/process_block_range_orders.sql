@@ -14,7 +14,7 @@ DECLARE
 BEGIN
 
   WITH
-    -- 1) One-pass grab of creates, fills & cancels
+    -- 1) One‐pass grab of creates, fills & cancels
     raw_ops AS (
       SELECT
         ov.body   ::jsonb AS body,
@@ -48,13 +48,21 @@ BEGIN
         AND (body->'value'->>'orderid') IS NOT NULL
     ),
 
-    -- 2b) Fills in this slice
+    -- 2b) Fills in this slice: consider both open_orderid and current_orderid
     fills AS (
       SELECT
         (body->'value'->>'open_orderid')::BIGINT AS order_id
       FROM raw_ops
       WHERE op_name = 'hive::protocol::fill_order_operation'
         AND (body->'value'->>'open_orderid') IS NOT NULL
+
+      UNION
+
+      SELECT
+        (body->'value'->>'current_orderid')::BIGINT AS order_id
+      FROM raw_ops
+      WHERE op_name = 'hive::protocol::fill_order_operation'
+        AND (body->'value'->>'current_orderid') IS NOT NULL
     ),
 
     -- 2c) Cancels in this slice
