@@ -14,7 +14,6 @@ DECLARE
 BEGIN
 
   WITH
-  -- 1) Pull just the three relevant op‐types in one go
   raw_ops AS (
     SELECT
       ov.body::jsonb      AS body,
@@ -30,7 +29,6 @@ BEGIN
       )
   ),
 
-  -- 2) Split out creates, fills, cancels
   creates AS (
     SELECT
       (body->'value'->>'owner')::TEXT            AS account_name,
@@ -50,7 +48,7 @@ BEGIN
 
   fills AS (
     SELECT
-      (body->'value'->>'open_owner')::TEXT   AS account_name,
+      (body->'value'->>'open_owner')::TEXT    AS account_name,
       (body->'value'->>'open_orderid')::BIGINT AS order_id
     FROM raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
@@ -59,14 +57,13 @@ BEGIN
 
   cancels AS (
     SELECT
-      (body->'value'->>'seller')::TEXT      AS account_name,
-      (body->'value'->>'orderid')::BIGINT   AS order_id
+      (body->'value'->>'seller')::TEXT     AS account_name,
+      (body->'value'->>'orderid')::BIGINT  AS order_id
     FROM raw_ops
     WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
   ),
 
-  -- 3) Compute per-account open orders summary
   open_summary AS (
     SELECT
       c.account_name,
@@ -82,7 +79,6 @@ BEGIN
     GROUP BY c.account_name
   ),
 
-  -- 4) Upsert into your summary table
   upsert AS (
     INSERT INTO btracker_app.account_open_orders_summary (
       account_name,
@@ -107,7 +103,6 @@ BEGIN
     RETURNING 1
   ),
 
-  -- 5) Remove any account no longer in open_summary
   cleanup AS (
     DELETE FROM btracker_app.account_open_orders_summary dst
     WHERE NOT EXISTS (
@@ -118,9 +113,11 @@ BEGIN
     RETURNING 1
   )
 
-  -- 6) Capture row‐counts & log
-  SELECT COUNT(*) INTO __upserted   FROM upsert;
-  SELECT COUNT(*) INTO __deleted_rows FROM cleanup;
+  /* single SELECT consumes both CTEs */
+  SELECT
+    (SELECT COUNT(*) FROM upsert),
+    (SELECT COUNT(*) FROM cleanup)
+  INTO __upserted, __deleted_rows;
 
   RAISE NOTICE 'Blocks %–%: upserted %, deleted %',
     _from_block, _to_block, __upserted, __deleted_rows;
