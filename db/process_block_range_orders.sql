@@ -1,7 +1,7 @@
--- 1) Drop any existing version
 DROP FUNCTION IF EXISTS btracker_app.process_block_range_orders(INT, INT) CASCADE;
 
--- 2) Create the corrected “delta” version in place of the old function
+SET ROLE btracker_owner;
+
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
     IN _from_block INT,
     IN _to_block   INT
@@ -15,33 +15,34 @@ DECLARE
   __closed   INT;
 BEGIN
   WITH raw_ops AS (
-    SELECT
-      ov.body  ::jsonb AS body,
-      ot.name         AS op_name
-    FROM hive.operations_view ov
-    JOIN hafd.operation_types ot
-      ON ot.id = ov.op_type_id
-    WHERE ov.block_num BETWEEN _from_block AND _to_block
-      AND ot.name IN (
-        'hive::protocol::limit_order_create_operation',
-        'hive::protocol::fill_order_operation',
-        'hive::protocol::limit_order_cancelled_operation'
-      )
+    SELECT ov.body::jsonb    AS body,
+           ot.name           AS op_name
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot
+        ON ot.id = ov.op_type_id
+     WHERE ov.block_num BETWEEN _from_block AND _to_block
+       AND ot.name IN (
+         'hive::protocol::limit_order_create_operation',
+         'hive::protocol::fill_order_operation',
+         'hive::protocol::limit_order_cancelled_operation'
+       )
   ),
 
-  -- 1) New opens in this slice
+  -- 1) New orders created in this slice that remain open here
   adds AS (
     SELECT
       (body->'value'->>'owner')::TEXT           AS account_name,
       (body->'value'->>'orderid')::BIGINT       AS order_id,
       (body->'value'->'amount_to_sell'->>'nai') AS nai,
       (body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-        / POWER(10, (body->'value'->'amount_to_sell'->>'precision')::INT)
+        / POWER(
+            10,
+            (body->'value'->'amount_to_sell'->>'precision')::INT
+          )
         AS amount
     FROM raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
-      -- exclude any that get closed in this same slice
       AND NOT EXISTS (
         SELECT 1
           FROM raw_ops r2
@@ -57,25 +58,25 @@ BEGIN
       )
   ),
 
-  -- 2) All fills/cancels in this slice that close any order
+  -- 2) Fills or cancels in this slice that close any order
   closes AS (
     SELECT
       COALESCE(
         (body->'value'->>'open_orderid'),
         (body->'value'->>'current_orderid'),
         (body->'value'->>'orderid')
-      )::BIGINT AS order_id,
+      )::BIGINT                              AS order_id,
       COALESCE(
         (body->'value'->>'open_owner'),
         (body->'value'->>'current_owner'),
         (body->'value'->>'seller')
-      )::TEXT AS account_name,
+      )::TEXT                                AS account_name,
       COALESCE(
         (body->'value'->'open_pays'   ->>'nai'),
         (body->'value'->'current_pays'->>'nai'),
         '@@000000013'
-      ) AS nai,
-      0::NUMERIC AS amount
+      )                                      AS nai,
+      0::NUMERIC                             AS amount
     FROM raw_ops
     WHERE op_name IN (
       'hive::protocol::fill_order_operation',
@@ -83,13 +84,13 @@ BEGIN
     )
   ),
 
-  -- 3) Net delta per account
+  -- 3) Compute net add/subtract delta per account
   delta AS (
     SELECT
       account_name,
-      SUM(CASE WHEN nai = '@@000000013' THEN  1 ELSE 0 END) AS hbd_cnt_delta,
+      SUM(CASE WHEN nai = '@@000000013' THEN  1 ELSE 0 END)    AS hbd_cnt_delta,
       SUM(CASE WHEN nai = '@@000000013' THEN amount ELSE 0 END) AS hbd_amt_delta,
-      SUM(CASE WHEN nai = '@@000000021' THEN  1 ELSE 0 END) AS hive_cnt_delta,
+      SUM(CASE WHEN nai = '@@000000021' THEN  1 ELSE 0 END)    AS hive_cnt_delta,
       SUM(CASE WHEN nai = '@@000000021' THEN amount ELSE 0 END) AS hive_amt_delta
     FROM (
       SELECT * FROM adds
@@ -99,7 +100,7 @@ BEGIN
     GROUP BY account_name
   ),
 
-  -- 4) Ensure each account exists
+  -- 4) Ensure each account has a row to update
   upsert AS (
     INSERT INTO btracker_app.account_open_orders_summary (
       account_name,
@@ -114,7 +115,7 @@ BEGIN
     RETURNING 1
   ),
 
-  -- 5) Apply the delta
+  -- 5) Apply the delta adjustments
   apply AS (
     UPDATE btracker_app.account_open_orders_summary dst
       SET
@@ -127,7 +128,7 @@ BEGIN
     RETURNING 1
   )
 
-  -- 6) Capture results into PL/pgSQL vars
+  -- 6) Capture how many rows were inserted vs updated
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM apply)
