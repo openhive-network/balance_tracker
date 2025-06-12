@@ -14,75 +14,75 @@ DECLARE
 BEGIN
 
   WITH
-    -- 1) One‐pass grab of creates, fills & cancels
-    raw_ops AS (
+    -- 0) Find the current head of the chain
+    head AS (
+      SELECT MAX(block_num) AS blk
+        FROM hive.operations_view
+    ),
+
+    -- 1) Pull only the creates in your slice
+    creates AS (
       SELECT
-        ov.body   ::jsonb AS body,
-        ot.name           AS op_name
+        (ov.body::jsonb->'value'->>'owner')::TEXT     AS account_name,
+        (ov.body::jsonb->'value'->>'orderid')::BIGINT AS order_id,
+        (ov.body::jsonb->'value'->'amount_to_sell'->>'nai')    AS nai,
+        (
+          (ov.body::jsonb->'value'->'amount_to_sell'->>'amount')::NUMERIC
+          / POWER(
+              10,
+              (ov.body::jsonb->'value'->'amount_to_sell'->>'precision')::INT
+            )
+        )                                                       AS amount
       FROM hive.operations_view ov
       JOIN hafd.operation_types ot
         ON ot.id = ov.op_type_id
-      WHERE ov.block_num BETWEEN _from_block AND _to_block
-        AND ot.name IN (
-          'hive::protocol::limit_order_create_operation',
-          'hive::protocol::fill_order_operation',
-          'hive::protocol::limit_order_cancelled_operation'
-        )
+      WHERE ot.name = 'hive::protocol::limit_order_create_operation'
+        AND ov.block_num BETWEEN _from_block AND _to_block
+        AND (ov.body::jsonb->'value'->>'orderid') IS NOT NULL
     ),
 
-    -- 2a) Creations in this slice
-    creates AS (
-      SELECT
-        (body->'value'->>'owner')::TEXT           AS account_name,
-        (body->'value'->>'orderid')::BIGINT       AS order_id,
-        (body->'value'->'amount_to_sell'->>'nai') AS nai,
-        (
-          (body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-          / POWER(
-              10::NUMERIC,
-              (body->'value'->'amount_to_sell'->>'precision')::INT
-            )
-        )                                          AS amount
-      FROM raw_ops
-      WHERE op_name = 'hive::protocol::limit_order_create_operation'
-        AND (body->'value'->>'orderid') IS NOT NULL
-    ),
-
-    -- 2b) Fills in this slice: consider both open_orderid and current_orderid
+    -- 2) Pull every fill of your orders, on *either* side, from slice start up to head
     fills AS (
-      SELECT
-        (body->'value'->>'open_orderid')::BIGINT AS order_id
-      FROM raw_ops
-      WHERE op_name = 'hive::protocol::fill_order_operation'
-        AND (body->'value'->>'open_orderid') IS NOT NULL
+      SELECT (ov.body::jsonb->'value'->>'open_orderid')::BIGINT  AS order_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot
+        ON ot.id = ov.op_type_id
+      JOIN head h ON ov.block_num <= h.blk
+      WHERE ot.name = 'hive::protocol::fill_order_operation'
+        AND (ov.body::jsonb->'value'->>'open_orderid') IS NOT NULL
+        AND ov.block_num >= _from_block
 
       UNION
 
-      SELECT
-        (body->'value'->>'current_orderid')::BIGINT AS order_id
-      FROM raw_ops
-      WHERE op_name = 'hive::protocol::fill_order_operation'
-        AND (body->'value'->>'current_orderid') IS NOT NULL
+      SELECT (ov.body::jsonb->'value'->>'current_orderid')::BIGINT AS order_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot
+        ON ot.id = ov.op_type_id
+      JOIN head h ON ov.block_num <= h.blk
+      WHERE ot.name = 'hive::protocol::fill_order_operation'
+        AND (ov.body::jsonb->'value'->>'current_orderid') IS NOT NULL
+        AND ov.block_num >= _from_block
     ),
 
-    -- 2c) Cancels in this slice
+    -- 3) Pull every cancel of your orders from slice start up to head
     cancels AS (
-      SELECT
-        (body->'value'->>'orderid')::BIGINT AS order_id
-      FROM raw_ops
-      WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
-        AND (body->'value'->>'orderid') IS NOT NULL
+      SELECT (ov.body::jsonb->'value'->>'orderid')::BIGINT AS order_id
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot
+        ON ot.id = ov.op_type_id
+      JOIN head h ON ov.block_num <= h.blk
+      WHERE ot.name = 'hive::protocol::limit_order_cancelled_operation'
+        AND (ov.body::jsonb->'value'->>'orderid') IS NOT NULL
+        AND ov.block_num >= _from_block
     ),
 
-    -- 3) Aggregate only those creates not filled or cancelled
+    -- 4) Now aggregate only those creates that were neither filled nor cancelled
     open_summary AS (
       SELECT
         c.account_name,
-        -- HBD
-        COUNT(*) FILTER (WHERE c.nai = '@@000000013')      AS open_orders_hbd_count,
+        COUNT(*) FILTER (WHERE c.nai = '@@000000013')            AS open_orders_hbd_count,
         COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000013'), 0) AS open_orders_hbd_amount,
-        -- HIVE
-        COUNT(*) FILTER (WHERE c.nai = '@@000000021')      AS open_orders_hive_count,
+        COUNT(*) FILTER (WHERE c.nai = '@@000000021')            AS open_orders_hive_count,
         COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000021'), 0) AS open_orders_hive_amount
       FROM creates c
       LEFT JOIN fills   f ON f.order_id   = c.order_id
@@ -92,7 +92,7 @@ BEGIN
       GROUP BY c.account_name
     ),
 
-    -- 4) Upsert into your existing summary table
+    -- 5) Upsert those per-account metrics
     upsert AS (
       INSERT INTO btracker_app.account_open_orders_summary (
         account_name,
@@ -117,7 +117,7 @@ BEGIN
       RETURNING 1
     ),
 
-    -- 5) Remove any accounts that no longer have open orders
+    -- 6) Remove any accounts that no longer have open orders
     cleanup AS (
       DELETE
         FROM btracker_app.account_open_orders_summary dst
@@ -128,7 +128,7 @@ BEGIN
        )
       RETURNING 1
     )
-  -- <<< NO SEMICOLON HERE >>>
+  -- <<< no semicolon here >>>
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM cleanup)
