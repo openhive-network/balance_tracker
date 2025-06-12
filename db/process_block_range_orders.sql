@@ -14,10 +14,11 @@ DECLARE
 BEGIN
 
   WITH
+    -- 1) One-pass grab of creates, fills & cancels
     raw_ops AS (
       SELECT
-        ov.body::jsonb   AS body,
-        ot.name          AS op_name
+        ov.body   ::jsonb AS body,
+        ot.name           AS op_name
       FROM hive.operations_view ov
       JOIN hafd.operation_types ot
         ON ot.id = ov.op_type_id
@@ -29,48 +30,52 @@ BEGIN
         )
     ),
 
+    -- 2a) Creations in this slice
     creates AS (
       SELECT
-        (body->'value'->>'owner')::TEXT   AS account_name,
-        (body->'value'->>'orderid')::BIGINT AS order_id,
-        (body->'value'->'amount_to_sell'->>'nai')      AS nai,
+        (body->'value'->>'owner')::TEXT           AS account_name,
+        (body->'value'->>'orderid')::BIGINT       AS order_id,
+        (body->'value'->'amount_to_sell'->>'nai') AS nai,
         (
           (body->'value'->'amount_to_sell'->>'amount')::NUMERIC
           / POWER(
               10::NUMERIC,
               (body->'value'->'amount_to_sell'->>'precision')::INT
             )
-        )                                             AS amount
+        )                                          AS amount
       FROM raw_ops
       WHERE op_name = 'hive::protocol::limit_order_create_operation'
         AND (body->'value'->>'orderid') IS NOT NULL
     ),
 
+    -- 2b) Fills in this slice
     fills AS (
       SELECT
-        (body->'value'->>'open_owner')::TEXT    AS account_name,
         (body->'value'->>'open_orderid')::BIGINT AS order_id
       FROM raw_ops
       WHERE op_name = 'hive::protocol::fill_order_operation'
         AND (body->'value'->>'open_orderid') IS NOT NULL
     ),
 
+    -- 2c) Cancels in this slice
     cancels AS (
       SELECT
-        (body->'value'->>'seller')::TEXT     AS account_name,
-        (body->'value'->>'orderid')::BIGINT  AS order_id
+        (body->'value'->>'orderid')::BIGINT AS order_id
       FROM raw_ops
       WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
         AND (body->'value'->>'orderid') IS NOT NULL
     ),
 
+    -- 3) Aggregate only those creates not filled or cancelled
     open_summary AS (
       SELECT
         c.account_name,
-        COUNT(*) FILTER (WHERE c.nai = '@@000000013') AS open_orders_hbd_count,
-        COUNT(*) FILTER (WHERE c.nai = '@@000000021') AS open_orders_hive_count,
-        COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000021'), 0) AS open_orders_hive_amount,
-        COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000013'), 0) AS open_orders_hbd_amount
+        -- HBD
+        COUNT(*) FILTER (WHERE c.nai = '@@000000013')      AS open_orders_hbd_count,
+        COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000013'), 0) AS open_orders_hbd_amount,
+        -- HIVE
+        COUNT(*) FILTER (WHERE c.nai = '@@000000021')      AS open_orders_hive_count,
+        COALESCE(SUM(c.amount) FILTER (WHERE c.nai = '@@000000021'), 0) AS open_orders_hive_amount
       FROM creates c
       LEFT JOIN fills   f ON f.order_id   = c.order_id
       LEFT JOIN cancels x ON x.order_id   = c.order_id
@@ -79,6 +84,7 @@ BEGIN
       GROUP BY c.account_name
     ),
 
+    -- 4) Upsert into your existing summary table
     upsert AS (
       INSERT INTO btracker_app.account_open_orders_summary (
         account_name,
@@ -103,17 +109,18 @@ BEGIN
       RETURNING 1
     ),
 
+    -- 5) Remove any accounts that no longer have open orders
     cleanup AS (
-      DELETE FROM btracker_app.account_open_orders_summary dst
-      WHERE NOT EXISTS (
-        SELECT 1
-          FROM open_summary os
-         WHERE os.account_name = dst.account_name
-      )
+      DELETE
+        FROM btracker_app.account_open_orders_summary dst
+       WHERE NOT EXISTS (
+         SELECT 1
+           FROM open_summary os
+          WHERE os.account_name = dst.account_name
+       )
       RETURNING 1
     )
-
-  -- <<< NO SEMICOLON HERE! >>>
+  -- <<< NO SEMICOLON HERE >>>
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM cleanup)
