@@ -1,7 +1,6 @@
 SET ROLE btracker_owner;
 
-DROP FUNCTION IF EXISTS process_block_range_orders(INT, INT) CASCADE;
-CREATE FUNCTION process_block_range_orders(
+CREATE OR REPLACE FUNCTION process_block_range_orders(
     IN _from_block INT,
     IN _to_block   INT
 )
@@ -96,7 +95,7 @@ BEGIN
     GROUP BY account_name
   ),
 
-  -- 4) Make sure every affected account has a row
+  -- 4) Ensure every affected account has a row
   upsert AS (
     INSERT INTO btracker_app.account_open_orders_summary (
       account_name,
