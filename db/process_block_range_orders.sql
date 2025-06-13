@@ -20,66 +20,68 @@ BEGIN
   ------------------------------------------------------------------
   WITH raw_ops AS (
          SELECT ov.body::jsonb AS body,
-                ot.name        AS op_name
+                ot.name       AS op_name
            FROM hive.operations_view ov
            JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
           WHERE ov.block_num BETWEEN _from_block AND _to_block
             AND ot.name IN (
                   'hive::protocol::limit_order_create_operation',
                   'hive::protocol::fill_order_operation',
-                  'hive::protocol::limit_order_cancelled_operation'  -- ✅ exact op-name
+                  'hive::protocol::limit_order_cancelled_operation'
                 )
        ),
 
   ------------------------------------------------------------------
-  -- 2) Slice buckets
+  -- 2) Bucket into creates / fills / cancels
   ------------------------------------------------------------------
        creates AS (
          SELECT
-           (body->'value'->>'owner')  ::TEXT    AS account_name,
-           (body->'value'->>'orderid')::BIGINT  AS order_id,
-           (body->'value'->'amount_to_sell'->>'nai') AS nai,
+           (body->'value'->>'owner')     ::TEXT    AS account_name,
+           (body->'value'->>'orderid')   ::BIGINT  AS order_id,
+           (body->'value'->'amount_to_sell'->>'nai')        AS nai,
            ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-              / POWER(10,
-                      (body->'value'->'amount_to_sell'->>'precision')::INT)) AS amount
+              / POWER(
+                  10,
+                  (body->'value'->'amount_to_sell'->>'precision')::INT
+                )
+           )                                             AS amount
          FROM raw_ops
          WHERE op_name = 'hive::protocol::limit_order_create_operation'
        ),
 
-       -- *any* fill closes the order
        fills AS (
-         SELECT (body->'value'->>'open_orderid')::BIGINT
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::fill_order_operation'
-           AND body->'value'->>'open_orderid' IS NOT NULL
+         SELECT (body->'value'->>'open_orderid')::BIGINT    AS order_id
+           FROM raw_ops
+          WHERE op_name = 'hive::protocol::fill_order_operation'
+            AND body->'value'->>'open_orderid' IS NOT NULL
          UNION
-         SELECT (body->'value'->>'current_orderid')::BIGINT
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::fill_order_operation'
-           AND body->'value'->>'current_orderid' IS NOT NULL
+         SELECT (body->'value'->>'current_orderid')::BIGINT AS order_id
+           FROM raw_ops
+          WHERE op_name = 'hive::protocol::fill_order_operation'
+            AND body->'value'->>'current_orderid' IS NOT NULL
        ),
 
        cancels AS (
          SELECT
            (body->'value'->>'orderid')::BIGINT AS order_id,
-           (body->'value'->>'seller') ::TEXT   AS account_name   -- ✅ key is seller
+           (body->'value'->>'seller')      ::TEXT   AS account_name
          FROM raw_ops
          WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
        ),
 
   ------------------------------------------------------------------
-  -- 3) Store new creates
+  -- 3) Persist new creates
   ------------------------------------------------------------------
        create_rows AS (
          INSERT INTO btracker_app.open_orders_detail (order_id, account_name, nai, amount)
          SELECT order_id, account_name, nai, amount
-         FROM creates
+           FROM creates
          ON CONFLICT DO NOTHING
          RETURNING 1
        ),
 
   ------------------------------------------------------------------
-  -- 4) Remove rows whose id appears in fills or cancels
+  -- 4) Delete any order_id seen in fills OR cancels
   ------------------------------------------------------------------
        close_rows AS (
          DELETE FROM btracker_app.open_orders_detail d
@@ -93,7 +95,7 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 5) Aggregate current open-order snapshot
+  -- 5) Re-aggregate every still-open order
   ------------------------------------------------------------------
        fresh_summary AS (
          SELECT
@@ -107,7 +109,7 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 6) Upsert summary
+  -- 6) Upsert the summary
   ------------------------------------------------------------------
        upserts AS (
          INSERT INTO btracker_app.account_open_orders_summary (
@@ -123,7 +125,7 @@ BEGIN
            open_orders_hive_count,
            open_orders_hive_amount,
            open_orders_hbd_amount
-         FROM fresh_summary
+           FROM fresh_summary
          ON CONFLICT (account_name) DO UPDATE
            SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
                open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
@@ -133,7 +135,7 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 7) Append new cancel IDs into array
+  -- 7) Append new cancels into the array
   ------------------------------------------------------------------
        append_cancels AS (
          UPDATE btracker_app.account_open_orders_summary dst
@@ -145,30 +147,30 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 8) Purge empty summaries
+  -- 8) Purge truly-empty accounts
   ------------------------------------------------------------------
        purge_empty AS (
          DELETE FROM btracker_app.account_open_orders_summary dst
-         WHERE open_orders_hbd_count  = 0
-           AND open_orders_hive_count = 0
+          WHERE open_orders_hbd_count  = 0
+            AND open_orders_hive_count = 0
          RETURNING 1
        )
 
   ------------------------------------------------------------------
-  -- 9) Collect stats
+  -- 9) Collect stats into locals
   ------------------------------------------------------------------
   SELECT
-      (SELECT COUNT(*) FROM create_rows),
-      (SELECT COUNT(*) FROM close_rows),
-      (SELECT COUNT(*) FROM upserts),
-      (SELECT COUNT(*) FROM append_cancels),
-      (SELECT COUNT(*) FROM purge_empty)
-    INTO
-      _new_creates,
-      _closed_orders,
-      _summary_upserts,
-      _new_cancel_ids,
-      _summaries_deleted;
+    (SELECT COUNT(*) FROM create_rows),
+    (SELECT COUNT(*) FROM close_rows),
+    (SELECT COUNT(*) FROM upserts),
+    (SELECT COUNT(*) FROM append_cancels),
+    (SELECT COUNT(*) FROM purge_empty)
+  INTO
+    _new_creates,
+    _closed_orders,
+    _summary_upserts,
+    _new_cancel_ids,
+    _summaries_deleted;
 
   RAISE NOTICE
     'Blocks %–% | creates %, closed %, upserts %, new-cancels %, rows-purged %',
