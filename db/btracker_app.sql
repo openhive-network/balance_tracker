@@ -189,13 +189,20 @@ PERFORM hive.app_register_table(
   -- Open Orders
   --------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS account_open_orders_summary (
-  account_name            TEXT    NOT NULL,
-  open_orders_hbd_count   BIGINT  NOT NULL,
-  open_orders_hive_count  BIGINT  NOT NULL,
-  open_orders_hive_amount NUMERIC NOT NULL,
-  open_orders_hbd_amount  NUMERIC NOT NULL,
-  PRIMARY KEY (account_name)
+CREATE TABLE btracker_app.open_orders_detail (
+  account_name TEXT    NOT NULL,
+  order_id     BIGINT  NOT NULL,
+  nai          TEXT    NOT NULL,          -- '@@000000013' = HBD, '@@000000021' = HIVE
+  amount       NUMERIC NOT NULL,
+  PRIMARY KEY (account_name, order_id)
+);
+CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
+  account_name            TEXT      PRIMARY KEY,
+  open_orders_hbd_count   BIGINT    NOT NULL,
+  open_orders_hive_count  BIGINT    NOT NULL,
+  open_orders_hive_amount NUMERIC   NOT NULL,
+  open_orders_hbd_amount  NUMERIC   NOT NULL,
+  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'   -- keeps a log of cancels (optional use)
 );
 
 
