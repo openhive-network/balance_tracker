@@ -15,8 +15,10 @@ DECLARE
 BEGIN
 
   WITH
+    -- grab all relevant operations in one scan
     raw_ops AS (
-      SELECT ov.body::jsonb AS body, ot.name AS op_name
+      SELECT ov.body::jsonb AS body,
+             ot.name       AS op_name
       FROM hive.operations_view ov
       JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
       WHERE ov.block_num BETWEEN _from_block AND _to_block
@@ -27,6 +29,7 @@ BEGIN
         )
     ),
 
+    -- new creates in this block range
     creates AS (
       SELECT
         (body->'value'->>'owner')::TEXT           AS account_name,
@@ -40,6 +43,7 @@ BEGIN
         AND body->'value'->>'orderid' IS NOT NULL
     ),
 
+    -- fills in this slice (open_orderid + current_orderid)
     fills AS (
       SELECT (body->'value'->>'open_orderid')::BIGINT    AS order_id
       FROM raw_ops
@@ -54,6 +58,7 @@ BEGIN
         AND body->'value'->>'current_orderid' IS NOT NULL
     ),
 
+    -- cancellations in this slice, including account_name for array-append
     cancels AS (
       SELECT
         (body->'value'->>'orderid')::BIGINT AS order_id,
@@ -63,6 +68,7 @@ BEGIN
         AND body->'value'->>'orderid' IS NOT NULL
     ),
 
+    -- aggregate creates minus fills/cancels for this slice
     open_summary AS (
       SELECT
         c.account_name,
@@ -78,6 +84,7 @@ BEGIN
       GROUP BY c.account_name
     ),
 
+    -- upsert the slice’s open-order counts
     upsert AS (
       INSERT INTO btracker_app.account_open_orders_summary (
         account_name,
@@ -102,6 +109,7 @@ BEGIN
       RETURNING 1
     ),
 
+    -- append any new cancelled order_ids into the array
     record_cancels AS (
       UPDATE btracker_app.account_open_orders_summary dst
       SET cancelled_order_ids = dst.cancelled_order_ids || c.order_id
@@ -111,6 +119,7 @@ BEGIN
       RETURNING 1
     ),
 
+    -- delete accounts with zero remaining open orders
     cleanup AS (
       DELETE FROM btracker_app.account_open_orders_summary dst
        WHERE dst.open_orders_hbd_count  = 0
@@ -118,7 +127,7 @@ BEGIN
       RETURNING 1
     )
 
-  -- correctly match three INTO targets to three SELECT expressions
+  -- capture stats into local variables
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM record_cancels),
@@ -129,7 +138,11 @@ BEGIN
     __deleted_rows;
 
   RAISE NOTICE 'Blocks %–%: upserted %, cancelled %, deleted %',
-    _from_block, _to_block, __upserted, __cancelled, __deleted_rows;
+    _from_block,
+    _to_block,
+    __upserted,
+    __cancelled,
+    __deleted_rows;
 
 END;
 $$;
