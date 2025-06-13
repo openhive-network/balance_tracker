@@ -189,22 +189,22 @@ PERFORM hive.app_register_table(
   -- Open Orders
   --------------------------------------------------------------------
 
--- Per-order canonical store
-CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
-  order_id      BIGINT    PRIMARY KEY,
-  account_name  TEXT      NOT NULL,
-  nai           TEXT      NOT NULL,
-  amount        NUMERIC   NOT NULL
+CREATE TABLE btracker_app.open_orders_detail (
+  account_name TEXT     NOT NULL,
+  order_id     BIGINT   NOT NULL,
+  nai          TEXT     NOT NULL,
+  amount       NUMERIC  NOT NULL,
+  PRIMARY KEY (account_name, order_id)
 );
 
--- Per-account summary (with cancellations array)
+-- 2) Create (or re-create) the summary table with cancelled_order_ids array
 CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
   account_name            TEXT      PRIMARY KEY,
   open_orders_hbd_count   BIGINT    NOT NULL,
   open_orders_hive_count  BIGINT    NOT NULL,
   open_orders_hive_amount NUMERIC   NOT NULL,
   open_orders_hbd_amount  NUMERIC   NOT NULL,
-  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'
+  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'  
 );
 
 
