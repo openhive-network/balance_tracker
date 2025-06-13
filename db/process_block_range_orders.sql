@@ -15,14 +15,10 @@ DECLARE
 BEGIN
 
   WITH
-    -- 1) Grab creates, fills & cancels in one pass
     raw_ops AS (
-      SELECT
-        ov.body   ::jsonb AS body,
-        ot.name           AS op_name
+      SELECT ov.body::jsonb AS body, ot.name AS op_name
       FROM hive.operations_view ov
-      JOIN hafd.operation_types ot
-        ON ot.id = ov.op_type_id
+      JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
       WHERE ov.block_num BETWEEN _from_block AND _to_block
         AND ot.name IN (
           'hive::protocol::limit_order_create_operation',
@@ -31,50 +27,42 @@ BEGIN
         )
     ),
 
-    -- 2a) New creates
     creates AS (
       SELECT
         (body->'value'->>'owner')::TEXT           AS account_name,
         (body->'value'->>'orderid')::BIGINT       AS order_id,
         (body->'value'->'amount_to_sell'->>'nai') AS nai,
-        (
-          (body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-          / POWER(
-              10::NUMERIC,
-              (body->'value'->'amount_to_sell'->>'precision')::INT
-            )
-        )                                          AS amount
+        ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
+         / POWER(10, (body->'value'->'amount_to_sell'->>'precision')::INT)
+        ) AS amount
       FROM raw_ops
       WHERE op_name = 'hive::protocol::limit_order_create_operation'
-        AND (body->'value'->>'orderid') IS NOT NULL
+        AND body->'value'->>'orderid' IS NOT NULL
     ),
 
-    -- 2b) Fills
     fills AS (
       SELECT (body->'value'->>'open_orderid')::BIGINT    AS order_id
       FROM raw_ops
       WHERE op_name = 'hive::protocol::fill_order_operation'
-        AND (body->'value'->>'open_orderid') IS NOT NULL
+        AND body->'value'->>'open_orderid' IS NOT NULL
 
       UNION
 
       SELECT (body->'value'->>'current_orderid')::BIGINT AS order_id
       FROM raw_ops
       WHERE op_name = 'hive::protocol::fill_order_operation'
-        AND (body->'value'->>'current_orderid') IS NOT NULL
+        AND body->'value'->>'current_orderid' IS NOT NULL
     ),
 
-    -- 2c) Cancels (with account_name for array-append)
     cancels AS (
       SELECT
         (body->'value'->>'orderid')::BIGINT AS order_id,
-        (body->'value'->>'owner')       ::TEXT   AS account_name
+        (body->'value'->>'owner')::TEXT     AS account_name
       FROM raw_ops
       WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
-        AND (body->'value'->>'orderid') IS NOT NULL
+        AND body->'value'->>'orderid' IS NOT NULL
     ),
 
-    -- 3) This-slice open-orders summary
     open_summary AS (
       SELECT
         c.account_name,
@@ -90,7 +78,6 @@ BEGIN
       GROUP BY c.account_name
     ),
 
-    -- 4) Upsert into the summary table
     upsert AS (
       INSERT INTO btracker_app.account_open_orders_summary (
         account_name,
@@ -115,7 +102,6 @@ BEGIN
       RETURNING 1
     ),
 
-    -- 5) Append newly-cancelled IDs into the array
     record_cancels AS (
       UPDATE btracker_app.account_open_orders_summary dst
       SET cancelled_order_ids = dst.cancelled_order_ids || c.order_id
@@ -125,7 +111,6 @@ BEGIN
       RETURNING 1
     ),
 
-    -- 6) Only delete accounts with zero open-order counts
     cleanup AS (
       DELETE FROM btracker_app.account_open_orders_summary dst
        WHERE dst.open_orders_hbd_count  = 0
@@ -133,7 +118,7 @@ BEGIN
       RETURNING 1
     )
 
-  -- 7) Capture counts into vars
+  -- correctly match three INTO targets to three SELECT expressions
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM record_cancels),
