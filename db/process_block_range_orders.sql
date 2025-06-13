@@ -9,14 +9,14 @@ LANGUAGE plpgsql
 VOLATILE
 AS $$
 DECLARE
-  __inserted_creates  INT;
-  __closed_orders     INT;
-  __upserted          INT;
-  __cancelled_ids     INT;
-  __deleted_summaries INT;
+  _new_creates       INT;
+  _closed_orders     INT;
+  _summary_upserts   INT;
+  _new_cancel_ids    INT;
+  _summaries_deleted INT;
 BEGIN
   ------------------------------------------------------------------
-  -- 1) Slice-level raw operations
+  -- 1) Pull slice-wide ops
   ------------------------------------------------------------------
   WITH raw_ops AS (
          SELECT ov.body::jsonb AS body,
@@ -27,31 +27,28 @@ BEGIN
             AND ot.name IN (
                   'hive::protocol::limit_order_create_operation',
                   'hive::protocol::fill_order_operation',
-                  'hive::protocol::limit_order_cancelled_operation'
+                  'hive::protocol::limit_order_cancelled_operation'  -- ✅ exact op-name
                 )
        ),
 
   ------------------------------------------------------------------
-  -- 2) Break into creates / fills / cancels
+  -- 2) Slice buckets
   ------------------------------------------------------------------
        creates AS (
          SELECT
-           (body->'value'->>'owner')::TEXT           AS account_name,
-           (body->'value'->>'orderid')::BIGINT       AS order_id,
+           (body->'value'->>'owner')  ::TEXT    AS account_name,
+           (body->'value'->>'orderid')::BIGINT  AS order_id,
            (body->'value'->'amount_to_sell'->>'nai') AS nai,
            ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-             / POWER(
-                 10,
-                 (body->'value'->'amount_to_sell'->>'precision')::INT
-               )
-           )                                         AS amount
+              / POWER(10,
+                      (body->'value'->'amount_to_sell'->>'precision')::INT)) AS amount
          FROM raw_ops
          WHERE op_name = 'hive::protocol::limit_order_create_operation'
-           AND body->'value'->>'orderid' IS NOT NULL
        ),
 
+       -- *any* fill closes the order
        fills AS (
-         SELECT (body->'value'->>'open_orderid')::BIGINT AS order_id
+         SELECT (body->'value'->>'open_orderid')::BIGINT
          FROM raw_ops
          WHERE op_name = 'hive::protocol::fill_order_operation'
            AND body->'value'->>'open_orderid' IS NOT NULL
@@ -65,16 +62,15 @@ BEGIN
        cancels AS (
          SELECT
            (body->'value'->>'orderid')::BIGINT AS order_id,
-           (body->'value'->>'owner')::TEXT     AS account_name
+           (body->'value'->>'seller') ::TEXT   AS account_name   -- ✅ key is seller
          FROM raw_ops
          WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
-           AND body->'value'->>'orderid' IS NOT NULL
        ),
 
   ------------------------------------------------------------------
-  -- 3) Persist creates into detail table
+  -- 3) Store new creates
   ------------------------------------------------------------------
-       insert_creates AS (
+       create_rows AS (
          INSERT INTO btracker_app.open_orders_detail (order_id, account_name, nai, amount)
          SELECT order_id, account_name, nai, amount
          FROM creates
@@ -83,37 +79,37 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 4) Remove fills and cancels from detail table
+  -- 4) Remove rows whose id appears in fills or cancels
   ------------------------------------------------------------------
-       close_ops AS (
+       close_rows AS (
          DELETE FROM btracker_app.open_orders_detail d
          USING (
            SELECT order_id FROM fills
            UNION
            SELECT order_id FROM cancels
-         ) x
-         WHERE d.order_id = x.order_id
+         ) z
+         WHERE d.order_id = z.order_id
          RETURNING 1
        ),
 
   ------------------------------------------------------------------
-  -- 5) Fresh full summary from detail table (all still-open orders)
+  -- 5) Aggregate current open-order snapshot
   ------------------------------------------------------------------
-       full_summary AS (
+       fresh_summary AS (
          SELECT
            account_name,
-           COUNT(*) FILTER (WHERE nai = '@@000000013')                   AS open_orders_hbd_count,
-           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)  AS open_orders_hbd_amount,
-           COUNT(*) FILTER (WHERE nai = '@@000000021')                   AS open_orders_hive_count,
-           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)  AS open_orders_hive_amount
+           COUNT(*) FILTER (WHERE nai = '@@000000013')                  AS open_orders_hbd_count,
+           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0) AS open_orders_hbd_amount,
+           COUNT(*) FILTER (WHERE nai = '@@000000021')                  AS open_orders_hive_count,
+           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0) AS open_orders_hive_amount
          FROM btracker_app.open_orders_detail
          GROUP BY account_name
        ),
 
   ------------------------------------------------------------------
-  -- 6) Upsert refreshed summary
+  -- 6) Upsert summary
   ------------------------------------------------------------------
-       upsert_summary AS (
+       upserts AS (
          INSERT INTO btracker_app.account_open_orders_summary (
            account_name,
            open_orders_hbd_count,
@@ -127,7 +123,7 @@ BEGIN
            open_orders_hive_count,
            open_orders_hive_amount,
            open_orders_hbd_amount
-         FROM full_summary
+         FROM fresh_summary
          ON CONFLICT (account_name) DO UPDATE
            SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
                open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
@@ -137,9 +133,9 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 7) Append newly seen cancellations into the array column
+  -- 7) Append new cancel IDs into array
   ------------------------------------------------------------------
-       record_cancels AS (
+       append_cancels AS (
          UPDATE btracker_app.account_open_orders_summary dst
          SET cancelled_order_ids = dst.cancelled_order_ids || c.order_id
          FROM cancels c
@@ -149,9 +145,9 @@ BEGIN
        ),
 
   ------------------------------------------------------------------
-  -- 8) Drop summary rows whose counts are now both zero
+  -- 8) Purge empty summaries
   ------------------------------------------------------------------
-       clear_empty AS (
+       purge_empty AS (
          DELETE FROM btracker_app.account_open_orders_summary dst
          WHERE open_orders_hbd_count  = 0
            AND open_orders_hive_count = 0
@@ -162,27 +158,21 @@ BEGIN
   -- 9) Collect stats
   ------------------------------------------------------------------
   SELECT
-      (SELECT COUNT(*) FROM insert_creates),
-      (SELECT COUNT(*) FROM close_ops),
-      (SELECT COUNT(*) FROM upsert_summary),
-      (SELECT COUNT(*) FROM record_cancels),
-      (SELECT COUNT(*) FROM clear_empty)
+      (SELECT COUNT(*) FROM create_rows),
+      (SELECT COUNT(*) FROM close_rows),
+      (SELECT COUNT(*) FROM upserts),
+      (SELECT COUNT(*) FROM append_cancels),
+      (SELECT COUNT(*) FROM purge_empty)
     INTO
-      __inserted_creates,
-      __closed_orders,
-      __upserted,
-      __cancelled_ids,
-      __deleted_summaries;
+      _new_creates,
+      _closed_orders,
+      _summary_upserts,
+      _new_cancel_ids,
+      _summaries_deleted;
 
   RAISE NOTICE
-    'Blocks %–% | creates %, closed %, summary-upserts %, new-cancels %, empty-accounts-deleted %',
-    _from_block,
-    _to_block,
-    __inserted_creates,
-    __closed_orders,
-    __upserted,
-    __cancelled_ids,
-    __deleted_summaries;
-
+    'Blocks %–% | creates %, closed %, upserts %, new-cancels %, rows-purged %',
+    _from_block, _to_block,
+    _new_creates, _closed_orders, _summary_upserts, _new_cancel_ids, _summaries_deleted;
 END;
 $$;
