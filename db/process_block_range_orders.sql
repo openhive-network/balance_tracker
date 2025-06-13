@@ -15,7 +15,7 @@ DECLARE
 BEGIN
 
   WITH
-    -- 1) One-pass grab of all relevant ops
+    -- 1) Grab creates, fills & cancels in one pass
     raw_ops AS (
       SELECT
         ov.body   ::jsonb AS body,
@@ -31,7 +31,7 @@ BEGIN
         )
     ),
 
-    -- 2a) Creations in this slice
+    -- 2a) New creates
     creates AS (
       SELECT
         (body->'value'->>'owner')::TEXT           AS account_name,
@@ -49,7 +49,7 @@ BEGIN
         AND (body->'value'->>'orderid') IS NOT NULL
     ),
 
-    -- 2b) Fills in this slice
+    -- 2b) Fills
     fills AS (
       SELECT (body->'value'->>'open_orderid')::BIGINT    AS order_id
       FROM raw_ops
@@ -64,17 +64,17 @@ BEGIN
         AND (body->'value'->>'current_orderid') IS NOT NULL
     ),
 
-    -- 2c) Cancels in this slice (carry account_name so we can append into the right row)
+    -- 2c) Cancels (with account_name for array-append)
     cancels AS (
       SELECT
         (body->'value'->>'orderid')::BIGINT AS order_id,
-        (body->'value'->>'owner')   ::TEXT   AS account_name
+        (body->'value'->>'owner')       ::TEXT   AS account_name
       FROM raw_ops
       WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
         AND (body->'value'->>'orderid') IS NOT NULL
     ),
 
-    -- 3) Per-account open-orders this slice (creates minus fills/cancels)
+    -- 3) This-slice open-orders summary
     open_summary AS (
       SELECT
         c.account_name,
@@ -90,7 +90,7 @@ BEGIN
       GROUP BY c.account_name
     ),
 
-    -- 4) Upsert into summary table
+    -- 4) Upsert into the summary table
     upsert AS (
       INSERT INTO btracker_app.account_open_orders_summary (
         account_name,
@@ -115,7 +115,7 @@ BEGIN
       RETURNING 1
     ),
 
-    -- 5) Append each newly-cancelled order_id into the array column
+    -- 5) Append newly-cancelled IDs into the array
     record_cancels AS (
       UPDATE btracker_app.account_open_orders_summary dst
       SET cancelled_order_ids = dst.cancelled_order_ids || c.order_id
@@ -125,7 +125,7 @@ BEGIN
       RETURNING 1
     ),
 
-    -- 6) Delete only those accounts whose open counts are both zero
+    -- 6) Only delete accounts with zero open-order counts
     cleanup AS (
       DELETE FROM btracker_app.account_open_orders_summary dst
        WHERE dst.open_orders_hbd_count  = 0
@@ -133,12 +133,15 @@ BEGIN
       RETURNING 1
     )
 
-  -- Capture stats into variables
+  -- 7) Capture counts into vars
   SELECT
     (SELECT COUNT(*) FROM upsert),
     (SELECT COUNT(*) FROM record_cancels),
     (SELECT COUNT(*) FROM cleanup)
-  INTO __upserted, __cancelled, __deleted_rows;
+  INTO
+    __upserted,
+    __cancelled,
+    __deleted_rows;
 
   RAISE NOTICE 'Blocks %–%: upserted %, cancelled %, deleted %',
     _from_block, _to_block, __upserted, __cancelled, __deleted_rows;
