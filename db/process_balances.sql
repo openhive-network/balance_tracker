@@ -1,178 +1,264 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
-    IN _from_block INT,
-    IN _to_block   INT
+CREATE OR REPLACE FUNCTION process_block_range_balances(
+    IN _from INT, IN _to INT
 )
 RETURNS VOID
-LANGUAGE plpgsql
-VOLATILE
-AS $$
-DECLARE
-  _new_creates       INT;
-  _closed_orders     INT;
-  _summary_upserts   INT;
-  _new_cancel_ids    INT;
-  _summaries_deleted INT;
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+AS
+$$
+DECLARE 
+ _result INT;
+ __balance_history INT;
+ __current_balances INT;
+ __balance_history_by_day INT;
+ __balance_history_by_month INT;
 BEGIN
-  ------------------------------------------------------------------
-  -- 1) Pull slice-wide ops
-  ------------------------------------------------------------------
-  WITH raw_ops AS (
-         SELECT ov.body::jsonb AS body,
-                ot.name        AS op_name
-           FROM hive.operations_view ov
-           JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
-          WHERE ov.block_num BETWEEN _from_block AND _to_block
-            AND ot.name IN (
-                  'hive::protocol::limit_order_create_operation',
-                  'hive::protocol::fill_order_operation',
-                  'hive::protocol::limit_order_cancelled_operation'  -- ✅ exact op-name
-                )
-       ),
+--RAISE NOTICE 'Processing balances';
 
-  ------------------------------------------------------------------
-  -- 2) Slice buckets
-  ------------------------------------------------------------------
-       creates AS (
-         SELECT
-           (body->'value'->>'owner')  ::TEXT    AS account_name,
-           (body->'value'->>'orderid')::BIGINT  AS order_id,
-           (body->'value'->'amount_to_sell'->>'nai') AS nai,
-           ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-              / POWER(10,
-                      (body->'value'->'amount_to_sell'->>'precision')::INT)) AS amount
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::limit_order_create_operation'
-       ),
+-- get all operations that can impact balances
+WITH balance_impacting_ops AS MATERIALIZED
+(
+  SELECT ot.id
+  FROM hafd.operation_types ot
+  WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
+),
+ops_in_range AS MATERIALIZED 
+(
+  SELECT 
+    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
+    get_impacted_balances.asset_symbol_nai AS nai,
+    get_impacted_balances.amount AS balance,
+    ho.id AS source_op,
+    ho.block_num AS source_op_block,
+    ho.body_binary
+  FROM operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
+  JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
+  CROSS JOIN hive.get_impacted_balances(
+    ho.body_binary, 
+    ho.block_num > ah.block_num
+  ) AS get_impacted_balances
+  WHERE 
+    ho.op_type_id IN (SELECT id FROM balance_impacting_ops) AND 
+    ho.block_num BETWEEN _from AND _to
+),
+-- prepare accounts that were impacted by the operations
+group_by_account_nai AS (
+  SELECT 
+    cp.account_id,
+    cp.nai
+  FROM ops_in_range cp
+  GROUP BY cp.account_id, cp.nai
+),
+get_latest_balance AS (
+  SELECT 
+    gan.account_id,
+    gan.nai,
+    COALESCE(cab.balance, 0) as balance,
+    0 AS source_op,
+    0 AS source_op_block
+--    (CASE WHEN cab.balance IS NULL THEN FALSE ELSE TRUE END) AS prev_balance_exists
+  FROM group_by_account_nai gan
+  LEFT JOIN current_account_balances cab ON cab.account = gan.account_id AND cab.nai = gan.nai
+),
 
-       -- *any* fill closes the order
-       fills AS (
-         SELECT (body->'value'->>'open_orderid')::BIGINT
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::fill_order_operation'
-           AND body->'value'->>'open_orderid' IS NOT NULL
-         UNION
-         SELECT (body->'value'->>'current_orderid')::BIGINT
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::fill_order_operation'
-           AND body->'value'->>'current_orderid' IS NOT NULL
-       ),
+-- prepare balances (sum balances for each account)
+union_latest_balance_with_impacted_balances AS (
+  SELECT 
+    cp.account_id, 
+    cp.nai,
+    cp.balance,
+    cp.source_op,
+    cp.source_op_block
+  FROM ops_in_range cp
 
-       cancels AS (
-         SELECT
-           (body->'value'->>'orderid')::BIGINT AS order_id,
-           (body->'value'->>'seller') ::TEXT   AS account_name   -- ✅ key is seller
-         FROM raw_ops
-         WHERE op_name = 'hive::protocol::limit_order_cancelled_operation'
-       ),
+  UNION ALL
 
-  ------------------------------------------------------------------
-  -- 3) Store new creates
-  ------------------------------------------------------------------
-       create_rows AS (
-         INSERT INTO btracker_app.open_orders_detail (order_id, account_name, nai, amount)
-         SELECT order_id, account_name, nai, amount
-         FROM creates
-         ON CONFLICT DO NOTHING
-         RETURNING 1
-       ),
+-- latest stored balance is needed to replecate balance history
+  SELECT 
+    glb.account_id,
+    glb.nai,
+    glb.balance,
+    glb.source_op,
+    glb.source_op_block
+  FROM get_latest_balance glb
+),
 
-  ------------------------------------------------------------------
-  -- 4) Remove rows whose id appears in fills or cancels
-  ------------------------------------------------------------------
-       close_rows AS (
-         DELETE FROM btracker_app.open_orders_detail d
-         USING (
-           SELECT order_id FROM fills
-           UNION
-           SELECT order_id FROM cancels
-         ) z
-         WHERE d.order_id = z.order_id
-         RETURNING 1
-       ),
+/*
+whole table is inserted into history (without id = 0) and the newest record is used to update current balance table
 
-  ------------------------------------------------------------------
-  -- 5) Aggregate current open-order snapshot
-  ------------------------------------------------------------------
-       fresh_summary AS (
-         SELECT
-           account_name,
-           COUNT(*) FILTER (WHERE nai = '@@000000013')                  AS open_orders_hbd_count,
-           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0) AS open_orders_hbd_amount,
-           COUNT(*) FILTER (WHERE nai = '@@000000021')                  AS open_orders_hive_count,
-           COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0) AS open_orders_hive_amount
-         FROM btracker_app.open_orders_detail
-         GROUP BY account_name
-       ),
+ id  | balance | sum-balance
+  2       10     10 + 5 + 1
+  1       5        5 + 1
+  0       1          1
 
-  ------------------------------------------------------------------
-  -- 6) Upsert summary
-  ------------------------------------------------------------------
-       upserts AS (
-         INSERT INTO btracker_app.account_open_orders_summary (
-           account_name,
-           open_orders_hbd_count,
-           open_orders_hive_count,
-           open_orders_hive_amount,
-           open_orders_hbd_amount
-         )
-         SELECT
-           account_name,
-           open_orders_hbd_count,
-           open_orders_hive_count,
-           open_orders_hive_amount,
-           open_orders_hbd_amount
-         FROM fresh_summary
-         ON CONFLICT (account_name) DO UPDATE
-           SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
-               open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
-               open_orders_hive_amount = EXCLUDED.open_orders_hive_amount,
-               open_orders_hbd_amount  = EXCLUDED.open_orders_hbd_amount
-         RETURNING 1
-       ),
+*/
 
-  ------------------------------------------------------------------
-  -- 7) Append new cancel IDs into array
-  ------------------------------------------------------------------
-       append_cancels AS (
-         UPDATE btracker_app.account_open_orders_summary dst
-         SET cancelled_order_ids = dst.cancelled_order_ids || c.order_id
-         FROM cancels c
-         WHERE dst.account_name = c.account_name
-           AND NOT (c.order_id = ANY(dst.cancelled_order_ids))
-         RETURNING 1
-       ),
+prepare_balance_history AS MATERIALIZED (
+  SELECT 
+    ulb.account_id,
+    ulb.nai,
+    SUM(ulb.balance) OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS balance,
+    ulb.source_op,
+    ulb.source_op_block,
+    ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
+  FROM union_latest_balance_with_impacted_balances ulb
+),
 
-  ------------------------------------------------------------------
-  -- 8) Purge empty summaries
-  ------------------------------------------------------------------
-       purge_empty AS (
-         DELETE FROM btracker_app.account_open_orders_summary dst
-         WHERE open_orders_hbd_count  = 0
-           AND open_orders_hive_count = 0
-         RETURNING 1
-       )
+insert_current_account_balances AS (
+  INSERT INTO current_account_balances AS acc_balances
+    (account, nai, source_op, source_op_block, balance)
+  SELECT 
+    rd.account_id,
+    rd.nai,
+    rd.source_op,
+    rd.source_op_block,
+    rd.balance
+  FROM prepare_balance_history rd 
+  WHERE rd.rn = 1
+  ON CONFLICT ON CONSTRAINT pk_current_account_balances DO
+  UPDATE SET 
+    balance = EXCLUDED.balance,
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block
+  RETURNING (xmax = 0) as is_new_entry, acc_balances.account
+),
 
-  ------------------------------------------------------------------
-  -- 9) Collect stats
-  ------------------------------------------------------------------
-  SELECT
-      (SELECT COUNT(*) FROM create_rows),
-      (SELECT COUNT(*) FROM close_rows),
-      (SELECT COUNT(*) FROM upserts),
-      (SELECT COUNT(*) FROM append_cancels),
-      (SELECT COUNT(*) FROM purge_empty)
-    INTO
-      _new_creates,
-      _closed_orders,
-      _summary_upserts,
-      _new_cancel_ids,
-      _summaries_deleted;
+remove_latest_stored_balance_record AS MATERIALIZED (
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.balance
+  FROM prepare_balance_history pbh
+  -- remove with prepared previous balance
+  WHERE pbh.source_op > 0
+  ORDER BY pbh.source_op
+),
+insert_account_balance_history AS (
+  INSERT INTO account_balance_history AS acc_history
+    (account, nai, source_op, source_op_block, balance)
+  SELECT 
+    pbh.account_id,
+    pbh.nai,
+    pbh.source_op,
+    pbh.source_op_block,
+    pbh.balance
+  FROM remove_latest_stored_balance_record pbh
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+join_created_at_to_balance_history AS (
+  SELECT 
+    rls.account_id,
+    rls.nai,
+    rls.source_op,
+    rls.source_op_block,
+    rls.balance,
+    date_trunc('day', bv.created_at) AS by_day,
+    date_trunc('month', bv.created_at) AS by_month
+  FROM remove_latest_stored_balance_record rls
+  JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
+),
+get_latest_updates AS (
+  SELECT 
+    account_id,
+    nai,
+    source_op,
+    source_op_block,
+    balance,
+    by_day,
+    by_month,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
+  FROM join_created_at_to_balance_history 
+),
+get_min_max_balances_by_day AS (
+  SELECT 
+    account_id,
+    nai,
+    by_day,
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_day
+),
+get_min_max_balances_by_month AS (
+  SELECT 
+    account_id,
+    nai,
+    by_month,
+    MAX(balance) AS max_balance,
+    MIN(balance) AS min_balance
+  FROM join_created_at_to_balance_history
+  GROUP BY account_id, nai, by_month
+),
+insert_account_balance_history_by_day AS (
+  INSERT INTO balance_history_by_day AS acc_history
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+  SELECT 
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_day,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_day gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_day = gl.by_day
+  WHERE gl.rn_by_day = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO 
+  UPDATE SET 
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+insert_account_balance_history_by_month AS (
+  INSERT INTO balance_history_by_month AS acc_history
+    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+  SELECT 
+    gl.account_id,
+    gl.nai,
+    gl.source_op,
+    gl.source_op_block,
+    gl.by_month,
+    gl.balance,
+    gm.min_balance,
+    gm.max_balance
+  FROM get_latest_updates gl
+  JOIN get_min_max_balances_by_month gm ON 
+    gm.account_id = gl.account_id AND 
+    gm.nai = gl.nai AND 
+    gm.by_month = gl.by_month
+  WHERE rn_by_month = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO 
+  UPDATE SET
+    source_op = EXCLUDED.source_op,
+    source_op_block = EXCLUDED.source_op_block,
+    balance = EXCLUDED.balance,
+    min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
+    max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
+  RETURNING (xmax = 0) as is_new_entry, acc_history.account
+)
 
-  RAISE NOTICE
-    'Blocks %–% | creates %, closed %, upserts %, new-cancels %, rows-purged %',
-    _from_block, _to_block,
-    _new_creates, _closed_orders, _summary_upserts, _new_cancel_ids, _summaries_deleted;
-END;
+SELECT
+  (SELECT count(*) FROM insert_account_balance_history) as balance_history,
+  (SELECT count(*) FROM insert_current_account_balances) AS current_balances,
+  (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
+  (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month
+INTO __balance_history, __current_balances, __balance_history_by_day,__balance_history_by_month;
+
+END
 $$;
+
+RESET ROLE;
