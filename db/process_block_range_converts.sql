@@ -9,13 +9,15 @@ LANGUAGE plpgsql
 VOLATILE
 AS $$
 DECLARE
-  c_new_requests     INT;
-  c_closed_fills     INT;
-  c_summary_upserts  INT;
-  c_purged           INT;
+  c_new_requests    INT;
+  c_closed_fills    INT;
+  c_summary_upserts INT;
+  c_purged          INT;
 BEGIN
+  /* 0) Clean up any leftover temp table */
+  DROP TABLE IF EXISTS tmp_raw_ops;
 
-  -- 1) Cache all convert ops in this block range
+  /* 1) Cache all convert ops in this block range */
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
   SELECT
     ov.body::jsonb AS body,
@@ -29,7 +31,7 @@ BEGIN
       'hive::protocol::fill_convert_request_operation'
     );
 
-  -- 2) Insert new convert requests into detail
+  /* 2) Insert new convert requests into detail */
   WITH new_reqs AS (
     SELECT
       (body->'value'->>'owner')              AS account_name,
@@ -54,7 +56,7 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_new_requests FROM ins;
 
-  -- 3) Delete any requests that got filled
+  /* 3) Delete any requests that got filled */
   DELETE FROM btracker_app.pending_converts_detail d
   USING (
     SELECT
@@ -68,7 +70,7 @@ BEGIN
     AND d.request_id   = f.request_id;
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
-  -- 4) Rebuild & upsert summary from detail
+  /* 4) Rebuild & upsert summary from detail */
   WITH snap AS (
     SELECT
       account_name,
@@ -80,12 +82,12 @@ BEGIN
     GROUP BY account_name
   ),
   up_summary AS (
-    -- HBD rows
+    -- HBD row
     INSERT INTO btracker_app.account_pending_converts
       (account_name, asset, request_count, total_amount)
     SELECT account_name, 'HBD', hbd_count, hbd_amount FROM snap
     UNION ALL
-    -- HIVE rows
+    -- HIVE row
     SELECT account_name, 'HIVE', hive_count, hive_amount FROM snap
     ON CONFLICT (account_name, asset) DO UPDATE
       SET request_count = EXCLUDED.request_count,
@@ -94,16 +96,24 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  -- 5) Purge any summary rows where everything is zero
+  /* 5) Purge any summary rows that are zero OR have no matching detail rows */
   WITH purge AS (
     DELETE FROM btracker_app.account_pending_converts apc
-    WHERE apc.request_count = 0
-      AND apc.total_amount  = 0
+    WHERE (apc.request_count = 0 AND apc.total_amount = 0)
+      OR NOT EXISTS (
+        SELECT 1
+        FROM btracker_app.pending_converts_detail d
+        WHERE d.account_name = apc.account_name
+          AND (
+               (apc.asset = 'HBD'  AND d.nai = '@@000000013')
+            OR (apc.asset = 'HIVE' AND d.nai = '@@000000021')
+          )
+      )
     RETURNING 1
   )
   SELECT COUNT(*) INTO c_purged FROM purge;
 
-  -- 6) Final log
+  /* 6) Final log */
   RAISE NOTICE
     'Blocks %–% | new_requests=% | fills_closed=% | summary_upserts=% | purged=%',
     _from_block, _to_block,
