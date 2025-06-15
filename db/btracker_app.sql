@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
 
 
 
+PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
 
 PERFORM hive.app_register_table(
   __schema_name,
