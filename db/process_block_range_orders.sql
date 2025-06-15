@@ -1,3 +1,11 @@
+/* ====================================================================== *
+ *  Open-orders dispatcher
+ *  – inserts new limit-order creates
+ *  – removes rows closed by cancels / fills
+ *  – rebuilds account-level summary
+ *  – appends cancel-IDs
+ *  – purges summaries that have no active rows
+ * ====================================================================== */
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
@@ -7,7 +15,7 @@ CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
 RETURNS VOID
 LANGUAGE plpgsql
 VOLATILE
-AS $$
+AS $FUNC$
 DECLARE
   c_new_creates     INT;
   c_closed_cancels  INT;
@@ -17,17 +25,15 @@ DECLARE
   c_new_cancel_ids  INT;
   c_purged          INT;
 BEGIN
-  -- If a previous invocation left tmp_raw_ops around, drop it:
+  /*— 0) clean any temp table left by a failed run —*/
   DROP TABLE IF EXISTS tmp_raw_ops;
 
-  -- 1) Cache all relevant ops once into a temp table
+  /*— 1) cache relevant ops in the window —*/
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
-  SELECT
-    ov.body   ::jsonb AS body,
-    ot.name           AS op_name
+  SELECT ov.body::jsonb AS body,
+         ot.name        AS op_name
   FROM hive.operations_view ov
-  JOIN hafd.operation_types ot
-    ON ot.id = ov.op_type_id
+  JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
   WHERE ov.block_num BETWEEN _from_block AND _to_block
     AND ot.name IN (
       'hive::protocol::limit_order_create_operation',
@@ -36,15 +42,15 @@ BEGIN
       'hive::protocol::limit_order_cancelled_operation'
     );
 
-  -- 2) Insert new creates
+  /*— 2) insert fresh order-creates —*/
   WITH creates AS (
     SELECT
-      (body->'value'->>'owner')::TEXT    AS acct,
-      (body->'value'->>'orderid')::BIGINT AS id,
-      (body->'value'->'amount_to_sell'->>'nai')    AS nai,
-      ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-         / POWER(10,(body->'value'->'amount_to_sell'->>'precision')::INT)
-      )                                            AS amt
+      (body->'value'->>'owner')        AS acct,
+      (body->'value'->>'orderid')::BIGINT  AS id,
+      (body->'value'->'amount_to_sell'->>'nai') AS nai,
+      ( (body->'value'->'amount_to_sell'->>'amount')::NUMERIC
+          / power(10,(body->'value'->'amount_to_sell'->>'precision')::INT)
+      )                                AS amt
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
@@ -52,39 +58,35 @@ BEGIN
   ins AS (
     INSERT INTO btracker_app.open_orders_detail
       (account_name, order_id, nai, amount)
-    SELECT acct, id, nai, amt
-      FROM creates
+    SELECT acct, id, nai, amt FROM creates
     ON CONFLICT DO NOTHING
     RETURNING 1
   )
   SELECT COUNT(*) INTO c_new_creates FROM ins;
 
-  -- 3) Delete cancelled orders
+  /*— 3) delete rows closed by explicit cancels —*/
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
       (body->'value'->>'orderid')::BIGINT AS id,
-      COALESCE(
-        body->'value'->>'seller',
-        body->'value'->>'owner'
-      )::TEXT                             AS acct
+      COALESCE(body->'value'->>'seller', body->'value'->>'owner') AS acct
     FROM tmp_raw_ops
     WHERE op_name IN (
       'hive::protocol::limit_order_cancel_operation',
       'hive::protocol::limit_order_cancelled_operation'
     )
       AND (body->'value'->>'orderid') IS NOT NULL
-  ) AS c
-  WHERE d.account_name = c.acct
-    AND d.order_id     = c.id;
+  ) c
+  WHERE d.order_id = c.id
+    AND d.account_name = c.acct;
   GET DIAGNOSTICS c_closed_cancels = ROW_COUNT;
 
-  -- 4) Delete filled orders
+  /*— 4) delete rows closed by fills —*/
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
-      (body->'value'->>'open_owner')   ::TEXT   AS acct,
-      (body->'value'->>'open_orderid') ::BIGINT AS id
+      (body->'value'->>'open_owner')   AS acct,
+      (body->'value'->>'open_orderid')::BIGINT AS id
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
       AND (body->'value'->>'open_orderid') IS NOT NULL
@@ -92,30 +94,30 @@ BEGIN
     UNION ALL
 
     SELECT
-      (body->'value'->>'current_owner')   ::TEXT   AS acct,
-      (body->'value'->>'current_orderid') ::BIGINT AS id
+      (body->'value'->>'current_owner')   AS acct,
+      (body->'value'->>'current_orderid')::BIGINT AS id
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
       AND (body->'value'->>'current_orderid') IS NOT NULL
-  ) AS f
-  WHERE d.account_name = f.acct
-    AND d.order_id     = f.id;
+  ) f
+  WHERE d.order_id = f.id
+    AND d.account_name = f.acct;
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
   c_closed_rows := c_closed_cancels + c_closed_fills;
 
-  -- 5) Rebuild & upsert summary (unchanged) …
+  /*— 5) rebuild / upsert account summary —*/
   WITH snap AS (
     SELECT
       account_name,
-      COUNT(*) FILTER (WHERE nai = '@@000000013')               AS open_orders_hbd_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'),0) AS open_orders_hbd_amount,
-      COUNT(*) FILTER (WHERE nai = '@@000000021')               AS open_orders_hive_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'),0) AS open_orders_hive_amount
+      COUNT(*) FILTER (WHERE nai='@@000000013')                AS hbd_cnt,
+      COALESCE(SUM(amount) FILTER (WHERE nai='@@000000013'),0) AS hbd_amt,
+      COUNT(*) FILTER (WHERE nai='@@000000021')                AS hive_cnt,
+      COALESCE(SUM(amount) FILTER (WHERE nai='@@000000021'),0) AS hive_amt
     FROM btracker_app.open_orders_detail
     GROUP BY account_name
   ),
-  up_summary AS (
+  upsert AS (
     INSERT INTO btracker_app.account_open_orders_summary (
       account_name,
       open_orders_hbd_count,
@@ -125,10 +127,8 @@ BEGIN
     )
     SELECT
       account_name,
-      open_orders_hbd_count,
-      open_orders_hbd_amount,
-      open_orders_hive_count,
-      open_orders_hive_amount
+      hbd_cnt, hbd_amt,
+      hive_cnt, hive_amt
     FROM snap
     ON CONFLICT (account_name) DO UPDATE
       SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
@@ -137,19 +137,16 @@ BEGIN
           open_orders_hive_amount = EXCLUDED.open_orders_hive_amount
     RETURNING 1
   )
-  SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
+  SELECT COUNT(*) INTO c_summary_upserts FROM upsert;
 
-   /* 6) Append new cancel IDs */
+  /*— 6) append any *new* cancel IDs —*/
   WITH append_ids AS (
     UPDATE btracker_app.account_open_orders_summary dst
     SET cancelled_order_ids = dst.cancelled_order_ids || c.id
     FROM (
       SELECT
-        (body->'value'->>'orderid')::BIGINT       AS id,
-        COALESCE(
-          body->'value'->>'seller',
-          body->'value'->>'owner'
-        )::TEXT                                    AS acct
+        (body->'value'->>'orderid')::BIGINT AS id,
+        COALESCE(body->'value'->>'seller', body->'value'->>'owner') AS acct
       FROM tmp_raw_ops
       WHERE op_name IN (
         'hive::protocol::limit_order_cancel_operation',
@@ -158,23 +155,26 @@ BEGIN
         AND (body->'value'->>'orderid') IS NOT NULL
     ) c
     WHERE dst.account_name = c.acct
-      AND NOT (c.id = ANY(dst.cancelled_order_ids))
+      AND NOT c.id = ANY(dst.cancelled_order_ids)
     RETURNING 1
   )
   SELECT COUNT(*) INTO c_new_cancel_ids FROM append_ids;
 
-  /* 7) Purge zero‐count summaries */
+  /*— 7) purge rows with no active detail rows (OR zero-count) —*/
   WITH purge AS (
-    DELETE FROM btracker_app.account_open_orders_summary dst
-    WHERE dst.open_orders_hbd_count  = 0
-      AND dst.open_orders_hive_count = 0
+    DELETE FROM btracker_app.account_open_orders_summary s
+    WHERE ( s.open_orders_hbd_count  = 0
+            AND s.open_orders_hive_count = 0 )
+       OR NOT EXISTS (               -- ← NEW: truly no detail rows left
+            SELECT 1 FROM btracker_app.open_orders_detail d
+            WHERE d.account_name = s.account_name)
     RETURNING 1
   )
   SELECT COUNT(*) INTO c_purged FROM purge;
 
-  /* 8) Final log */
+  /*— 8) final notice —*/
   RAISE NOTICE
-    'Blocks %–% | new_creates=% | cancelled_deleted=% | fills_deleted=% | total_closed=% | summary_upserts=% | appended_ids=% | purged=%',
+    'Blocks %–% | creates % | cancels % | fills % | closed % | upserts % | +cancel_ids % | purged %',
     _from_block, _to_block,
     c_new_creates,
     c_closed_cancels,
@@ -184,4 +184,4 @@ BEGIN
     c_new_cancel_ids,
     c_purged;
 END;
-$$;
+$FUNC$;
