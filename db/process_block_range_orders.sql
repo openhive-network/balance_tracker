@@ -1,11 +1,3 @@
-/* ====================================================================== *
- *  Open-orders dispatcher
- *  – inserts new limit-order creates
- *  – removes rows closed by cancels / fills
- *  – rebuilds account-level summary
- *  – appends cancel-IDs
- *  – purges summaries that have no active rows
- * ====================================================================== */
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
