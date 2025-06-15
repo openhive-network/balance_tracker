@@ -17,7 +17,10 @@ DECLARE
   c_new_cancel_ids  INT;
   c_purged          INT;
 BEGIN
-  -- 1) Cache all relevant ops once
+  -- If a previous invocation left tmp_raw_ops around, drop it:
+  DROP TABLE IF EXISTS tmp_raw_ops;
+
+  -- 1) Cache all relevant ops once into a temp table
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
   SELECT
     ov.body   ::jsonb AS body,
@@ -31,7 +34,7 @@ BEGIN
       'hive::protocol::fill_order_operation',
       'hive::protocol::limit_order_cancel_operation',
       'hive::protocol::limit_order_cancelled_operation'
-    );  -- ← no stray quote here
+    );
 
   -- 2) Insert new creates
   WITH creates AS (
@@ -49,13 +52,14 @@ BEGIN
   ins AS (
     INSERT INTO btracker_app.open_orders_detail
       (account_name, order_id, nai, amount)
-    SELECT acct, id, nai, amt FROM creates
+    SELECT acct, id, nai, amt
+      FROM creates
     ON CONFLICT DO NOTHING
     RETURNING 1
   )
   SELECT COUNT(*) INTO c_new_creates FROM ins;
 
-  -- 3) Delete cancels
+  -- 3) Delete cancelled orders
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
@@ -75,7 +79,7 @@ BEGIN
     AND d.order_id     = c.id;
   GET DIAGNOSTICS c_closed_cancels = ROW_COUNT;
 
-  -- 4) Delete fills
+  -- 4) Delete filled orders
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
@@ -100,7 +104,84 @@ BEGIN
 
   c_closed_rows := c_closed_cancels + c_closed_fills;
 
-  -- … rest of upsert / append / purge / final NOTICE …
+  -- 5) Rebuild & upsert summary (unchanged) …
+  WITH snap AS (
+    SELECT
+      account_name,
+      COUNT(*) FILTER (WHERE nai = '@@000000013')               AS open_orders_hbd_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'),0) AS open_orders_hbd_amount,
+      COUNT(*) FILTER (WHERE nai = '@@000000021')               AS open_orders_hive_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'),0) AS open_orders_hive_amount
+    FROM btracker_app.open_orders_detail
+    GROUP BY account_name
+  ),
+  up_summary AS (
+    INSERT INTO btracker_app.account_open_orders_summary (
+      account_name,
+      open_orders_hbd_count,
+      open_orders_hbd_amount,
+      open_orders_hive_count,
+      open_orders_hive_amount
+    )
+    SELECT
+      account_name,
+      open_orders_hbd_count,
+      open_orders_hbd_amount,
+      open_orders_hive_count,
+      open_orders_hive_amount
+    FROM snap
+    ON CONFLICT (account_name) DO UPDATE
+      SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
+          open_orders_hbd_amount  = EXCLUDED.open_orders_hbd_amount,
+          open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
+          open_orders_hive_amount = EXCLUDED.open_orders_hive_amount
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
+   /* 6) Append new cancel IDs */
+  WITH append_ids AS (
+    UPDATE btracker_app.account_open_orders_summary dst
+    SET cancelled_order_ids = dst.cancelled_order_ids || c.id
+    FROM (
+      SELECT
+        (body->'value'->>'orderid')::BIGINT       AS id,
+        COALESCE(
+          body->'value'->>'seller',
+          body->'value'->>'owner'
+        )::TEXT                                    AS acct
+      FROM tmp_raw_ops
+      WHERE op_name IN (
+        'hive::protocol::limit_order_cancel_operation',
+        'hive::protocol::limit_order_cancelled_operation'
+      )
+        AND (body->'value'->>'orderid') IS NOT NULL
+    ) c
+    WHERE dst.account_name = c.acct
+      AND NOT (c.id = ANY(dst.cancelled_order_ids))
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO c_new_cancel_ids FROM append_ids;
+
+  /* 7) Purge zero‐count summaries */
+  WITH purge AS (
+    DELETE FROM btracker_app.account_open_orders_summary dst
+    WHERE dst.open_orders_hbd_count  = 0
+      AND dst.open_orders_hive_count = 0
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO c_purged FROM purge;
+
+  /* 8) Final log */
+  RAISE NOTICE
+    'Blocks %–% | new_creates=% | cancelled_deleted=% | fills_deleted=% | total_closed=% | summary_upserts=% | appended_ids=% | purged=%',
+    _from_block, _to_block,
+    c_new_creates,
+    c_closed_cancels,
+    c_closed_fills,
+    c_closed_rows,
+    c_summary_upserts,
+    c_new_cancel_ids,
+    c_purged;
 END;
 $$;
