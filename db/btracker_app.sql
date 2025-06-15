@@ -172,6 +172,14 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
   --------------------------------------------------------------------
   -- PENDING CONVERTS SUMMARY
   --------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS btracker_app.pending_converts_detail (
+  account_name TEXT    NOT NULL,
+  request_id   BIGINT  NOT NULL,
+  nai          TEXT    NOT NULL,          -- '@@000000013' (HBD) or '@@000000021' (HIVE)
+  amount       NUMERIC NOT NULL,
+  PRIMARY KEY (account_name, request_id, nai)
+);
+
   CREATE TABLE IF NOT EXISTS account_pending_converts (
   account_name   TEXT    NOT NULL,
   asset          TEXT    NOT NULL,
@@ -182,6 +190,11 @@ RAISE NOTICE 'Attempting to create an application schema tables...';
 PERFORM hive.app_register_table(
   __schema_name,
   'account_pending_converts',
+  __schema_name
+);
+PERFORM hive.app_register_table(
+  __schema_name,
+  'pending_converts_detail',
   __schema_name
 );
 
