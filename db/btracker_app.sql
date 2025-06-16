@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
   open_orders_hbd_amount  NUMERIC   NOT NULL,
   cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'
 );
-|
+
 PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
 
 PERFORM hive.app_register_table(
