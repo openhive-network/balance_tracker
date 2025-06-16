@@ -17,19 +17,26 @@ DECLARE
   c_new_cancel_ids  INT;
   c_purged          INT;
 BEGIN
+  -- ensure no leftover temp table from a previous invocation
+  DROP TABLE IF EXISTS tmp_raw_ops;
+
   /* 1) Cache all relevant ops once */
-  CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
-  SELECT ov.body::jsonb   AS body,
-         ot.name          AS op_name
-    FROM hive.operations_view ov
-    JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
-   WHERE ov.block_num BETWEEN _from_block AND _to_block
-     AND ot.name IN (
-       'hive::protocol::limit_order_create_operation',
-       'hive::protocol::fill_order_operation',
-       'hive::protocol::limit_order_cancel_operation',
-       'hive::protocol::limit_order_cancelled_operation'
-     );
+  CREATE TEMP TABLE tmp_raw_ops
+    ON COMMIT DROP
+  AS
+  SELECT
+    ov.body::jsonb AS body,
+    ot.name        AS op_name
+  FROM hive.operations_view ov
+  JOIN hafd.operation_types ot
+    ON ot.id = ov.op_type_id
+  WHERE ov.block_num BETWEEN _from_block AND _to_block
+    AND ot.name IN (
+      'hive::protocol::limit_order_create_operation',
+      'hive::protocol::fill_order_operation',
+      'hive::protocol::limit_order_cancel_operation',
+      'hive::protocol::limit_order_cancelled_operation'
+    );
 
   /* 2) Insert new creates */
   WITH creates AS (
@@ -38,7 +45,7 @@ BEGIN
       (body->'value'->>'orderid')::BIGINT AS id,
       (body->'value'->'amount_to_sell'->>'nai')    AS nai,
       ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-         / POWER(10,(body->'value'->'amount_to_sell'->>'precision')::INT)
+         / POWER(10, (body->'value'->'amount_to_sell'->>'precision')::INT)
       )                                            AS amt
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
@@ -54,15 +61,15 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_new_creates FROM ins;
 
-  /* 3) Delete cancelled orders by querying tmp_raw_ops */
+  /* 3) Delete cancelled orders */
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
-      (body->'value'->>'orderid')::BIGINT                                AS id,
+      (body->'value'->>'orderid')::BIGINT                               AS id,
       COALESCE(
         body->'value'->>'seller',
         body->'value'->>'owner'
-      )::TEXT                                                               AS acct
+      )::TEXT                                                             AS acct
     FROM tmp_raw_ops
     WHERE op_name IN (
       'hive::protocol::limit_order_cancel_operation',
@@ -74,7 +81,7 @@ BEGIN
     AND d.order_id     = c.id;
   GET DIAGNOSTICS c_closed_cancels = ROW_COUNT;
 
-  /* 4) Delete filled orders by querying tmp_raw_ops */
+  /* 4) Delete filled orders */
   DELETE FROM btracker_app.open_orders_detail d
   USING (
     SELECT
@@ -103,10 +110,10 @@ BEGIN
   WITH snap AS (
     SELECT
       account_name,
-      COUNT(*) FILTER (WHERE nai = '@@000000013')                    AS open_orders_hbd_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)     AS open_orders_hbd_amount,
-      COUNT(*) FILTER (WHERE nai = '@@000000021')                    AS open_orders_hive_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)     AS open_orders_hive_amount
+      COUNT(*) FILTER (WHERE nai = '@@000000013')                AS open_orders_hbd_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0) AS open_orders_hbd_amount,
+      COUNT(*) FILTER (WHERE nai = '@@000000021')                AS open_orders_hive_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0) AS open_orders_hive_amount
     FROM btracker_app.open_orders_detail
     GROUP BY account_name
   ),
