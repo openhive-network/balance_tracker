@@ -179,37 +179,4 @@ BEGIN
     c_new_cancel_ids,
     c_purged;
 END;
-$$;  give me a new code for conversion i gave you open order code so you can see its logic it worked correctly -------------------------------------------------------------------
-  CREATE TABLE IF NOT EXISTS account_pending_converts (
-  account_name   TEXT    NOT NULL,
-  asset          TEXT    NOT NULL,
-  request_count  BIGINT  NOT NULL,
-  total_amount   NUMERIC NOT NULL,
-  PRIMARY KEY (account_name, asset)
-);
-PERFORM hive.app_register_table(
-  __schema_name,
-  'account_pending_converts',
-  __schema_name
-);
-
-  --------------------------------------------------------------------
-  -- Open Orders
-  --------------------------------------------------------------------
-
-CREATE TABLE btracker_app.open_orders_detail (
-  account_name TEXT    NOT NULL,
-  order_id     BIGINT  NOT NULL,
-  nai          TEXT    NOT NULL,          -- '@@000000013' (HBD) or '@@000000021' (HIVE)
-  amount       NUMERIC NOT NULL,
-  PRIMARY KEY (account_name, order_id, nai)
-);
-CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
-  account_name            TEXT      PRIMARY KEY,
-  open_orders_hbd_count   BIGINT    NOT NULL,
-  open_orders_hive_count  BIGINT    NOT NULL,
-  open_orders_hive_amount NUMERIC   NOT NULL,
-  open_orders_hbd_amount  NUMERIC   NOT NULL,
-  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'
-);
-
+$$; 
