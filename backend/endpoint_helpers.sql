@@ -1,15 +1,15 @@
--- helper to strip trailing zeros and dot from NUMERIC
+SET ROLE btracker_owner;
+
+-- 2) Helper function in btracker_backend schema
 CREATE OR REPLACE FUNCTION btracker_backend.trim_numeric(n NUMERIC)
 RETURNS NUMERIC
 LANGUAGE SQL
 IMMUTABLE
 AS $$
-  SELECT
-    TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM n::TEXT))::NUMERIC;
+  SELECT TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM n::TEXT))::NUMERIC;
 $$;
 
-SET ROLE btracker_owner;
-
+-- 3) Main balances function, using fully-qualified helper calls
 CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(
     _account_id INT
 )
@@ -153,10 +153,10 @@ BEGIN
     wd.withdraw_routes,
     wd.delayed_vests,
 
-    -- only wrap the numeric conversion amounts:
-    trim_numeric(cp.conversion_pending_amount_hbd)   AS conversion_pending_amount_hbd,
+    -- fully‐qualified helper for just the two numeric fields:
+    btracker_backend.trim_numeric(cp.conversion_pending_amount_hbd)   AS conversion_pending_amount_hbd,
     cp.conversion_pending_count_hbd,
-    trim_numeric(cp.conversion_pending_amount_hive)  AS conversion_pending_amount_hive,
+    btracker_backend.trim_numeric(cp.conversion_pending_amount_hive)  AS conversion_pending_amount_hive,
     cp.conversion_pending_count_hive,
 
     oo.open_orders_hbd_count,
