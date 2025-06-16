@@ -1,15 +1,5 @@
 SET ROLE btracker_owner;
 
--- 2) Helper function in btracker_backend schema
-CREATE OR REPLACE FUNCTION btracker_backend.trim_numeric(n NUMERIC)
-RETURNS NUMERIC
-LANGUAGE SQL
-IMMUTABLE
-AS $$
-  SELECT TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM n::TEXT))::NUMERIC;
-$$;
-
--- 3) Main balances function, using fully-qualified helper calls
 CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(
     _account_id INT
 )
@@ -56,8 +46,10 @@ BEGIN
 
     get_post_voting_power AS (
       SELECT
-        (gb.vesting_shares - gd.delegated_vests + gd.received_vests)
-          AS post_voting_power_vests
+        (gb.vesting_shares
+         - gd.delegated_vests
+         + gd.received_vests
+        ) AS post_voting_power_vests
       FROM get_balances gb
       CROSS JOIN get_delegations gd
     ),
@@ -153,10 +145,26 @@ BEGIN
     wd.withdraw_routes,
     wd.delayed_vests,
 
-    -- fully‐qualified helper for just the two numeric fields:
-    btracker_backend.trim_numeric(cp.conversion_pending_amount_hbd)   AS conversion_pending_amount_hbd,
+    -- inline trim for conversion‐pending amounts only
+    (
+      TRIM(
+        TRAILING '.'
+        FROM TRIM(
+          TRAILING '0'
+          FROM cp.conversion_pending_amount_hbd::TEXT
+        )
+      )
+    )::NUMERIC AS conversion_pending_amount_hbd,
     cp.conversion_pending_count_hbd,
-    btracker_backend.trim_numeric(cp.conversion_pending_amount_hive)  AS conversion_pending_amount_hive,
+    (
+      TRIM(
+        TRAILING '.'
+        FROM TRIM(
+          TRAILING '0'
+          FROM cp.conversion_pending_amount_hive::TEXT
+        )
+      )
+    )::NUMERIC AS conversion_pending_amount_hive,
     cp.conversion_pending_count_hive,
 
     oo.open_orders_hbd_count,
