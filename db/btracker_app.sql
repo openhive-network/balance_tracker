@@ -218,6 +218,43 @@ CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
   cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}'
 );
 
+DROP TABLE IF EXISTS tmp_raw_ops;
+CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
+SELECT ov.body::jsonb AS body,
+       ot.name      AS op_name
+FROM hive.operations_view ov
+JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
+WHERE ov.block_num BETWEEN _from_block AND _to_block
+  AND ot.name IN (
+    'hive::protocol::limit_order_create_operation',
+    'hive::protocol::fill_order_operation',
+    'hive::protocol::limit_order_cancel_operation',
+    'hive::protocol::limit_order_cancelled_operation'
+  );
+
+DROP TABLE IF EXISTS tmp_enki_ops;
+CREATE TEMP TABLE tmp_enki_ops ON COMMIT DROP AS
+SELECT
+  op_name,
+  COALESCE(
+    (body->'value'->>'orderid'),
+    (body->'value'->>'open_orderid'),
+    (body->'value'->>'current_orderid')
+  )::BIGINT AS order_id,
+  COALESCE(
+    body->'value'->>'seller',
+    body->'value'->>'owner',
+    body->'value'->>'open_owner',
+    body->'value'->>'current_owner'
+  ) AS acct,
+  body
+FROM tmp_raw_ops
+WHERE
+     (body->'value'->>'seller')        = 'enki'
+  OR (body->'value'->>'owner')         = 'enki'
+  OR (body->'value'->>'open_owner')    = 'enki'
+  OR (body->'value'->>'current_owner') = 'enki'
+ORDER BY op_name, order_id;
 
 
 PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
