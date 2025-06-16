@@ -1,3 +1,13 @@
+-- helper to strip trailing zeros and dot from NUMERIC
+CREATE OR REPLACE FUNCTION btracker_backend.trim_numeric(n NUMERIC)
+RETURNS NUMERIC
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT
+    TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM n::TEXT))::NUMERIC;
+$$;
+
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(
@@ -11,7 +21,6 @@ DECLARE
   result_row btracker_backend.balance;
 BEGIN
   WITH
-    -- 1) Delegations (always returns exactly one row)
     get_delegations AS (
       SELECT
         COALESCE(ad.delegated_vests, 0) AS delegated_vests,
@@ -21,7 +30,6 @@ BEGIN
         ON ad.account = _account_id
     ),
 
-    -- 2) Liquid & vesting shares
     get_balances AS MATERIALIZED (
       SELECT
         COALESCE(MAX(CASE WHEN cab.nai = 13 THEN cab.balance END), 0) AS hbd_balance,
@@ -31,14 +39,10 @@ BEGIN
       WHERE cab.account = _account_id
     ),
 
-    -- 3) Convert vesting_shares → hive-vest balance
     get_vest_balance AS (
       SELECT
         COALESCE(
-          hive.get_vesting_balance(
-            bv.num,
-            gb.vesting_shares
-          ),
+          hive.get_vesting_balance(bv.num, gb.vesting_shares),
           0
         ) AS vesting_balance_hive
       FROM get_balances gb
@@ -50,7 +54,6 @@ BEGIN
       ) bv
     ),
 
-    -- 4) Post-voting-power calculation
     get_post_voting_power AS (
       SELECT
         (gb.vesting_shares - gd.delegated_vests + gd.received_vests)
@@ -59,7 +62,6 @@ BEGIN
       CROSS JOIN get_delegations gd
     ),
 
-    -- 5) Curation & posting rewards
     get_info_rewards AS (
       SELECT
         COALESCE(air.curation_rewards, 0) AS curation_rewards,
@@ -69,7 +71,6 @@ BEGIN
         ON air.account = _account_id
     ),
 
-    -- 6) Other HBD/HIVE/VESTS rewards
     calculate_rewards AS MATERIALIZED (
       SELECT
         COALESCE(MAX(CASE WHEN ar.nai = 13 THEN ar.balance END), 0) AS hbd_rewards,
@@ -80,7 +81,6 @@ BEGIN
       WHERE ar.account = _account_id
     ),
 
-    -- 7) Savings + pending-withdrawal count
     get_savings AS (
       SELECT
         COALESCE(MAX(CASE WHEN ats.nai = 13 THEN ats.saving_balance END), 0) AS hbd_savings,
@@ -90,7 +90,6 @@ BEGIN
       WHERE ats.account = _account_id
     ),
 
-    -- 8) Vesting-withdraw info
     get_withdraws AS (
       SELECT
         COALESCE(aw.vesting_withdraw_rate, 0) AS vesting_withdraw_rate,
@@ -103,7 +102,6 @@ BEGIN
         ON aw.account = _account_id
     ),
 
-    -- 9) Pending convert requests pivoted by asset
     conv_pivot AS (
       SELECT
         COALESCE(MAX(CASE WHEN asset = 'HBD'  THEN total_amount END), 0) AS conversion_pending_amount_hbd,
@@ -118,7 +116,6 @@ BEGIN
       )
     ),
 
-    -- 10) Open-orders summary
     open_orders AS (
       SELECT
         COALESCE(MAX(aoos.open_orders_hbd_count),  0) AS open_orders_hbd_count,
@@ -133,7 +130,6 @@ BEGIN
       )
     )
 
-  -- 🔥 Final assembly into the composite type
   SELECT
     gb.hbd_balance,
     gb.hive_balance,
@@ -156,10 +152,13 @@ BEGIN
     wd.withdrawn,
     wd.withdraw_routes,
     wd.delayed_vests,
-    cp.conversion_pending_amount_hbd,
+
+    -- only wrap the numeric conversion amounts:
+    trim_numeric(cp.conversion_pending_amount_hbd)   AS conversion_pending_amount_hbd,
     cp.conversion_pending_count_hbd,
-    cp.conversion_pending_amount_hive,
+    trim_numeric(cp.conversion_pending_amount_hive)  AS conversion_pending_amount_hive,
     cp.conversion_pending_count_hive,
+
     oo.open_orders_hbd_count,
     oo.open_orders_hive_count,
     oo.open_orders_hive_amount,
@@ -179,6 +178,8 @@ BEGIN
   RETURN result_row;
 END;
 $BODY$;
+
+RESET ROLE;
 
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
