@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_open_orders(
+CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
   IN _from_block INT,
   IN _to_block   INT
 )
