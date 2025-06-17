@@ -17,8 +17,8 @@ DECLARE
 BEGIN
   WITH raw_ops AS MATERIALIZED (
     SELECT
-      ov.body::jsonb   AS body,
-      ot.name          AS op_name
+      ov.body   ::jsonb AS body,
+      ot.name           AS op_name
     FROM hive.operations_view ov
     JOIN hafd.operation_types ot
       ON ot.id = ov.op_type_id
@@ -30,13 +30,16 @@ BEGIN
         'hive::protocol::limit_order_cancelled_operation'
       )
   ),
+
+  -- 2a) New order creates
   creates AS MATERIALIZED (
     SELECT
       (body->'value'->>'owner')::TEXT    AS acct,
       (body->'value'->>'orderid')::BIGINT AS id,
       (body->'value'->'amount_to_sell'->>'nai')   AS nai,
       ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-         / POWER(10,
+         / POWER(
+             10,
              (body->'value'->'amount_to_sell'->>'precision')::INT
            )
       )                                           AS amt
@@ -44,13 +47,15 @@ BEGIN
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
   ),
+
+  -- 2b) Cancels
   cancels AS MATERIALIZED (
     SELECT
-      (body->'value'->>'orderid')::BIGINT           AS id,
+      (body->'value'->>'orderid')::BIGINT AS id,
       COALESCE(
         body->'value'->>'seller',
         body->'value'->>'owner'
-      )::TEXT                                        AS acct
+      )::TEXT                              AS acct
     FROM raw_ops
     WHERE op_name IN (
       'hive::protocol::limit_order_cancel_operation',
@@ -58,11 +63,12 @@ BEGIN
     )
       AND (body->'value'->>'orderid') IS NOT NULL
   ),
+
+  -- 2c) Fills (only owner + order id)
   fills AS MATERIALIZED (
     SELECT
       (body->'value'->>'open_owner')   ::TEXT   AS acct,
-      (body->'value'->>'open_orderid') ::BIGINT AS id,
-      (body->'value'->'pays'->>'nai')           AS nai
+      (body->'value'->>'open_orderid') ::BIGINT AS id
     FROM raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
       AND (body->'value'->>'open_orderid') IS NOT NULL
@@ -71,12 +77,13 @@ BEGIN
 
     SELECT
       (body->'value'->>'current_owner')   ::TEXT   AS acct,
-      (body->'value'->>'current_orderid') ::BIGINT AS id,
-      (body->'value'->'receives'->>'nai')       AS nai
+      (body->'value'->>'current_orderid') ::BIGINT AS id
     FROM raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
       AND (body->'value'->>'current_orderid') IS NOT NULL
   ),
+
+  -- 3a) Insert new creates
   ins AS (
     INSERT INTO btracker_app.open_orders_detail
       (account_name, order_id, nai, amount)
@@ -85,6 +92,8 @@ BEGIN
     ON CONFLICT DO NOTHING
     RETURNING 1
   ),
+
+  -- 3b) Delete cancelled orders
   del_c AS (
     DELETE FROM btracker_app.open_orders_detail d
     USING cancels c
@@ -92,14 +101,17 @@ BEGIN
       AND d.order_id     = c.id
     RETURNING 1
   ),
+
+  -- 3c) Delete filled orders (no asset check)
   del_f AS (
     DELETE FROM btracker_app.open_orders_detail d
     USING fills f
     WHERE d.account_name = f.acct
       AND d.order_id     = f.id
-      AND d.nai          = f.nai
     RETURNING 1
   ),
+
+  -- 4) Rebuild per-account summary
   snap AS (
     SELECT
       account_name,
@@ -129,12 +141,15 @@ BEGIN
         open_orders_hive_amount = EXCLUDED.open_orders_hive_amount
     RETURNING 1
   ),
+
+  -- 5) Purge zero‐order summaries
   purge AS (
     DELETE FROM btracker_app.account_open_orders_summary s
     WHERE s.open_orders_hbd_count  = 0
       AND s.open_orders_hive_count = 0
     RETURNING 1
   )
+
   SELECT
     (SELECT COUNT(*) FROM ins),
     (SELECT COUNT(*) FROM del_c),
