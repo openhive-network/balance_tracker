@@ -201,14 +201,26 @@ PERFORM hive.app_register_table(
   --------------------------------------------------------------------
   -- Open Orders
   --------------------------------------------------------------------
-CREATE TABLE btracker_app.open_orders_detail (
+CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
   account_name TEXT    NOT NULL,
   order_id     BIGINT  NOT NULL,
   nai          TEXT    NOT NULL,   -- '@@000000013' (HBD) or '@@000000021' (HIVE)
   amount       NUMERIC NOT NULL,
   PRIMARY KEY (account_name, order_id, nai)
 );
+
+-- 2) Per‐account summary of those open orders
+CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
+  account_name            TEXT      PRIMARY KEY,
+  open_orders_hbd_count   BIGINT    NOT NULL,
+  open_orders_hbd_amount  NUMERIC   NOT NULL,
+  open_orders_hive_count  BIGINT    NOT NULL,
+  open_orders_hive_amount NUMERIC   NOT NULL
+);
+
 PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
+PERFORM hive.app_register_table(__schema_name, 'account_open_orders_summary', __schema_name);
+
 
   --------------------------------------------------------------------
   -- ACCOUNT WITHDRAWS & ROUTES
