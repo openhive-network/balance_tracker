@@ -9,14 +9,31 @@ LANGUAGE plpgsql
 VOLATILE
 AS $$
 DECLARE
-  c_new_creates     INT;
-  c_closed_cancels  INT;
-  c_closed_fills    INT;
-  c_closed_rows     INT;
-  c_summary_upserts INT;
-  c_new_cancel_ids  INT;
-  c_purged          INT;
+  c_new_creates      INT;
+  c_closed_cancels   INT;
+  c_closed_fills     INT;
+  c_closed_rows      INT;
+  c_summary_upserts  INT;
+  c_new_cancel_ids   INT;
+  c_purged           INT;
 BEGIN
+  /* 0) Build a reusable temp table of cancels */
+  CREATE TEMP TABLE tmp_cancels ON COMMIT DROP AS
+  SELECT
+    (ov.body::jsonb->'value'->>'orderid')::BIGINT AS id,
+    COALESCE(
+      ov.body::jsonb->'value'->>'seller',
+      ov.body::jsonb->'value'->>'owner'
+    )::TEXT AS acct
+  FROM hive.operations_view ov
+  JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
+  WHERE ov.block_num BETWEEN _from_block AND _to_block
+    AND ot.name IN (
+      'hive::protocol::limit_order_cancel_operation',
+      'hive::protocol::limit_order_cancelled_operation'
+    )
+    AND (ov.body::jsonb->'value'->>'orderid') IS NOT NULL;
+
   /* 1) Insert new creates */
   WITH raw_ops AS (
     SELECT ov.body::jsonb AS body
@@ -29,10 +46,10 @@ BEGIN
     SELECT
       (body->'value'->>'owner')::TEXT    AS acct,
       (body->'value'->>'orderid')::BIGINT AS id,
-      (body->'value'->'amount_to_sell'->>'nai')    AS nai,
+      (body->'value'->'amount_to_sell'->>'nai') AS nai,
       ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
          / POWER(10,(body->'value'->'amount_to_sell'->>'precision')::INT)
-      )                                            AS amt
+      ) AS amt
     FROM raw_ops
     WHERE (body->'value'->>'orderid') IS NOT NULL
   ),
@@ -46,29 +63,9 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_new_creates FROM ins;
 
-  /* 2) Delete cancelled orders */
-  WITH raw_ops AS (
-    SELECT ov.body::jsonb AS body
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
-     WHERE ov.block_num BETWEEN _from_block AND _to_block
-       AND ot.name IN (
-         'hive::protocol::limit_order_cancel_operation',
-         'hive::protocol::limit_order_cancelled_operation'
-       )
-  ),
-  cancels AS (
-    SELECT
-      (body->'value'->>'orderid')::BIGINT                                    AS id,
-      COALESCE(
-        body->'value'->>'seller',
-        body->'value'->>'owner'
-      )::TEXT                                                                   AS acct
-    FROM raw_ops
-    WHERE (body->'value'->>'orderid') IS NOT NULL
-  )
+  /* 2) Delete cancelled orders using tmp_cancels */
   DELETE FROM btracker_app.open_orders_detail d
-  USING cancels c
+  USING tmp_cancels c
   WHERE d.account_name = c.acct
     AND d.order_id     = c.id;
   GET DIAGNOSTICS c_closed_cancels = ROW_COUNT;
@@ -108,10 +105,10 @@ BEGIN
   WITH snap AS (
     SELECT
       account_name,
-      COUNT(*) FILTER (WHERE nai = '@@000000013')                    AS open_orders_hbd_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)     AS open_orders_hbd_amount,
-      COUNT(*) FILTER (WHERE nai = '@@000000021')                    AS open_orders_hive_count,
-      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)     AS open_orders_hive_amount
+      COUNT(*) FILTER (WHERE nai = '@@000000013')                AS open_orders_hbd_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0) AS open_orders_hbd_amount,
+      COUNT(*) FILTER (WHERE nai = '@@000000021')                AS open_orders_hive_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0) AS open_orders_hive_amount
     FROM btracker_app.open_orders_detail
     GROUP BY account_name
   ),
@@ -139,11 +136,11 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  /* 5) Append new cancel IDs */
+  /* 5) Append new cancel IDs using tmp_cancels */
   WITH append_ids AS (
     UPDATE btracker_app.account_open_orders_summary dst
     SET cancelled_order_ids = dst.cancelled_order_ids || c.id
-    FROM cancels c
+    FROM tmp_cancels c
     WHERE dst.account_name = c.acct
       AND NOT (c.id = ANY(dst.cancelled_order_ids))
     RETURNING 1
