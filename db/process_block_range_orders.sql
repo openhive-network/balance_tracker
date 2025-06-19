@@ -32,10 +32,14 @@ BEGIN
          'hive::protocol::limit_order_cancelled_operation'
        );
 
-  -- b) Insert new creates
+  -- b) Insert new creates (skip ones already filled)
   DROP TABLE IF EXISTS tmp_ins_created;
   CREATE TEMP TABLE tmp_ins_created ON COMMIT DROP AS
-  WITH ins AS (
+  WITH already_closed AS (
+    SELECT order_id
+      FROM btracker_app.order_event_log
+     WHERE event_type = 'fill'
+  ), ins AS (
     INSERT INTO btracker_app.open_orders_detail (account_name, order_id, nai, amount)
     SELECT
       (body->'value'->>'owner')::TEXT,
@@ -47,6 +51,7 @@ BEGIN
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
+      AND (body->'value'->>'orderid')::BIGINT NOT IN (SELECT order_id FROM already_closed)
     ON CONFLICT DO NOTHING
     RETURNING account_name, order_id
   )
@@ -103,7 +108,6 @@ BEGIN
     UNION ALL
     SELECT curr_acct AS acct, curr_id AS id       FROM tmp_fill_ops;
 
-  -- subtract & truncate (force numeric for trunc())
   UPDATE btracker_app.open_orders_detail d
      SET amount = TRUNC((d.amount - f.open_amount)::numeric, 3)
     FROM tmp_fill_ops f
@@ -116,9 +120,16 @@ BEGIN
    WHERE d.account_name = f.curr_acct
      AND d.order_id     = f.curr_id;
 
-  -- delete exactly-empty rows
-  DELETE FROM btracker_app.open_orders_detail
-   WHERE amount <= 0;
+  -- delete fully filled, dust, or any already-filled orders
+  DELETE FROM btracker_app.open_orders_detail d
+   WHERE amount <= 0.001
+      OR EXISTS (
+        SELECT 1
+          FROM btracker_app.order_event_log e
+         WHERE e.order_id   = d.order_id
+           AND e.acct       = d.account_name
+           AND e.event_type = 'fill'
+      );
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
   INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
@@ -153,7 +164,7 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  -- f) Append debug arrays
+  -- f) Append to debug arrays
   WITH a1 AS (
     UPDATE btracker_app.account_open_orders_summary dst
        SET created_order_ids = dst.created_order_ids || c.order_id
@@ -189,7 +200,7 @@ BEGIN
     RETURNING 1
   ) SELECT COUNT(*) INTO c_purged FROM purge;
 
-  -- h) Notice
+  -- h) Console notice
   RAISE NOTICE
     'Blocks %–% | new_creates=% | created_ids_appended=% | cancelled_deleted=% | cancels_appended=% | fills_deleted=% | fills_appended=% | summary_upserts=% | purged=%',
     _from_block, _to_block,
