@@ -1,63 +1,3 @@
--- ======================================================================
--- 1) Order book detail
--- ======================================================================
-CREATE SCHEMA IF NOT EXISTS btracker_app;
-
-CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
-  account_name TEXT    NOT NULL,
-  order_id     BIGINT  NOT NULL,
-  nai          TEXT    NOT NULL,   -- '@@000000013' (HBD) or '@@000000021' (HIVE)
-  amount       NUMERIC NOT NULL,   -- remaining amount_to_sell
-  PRIMARY KEY (account_name, order_id, nai)
-);
-
--- ======================================================================
--- 2) Per-account summary + debug arrays
--- ======================================================================
-CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
-  account_name            TEXT      PRIMARY KEY,
-  open_orders_hbd_count   BIGINT    NOT NULL,
-  open_orders_hbd_amount  NUMERIC   NOT NULL,
-  open_orders_hive_count  BIGINT    NOT NULL,
-  open_orders_hive_amount NUMERIC   NOT NULL,
-  created_order_ids       BIGINT[]  NOT NULL DEFAULT '{}',
-  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}',
-  filled_order_ids        BIGINT[]  NOT NULL DEFAULT '{}'
-);
-
--- ======================================================================
--- 3) Run-level audit log
--- ======================================================================
-CREATE TABLE IF NOT EXISTS btracker_app.block_range_run_log (
-  run_id            BIGSERIAL   PRIMARY KEY,
-  processed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  from_block        INT         NOT NULL,
-  to_block          INT         NOT NULL,
-  new_creates       INT         NOT NULL,
-  cancelled_deleted INT         NOT NULL,
-  fills_deleted     INT         NOT NULL,
-  summary_upserts   INT         NOT NULL,
-  purged            INT         NOT NULL,
-  created_ids       BIGINT[]    NOT NULL,
-  cancelled_ids     BIGINT[]    NOT NULL,
-  filled_ids        BIGINT[]    NOT NULL
-);
-
--- ======================================================================
--- 4) Per-event log
--- ======================================================================
-CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
-  acct       TEXT      NOT NULL,
-  order_id   BIGINT    NOT NULL,
-  event_type TEXT      NOT NULL CHECK (event_type IN ('create','cancel','fill')),
-  block_num  INT       NOT NULL,
-  event_ts   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- ======================================================================
--- Function: process_block_range_orders
---   (with numeric rounding to avoid double-precision errors)
--- ======================================================================
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
@@ -140,7 +80,7 @@ BEGIN
   SELECT acct, id, 'cancel', _to_block
     FROM tmp_cancels;
 
-  -- d) Process partial fills (force numeric rounding)
+  -- d) Process partial fills (with numeric rounding)
   DROP TABLE IF EXISTS tmp_fill_ops;
   CREATE TEMP TABLE tmp_fill_ops ON COMMIT DROP AS
     SELECT
@@ -163,7 +103,7 @@ BEGIN
     UNION ALL
     SELECT curr_acct AS acct, curr_id AS id       FROM tmp_fill_ops;
 
-  -- subtract & explicitly cast to numeric for round()
+  -- subtract & round (force numeric for round())
   UPDATE btracker_app.open_orders_detail d
      SET amount = ROUND((d.amount - f.open_amount)::numeric, 3)
     FROM tmp_fill_ops f
