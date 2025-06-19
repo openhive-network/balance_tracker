@@ -32,7 +32,7 @@ BEGIN
          'hive::protocol::limit_order_cancelled_operation'
        );
 
-  -- b) Insert new creates (skip ones already filled)
+  -- b) Insert new creates (skip orders already filled)
   DROP TABLE IF EXISTS tmp_ins_created;
   CREATE TEMP TABLE tmp_ins_created ON COMMIT DROP AS
   WITH already_closed AS (
@@ -120,16 +120,9 @@ BEGIN
    WHERE d.account_name = f.curr_acct
      AND d.order_id     = f.curr_id;
 
-  -- delete fully filled, dust, or any already-filled orders
-  DELETE FROM btracker_app.open_orders_detail d
-   WHERE amount <= 0.001
-      OR EXISTS (
-        SELECT 1
-          FROM btracker_app.order_event_log e
-         WHERE e.order_id   = d.order_id
-           AND e.acct       = d.account_name
-           AND e.event_type = 'fill'
-      );
+  -- ←– FIX: only delete fully zero or dust (<0.001). PARTIAL REMAINDERS STAY OPEN.
+  DELETE FROM btracker_app.open_orders_detail
+   WHERE amount < 0.001;
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
   INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
@@ -164,13 +157,13 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  -- f) Append to debug arrays
+  -- f) Append debug arrays
   WITH a1 AS (
     UPDATE btracker_app.account_open_orders_summary dst
        SET created_order_ids = dst.created_order_ids || c.order_id
       FROM tmp_ins_created c
      WHERE dst.account_name = c.account_name
-       AND NOT (c.order_id = ANY(dst.created_order_ids))
+       AND NOT c.order_id = ANY(dst.created_order_ids)
     RETURNING 1
   ) SELECT COUNT(*) INTO c_new_created_ids FROM a1;
 
@@ -179,7 +172,7 @@ BEGIN
        SET cancelled_order_ids = dst.cancelled_order_ids || c.id
       FROM tmp_cancels c
      WHERE dst.account_name = c.acct
-       AND NOT (c.id = ANY(dst.cancelled_order_ids))
+       AND NOT c.id = ANY(dst.cancelled_order_ids)
     RETURNING 1
   ) SELECT COUNT(*) INTO c_new_cancel_ids FROM a2;
 
@@ -188,7 +181,7 @@ BEGIN
        SET filled_order_ids = dst.filled_order_ids || f.id
       FROM tmp_fills f
      WHERE dst.account_name = f.acct
-       AND NOT (f.id = ANY(dst.filled_order_ids))
+       AND NOT f.id = ANY(dst.filled_order_ids)
     RETURNING 1
   ) SELECT COUNT(*) INTO c_new_fill_ids FROM a3;
 
