@@ -209,17 +209,46 @@ CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
   PRIMARY KEY (account_name, order_id, nai)
 );
 
--- 2) Per‐account summary of those open orders
+-- 2) Per-account summary, plus arrays for created / cancelled / filled IDs
 CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
   account_name            TEXT      PRIMARY KEY,
   open_orders_hbd_count   BIGINT    NOT NULL,
   open_orders_hbd_amount  NUMERIC   NOT NULL,
   open_orders_hive_count  BIGINT    NOT NULL,
-  open_orders_hive_amount NUMERIC   NOT NULL
+  open_orders_hive_amount NUMERIC   NOT NULL,
+  created_order_ids       BIGINT[]  NOT NULL DEFAULT '{}',
+  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}',
+  filled_order_ids        BIGINT[]  NOT NULL DEFAULT '{}'
 );
 
+-- 3) Run‐level audit: one row per function invocation
+CREATE TABLE IF NOT EXISTS btracker_app.block_range_run_log (
+  run_id            BIGSERIAL   PRIMARY KEY,
+  processed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  from_block        INT         NOT NULL,
+  to_block          INT         NOT NULL,
+  new_creates       INT         NOT NULL,
+  cancelled_deleted INT         NOT NULL,
+  fills_deleted     INT         NOT NULL,
+  summary_upserts   INT         NOT NULL,
+  purged            INT         NOT NULL,
+  created_ids       BIGINT[]    NOT NULL,
+  cancelled_ids     BIGINT[]    NOT NULL,
+  filled_ids        BIGINT[]    NOT NULL
+);
+
+-- 4) Event‐level log: one row per order event
+CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
+  acct       TEXT      NOT NULL,
+  order_id   BIGINT    NOT NULL,
+  event_type TEXT      NOT NULL CHECK (event_type IN ('create','cancel','fill')),
+  block_num  INT       NOT NULL,
+  event_ts   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
 PERFORM hive.app_register_table(__schema_name, 'account_open_orders_summary', __schema_name);
+PERFORM hive.app_register_table(__schema_name, 'block_range_run_log', __schema_name);
+PERFORM hive.app_register_table(__schema_name, 'order_event_log', __schema_name);
 
 
   --------------------------------------------------------------------
