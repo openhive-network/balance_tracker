@@ -1,3 +1,63 @@
+-- ======================================================================
+-- 1) Order book detail
+-- ======================================================================
+CREATE SCHEMA IF NOT EXISTS btracker_app;
+
+CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
+  account_name TEXT    NOT NULL,
+  order_id     BIGINT  NOT NULL,
+  nai          TEXT    NOT NULL,   -- '@@000000013' (HBD) or '@@000000021' (HIVE)
+  amount       NUMERIC NOT NULL,   -- remaining amount_to_sell
+  PRIMARY KEY (account_name, order_id, nai)
+);
+
+-- ======================================================================
+-- 2) Per-account summary + debug arrays
+-- ======================================================================
+CREATE TABLE IF NOT EXISTS btracker_app.account_open_orders_summary (
+  account_name            TEXT      PRIMARY KEY,
+  open_orders_hbd_count   BIGINT    NOT NULL,
+  open_orders_hbd_amount  NUMERIC   NOT NULL,
+  open_orders_hive_count  BIGINT    NOT NULL,
+  open_orders_hive_amount NUMERIC   NOT NULL,
+  created_order_ids       BIGINT[]  NOT NULL DEFAULT '{}',
+  cancelled_order_ids     BIGINT[]  NOT NULL DEFAULT '{}',
+  filled_order_ids        BIGINT[]  NOT NULL DEFAULT '{}'
+);
+
+-- ======================================================================
+-- 3) Run-level audit log
+-- ======================================================================
+CREATE TABLE IF NOT EXISTS btracker_app.block_range_run_log (
+  run_id            BIGSERIAL   PRIMARY KEY,
+  processed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  from_block        INT         NOT NULL,
+  to_block          INT         NOT NULL,
+  new_creates       INT         NOT NULL,
+  cancelled_deleted INT         NOT NULL,
+  fills_deleted     INT         NOT NULL,
+  summary_upserts   INT         NOT NULL,
+  purged            INT         NOT NULL,
+  created_ids       BIGINT[]    NOT NULL,
+  cancelled_ids     BIGINT[]    NOT NULL,
+  filled_ids        BIGINT[]    NOT NULL
+);
+
+-- ======================================================================
+-- 4) Per-event log
+-- ======================================================================
+CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
+  acct       TEXT      NOT NULL,
+  order_id   BIGINT    NOT NULL,
+  event_type TEXT      NOT NULL CHECK (event_type IN ('create','cancel','fill')),
+  block_num  INT       NOT NULL,
+  event_ts   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ======================================================================
+-- Function: process_block_range_orders
+--   (with 3-decimal rounding in fill logic)
+-- ======================================================================
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
@@ -21,16 +81,16 @@ BEGIN
   -- a) Load raw ops
   DROP TABLE IF EXISTS tmp_raw_ops;
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
-  SELECT ov.body::jsonb AS body, ot.name AS op_name
-    FROM hive.operations_view ov
-    JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
-   WHERE ov.block_num BETWEEN _from_block AND _to_block
-     AND ot.name IN (
-       'hive::protocol::limit_order_create_operation',
-       'hive::protocol::fill_order_operation',
-       'hive::protocol::limit_order_cancel_operation',
-       'hive::protocol::limit_order_cancelled_operation'
-     );
+    SELECT ov.body::jsonb AS body, ot.name AS op_name
+      FROM hive.operations_view ov
+      JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
+     WHERE ov.block_num BETWEEN _from_block AND _to_block
+       AND ot.name IN (
+         'hive::protocol::limit_order_create_operation',
+         'hive::protocol::fill_order_operation',
+         'hive::protocol::limit_order_cancel_operation',
+         'hive::protocol::limit_order_cancelled_operation'
+       );
 
   -- b) Insert new creates
   DROP TABLE IF EXISTS tmp_ins_created;
@@ -60,15 +120,15 @@ BEGIN
   -- c) Delete cancelled orders
   DROP TABLE IF EXISTS tmp_cancels;
   CREATE TEMP TABLE tmp_cancels ON COMMIT DROP AS
-  SELECT
-    (body->'value'->>'orderid')::BIGINT AS id,
-    COALESCE(body->'value'->>'seller', body->'value'->>'owner')::TEXT AS acct
-  FROM tmp_raw_ops
-  WHERE op_name IN (
-    'hive::protocol::limit_order_cancel_operation',
-    'hive::protocol::limit_order_cancelled_operation'
-  )
-    AND (body->'value'->>'orderid') IS NOT NULL;
+    SELECT
+      (body->'value'->>'orderid')::BIGINT AS id,
+      COALESCE(body->'value'->>'seller', body->'value'->>'owner')::TEXT AS acct
+    FROM tmp_raw_ops
+    WHERE op_name IN (
+      'hive::protocol::limit_order_cancel_operation',
+      'hive::protocol::limit_order_cancelled_operation'
+    )
+      AND (body->'value'->>'orderid') IS NOT NULL;
 
   DELETE FROM btracker_app.open_orders_detail d
     USING tmp_cancels c
@@ -80,45 +140,44 @@ BEGIN
   SELECT acct, id, 'cancel', _to_block
     FROM tmp_cancels;
 
-  -- d) Process partial fills
+  -- d) Process partial fills (with 3-decimal rounding)
   DROP TABLE IF EXISTS tmp_fill_ops;
   CREATE TEMP TABLE tmp_fill_ops ON COMMIT DROP AS
-  SELECT
-    (body->'value'->>'open_owner')   ::TEXT    AS open_acct,
-    (body->'value'->>'open_orderid') ::BIGINT  AS open_id,
-    ((body->'value'->'open_pays'->>'amount')::NUMERIC
-       / POWER(10,(body->'value'->'open_pays'->>'precision')::INT)
-    )                                AS open_amount,
-    (body->'value'->>'current_owner')   ::TEXT    AS curr_acct,
-    (body->'value'->>'current_orderid') ::BIGINT  AS curr_id,
-    ((body->'value'->'current_pays'->>'amount')::NUMERIC
-       / POWER(10,(body->'value'->'current_pays'->>'precision')::INT)
-    )                                AS curr_amount
-  FROM tmp_raw_ops
-  WHERE op_name = 'hive::protocol::fill_order_operation';
+    SELECT
+      (body->'value'->>'open_owner')   ::TEXT    AS open_acct,
+      (body->'value'->>'open_orderid') ::BIGINT  AS open_id,
+      ((body->'value'->'open_pays'->>'amount')::NUMERIC
+         / POWER(10,(body->'value'->'open_pays'->>'precision')::INT)
+      )                                AS open_amount,
+      (body->'value'->>'current_owner')   ::TEXT    AS curr_acct,
+      (body->'value'->>'current_orderid') ::BIGINT  AS curr_id,
+      ((body->'value'->'current_pays'->>'amount')::NUMERIC
+         / POWER(10,(body->'value'->'current_pays'->>'precision')::INT)
+      )                                AS curr_amount
+    FROM tmp_raw_ops
+    WHERE op_name = 'hive::protocol::fill_order_operation';
 
-  -- make a flattened list of all sides for logging & summary
+  -- flatten for logging
   DROP TABLE IF EXISTS tmp_fills;
   CREATE TEMP TABLE tmp_fills ON COMMIT DROP AS
-  SELECT open_acct AS acct, open_id AS id FROM tmp_fill_ops
-  UNION ALL
-  SELECT curr_acct AS acct, curr_id AS id FROM tmp_fill_ops;
+    SELECT open_acct AS acct, open_id AS id FROM tmp_fill_ops
+    UNION ALL
+    SELECT curr_acct AS acct, curr_id AS id       FROM tmp_fill_ops;
 
-  -- subtract from maker’s remaining amount
+  -- subtract and round to 3 dp
   UPDATE btracker_app.open_orders_detail d
-     SET amount = d.amount - f.open_amount
+     SET amount = ROUND(d.amount - f.open_amount, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.open_acct
      AND d.order_id     = f.open_id;
 
-  -- subtract from taker’s remaining amount
   UPDATE btracker_app.open_orders_detail d
-     SET amount = d.amount - f.curr_amount
+     SET amount = ROUND(d.amount - f.curr_amount, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.curr_acct
      AND d.order_id     = f.curr_id;
 
-  -- delete any order fully filled (amount ≤ 0)
+  -- delete exactly-empty rows
   DELETE FROM btracker_app.open_orders_detail
    WHERE amount <= 0;
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
