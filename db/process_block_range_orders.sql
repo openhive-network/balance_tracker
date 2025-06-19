@@ -42,7 +42,7 @@ BEGIN
       (body->'value'->>'orderid')::BIGINT,
       (body->'value'->'amount_to_sell'->>'nai'),
       ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-         / POWER(10, (body->'value'->'amount_to_sell'->>'precision')::INT)
+         / POWER(10,(body->'value'->'amount_to_sell'->>'precision')::INT)
       )
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
@@ -87,12 +87,12 @@ BEGIN
       (body->'value'->>'open_owner')   ::TEXT    AS open_acct,
       (body->'value'->>'open_orderid') ::BIGINT  AS open_id,
       ((body->'value'->'open_pays'->>'amount')::NUMERIC
-         / POWER(10, (body->'value'->'open_pays'->>'precision')::INT)
+         / POWER(10,(body->'value'->'open_pays'->>'precision')::INT)
       )                                AS open_amount,
       (body->'value'->>'current_owner')   ::TEXT    AS curr_acct,
       (body->'value'->>'current_orderid') ::BIGINT  AS curr_id,
       ((body->'value'->'current_pays'->>'amount')::NUMERIC
-         / POWER(10, (body->'value'->'current_pays'->>'precision')::INT)
+         / POWER(10,(body->'value'->'current_pays'->>'precision')::INT)
       )                                AS curr_amount
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation';
@@ -103,15 +103,15 @@ BEGIN
     UNION ALL
     SELECT curr_acct AS acct, curr_id AS id       FROM tmp_fill_ops;
 
-  -- subtract & trunc to 3 dp
+  -- subtract & truncate (force numeric for trunc())
   UPDATE btracker_app.open_orders_detail d
-     SET amount = TRUNC(d.amount - f.open_amount, 3)
+     SET amount = TRUNC((d.amount - f.open_amount)::numeric, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.open_acct
      AND d.order_id     = f.open_id;
 
   UPDATE btracker_app.open_orders_detail d
-     SET amount = TRUNC(d.amount - f.curr_amount, 3)
+     SET amount = TRUNC((d.amount - f.curr_amount)::numeric, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.curr_acct
      AND d.order_id     = f.curr_id;
@@ -153,7 +153,7 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  -- f) Append to debug arrays
+  -- f) Append debug arrays
   WITH a1 AS (
     UPDATE btracker_app.account_open_orders_summary dst
        SET created_order_ids = dst.created_order_ids || c.order_id
@@ -189,7 +189,7 @@ BEGIN
     RETURNING 1
   ) SELECT COUNT(*) INTO c_purged FROM purge;
 
-  -- h) Console notice
+  -- h) Notice
   RAISE NOTICE
     'Blocks %–% | new_creates=% | created_ids_appended=% | cancelled_deleted=% | cancels_appended=% | fills_deleted=% | fills_appended=% | summary_upserts=% | purged=%',
     _from_block, _to_block,
