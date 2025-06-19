@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
 
 -- ======================================================================
 -- Function: process_block_range_orders
---   (with 3-decimal rounding in fill logic)
+--   (with numeric rounding to avoid double-precision errors)
 -- ======================================================================
 SET ROLE btracker_owner;
 
@@ -140,7 +140,7 @@ BEGIN
   SELECT acct, id, 'cancel', _to_block
     FROM tmp_cancels;
 
-  -- d) Process partial fills (with 3-decimal rounding)
+  -- d) Process partial fills (force numeric rounding)
   DROP TABLE IF EXISTS tmp_fill_ops;
   CREATE TEMP TABLE tmp_fill_ops ON COMMIT DROP AS
     SELECT
@@ -157,22 +157,21 @@ BEGIN
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation';
 
-  -- flatten for logging
   DROP TABLE IF EXISTS tmp_fills;
   CREATE TEMP TABLE tmp_fills ON COMMIT DROP AS
     SELECT open_acct AS acct, open_id AS id FROM tmp_fill_ops
     UNION ALL
     SELECT curr_acct AS acct, curr_id AS id       FROM tmp_fill_ops;
 
-  -- subtract and round to 3 dp
+  -- subtract & explicitly cast to numeric for round()
   UPDATE btracker_app.open_orders_detail d
-     SET amount = ROUND(d.amount - f.open_amount, 3)
+     SET amount = ROUND((d.amount - f.open_amount)::numeric, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.open_acct
      AND d.order_id     = f.open_id;
 
   UPDATE btracker_app.open_orders_detail d
-     SET amount = ROUND(d.amount - f.curr_amount, 3)
+     SET amount = ROUND((d.amount - f.curr_amount)::numeric, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.curr_acct
      AND d.order_id     = f.curr_id;
@@ -182,7 +181,6 @@ BEGIN
    WHERE amount <= 0;
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
-  -- log each side of the fill
   INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
   SELECT acct, id, 'fill', _to_block
     FROM tmp_fills;
