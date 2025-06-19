@@ -1,14 +1,5 @@
 SET ROLE btracker_owner;
 
--- (One‐time only:)
--- CREATE TABLE IF NOT EXISTS btracker_app.pending_fills (
---   account_name TEXT    NOT NULL,
---   order_id     BIGINT  NOT NULL,
---   nai          TEXT    NOT NULL,
---   delta_amount NUMERIC NOT NULL,
---   PRIMARY KEY (account_name, order_id, nai)
--- );
-
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
   IN _from_block INT,
   IN _to_block   INT
@@ -18,30 +9,31 @@ LANGUAGE plpgsql
 VOLATILE
 AS $$
 DECLARE
-  c_new_creates     INT;
-  c_new_created_ids INT;
-  c_closed_cancels  INT;
-  c_new_cancel_ids  INT;
-  c_closed_fills    INT;
-  c_new_fill_ids    INT;
-  c_summary_upserts INT;
-  c_purged          INT;
+  c_new_creates      INT;
+  c_new_created_ids  INT;
+  c_closed_cancels   INT;
+  c_new_cancel_ids   INT;
+  c_closed_fills     INT;
+  c_new_fill_ids     INT;
+  c_summary_upserts  INT;
+  c_purged           INT;
 BEGIN
-  -- a) Load raw ops for this block range
+  -- a) load raw ops
   DROP TABLE IF EXISTS tmp_raw_ops;
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
-    SELECT ov.body::jsonb AS body, ot.name AS op_name
-      FROM hive.operations_view ov
-      JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
-     WHERE ov.block_num BETWEEN _from_block AND _to_block
-       AND ot.name IN (
-         'hive::protocol::limit_order_create_operation',
-         'hive::protocol::fill_order_operation',
-         'hive::protocol::limit_order_cancel_operation',
-         'hive::protocol::limit_order_cancelled_operation'
-       );
+  SELECT ov.body::jsonb AS body, ot.name AS op_name
+    FROM hive.operations_view ov
+    JOIN hafd.operation_types ot
+      ON ot.id = ov.op_type_id
+   WHERE ov.block_num BETWEEN _from_block AND _to_block
+     AND ot.name IN (
+       'hive::protocol::limit_order_create_operation',
+       'hive::protocol::fill_order_operation',
+       'hive::protocol::limit_order_cancel_operation',
+       'hive::protocol::limit_order_cancelled_operation'
+     );
 
-  -- b) Insert new creates (skip ones already completely filled)
+  -- b) insert creates, skipping ones already filled…
   DROP TABLE IF EXISTS tmp_ins_created;
   CREATE TEMP TABLE tmp_ins_created ON COMMIT DROP AS
   WITH already_closed AS (
@@ -49,69 +41,75 @@ BEGIN
       FROM btracker_app.order_event_log
      WHERE event_type = 'fill'
   ), ins AS (
-    INSERT INTO btracker_app.open_orders_detail (account_name, order_id, nai, amount)
+    INSERT INTO btracker_app.open_orders_detail
+      (account_name, order_id, nai, amount)
     SELECT
       (body->'value'->>'owner')::TEXT,
       (body->'value'->>'orderid')::BIGINT,
       (body->'value'->'amount_to_sell'->>'nai'),
       ((body->'value'->'amount_to_sell'->>'amount')::NUMERIC
-         / POWER(10,(body->'value'->'amount_to_sell'->>'precision')::INT))
+         / POWER(10,
+             (body->'value'->'amount_to_sell'->>'precision')::INT
+           )
+      )
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::limit_order_create_operation'
       AND (body->'value'->>'orderid') IS NOT NULL
-      AND (body->'value'->>'orderid')::BIGINT NOT IN (SELECT order_id FROM already_closed)
+      AND (body->'value'->>'orderid')::BIGINT
+          NOT IN (SELECT order_id FROM already_closed)
     ON CONFLICT DO NOTHING
     RETURNING account_name, order_id
   )
   SELECT * FROM ins;
   SELECT COUNT(*) INTO c_new_creates FROM tmp_ins_created;
 
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  INSERT INTO btracker_app.order_event_log
+    (acct, order_id, event_type, block_num)
   SELECT account_name, order_id, 'create', _to_block
     FROM tmp_ins_created;
 
-  -- c) Apply any pending fills that now match
+  -- c) re‐apply any pending fills that now match…
   WITH applied AS (
     UPDATE btracker_app.open_orders_detail d
-       SET amount = TRUNC(d.amount - p.delta_amount, 3)
+       SET amount = TRUNC((d.amount - p.delta_amount)::NUMERIC, 3)
       FROM btracker_app.pending_fills p
      WHERE d.account_name = p.account_name
        AND d.order_id     = p.order_id
        AND d.nai          = p.nai
     RETURNING p.*
   )
-  DELETE
-    FROM btracker_app.pending_fills p
+  DELETE FROM btracker_app.pending_fills p
     USING applied a
    WHERE p.account_name = a.account_name
      AND p.order_id     = a.order_id
      AND p.nai          = a.nai;
 
-  -- d) Delete cancelled orders
+  -- d) cancel logic…
   DROP TABLE IF EXISTS tmp_cancels;
   CREATE TEMP TABLE tmp_cancels ON COMMIT DROP AS
     SELECT
       (body->'value'->>'orderid')::BIGINT AS id,
-      COALESCE(body->'value'->>'seller', body->'value'->>'owner')::TEXT AS acct
-    FROM tmp_raw_ops
-    WHERE op_name IN (
-      'hive::protocol::limit_order_cancel_operation',
-      'hive::protocol::limit_order_cancelled_operation'
-    )
-      AND (body->'value'->>'orderid') IS NOT NULL;
+      COALESCE(body->'value'->>'seller',
+               body->'value'->>'owner')::TEXT AS acct
+      FROM tmp_raw_ops
+     WHERE op_name IN (
+       'hive::protocol::limit_order_cancel_operation',
+       'hive::protocol::limit_order_cancelled_operation'
+     )
+       AND (body->'value'->>'orderid') IS NOT NULL;
 
-  DELETE
-    FROM btracker_app.open_orders_detail d
+  DELETE FROM btracker_app.open_orders_detail d
     USING tmp_cancels c
    WHERE d.account_name = c.acct
      AND d.order_id     = c.id;
   GET DIAGNOSTICS c_closed_cancels = ROW_COUNT;
 
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  INSERT INTO btracker_app.order_event_log
+    (acct, order_id, event_type, block_num)
   SELECT acct, id, 'cancel', _to_block
     FROM tmp_cancels;
 
-  -- e) Process fills from this block range
+  -- e) gather fills for this range…
   DROP TABLE IF EXISTS tmp_fill_ops;
   CREATE TEMP TABLE tmp_fill_ops ON COMMIT DROP AS
     SELECT
@@ -119,34 +117,41 @@ BEGIN
       (body->'value'->>'open_orderid') ::BIGINT  AS id_maker,
       (body->'value'->'open_pays'->>'nai')       AS nai_maker,
       ((body->'value'->'open_pays'->>'amount')::NUMERIC
-         / POWER(10,(body->'value'->'open_pays'->>'precision')::INT)) AS amt_maker,
+         / POWER(10,
+             (body->'value'->'open_pays'->>'precision')::INT
+           )
+      )                                          AS amt_maker,
       (body->'value'->>'current_owner')   ::TEXT    AS acct_taker,
       (body->'value'->>'current_orderid') ::BIGINT  AS id_taker,
       (body->'value'->'current_pays'->>'nai')      AS nai_taker,
       ((body->'value'->'current_pays'->>'amount')::NUMERIC
-         / POWER(10,(body->'value'->'current_pays'->>'precision')::INT)) AS amt_taker
+         / POWER(10,
+             (body->'value'->'current_pays'->>'precision')::INT
+           )
+      )                                          AS amt_taker
     FROM tmp_raw_ops
-    WHERE op_name = 'hive::protocol::fill_order_operation';
+   WHERE op_name = 'hive::protocol::fill_order_operation';
 
-  -- immediate subtraction: maker side
+  -- f) subtract immediately (maker side)
   UPDATE btracker_app.open_orders_detail d
-     SET amount = TRUNC(d.amount - f.amt_maker, 3)
+     SET amount = TRUNC((d.amount - f.amt_maker)::NUMERIC, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.acct_maker
      AND d.order_id     = f.id_maker
      AND d.nai          = f.nai_maker;
 
-  -- immediate subtraction: taker side
+  -- g) subtract immediately (taker side)
   UPDATE btracker_app.open_orders_detail d
-     SET amount = TRUNC(d.amount - f.amt_taker, 3)
+     SET amount = TRUNC((d.amount - f.amt_taker)::NUMERIC, 3)
     FROM tmp_fill_ops f
    WHERE d.account_name = f.acct_taker
      AND d.order_id     = f.id_taker
      AND d.nai          = f.nai_taker;
 
-  -- f) Buffer orphan fills for later
-  INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
-  SELECT acct_maker, id_maker, nai_maker, amt_maker
+  -- h) buffer any orphan fills…
+  INSERT INTO btracker_app.pending_fills
+    (account_name, order_id, nai, delta_amount)
+  SELECT acct_maker,id_maker,nai_maker,amt_maker
     FROM tmp_fill_ops f
    WHERE NOT EXISTS (
      SELECT 1 FROM btracker_app.open_orders_detail d
@@ -154,11 +159,14 @@ BEGIN
         AND d.order_id     = f.id_maker
         AND d.nai          = f.nai_maker
    )
-  ON CONFLICT (account_name, order_id, nai)
-    DO UPDATE SET delta_amount = btracker_app.pending_fills.delta_amount + EXCLUDED.delta_amount;
+  ON CONFLICT(account_name,order_id,nai)
+    DO UPDATE
+      SET delta_amount = btracker_app.pending_fills.delta_amount
+                         + EXCLUDED.delta_amount;
 
-  INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
-  SELECT acct_taker, id_taker, nai_taker, amt_taker
+  INSERT INTO btracker_app.pending_fills
+    (account_name, order_id, nai, delta_amount)
+  SELECT acct_taker,id_taker,nai_taker,amt_taker
     FROM tmp_fill_ops f
    WHERE NOT EXISTS (
      SELECT 1 FROM btracker_app.open_orders_detail d
@@ -166,10 +174,12 @@ BEGIN
         AND d.order_id     = f.id_taker
         AND d.nai          = f.nai_taker
    )
-  ON CONFLICT (account_name, order_id, nai)
-    DO UPDATE SET delta_amount = btracker_app.pending_fills.delta_amount + EXCLUDED.delta_amount;
+  ON CONFLICT(account_name,order_id,nai)
+    DO UPDATE
+      SET delta_amount = btracker_app.pending_fills.delta_amount
+                         + EXCLUDED.delta_amount;
 
-  -- build tmp_fills for logging
+  -- i) log fills…
   DROP TABLE IF EXISTS tmp_fills;
   CREATE TEMP TABLE tmp_fills ON COMMIT DROP AS
     SELECT acct_maker AS acct, id_maker AS id FROM tmp_fill_ops
@@ -178,15 +188,16 @@ BEGIN
 
   GET DIAGNOSTICS c_closed_fills = ROW_COUNT;
 
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  INSERT INTO btracker_app.order_event_log
+    (acct, order_id, event_type, block_num)
   SELECT acct, id, 'fill', _to_block FROM tmp_fills;
 
-  -- g) Purge fully filled or dust (< 0.001) rows
+  -- j) purge zero/dust rows
   DELETE FROM btracker_app.open_orders_detail
    WHERE amount < 0.001;
   GET DIAGNOSTICS c_new_fill_ids = ROW_COUNT;
 
-  -- h) Upsert summary counts
+  -- k) upsert per-account summary …
   WITH snap AS (
     SELECT
       account_name,
@@ -197,7 +208,7 @@ BEGIN
     FROM btracker_app.open_orders_detail
     GROUP BY account_name
   ), up_summary AS (
-    INSERT INTO btracker_app.account_open_orders_summary (
+    INSERT INTO btracker_app.account_open_orders_summary(
       account_name,
       open_orders_hbd_count,
       open_orders_hbd_amount,
@@ -205,7 +216,7 @@ BEGIN
       open_orders_hive_amount
     )
     SELECT * FROM snap
-    ON CONFLICT (account_name) DO UPDATE
+    ON CONFLICT(account_name) DO UPDATE
       SET open_orders_hbd_count   = EXCLUDED.open_orders_hbd_count,
           open_orders_hbd_amount  = EXCLUDED.open_orders_hbd_amount,
           open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
@@ -214,7 +225,7 @@ BEGIN
   )
   SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
 
-  -- i) Append debug arrays
+  -- l) append debug arrays…
   WITH a1 AS (
     UPDATE btracker_app.account_open_orders_summary dst
        SET created_order_ids = dst.created_order_ids || c.order_id
@@ -242,7 +253,7 @@ BEGIN
     RETURNING 1
   ) SELECT COUNT(*) INTO c_new_fill_ids FROM a3;
 
-  -- j) Purge empty summaries
+  -- m) purge empty summaries
   WITH purge AS (
     DELETE FROM btracker_app.account_open_orders_summary dst
      WHERE dst.open_orders_hbd_count=0
@@ -250,7 +261,7 @@ BEGIN
     RETURNING 1
   ) SELECT COUNT(*) INTO c_purged FROM purge;
 
-  -- k) Console notice
+  -- n) console notice
   RAISE NOTICE
     'Blocks %–% | new_creates=% | created_ids_appended=% | cancelled_deleted=% | cancels_appended=% | fills_deleted=% | fills_appended=% | summary_upserts=% | purged=%',
     _from_block,_to_block,
@@ -259,8 +270,8 @@ BEGIN
     c_closed_fills,c_new_fill_ids,
     c_summary_upserts,c_purged;
 
-  -- l) Persist run summary
-  INSERT INTO btracker_app.block_range_run_log (
+  -- o) persist run log
+  INSERT INTO btracker_app.block_range_run_log(
     from_block,to_block,
     new_creates,cancelled_deleted,fills_deleted,
     summary_upserts,purged,
