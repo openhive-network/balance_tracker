@@ -201,6 +201,7 @@ PERFORM hive.app_register_table(
   --------------------------------------------------------------------
   -- Open Orders
   --------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
   account_name TEXT    NOT NULL,
   order_id     BIGINT  NOT NULL,
@@ -245,10 +246,19 @@ CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
   block_num  INT       NOT NULL,
   event_ts   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS btracker_app.pending_fills (
+  account_name TEXT    NOT NULL,
+  order_id     BIGINT  NOT NULL,
+  nai          TEXT    NOT NULL,
+  delta_amount NUMERIC NOT NULL,          -- amount to subtract when the row appears
+  PRIMARY KEY (account_name, order_id, nai)
+);
+
 PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
 PERFORM hive.app_register_table(__schema_name, 'account_open_orders_summary', __schema_name);
 PERFORM hive.app_register_table(__schema_name, 'block_range_run_log', __schema_name);
 PERFORM hive.app_register_table(__schema_name, 'order_event_log', __schema_name);
+PERFORM hive.app_register_table(__schema_name, 'pending_fills', __schema_name);
 
 
   --------------------------------------------------------------------
