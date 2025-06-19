@@ -193,10 +193,92 @@ BEGIN
   DELETE FROM btracker_app.open_orders_detail
    WHERE amount < 0.001;        -- keep 0.001 dust
 
-  /*--------------------------------------------------------------------
-   h) Re-build per-account summary, debug arrays, purge empties
-   (unchanged from your previous version)
-  --------------------------------------------------------------------*/
-  /* … same as before … */
+ - h) Upsert summary counts
+  WITH snap AS (
+    SELECT
+      account_name,
+      COUNT(*) FILTER (WHERE nai='@@000000013')               AS open_orders_hbd_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai='@@000000013'),0) AS open_orders_hbd_amount,
+      COUNT(*) FILTER (WHERE nai='@@000000021')               AS open_orders_hive_count,
+      COALESCE(SUM(amount) FILTER (WHERE nai='@@000000021'),0) AS open_orders_hive_amount
+    FROM btracker_app.open_orders_detail
+    GROUP BY account_name
+  ), up_summary AS (
+    INSERT INTO btracker_app.account_open_orders_summary(
+      account_name,
+      open_orders_hbd_count,
+      open_orders_hbd_amount,
+      open_orders_hive_count,
+      open_orders_hive_amount
+    )
+    SELECT * FROM snap
+    ON CONFLICT(account_name) DO UPDATE
+      SET open_orders_hbd_count  = EXCLUDED.open_orders_hbd_count,
+          open_orders_hbd_amount = EXCLUDED.open_orders_hbd_amount,
+          open_orders_hive_count  = EXCLUDED.open_orders_hive_count,
+          open_orders_hive_amount = EXCLUDED.open_orders_hive_amount
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO c_summary_upserts FROM up_summary;
+
+  -- i) Append debug arrays
+  WITH a1 AS (
+    UPDATE btracker_app.account_open_orders_summary dst
+       SET created_order_ids = dst.created_order_ids || c.order_id
+      FROM tmp_ins_created c
+     WHERE dst.account_name = c.account_name
+       AND NOT c.order_id = ANY(dst.created_order_ids)
+    RETURNING 1
+  ) SELECT COUNT(*) INTO c_new_created_ids FROM a1;
+
+  WITH a2 AS (
+    UPDATE btracker_app.account_open_orders_summary dst
+       SET cancelled_order_ids = dst.cancelled_order_ids || c.id
+      FROM tmp_cancels c
+     WHERE dst.account_name = c.acct
+       AND NOT c.id = ANY(dst.cancelled_order_ids)
+    RETURNING 1
+  ) SELECT COUNT(*) INTO c_new_cancel_ids FROM a2;
+
+  WITH a3 AS (
+    UPDATE btracker_app.account_open_orders_summary dst
+       SET filled_order_ids = dst.filled_order_ids || f.id
+      FROM tmp_fills f
+     WHERE dst.account_name = f.acct
+       AND NOT f.id = ANY(dst.filled_order_ids)
+    RETURNING 1
+  ) SELECT COUNT(*) INTO c_new_fill_ids FROM a3;
+
+  -- j) Purge empty summaries
+  WITH purge AS (
+    DELETE FROM btracker_app.account_open_orders_summary dst
+     WHERE dst.open_orders_hbd_count=0
+       AND dst.open_orders_hive_count=0
+    RETURNING 1
+  ) SELECT COUNT(*) INTO c_purged FROM purge;
+
+  -- k) Console notice
+  RAISE NOTICE
+    'Blocks %–% | new_creates=% | created_ids_appended=% | cancelled_deleted=% | cancels_appended=% | fills_deleted=% | fills_appended=% | summary_upserts=% | purged=%',
+    _from_block,_to_block,
+    c_new_creates,c_new_created_ids,
+    c_closed_cancels,c_new_cancel_ids,
+    c_closed_fills,c_new_fill_ids,
+    c_summary_upserts,c_purged;
+
+  -- l) Persist run summary
+  INSERT INTO btracker_app.block_range_run_log(
+    from_block,to_block,
+    new_creates,cancelled_deleted,fills_deleted,
+    summary_upserts,purged,
+    created_ids,cancelled_ids,filled_ids
+  ) VALUES(
+    _from_block,_to_block,
+    c_new_creates,c_closed_cancels,c_closed_fills,
+    c_summary_upserts,c_purged,
+    COALESCE((SELECT array_agg(order_id) FROM tmp_ins_created),ARRAY[]::BIGINT[]),
+    COALESCE((SELECT array_agg(id)        FROM tmp_cancels),   ARRAY[]::BIGINT[]),
+    COALESCE((SELECT array_agg(id)        FROM tmp_fills),     ARRAY[]::BIGINT[])
+  );
 END;
 $$;
