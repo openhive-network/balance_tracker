@@ -116,19 +116,46 @@ BEGIN
       )
     ),
 
-    -- 10) Open‐orders summary
     open_orders AS (
       SELECT
-        COALESCE(MAX(aoos.open_orders_hbd_count),  0)::INT    AS open_orders_hbd_count,
-        COALESCE(MAX(aoos.open_orders_hive_count), 0)::INT    AS open_orders_hive_count,
-        COALESCE(MAX(aoos.open_orders_hive_amount),0)       AS open_orders_hive_amount,
-        COALESCE(MAX(aoos.open_orders_hbd_amount), 0)       AS open_orders_hbd_amount
-      FROM btracker_app.account_open_orders_summary aoos
-      WHERE aoos.account_name = (
-        SELECT name FROM hive.accounts_view WHERE id = _account_id
-      )
+        -- count of outstanding creates not fully filled or canceled
+        COUNT(*) FILTER (WHERE amount_remaining > 0 AND nai = _nai_hbd)::INT    AS open_orders_hbd_count,
+        COUNT(*) FILTER (WHERE amount_remaining > 0 AND nai = _nai_hive)::INT   AS open_orders_hive_count,
+        SUM(amount_remaining) FILTER (WHERE nai = _nai_hive)                   AS open_orders_hive_amount,
+        SUM(amount_remaining) FILTER (WHERE nai = _nai_hbd)                    AS open_orders_hbd_amount
+      FROM (
+        -- reuse your get_open_orders SQL over the flat table
+        SELECT
+          o.order_id,
+          o.create_block,
+          o.create_amount,
+          COALESCE(f.total_filled,0)   AS total_filled,
+          o.create_amount - COALESCE(f.total_filled,0) AS amount_remaining,
+          o.nai
+        FROM (
+          SELECT *
+          FROM btracker_app.get_open_orders(
+            _acct_name,
+            1,
+            (SELECT MAX(block_num) FROM btracker_app.account_operations)
+          )
+        ) o
+        LEFT JOIN (
+          -- aggregate fills per order/asset from the flat table
+          SELECT
+            order_id,
+            nai,
+            SUM(amount) AS total_filled
+          FROM btracker_app.account_operations
+          WHERE account_name = _acct_name
+            AND op_type = 'fill'
+          GROUP BY 1,2
+        ) f
+          ON f.order_id = o.order_id
+         AND f.nai      = o.nai
+        WHERE o.order_id IS NOT NULL
+      ) sub
     )
-
   -- Final assembly, casting conversion‐pending amounts to 1 decimal place
   SELECT
     gb.hbd_balance,
