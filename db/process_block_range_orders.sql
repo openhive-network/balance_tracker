@@ -114,18 +114,28 @@ BEGIN
   SELECT acct, order_id, 'fill', block_num
     FROM tmp_fills;
 
-  -- 5b) any fills without an existing open → pending (accumulate on conflict)
-  INSERT INTO btracker_app.pending_fills AS pf(account_name, order_id, nai, delta_amount)
-  SELECT f.acct, f.order_id, f.nai, f.delta
+  -- 5b) aggregate all pre-create fills, then insert or update pending_fills
+  WITH new_pending AS (
+    SELECT
+      f.acct       AS account_name,
+      f.order_id,
+      f.nai,
+      SUM(f.delta) AS delta_sum
     FROM tmp_fills f
     LEFT JOIN btracker_app.open_orders_detail d
       ON d.account_name = f.acct
      AND d.order_id     = f.order_id
      AND d.nai          = f.nai
-   WHERE d.order_id IS NULL
+    WHERE d.order_id IS NULL
+    GROUP BY f.acct, f.order_id, f.nai
+  )
+  INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
+  SELECT account_name, order_id, nai, delta_sum
+    FROM new_pending
   ON CONFLICT (account_name, order_id, nai)
   DO UPDATE
-    SET delta_amount = pf.delta_amount + EXCLUDED.delta_amount;
+    SET delta_amount = btracker_app.pending_fills.delta_amount
+                       + EXCLUDED.delta_amount;
 
   -- 5c) subtract fills from open orders
   UPDATE btracker_app.open_orders_detail dst
