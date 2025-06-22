@@ -116,45 +116,90 @@ BEGIN
       )
     ),
 
-    -- 10) **Flat open‐orders summary** via account_operations
-    open_orders AS (
-      SELECT
-        COUNT(*) FILTER (WHERE amount_remaining > 0 AND nai = '@@000000013')::INT AS open_orders_hbd_count,
-        COUNT(*) FILTER (WHERE amount_remaining > 0 AND nai = '@@000000021')::INT AS open_orders_hive_count,
-        SUM(amount_remaining) FILTER (WHERE nai = '@@000000021')                  AS open_orders_hive_amount,
-        SUM(amount_remaining) FILTER (WHERE nai = '@@000000013')                  AS open_orders_hbd_amount
-      FROM (
-        SELECT
-          o.order_id,
-          o.create_block,
-          o.create_amount,
-          COALESCE(f.total_filled,0)                             AS total_filled,
-          o.create_amount - COALESCE(f.total_filled,0)           AS amount_remaining,
-          o.nai
-        FROM (
-          -- call your SQL function, passing the name lookup inline:
-          SELECT *
-          FROM btracker_app.get_open_orders(
-            (SELECT name FROM hive.accounts_view WHERE id = _account_id),
-            1,
-            (SELECT MAX(block_num) FROM btracker_app.account_operations)
-          )
-        ) AS o
-        LEFT JOIN (
-          -- aggregate fills per order/asset from the flat table, again inlining the name lookup
-          SELECT
-            order_id,
-            nai,
-            SUM(amount) AS total_filled
-          FROM btracker_app.account_operations
-          WHERE account_name = (SELECT name FROM hive.accounts_view WHERE id = _account_id)
-            AND op_type      = 'fill'
-          GROUP BY 1,2
-        ) AS f
-          ON f.order_id = o.order_id
-         AND f.nai      = o.nai
-      ) AS sub
+-- inside your PL/pgSQL function, replace step 10 with this:
+
+open_orders AS (
+  WITH ops AS (
+    SELECT
+      block_num,
+      op_type,
+      order_id,
+      nai,
+      amount
+    FROM btracker_app.account_operations
+    WHERE account_name = (
+      SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
     )
+      AND op_type IN ('create','fill','cancel')
+  ),
+
+  last_cancel AS (
+    SELECT
+      order_id,
+      MAX(block_num) AS last_cancel_block
+    FROM ops
+    WHERE op_type = 'cancel'
+    GROUP BY order_id
+  ),
+
+  creates AS (
+    SELECT
+      order_id,
+      block_num    AS create_block,
+      amount       AS create_amount,
+      nai
+    FROM ops
+    WHERE op_type = 'create'
+  ),
+
+  fills AS (
+    SELECT
+      order_id,
+      amount       AS fill_amt,
+      block_num,
+      nai
+    FROM ops
+    WHERE op_type = 'fill'
+  ),
+
+  live_creates AS (
+    SELECT c.*
+      FROM creates c
+      LEFT JOIN last_cancel lc USING (order_id)
+     WHERE c.create_block > COALESCE(lc.last_cancel_block,0)
+  ),
+
+  agg_fills AS (
+    SELECT
+      f.order_id,
+      f.nai,
+      SUM(f.fill_amt) AS total_filled
+    FROM fills f
+    LEFT JOIN last_cancel lc USING (order_id)
+    WHERE f.block_num > COALESCE(lc.last_cancel_block,0)
+    GROUP BY f.order_id, f.nai
+  )
+
+  SELECT
+    COUNT(*) FILTER (WHERE cri.amount_remaining > 0 AND cri.nai = '@@000000013')::INT AS open_orders_hbd_count,
+    COUNT(*) FILTER (WHERE cri.amount_remaining > 0 AND cri.nai = '@@000000021')::INT AS open_orders_hive_count,
+    SUM(cri.amount_remaining) FILTER (WHERE cri.nai = '@@000000021')                AS open_orders_hive_amount,
+    SUM(cri.amount_remaining) FILTER (WHERE cri.nai = '@@000000013')                AS open_orders_hbd_amount
+  FROM (
+    SELECT
+      lc.order_id,
+      lc.create_block,
+      lc.create_amount,
+      COALESCE(af.total_filled,0)                                AS total_filled,
+      lc.create_amount - COALESCE(af.total_filled,0)             AS amount_remaining,
+      lc.nai
+    FROM live_creates lc
+    LEFT JOIN agg_fills af
+      ON af.order_id = lc.order_id
+     AND af.nai      = lc.nai
+  ) AS cri
+)
+
 
   -- Final assembly, casting conversion‐pending amounts to 1 decimal place
   SELECT
