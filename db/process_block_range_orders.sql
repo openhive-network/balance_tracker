@@ -18,7 +18,7 @@ BEGIN
     ot.name        AS op_name,
     ov.body::jsonb AS j
   FROM hive.operations_view ov
-  JOIN hafd.operation_types ot USING (id)
+  JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
   WHERE ot.name IN (
     'hive::protocol::limit_order_create_operation',
     'hive::protocol::limit_order_cancel_operation',
@@ -32,39 +32,38 @@ BEGIN
   ----------------------------------------------------------------
   DROP TABLE IF EXISTS tmp_fills;
   CREATE TEMP TABLE tmp_fills AS
-  SELECT
-    -- maker side
-    (j->'value'->>'open_owner')                                   AS acct,
-    (j->'value'->>'open_orderid')::BIGINT                         AS order_id,
-    (j->'value'->'open_pays'->>'nai')                             AS nai,
-    ((j->'value'->'open_pays'->>'amount')::NUMERIC
-       / POWER(10,(j->'value'->'open_pays'->>'precision')::INT)
-    )                                                             AS delta,
-    block_num
-  FROM tmp_raw_ops
-  WHERE op_name = 'hive::protocol::fill_order_operation'
-    AND j->'value'->>'open_owner' IS NOT NULL
+    SELECT
+      (j->'value'->>'open_owner')                               AS acct,
+      (j->'value'->>'open_orderid')::BIGINT                     AS order_id,
+      (j->'value'->'open_pays'->>'nai')                         AS nai,
+      ((j->'value'->'open_pays'->>'amount')::NUMERIC
+         / POWER(10,(j->'value'->'open_pays'->>'precision')::INT)
+      )                                                         AS delta,
+      block_num
+    FROM tmp_raw_ops
+    WHERE op_name = 'hive::protocol::fill_order_operation'
+      AND j->'value'->>'open_owner' IS NOT NULL
 
-  UNION ALL
+    UNION ALL
 
-  SELECT
-    (j->'value'->>'current_owner'),
-    (j->'value'->>'current_orderid')::BIGINT,
-    (j->'value'->'current_pays'->>'nai'),
-    ((j->'value'->'current_pays'->>'amount')::NUMERIC
-       / POWER(10,(j->'value'->'current_pays'->>'precision')::INT)
-    ),
-    block_num
-  FROM tmp_raw_ops
-  WHERE op_name = 'hive::protocol::fill_order_operation'
-    AND j->'value'->>'current_owner' IS NOT NULL;
+    SELECT
+      (j->'value'->>'current_owner'),
+      (j->'value'->>'current_orderid')::BIGINT,
+      (j->'value'->'current_pays'->>'nai'),
+      ((j->'value'->'current_pays'->>'amount')::NUMERIC
+         / POWER(10,(j->'value'->'current_pays'->>'precision')::INT)
+      ),
+      block_num
+    FROM tmp_raw_ops
+    WHERE op_name = 'hive::protocol::fill_order_operation'
+      AND j->'value'->>'current_owner' IS NOT NULL;
 
   ----------------------------------------------------------------
   -- 3a) Log creates + upsert (with correct nai)
   ----------------------------------------------------------------
   INSERT INTO btracker_app.order_event_log(acct, order_id, event_type, block_num)
   SELECT
-    (j->'value'->>'owner'),
+    j->'value'->>'owner',
     (j->'value'->>'orderid')::BIGINT,
     'create',
     block_num
@@ -73,9 +72,9 @@ BEGIN
 
   INSERT INTO btracker_app.open_orders_detail(account_name, order_id, nai, amount)
   SELECT
-    (j->'value'->>'owner'),
+    j->'value'->>'owner',
     (j->'value'->>'orderid')::BIGINT,
-    (j->'value'->'amount_to_sell'->>'nai'),
+    j->'value'->'amount_to_sell'->>'nai',
     ((j->'value'->'amount_to_sell'->>'amount')::NUMERIC
        / POWER(10,(j->'value'->'amount_to_sell'->>'precision')::INT)
     )
@@ -114,7 +113,7 @@ BEGIN
     AND dst.nai          = f.nai;
 
   ----------------------------------------------------------------
-  -- 4) Log + delete cancels (with correct nai)
+  -- 4) Log + delete cancels (using top-level nai)
   ----------------------------------------------------------------
   INSERT INTO btracker_app.order_event_log(acct, order_id, event_type, block_num)
   SELECT
@@ -136,10 +135,7 @@ BEGIN
   )
     AND dst.account_name = COALESCE(t.j->'value'->>'seller', t.j->'value'->>'owner')
     AND dst.order_id     = (t.j->'value'->>'orderid')::BIGINT
-    AND dst.nai          = t.j->'value'->'amount_to_sell'->>'nai'  -- if cancels include nai in amount_to_sell; else use j->'value'->>'nai'
-
-    -- or if cancel doesn't nest nai, pull from top-level
-    -- AND dst.nai = t.j->'value'->>'nai';
+    AND dst.nai          = t.j->'value'->>'nai';
 
   ----------------------------------------------------------------
   -- 5) Done
