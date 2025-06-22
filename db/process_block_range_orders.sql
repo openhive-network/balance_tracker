@@ -9,7 +9,7 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   ----------------------------------------------------------------
-  -- 1) Cache all relevant ops in this slice (ensure fresh temp table)
+  -- 1) Cache all relevant ops in this slice
   ----------------------------------------------------------------
   DROP TABLE IF EXISTS tmp_raw_ops;
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
@@ -54,8 +54,7 @@ BEGIN
     SET amount = EXCLUDED.amount;
 
   ----------------------------------------------------------------
-  -- 2b) FILLS: decompose both sides, log events, capture pendings,
-  --           then subtract from live‐orders
+  -- 2b) FILLS: decompose both sides
   ----------------------------------------------------------------
   WITH fills AS (
     SELECT
@@ -83,25 +82,24 @@ BEGIN
     FROM tmp_raw_ops
     WHERE op_name = 'hive::protocol::fill_order_operation'
       AND j->'value'->>'current_owner' IS NOT NULL
-  ),
-  _logged AS (
-    -- log every fill event
-    INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
-    SELECT acct, order_id, 'fill', block_num FROM fills
-    RETURNING acct, order_id, nai, delta
   )
 
-  -- capture fills before the create arrives
+  -- 2b-i) log every fill
+  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  SELECT acct, order_id, 'fill', block_num
+  FROM fills;
+
+  -- 2b-ii) capture fills before their create arrives
   INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
-  SELECT l.acct, l.order_id, l.nai, l.delta
-  FROM _logged l
+  SELECT f.acct, f.order_id, f.nai, f.delta
+  FROM fills f
   LEFT JOIN btracker_app.open_orders_detail d
-    ON d.account_name = l.acct
-   AND d.order_id     = l.order_id
-   AND d.nai          = l.nai
+    ON d.account_name = f.acct
+   AND d.order_id     = f.order_id
+   AND d.nai          = f.nai
   WHERE d.order_id IS NULL;
 
-  -- apply fills to existing orders
+  -- 2b-iii) apply fills to existing orders
   UPDATE btracker_app.open_orders_detail dst
   SET amount = dst.amount - f.delta
   FROM fills f
