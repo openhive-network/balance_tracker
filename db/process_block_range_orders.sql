@@ -12,7 +12,7 @@ BEGIN
   -- 1) Cache all relevant ops in this slice
   ----------------------------------------------------------------
   DROP TABLE IF EXISTS tmp_raw_ops;
-  CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
+  CREATE TEMP TABLE tmp_raw_ops AS
   SELECT
     ov.block_num,
     ot.name        AS op_name,
@@ -28,117 +28,119 @@ BEGIN
     AND ov.block_num BETWEEN p_from_block AND p_to_block;
 
   ----------------------------------------------------------------
-  -- 2a) CREATEs: log the event, then upsert the live‐orders table
+  -- 2) Materialize fills for reuse
   ----------------------------------------------------------------
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  DROP TABLE IF EXISTS tmp_fills;
+  CREATE TEMP TABLE tmp_fills AS
   SELECT
-    (j->'value'->>'owner')           AS acct,
-    (j->'value'->>'orderid')::BIGINT AS order_id,
-    'create'                         AS event_type,
+    -- maker side
+    (j->'value'->>'open_owner')        AS acct,
+    (j->'value'->>'open_orderid')::BIGINT AS order_id,
+    j->'value'->>'nai'                 AS nai,
+    ((j->'value'->'open_pays'->>'amount')::NUMERIC
+       / POWER(10,(j->'value'->'open_pays'->>'precision')::INT)
+    )                                  AS delta,
+    block_num
+  FROM tmp_raw_ops
+  WHERE op_name = 'hive::protocol::fill_order_operation'
+    AND j->'value'->>'open_owner' IS NOT NULL
+
+  UNION ALL
+
+  SELECT
+    -- taker side
+    (j->'value'->>'current_owner'),
+    (j->'value'->>'current_orderid')::BIGINT,
+    j->'value'->>'nai',
+    ((j->'value'->'current_pays'->>'amount')::NUMERIC
+       / POWER(10,(j->'value'->'current_pays'->>'precision')::INT)
+    ),
+    block_num
+  FROM tmp_raw_ops
+  WHERE op_name = 'hive::protocol::fill_order_operation'
+    AND j->'value'->>'current_owner' IS NOT NULL;
+
+  ----------------------------------------------------------------
+  -- 3a) Log creates + upsert
+  ----------------------------------------------------------------
+  INSERT INTO btracker_app.order_event_log(acct, order_id, event_type, block_num)
+  SELECT
+    (j->'value'->>'owner'),
+    (j->'value'->>'orderid')::BIGINT,
+    'create',
     block_num
   FROM tmp_raw_ops
   WHERE op_name = 'hive::protocol::limit_order_create_operation';
 
-  INSERT INTO btracker_app.open_orders_detail AS dst
-    (account_name, order_id, nai, amount)
+  INSERT INTO btracker_app.open_orders_detail(account_name, order_id, nai, amount)
   SELECT
-    (j->'value'->>'owner')           AS account_name,
-    (j->'value'->>'orderid')::BIGINT AS order_id,
-    (j->'value'->>'nai')             AS nai,
+    (j->'value'->>'owner'),
+    (j->'value'->>'orderid')::BIGINT,
+    (j->'value'->>'nai'),
     ((j->'value'->'amount_to_sell'->>'amount')::NUMERIC
        / POWER(10,(j->'value'->'amount_to_sell'->>'precision')::INT)
-    )                                 AS amount
+    )
   FROM tmp_raw_ops
   WHERE op_name = 'hive::protocol::limit_order_create_operation'
   ON CONFLICT (account_name, order_id, nai) DO UPDATE
     SET amount = EXCLUDED.amount;
 
   ----------------------------------------------------------------
-  -- 2b) FILLS: decompose both sides
+  -- 3b) Log fills
   ----------------------------------------------------------------
-  WITH fills AS (
-    SELECT
-      (j->'value'->>'open_owner')       AS acct,
-      (j->'value'->>'open_orderid')::BIGINT AS order_id,
-      j->'value'->>'nai'                AS nai,
-      ((j->'value'->'open_pays'->>'amount')::NUMERIC
-         / POWER(10,(j->'value'->'open_pays'->>'precision')::INT)
-      )                                 AS delta,
-      block_num
-    FROM tmp_raw_ops
-    WHERE op_name = 'hive::protocol::fill_order_operation'
-      AND j->'value'->>'open_owner' IS NOT NULL
-
-    UNION ALL
-
-    SELECT
-      (j->'value'->>'current_owner'),
-      (j->'value'->>'current_orderid')::BIGINT,
-      j->'value'->>'nai',
-      ((j->'value'->'current_pays'->>'amount')::NUMERIC
-         / POWER(10,(j->'value'->'current_pays'->>'precision')::INT)
-      ),
-      block_num
-    FROM tmp_raw_ops
-    WHERE op_name = 'hive::protocol::fill_order_operation'
-      AND j->'value'->>'current_owner' IS NOT NULL
-  )
-
-  -- 2b-i) log every fill
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
+  INSERT INTO btracker_app.order_event_log(acct, order_id, event_type, block_num)
   SELECT acct, order_id, 'fill', block_num
-  FROM fills;
+  FROM tmp_fills;
 
-  -- 2b-ii) capture fills before their create arrives
-  INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
+  ----------------------------------------------------------------
+  -- 3c) Pending fills (before the create arrives)
+  ----------------------------------------------------------------
+  INSERT INTO btracker_app.pending_fills(account_name, order_id, nai, delta_amount)
   SELECT f.acct, f.order_id, f.nai, f.delta
-  FROM fills f
+  FROM tmp_fills f
   LEFT JOIN btracker_app.open_orders_detail d
     ON d.account_name = f.acct
    AND d.order_id     = f.order_id
    AND d.nai          = f.nai
   WHERE d.order_id IS NULL;
 
-  -- 2b-iii) apply fills to existing orders
+  ----------------------------------------------------------------
+  -- 3d) Apply fills
+  ----------------------------------------------------------------
   UPDATE btracker_app.open_orders_detail dst
   SET amount = dst.amount - f.delta
-  FROM fills f
+  FROM tmp_fills f
   WHERE dst.account_name = f.acct
     AND dst.order_id     = f.order_id
     AND dst.nai          = f.nai;
 
   ----------------------------------------------------------------
-  -- 2c) CANCELs: log then delete
+  -- 4) Log + delete cancels
   ----------------------------------------------------------------
-  WITH cancels AS (
-    SELECT
-      COALESCE(
-        j->'value'->>'seller',
-        j->'value'->>'owner'
-      )                                  AS acct,
-      (j->'value'->>'orderid')::BIGINT   AS order_id,
-      j->'value'->>'nai'                 AS nai,
-      block_num
-    FROM tmp_raw_ops
-    WHERE op_name IN (
-      'hive::protocol::limit_order_cancel_operation',
-      'hive::protocol::limit_order_cancelled_operation'
-    )
-  )
-  -- log cancels
-  INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
-  SELECT acct, order_id, 'cancel', block_num
-  FROM cancels;
+  INSERT INTO btracker_app.order_event_log(acct, order_id, event_type, block_num)
+  SELECT
+    COALESCE(j->'value'->>'seller', j->'value'->>'owner'),
+    (j->'value'->>'orderid')::BIGINT,
+    'cancel',
+    block_num
+  FROM tmp_raw_ops
+  WHERE op_name IN (
+    'hive::protocol::limit_order_cancel_operation',
+    'hive::protocol::limit_order_cancelled_operation'
+  );
 
-  -- delete cancelled orders
   DELETE FROM btracker_app.open_orders_detail dst
-  USING cancels c
-  WHERE dst.account_name = c.acct
-    AND dst.order_id     = c.order_id
-    AND dst.nai          = c.nai;
+  USING tmp_raw_ops t
+  WHERE t.op_name IN (
+    'hive::protocol::limit_order_cancel_operation',
+    'hive::protocol::limit_order_cancelled_operation'
+  )
+    AND dst.account_name = COALESCE(t.j->'value'->>'seller', t.j->'value'->>'owner')
+    AND dst.order_id     = (t.j->'value'->>'orderid')::BIGINT
+    AND dst.nai          = t.j->'value'->>'nai';
 
   ----------------------------------------------------------------
-  -- 3) Done
+  -- 5) Done
   ----------------------------------------------------------------
   RAISE NOTICE 'Processed blocks % to %', p_from_block, p_to_block;
 END;
