@@ -202,36 +202,22 @@ PERFORM hive.app_register_table(
   -- Open Orders
   --------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS btracker_app.open_orders_detail (
-  account_name TEXT    NOT NULL,
-  order_id     BIGINT  NOT NULL,
-  nai          TEXT    NOT NULL,   -- '@@000000013' or '@@000000021'
-  amount       NUMERIC NOT NULL,   -- remaining amount
-  PRIMARY KEY (account_name, order_id, nai)
-);
 
--- (Optional) If you still want to log events:
-CREATE TABLE IF NOT EXISTS btracker_app.order_event_log (
-  acct       TEXT      NOT NULL,
-  order_id   BIGINT    NOT NULL,
-  event_type TEXT      NOT NULL  CHECK (event_type IN ('create','fill','cancel')),
-  block_num  INT       NOT NULL,
-  event_ts   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS btracker_app.pending_fills (
-  account_name TEXT    NOT NULL,
-  order_id     BIGINT  NOT NULL,
-  nai          TEXT    NOT NULL,
-  delta_amount NUMERIC NOT NULL,
-  PRIMARY KEY (account_name, order_id, nai)
+CREATE TABLE IF NOT EXISTS btracker_app.account_operations (
+  op_id         SERIAL      PRIMARY KEY,
+  account_name  TEXT        NOT NULL,
+  order_id      BIGINT      NOT NULL,
+  nai           TEXT        NULL,
+  op_type       TEXT        NOT NULL,
+  block_num     INT         NOT NULL,
+  amount        NUMERIC     NULL,
+  raw           JSONB       NOT NULL,
+  inserted_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
 
-PERFORM hive.app_register_table(__schema_name, 'open_orders_detail', __schema_name);
-PERFORM hive.app_register_table(__schema_name, 'order_event_log', __schema_name);
+PERFORM hive.app_register_table(__schema_name, 'account_operations', __schema_name);
 
-PERFORM hive.app_register_table(__schema_name, 'pending_fills', __schema_name);
 
   --------------------------------------------------------------------
   -- ACCOUNT WITHDRAWS & ROUTES
