@@ -114,15 +114,18 @@ BEGIN
   SELECT acct, order_id, 'fill', block_num
     FROM tmp_fills;
 
-  -- 5b) any fills without an existing open → pending
-  INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
+  -- 5b) any fills without an existing open → pending (accumulate on conflict)
+  INSERT INTO btracker_app.pending_fills AS pf(account_name, order_id, nai, delta_amount)
   SELECT f.acct, f.order_id, f.nai, f.delta
     FROM tmp_fills f
     LEFT JOIN btracker_app.open_orders_detail d
       ON d.account_name = f.acct
      AND d.order_id     = f.order_id
      AND d.nai          = f.nai
-   WHERE d.order_id IS NULL;
+   WHERE d.order_id IS NULL
+  ON CONFLICT (account_name, order_id, nai)
+  DO UPDATE
+    SET delta_amount = pf.delta_amount + EXCLUDED.delta_amount;
 
   -- 5c) subtract fills from open orders
   UPDATE btracker_app.open_orders_detail dst
@@ -133,7 +136,7 @@ BEGIN
     AND dst.nai          = f.nai;
 
   --------------------------------------------------------------------------------
-  -- 6) Log and DELETE CANCELs (drop the nai filter!)
+  -- 6) Log and DELETE CANCELs (no nai filter)
   --------------------------------------------------------------------------------
   INSERT INTO btracker_app.order_event_log (acct, order_id, event_type, block_num)
   SELECT
@@ -147,8 +150,7 @@ BEGIN
     'hive::protocol::limit_order_cancelled_operation'
   );
 
-  DELETE
-    FROM btracker_app.open_orders_detail dst
+  DELETE FROM btracker_app.open_orders_detail dst
   USING tmp_raw_ops t
   WHERE t.op_name IN (
     'hive::protocol::limit_order_cancel_operation',
