@@ -1,52 +1,94 @@
+-- 1) Elevate to the loader role
+SET ROLE btracker_owner;
+
+-- 2) Drop existing definition so we can change the body safely
+DROP FUNCTION IF EXISTS btracker_app.process_block_range_converts(INT, INT);
+
+-- 3) Re-create using the original parameter names (_from_block, _to_block)
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_converts(
-  p_from_block INT,
-  p_to_block   INT
+  _from_block INT,
+  _to_block   INT
 )
 RETURNS VOID
 LANGUAGE plpgsql
-AS $BODY$
-DECLARE
-  rec RECORD;
+AS $$
 BEGIN
-  FOR rec IN
-    SELECT
-        ov.block_num,
-        ot.name         AS op_name,
-        ov.body::jsonb  AS j
-    FROM hive.operations_view AS ov
-    JOIN hafd.operation_types AS ot
-      ON ot.id = ov.op_type_id
-    WHERE ot.name IN (
-        'hive::protocol::convert_operation',
-        'hive::protocol::fill_convert_request_operation'
-      )
-      AND ov.block_num BETWEEN p_from_block AND p_to_block
-  LOOP
-    -- insert a new “convert” request
-    IF rec.op_name = 'hive::protocol::convert_operation' THEN
-      INSERT INTO btracker_app.account_convert_operations
-        (block_num, op_type, request_id, nai, amount)
-      VALUES
-        (
-          rec.block_num,
-          'convert',
-          (rec.j->'value'->>'requestid')::BIGINT,
-          rec.j->'value'->'amount'->>'nai',
-          (rec.j->'value'->'amount'->>'amount')::NUMERIC
-        );
-    -- insert a “fill” for an existing convert request
-    ELSIF rec.op_name = 'hive::protocol::fill_convert_request_operation' THEN
-      INSERT INTO btracker_app.account_convert_operations
-        (block_num, op_type, request_id, nai, amount)
-      VALUES
-        (
-          rec.block_num,
-          'fill',
-          (rec.j->'value'->>'requestid')::BIGINT,
-          rec.j->'value'->'amount'->>'nai',
-          (rec.j->'value'->'amount'->>'amount')::NUMERIC
-        );
-    END IF;
-  END LOOP;
+  --------------------------------------------------------------------------------
+  -- 1) Pull raw convert ops in this slice
+  --------------------------------------------------------------------------------
+  DROP TABLE IF EXISTS tmp_convert_ops;
+  CREATE TEMP TABLE tmp_convert_ops ON COMMIT DROP AS
+  SELECT
+    ov.block_num,
+    ot.name         AS op_name,
+    ov.body::jsonb  AS j
+  FROM hive.operations_view ov
+  JOIN hafd.operation_types ot
+    ON ot.id = ov.op_type_id
+  WHERE ot.name IN (
+    'hive::protocol::convert_operation',
+    'hive::protocol::fill_convert_request_operation'
+  )
+    AND ov.block_num BETWEEN _from_block AND _to_block;
+
+  --------------------------------------------------------------------------------
+  -- 2) Append them to the flat table, picking the correct NAI & amount fields
+  --------------------------------------------------------------------------------
+  INSERT INTO btracker_app.account_convert_operations (
+    account_name,
+    request_id,
+    nai,
+    op_type,
+    amount,
+    block_num,
+    raw
+  )
+  SELECT
+    (j->'value'->>'owner')::TEXT                                   AS account_name,
+    (j->'value'->>'requestid')::BIGINT                             AS request_id,
+
+    -- on convert ops take the "amount" NAI, on fills take the "amount_in" NAI
+    CASE
+      WHEN op_name = 'hive::protocol::convert_operation'
+        THEN (j->'value'->'amount'->>'nai')::TEXT
+      ELSE (j->'value'->'amount_in'->>'nai')::TEXT
+    END                                                             AS nai,
+
+    -- tag the row
+    CASE
+      WHEN op_name = 'hive::protocol::convert_operation' THEN 'convert'
+      ELSE 'fill'
+    END                                                             AS op_type,
+
+    -- numeric amount: original amount on convert, or "in" amount on fill
+    CASE
+      WHEN op_name = 'hive::protocol::convert_operation'
+        THEN (
+          (j->'value'->'amount'->>'amount')::NUMERIC
+            / POWER(
+                10,
+                (j->'value'->'amount'->>'precision')::INT
+              )
+        )
+      ELSE (
+          (j->'value'->'amount_in'->>'amount')::NUMERIC
+            / POWER(
+                10,
+                (j->'value'->'amount_in'->>'precision')::INT
+              )
+        )
+    END                                                             AS amount,
+
+    block_num,
+    j                                                               AS raw
+  FROM tmp_convert_ops;
+
+  --------------------------------------------------------------------------------
+  -- 3) Done
+  --------------------------------------------------------------------------------
+  RAISE NOTICE 'Processed convert ops %–%', _from_block, _to_block;
 END;
-$BODY$;
+$$;
+
+-- 4) Drop back to your original role
+RESET ROLE;
