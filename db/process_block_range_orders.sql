@@ -9,8 +9,9 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   ----------------------------------------------------------------
-  -- 1) Cache all relevant ops in this slice
+  -- 1) Cache all relevant ops in this slice (ensure fresh temp table)
   ----------------------------------------------------------------
+  DROP TABLE IF EXISTS tmp_raw_ops;
   CREATE TEMP TABLE tmp_raw_ops ON COMMIT DROP AS
   SELECT
     ov.block_num,
@@ -90,7 +91,7 @@ BEGIN
     RETURNING acct, order_id, nai, delta
   )
 
-  -- capture any fills before the create arrives
+  -- capture fills before the create arrives
   INSERT INTO btracker_app.pending_fills (account_name, order_id, nai, delta_amount)
   SELECT l.acct, l.order_id, l.nai, l.delta
   FROM _logged l
