@@ -13,255 +13,261 @@ BEGIN
   WITH
     -- 1) Delegations
     get_delegations AS (
-        SELECT
-            COALESCE(ad.delegated_vests, 0)::BIGINT AS delegated_vests,
-            COALESCE(ad.received_vests,  0)::BIGINT AS received_vests
-        FROM (VALUES (1)) AS dummy(_)
-        LEFT JOIN account_delegations ad
-          ON ad.account = _account_id
+      SELECT
+        COALESCE(ad.delegated_vests,0)::BIGINT AS delegated_vests,
+        COALESCE(ad.received_vests,0)::BIGINT   AS received_vests
+      FROM (VALUES(1)) AS dummy(_)
+      LEFT JOIN account_delegations ad
+        ON ad.account = _account_id
     ),
 
     -- 2) Liquid balances & vesting shares
     get_balances AS MATERIALIZED (
-        SELECT
-            COALESCE(MAX(CASE WHEN cab.nai = 13 THEN cab.balance END), 0)::BIGINT AS hbd_balance,
-            COALESCE(MAX(CASE WHEN cab.nai = 21 THEN cab.balance END), 0)::BIGINT AS hive_balance,
-            COALESCE(MAX(CASE WHEN cab.nai = 37 THEN cab.balance END), 0)::BIGINT AS vesting_shares
-        FROM current_account_balances cab
-        WHERE cab.account = _account_id
+      SELECT
+        COALESCE(MAX(CASE WHEN cab.nai=13 THEN cab.balance END),0)::BIGINT AS hbd_balance,
+        COALESCE(MAX(CASE WHEN cab.nai=21 THEN cab.balance END),0)::BIGINT AS hive_balance,
+        COALESCE(MAX(CASE WHEN cab.nai=37 THEN cab.balance END),0)::BIGINT AS vesting_shares
+      FROM current_account_balances cab
+      WHERE cab.account = _account_id
     ),
 
-    -- 3) Convert vesting_shares → hive-vest balance
+    -- 3) Convert vesting_shares → hive‐vest balance
     get_vest_balance AS (
-        SELECT
-            COALESCE(
-                hive.get_vesting_balance(bv.num, gb.vesting_shares),
-                0
-            )::BIGINT AS vesting_balance_hive
-        FROM get_balances gb
-        CROSS JOIN LATERAL (
-            SELECT num
-            FROM hive.blocks_view
-            ORDER BY num DESC
-            LIMIT 1
-        ) bv
+      SELECT
+        COALESCE(
+          hive.get_vesting_balance(bv.num, gb.vesting_shares),
+          0
+        )::BIGINT AS vesting_balance_hive
+      FROM get_balances gb
+      CROSS JOIN LATERAL (
+        SELECT num
+        FROM hive.blocks_view
+        ORDER BY num DESC
+        LIMIT 1
+      ) bv
     ),
 
-    -- 4) Post-voting power
+    -- 4) Post‐voting power
     get_post_voting_power AS (
-        SELECT
-            (gb.vesting_shares
-             - gd.delegated_vests
-             + gd.received_vests
-            )::BIGINT AS post_voting_power_vests
-        FROM get_balances gb
-        CROSS JOIN get_delegations gd
+      SELECT
+        (gb.vesting_shares
+         - gd.delegated_vests
+         + gd.received_vests
+        )::BIGINT AS post_voting_power_vests
+      FROM get_balances gb
+      CROSS JOIN get_delegations gd
     ),
 
     -- 5) Curation & posting rewards
     get_info_rewards AS (
-        SELECT
-            COALESCE(air.curation_rewards, 0)::BIGINT AS curation_rewards,
-            COALESCE(air.posting_rewards, 0)::BIGINT AS posting_rewards
-        FROM (VALUES (1)) AS dummy(_)
-        LEFT JOIN account_info_rewards air
-          ON air.account = _account_id
+      SELECT
+        COALESCE(air.curation_rewards,0)::BIGINT AS curation_rewards,
+        COALESCE(air.posting_rewards,0)::BIGINT AS posting_rewards
+      FROM (VALUES(1)) AS dummy(_)
+      LEFT JOIN account_info_rewards air
+        ON air.account = _account_id
     ),
 
     -- 6) Other rewards
     calculate_rewards AS MATERIALIZED (
-        SELECT
-            COALESCE(MAX(CASE WHEN ar.nai = 13 THEN ar.balance END), 0)::BIGINT AS hbd_rewards,
-            COALESCE(MAX(CASE WHEN ar.nai = 21 THEN ar.balance END), 0)::BIGINT AS hive_rewards,
-            COALESCE(MAX(CASE WHEN ar.nai = 37 THEN ar.balance END), 0)::BIGINT AS vests_rewards,
-            COALESCE(MAX(CASE WHEN ar.nai = 38 THEN ar.balance END), 0)::BIGINT AS hive_vesting_rewards
-        FROM account_rewards ar
-        WHERE ar.account = _account_id
+      SELECT
+        COALESCE(MAX(CASE WHEN ar.nai=13 THEN ar.balance END),0)::BIGINT AS hbd_rewards,
+        COALESCE(MAX(CASE WHEN ar.nai=21 THEN ar.balance END),0)::BIGINT AS hive_rewards,
+        COALESCE(MAX(CASE WHEN ar.nai=37 THEN ar.balance END),0)::BIGINT AS vests_rewards,
+        COALESCE(MAX(CASE WHEN ar.nai=38 THEN ar.balance END),0)::BIGINT AS hive_vesting_rewards
+      FROM account_rewards ar
+      WHERE ar.account = _account_id
     ),
 
-    -- 7) Savings + withdraw-requests count
+    -- 7) Savings + withdraw‐requests count
     get_savings AS (
-        SELECT
-            COALESCE(MAX(CASE WHEN ats.nai = 13 THEN ats.saving_balance END), 0)::BIGINT AS hbd_savings,
-            COALESCE(MAX(CASE WHEN ats.nai = 21 THEN ats.saving_balance END), 0)::BIGINT AS hive_savings,
-            COALESCE(SUM(ats.savings_withdraw_requests), 0)::INT      AS savings_withdraw_requests
-        FROM account_savings ats
-        WHERE ats.account = _account_id
+      SELECT
+        COALESCE(MAX(CASE WHEN ats.nai=13 THEN ats.saving_balance END),0)::BIGINT AS hbd_savings,
+        COALESCE(MAX(CASE WHEN ats.nai=21 THEN ats.saving_balance END),0)::BIGINT AS hive_savings,
+        COALESCE(SUM(ats.savings_withdraw_requests),0)::INT              AS savings_withdraw_requests
+      FROM account_savings ats
+      WHERE ats.account = _account_id
     ),
 
-    -- 8) Vesting-withdraw info
+    -- 8) Vesting‐withdraw info
     get_withdraws AS (
-        SELECT
-            COALESCE(aw.vesting_withdraw_rate, 0)::BIGINT AS vesting_withdraw_rate,
-            COALESCE(aw.to_withdraw,          0)::BIGINT AS to_withdraw,
-            COALESCE(aw.withdrawn,            0)::BIGINT AS withdrawn,
-            COALESCE(aw.withdraw_routes,      0)::INT    AS withdraw_routes,
-            COALESCE(aw.delayed_vests,        0)::BIGINT AS delayed_vests
-        FROM (VALUES (1)) AS dummy(_)
-        LEFT JOIN account_withdraws aw
-          ON aw.account = _account_id
+      SELECT
+        COALESCE(aw.vesting_withdraw_rate,0)::BIGINT AS vesting_withdraw_rate,
+        COALESCE(aw.to_withdraw,0)::BIGINT             AS to_withdraw,
+        COALESCE(aw.withdrawn,0)::BIGINT               AS withdrawn,
+        COALESCE(aw.withdraw_routes,0)::INT            AS withdraw_routes,
+        COALESCE(aw.delayed_vests,0)::BIGINT           AS delayed_vests
+      FROM (VALUES(1)) AS dummy(_)
+      LEFT JOIN account_withdraws aw
+        ON aw.account = _account_id
     ),
 
-    -- 9) Pending-converts summary (flat-table version)
-        -- 9) Pending‐converts summary (flat‐table version)
+    -- 9) Pending‐converts summary, dynamic truncation
     conv_pivot AS (
-        WITH
-            ops AS (
-                SELECT block_num, op_type, request_id, nai, amount
-                  FROM btracker_app.account_convert_operations
-                 WHERE account_name = (
-                   SELECT name::TEXT
-                     FROM hive.accounts_view
-                    WHERE id = _account_id
-                 )
-            ),
-            last_fill AS (
-                SELECT
-                    request_id,
-                    MAX(block_num) AS last_fill_block
-                  FROM ops
-                 WHERE op_type = 'fill'
-                 GROUP BY request_id
-            ),
-            requests AS (
-                SELECT
-                    request_id,
-                    block_num  AS request_block,
-                    nai,
-                    amount
-                  FROM ops
-                 WHERE op_type = 'convert'
-            ),
-            open_requests AS (
-                SELECT r.*
-                  FROM requests r
-                  LEFT JOIN last_fill lf USING (request_id)
-                 WHERE r.request_block > COALESCE(lf.last_fill_block, 0)
+      WITH
+        ops AS (
+          SELECT block_num, op_type, request_id, nai, amount
+          FROM btracker_app.account_convert_operations
+          WHERE account_name = (
+            SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
+          )
+        ),
+        last_fill AS (
+          SELECT
+            request_id,
+            MAX(block_num) AS last_fill_block
+          FROM ops
+          WHERE op_type = 'fill'
+          GROUP BY request_id
+        ),
+        requests AS (
+          SELECT
+            request_id,
+            block_num AS request_block,
+            nai,
+            amount
+          FROM ops
+          WHERE op_type = 'convert'
+        ),
+        open_requests AS (
+          SELECT r.*
+          FROM requests r
+          LEFT JOIN last_fill lf USING (request_id)
+          WHERE r.request_block > COALESCE(lf.last_fill_block,0)
+        )
+      SELECT
+        -- dynamically drop trailing zeros from the text repr,
+        -- then cast back to numeric
+        COALESCE(
+          TRIM(TRAILING '.' 
+            FROM TRIM(TRAILING '0'
+              FROM (SUM(amount) FILTER (WHERE nai='@@000000013'))::TEXT
             )
-        SELECT
-            -- cast to 3 decimal places instead of 1
-            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)
-              ::NUMERIC(20,3)    AS conversion_pending_amount_hbd,
-            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000013'), 0)::INT
-                                AS conversion_pending_count_hbd,
-            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)
-              ::NUMERIC(20,3)    AS conversion_pending_amount_hive,
-            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000021'), 0)::INT
-                                AS conversion_pending_count_hive
-          FROM open_requests
+          )::NUMERIC,
+        0) AS conversion_pending_amount_hbd,
+        COALESCE(
+          COUNT(*) FILTER (WHERE nai='@@000000013'),
+        0)::INT AS conversion_pending_count_hbd,
+        COALESCE(
+          TRIM(TRAILING '.'
+            FROM TRIM(TRAILING '0'
+              FROM (SUM(amount) FILTER (WHERE nai='@@000000021'))::TEXT
+            )
+          )::NUMERIC,
+        0) AS conversion_pending_amount_hive,
+        COALESCE(
+          COUNT(*) FILTER (WHERE nai='@@000000021'),
+        0)::INT AS conversion_pending_count_hive
+      FROM open_requests
     ),
 
-    -- 10) Open orders
+    -- 10) Open‐orders summary, dynamic truncation
     open_orders AS (
-        WITH
-            ops AS (
-                SELECT
-                    block_num,
-                    op_type,
-                    order_id,
-                    nai,
-                    amount
-                FROM btracker_app.account_operations
-                WHERE account_name = (
-                    SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
-                )
-                  AND op_type IN ('create','fill','cancel')
-            ),
-            last_cancel AS (
-                SELECT
-                    order_id,
-                    MAX(block_num) AS last_cancel_block
-                FROM ops
-                WHERE op_type = 'cancel'
-                GROUP BY order_id
-            ),
-            creates AS (
-                SELECT
-                    order_id,
-                    block_num    AS create_block,
-                    amount       AS create_amount,
-                    nai
-                FROM ops
-                WHERE op_type = 'create'
-            ),
-            fills AS (
-                SELECT
-                    order_id,
-                    amount       AS fill_amt,
-                    block_num,
-                    nai
-                FROM ops
-                WHERE op_type = 'fill'
-            ),
-            live_creates AS (
-                SELECT c.*
-                FROM creates c
-                LEFT JOIN last_cancel lc USING (order_id)
-                WHERE c.create_block > COALESCE(lc.last_cancel_block, 0)
-            ),
-            agg_fills AS (
-                SELECT
-                    f.order_id,
-                    f.nai,
-                    SUM(f.fill_amt) AS total_filled
-                FROM fills f
-                LEFT JOIN last_cancel lc USING (order_id)
-                WHERE f.block_num > COALESCE(lc.last_cancel_block, 0)
-                GROUP BY f.order_id, f.nai
+      WITH
+        ops AS (
+          SELECT block_num, op_type, order_id, nai, amount
+          FROM btracker_app.account_operations
+          WHERE account_name = (
+            SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
+          )
+            AND op_type IN ('create','fill','cancel')
+        ),
+        last_cancel AS (
+          SELECT
+            order_id,
+            MAX(block_num) AS last_cancel_block
+          FROM ops
+          WHERE op_type = 'cancel'
+          GROUP BY order_id
+        ),
+        creates AS (
+          SELECT order_id, block_num AS create_block, amount AS create_amount, nai
+          FROM ops
+          WHERE op_type = 'create'
+        ),
+        fills AS (
+          SELECT order_id, amount AS fill_amt, block_num, nai
+          FROM ops
+          WHERE op_type = 'fill'
+        ),
+        live_creates AS (
+          SELECT c.*
+          FROM creates c
+          LEFT JOIN last_cancel lc USING (order_id)
+          WHERE c.create_block > COALESCE(lc.last_cancel_block,0)
+        ),
+        agg_fills AS (
+          SELECT f.order_id, f.nai, SUM(f.fill_amt) AS total_filled
+          FROM fills f
+          LEFT JOIN last_cancel lc USING (order_id)
+          WHERE f.block_num > COALESCE(lc.last_cancel_block,0)
+          GROUP BY f.order_id, f.nai
+        )
+      SELECT
+        COUNT(*) FILTER (WHERE cri.amount_remaining>0 AND cri.nai='@@000000013')::INT AS open_orders_hbd_count,
+        COUNT(*) FILTER (WHERE cri.amount_remaining>0 AND cri.nai='@@000000021')::INT AS open_orders_hive_count,
+        COALESCE(
+          TRIM(TRAILING '.'
+            FROM TRIM(TRAILING '0'
+              FROM (SUM(cri.amount_remaining) FILTER (WHERE cri.nai='@@000000021'))::TEXT
             )
+          )::NUMERIC,
+        0) AS open_orders_hive_amount,
+        COALESCE(
+          TRIM(TRAILING '.'
+            FROM TRIM(TRAILING '0'
+              FROM (SUM(cri.amount_remaining) FILTER (WHERE cri.nai='@@000000013'))::TEXT
+            )
+          )::NUMERIC,
+        0) AS open_orders_hbd_amount
+      FROM (
         SELECT
-            COUNT(*) FILTER (WHERE cri.amount_remaining > 0 AND cri.nai = '@@000000013')::INT AS open_orders_hbd_count,
-            COUNT(*) FILTER (WHERE cri.amount_remaining > 0 AND cri.nai = '@@000000021')::INT AS open_orders_hive_count,
-            SUM(cri.amount_remaining) FILTER (WHERE cri.nai = '@@000000021')                AS open_orders_hive_amount,
-            SUM(cri.amount_remaining) FILTER (WHERE cri.nai = '@@000000013')                AS open_orders_hbd_amount
-        FROM (
-            SELECT
-                lc.order_id,
-                lc.create_block,
-                lc.create_amount,
-                COALESCE(af.total_filled, 0)                         AS total_filled,
-                lc.create_amount - COALESCE(af.total_filled, 0)      AS amount_remaining,
-                lc.nai
-            FROM live_creates lc
-            LEFT JOIN agg_fills af
-              ON af.order_id = lc.order_id
-             AND af.nai      = lc.nai
-        ) AS cri
+          lc.order_id,
+          lc.create_block,
+          lc.create_amount,
+          COALESCE(af.total_filled,0)                    AS total_filled,
+          lc.create_amount - COALESCE(af.total_filled,0) AS amount_remaining,
+          lc.nai
+        FROM live_creates lc
+        LEFT JOIN agg_fills af
+          ON af.order_id = lc.order_id
+         AND af.nai      = lc.nai
+      ) AS cri
     )
 
-  -- Final assembly, casting conversion-pending amounts to 1 decimal place
+  -- Final assembly
   SELECT
-      gb.hbd_balance,
-      gb.hive_balance,
-      gb.vesting_shares,
-      gvb.vesting_balance_hive,
-      gpv.post_voting_power_vests,
-      gd.delegated_vests,
-      gd.received_vests,
-      ir.curation_rewards,
-      ir.posting_rewards,
-      cr.hbd_rewards,
-      cr.hive_rewards,
-      cr.vests_rewards,
-      cr.hive_vesting_rewards,
-      sv.hbd_savings,
-      sv.hive_savings,
-      sv.savings_withdraw_requests,
-      wd.vesting_withdraw_rate,
-      wd.to_withdraw,
-      wd.withdrawn,
-      wd.withdraw_routes,
-      wd.delayed_vests,
-      (cp.conversion_pending_amount_hbd::NUMERIC(20,1)) AS conversion_pending_amount_hbd,
-      cp.conversion_pending_count_hbd,
-      (cp.conversion_pending_amount_hive::NUMERIC(20,1)) AS conversion_pending_amount_hive,
-      cp.conversion_pending_count_hive,
-      oo.open_orders_hbd_count,
-      oo.open_orders_hive_count,
-      oo.open_orders_hive_amount,
-      oo.open_orders_hbd_amount
+    gb.hbd_balance,
+    gb.hive_balance,
+    gb.vesting_shares,
+    gvb.vesting_balance_hive,
+    gpv.post_voting_power_vests,
+    gd.delegated_vests,
+    gd.received_vests,
+    ir.curation_rewards,
+    ir.posting_rewards,
+    cr.hbd_rewards,
+    cr.hive_rewards,
+    cr.vests_rewards,
+    cr.hive_vesting_rewards,
+    sv.hbd_savings,
+    sv.hive_savings,
+    sv.savings_withdraw_requests,
+    wd.vesting_withdraw_rate,
+    wd.to_withdraw,
+    wd.withdrawn,
+    wd.withdraw_routes,
+    wd.delayed_vests,
+    cp.conversion_pending_amount_hbd,
+    cp.conversion_pending_count_hbd,
+    cp.conversion_pending_amount_hive,
+    cp.conversion_pending_count_hive,
+    oo.open_orders_hbd_count,
+    oo.open_orders_hive_count,
+    oo.open_orders_hive_amount,
+    oo.open_orders_hbd_amount
   INTO result_row
-  FROM get_balances       gb
+  FROM get_balances     gb
   CROSS JOIN get_vest_balance      gvb
   CROSS JOIN get_post_voting_power gpv
   CROSS JOIN get_delegations       gd
@@ -277,7 +283,6 @@ END;
 $BODY$;
 
 RESET ROLE;
-
 
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
