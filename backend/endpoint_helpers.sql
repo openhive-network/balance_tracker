@@ -103,24 +103,25 @@ BEGIN
     ),
 
     -- 9) Pending-converts summary (flat-table version)
+        -- 9) Pending‐converts summary (flat‐table version)
     conv_pivot AS (
         WITH
             ops AS (
                 SELECT block_num, op_type, request_id, nai, amount
-                FROM btracker_app.account_convert_operations
-                WHERE account_name = (
-                    SELECT name::TEXT
-                    FROM hive.accounts_view
+                  FROM btracker_app.account_convert_operations
+                 WHERE account_name = (
+                   SELECT name::TEXT
+                     FROM hive.accounts_view
                     WHERE id = _account_id
-                )
+                 )
             ),
             last_fill AS (
                 SELECT
                     request_id,
                     MAX(block_num) AS last_fill_block
-                FROM ops
-                WHERE op_type = 'fill'
-                GROUP BY request_id
+                  FROM ops
+                 WHERE op_type = 'fill'
+                 GROUP BY request_id
             ),
             requests AS (
                 SELECT
@@ -128,21 +129,26 @@ BEGIN
                     block_num  AS request_block,
                     nai,
                     amount
-                FROM ops
-                WHERE op_type = 'convert'
+                  FROM ops
+                 WHERE op_type = 'convert'
             ),
             open_requests AS (
                 SELECT r.*
-                FROM requests r
-                LEFT JOIN last_fill lf USING (request_id)
-                WHERE r.request_block > COALESCE(lf.last_fill_block, 0)
+                  FROM requests r
+                  LEFT JOIN last_fill lf USING (request_id)
+                 WHERE r.request_block > COALESCE(lf.last_fill_block, 0)
             )
         SELECT
-            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)         AS conversion_pending_amount_hbd,
-            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000013'), 0)::INT     AS conversion_pending_count_hbd,
-            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)         AS conversion_pending_amount_hive,
-            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000021'), 0)::INT     AS conversion_pending_count_hive
-        FROM open_requests
+            -- cast to 3 decimal places instead of 1
+            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000013'), 0)
+              ::NUMERIC(20,3)    AS conversion_pending_amount_hbd,
+            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000013'), 0)::INT
+                                AS conversion_pending_count_hbd,
+            COALESCE(SUM(amount) FILTER (WHERE nai = '@@000000021'), 0)
+              ::NUMERIC(20,3)    AS conversion_pending_amount_hive,
+            COALESCE(COUNT(*) FILTER (WHERE nai = '@@000000021'), 0)::INT
+                                AS conversion_pending_count_hive
+          FROM open_requests
     ),
 
     -- 10) Open orders
