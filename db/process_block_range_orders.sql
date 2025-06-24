@@ -1,8 +1,8 @@
 SET ROLE btracker_owner;
 
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
-  p_from_block INT,
-  p_to_block   INT
+    p_from_block INT,
+    p_to_block   INT
 )
 RETURNS VOID
 LANGUAGE plpgsql
