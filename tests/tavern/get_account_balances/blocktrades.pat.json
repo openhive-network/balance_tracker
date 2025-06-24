@@ -19,7 +19,7 @@
   "to_withdraw": "8362101094935031",
   "withdrawn": "804048182205290",
   "withdraw_routes": 4,
-  "delayed_vests": "0"
+  "delayed_vests": "0",
   "conversion_pending_amount_hbd": 0,
   "conversion_pending_count_hbd": 0,
   "conversion_pending_amount_hive": 0,
