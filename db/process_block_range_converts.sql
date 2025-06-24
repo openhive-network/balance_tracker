@@ -1,13 +1,10 @@
--- 1) Elevate to the loader role
 SET ROLE btracker_owner;
 
--- 2) Drop existing definition so we can change the body safely
 DROP FUNCTION IF EXISTS btracker_app.process_block_range_converts(INT, INT);
 
--- 3) Re-create using the original parameter names (_from_block, _to_block)
 CREATE OR REPLACE FUNCTION btracker_app.process_block_range_converts(
-  _from_block INT,
-  _to_block   INT
+    _from_block INT,
+    _to_block   INT
 )
 RETURNS VOID
 LANGUAGE plpgsql
