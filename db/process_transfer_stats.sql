@@ -14,7 +14,7 @@ DECLARE
   __transfers_by_day INT;
   __transfers_by_month INT;
 BEGIN
-  WITH gather_transfers AS MATERIALIZED (
+  WITH gather_transfers AS (
     SELECT 
       ov.block_num,
       git.nai,
@@ -34,7 +34,7 @@ BEGIN
       date_trunc('day',bv.created_at) as by_day, 
       date_trunc('month',bv.created_at) as by_month
     FROM gather_transfers gt 
-    JOIN blocks_view bv ON gt.block_num = bv.num
+    JOIN hive.blocks_view bv ON gt.block_num = bv.num
   ),
   group_by_hour AS (
     SELECT 
