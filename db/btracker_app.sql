@@ -262,6 +262,54 @@ CREATE TABLE IF NOT EXISTS saving_history_by_day
 
 PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schema_name );
 
+
+------------------------------------------
+
+  CREATE TABLE IF NOT EXISTS transfer_stats_by_month
+  (
+    sum_transfer_amount BIGINT NOT NULL,
+    avg_transfer_amount BIGINT NOT NULL,
+    max_transfer_amount BIGINT NOT NULL,
+    min_transfer_amount BIGINT NOT NULL,
+    transfer_count INT NOT NULL,
+    nai INT NOT NULL, -- NAI of the transfer
+    last_block_num INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_transfer_stats_by_month PRIMARY KEY (nai, updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_month', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS transfer_stats_by_day
+  (
+    sum_transfer_amount BIGINT NOT NULL,
+    avg_transfer_amount BIGINT NOT NULL,
+    max_transfer_amount BIGINT NOT NULL,
+    min_transfer_amount BIGINT NOT NULL,
+    transfer_count INT NOT NULL,
+    nai INT NOT NULL, -- NAI of the transfer
+    last_block_num INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_transfer_stats_by_day PRIMARY KEY (nai, updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_day', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS transfer_stats_by_hour
+  (
+    sum_transfer_amount BIGINT NOT NULL,
+    avg_transfer_amount BIGINT NOT NULL,
+    max_transfer_amount BIGINT NOT NULL,
+    min_transfer_amount BIGINT NOT NULL,
+    transfer_count INT NOT NULL,
+    nai INT NOT NULL, -- NAI of the transfer
+    last_block_num INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_transfer_stats_by_hour PRIMARY KEY (nai, updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __schema_name );
+
 CREATE TABLE IF NOT EXISTS transfer_saving_id
 (
   account INT NOT NULL,
@@ -384,6 +432,7 @@ BEGIN
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
+    PERFORM process_transfer_stats(_from, __hardfork_23_block);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -397,6 +446,8 @@ BEGIN
       PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
+      PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
+
     END IF;
 
   ELSE
@@ -407,6 +458,7 @@ BEGIN
     PERFORM process_block_range_rewards(_from, _to);
     PERFORM process_block_range_delegations(_from, _to);
     PERFORM process_block_range_recurrent_transfers(_from, _to);
+    PERFORM process_transfer_stats(_from, _to);
 
   END IF;
 
@@ -442,6 +494,7 @@ BEGIN
   PERFORM process_block_range_rewards(_block, _block);
   PERFORM process_block_range_delegations(_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
+  PERFORM process_transfer_stats(_block, _block);
 
   IF _logs THEN
     __end_ts := clock_timestamp();
