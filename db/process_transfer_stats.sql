@@ -100,9 +100,9 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_hour DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::INT,
-      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::INT,
-      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::INT,
+      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
+      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
+      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
       last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) as is_new_entry, trx_agg.updated_at
@@ -132,9 +132,9 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_day DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::INT,
-      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::INT,
-      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::INT,
+      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
+      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
+      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
       last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) as is_new_entry, trx_agg.updated_at
@@ -164,9 +164,9 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_month DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::INT,
-      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::INT,
-      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::INT,
+      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
+      max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
+      min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
       last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) as is_new_entry, trx_agg.updated_at
