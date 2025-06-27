@@ -265,50 +265,50 @@ PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schem
 
 ------------------------------------------
 
-  CREATE TABLE IF NOT EXISTS transfer_stats_by_month
-  (
-    sum_transfer_amount BIGINT NOT NULL,
-    avg_transfer_amount BIGINT NOT NULL,
-    max_transfer_amount BIGINT NOT NULL,
-    min_transfer_amount BIGINT NOT NULL,
-    transfer_count INT NOT NULL,
-    nai INT NOT NULL, -- NAI of the transfer
-    last_block_num INT NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+CREATE TABLE IF NOT EXISTS transfer_stats_by_month
+(
+  sum_transfer_amount BIGINT NOT NULL,
+  avg_transfer_amount BIGINT NOT NULL,
+  max_transfer_amount BIGINT NOT NULL,
+  min_transfer_amount BIGINT NOT NULL,
+  transfer_count INT NOT NULL,
+  nai INT NOT NULL, -- NAI of the transfer
+  last_block_num INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
 
-    CONSTRAINT pk_transfer_stats_by_month PRIMARY KEY (nai, updated_at)
-  );
-  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_month', __schema_name );
+  CONSTRAINT pk_transfer_stats_by_month PRIMARY KEY (nai, updated_at)
+);
+PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_month', __schema_name );
 
-  CREATE TABLE IF NOT EXISTS transfer_stats_by_day
-  (
-    sum_transfer_amount BIGINT NOT NULL,
-    avg_transfer_amount BIGINT NOT NULL,
-    max_transfer_amount BIGINT NOT NULL,
-    min_transfer_amount BIGINT NOT NULL,
-    transfer_count INT NOT NULL,
-    nai INT NOT NULL, -- NAI of the transfer
-    last_block_num INT NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+CREATE TABLE IF NOT EXISTS transfer_stats_by_day
+(
+  sum_transfer_amount BIGINT NOT NULL,
+  avg_transfer_amount BIGINT NOT NULL,
+  max_transfer_amount BIGINT NOT NULL,
+  min_transfer_amount BIGINT NOT NULL,
+  transfer_count INT NOT NULL,
+  nai INT NOT NULL, -- NAI of the transfer
+  last_block_num INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
 
-    CONSTRAINT pk_transfer_stats_by_day PRIMARY KEY (nai, updated_at)
-  );
-  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_day', __schema_name );
+  CONSTRAINT pk_transfer_stats_by_day PRIMARY KEY (nai, updated_at)
+);
+PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_day', __schema_name );
 
-  CREATE TABLE IF NOT EXISTS transfer_stats_by_hour
-  (
-    sum_transfer_amount BIGINT NOT NULL,
-    avg_transfer_amount BIGINT NOT NULL,
-    max_transfer_amount BIGINT NOT NULL,
-    min_transfer_amount BIGINT NOT NULL,
-    transfer_count INT NOT NULL,
-    nai INT NOT NULL, -- NAI of the transfer
-    last_block_num INT NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+CREATE TABLE IF NOT EXISTS transfer_stats_by_hour
+(
+  sum_transfer_amount BIGINT NOT NULL,
+  avg_transfer_amount BIGINT NOT NULL,
+  max_transfer_amount BIGINT NOT NULL,
+  min_transfer_amount BIGINT NOT NULL,
+  transfer_count INT NOT NULL,
+  nai INT NOT NULL, -- NAI of the transfer
+  last_block_num INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
 
-    CONSTRAINT pk_transfer_stats_by_hour PRIMARY KEY (nai, updated_at)
-  );
-  PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __schema_name );
+  CONSTRAINT pk_transfer_stats_by_hour PRIMARY KEY (nai, updated_at)
+);
+PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __schema_name );
 
 CREATE TABLE IF NOT EXISTS transfer_saving_id
 (
