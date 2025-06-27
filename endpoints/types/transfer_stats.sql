@@ -1,4 +1,4 @@
-SET ROLE hafbe_owner;
+SET ROLE btracker_owner;
 
 /** openapi:components:schemas
 btracker_backend.transfer_stats:
