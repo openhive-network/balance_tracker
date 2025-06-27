@@ -18,6 +18,21 @@ CREATE TYPE btracker_backend.nai_type AS ENUM (
 -- openapi-generated-code-end
 
 /** openapi:components:schemas
+btracker_backend.liquid_nai_type:
+  type: string
+  enum:
+    - HBD
+    - HIVE
+ */
+-- openapi-generated-code-begin
+DROP TYPE IF EXISTS btracker_backend.liquid_nai_type CASCADE;
+CREATE TYPE btracker_backend.liquid_nai_type AS ENUM (
+    'HBD',
+    'HIVE'
+);
+-- openapi-generated-code-end
+
+/** openapi:components:schemas
 btracker_backend.balance_type:
   type: string
   enum:
