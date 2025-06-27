@@ -17,6 +17,8 @@ externalDocs:
 tags:
   - name: Accounts
     description: Informations about account balances
+  - name: Transfers
+    description: Information about transfers and their history
   - name: Other
     description: General API information
 servers:
@@ -61,6 +63,10 @@ declare
       "description": "Informations about account balances"
     },
     {
+      "name": "Transfers",
+      "description": "Information about transfers and their history"
+    },
+    {
       "name": "Other",
       "description": "General API information"
     }
@@ -80,12 +86,28 @@ declare
           "yearly"
         ]
       },
+      "btracker_backend.granularity_hourly": {
+        "type": "string",
+        "enum": [
+          "hourly",
+          "daily",
+          "monthly",
+          "yearly"
+        ]
+      },
       "btracker_backend.nai_type": {
         "type": "string",
         "enum": [
           "HBD",
           "HIVE",
           "VESTS"
+        ]
+      },
+      "btracker_backend.liquid_nai_type": {
+        "type": "string",
+        "enum": [
+          "HBD",
+          "HIVE"
         ]
       },
       "btracker_backend.balance_type": {
@@ -478,6 +500,50 @@ declare
           }
         }
       },
+      "btracker_backend.transfer_stats": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "the time transfers were included in the blockchain"
+          },
+          "total_transfer_amount": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "sum of a amount of transfered tokens in the period"
+          },
+          "average_transfer_amount": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "average amount of transfered tokens in the period"
+          },
+          "maximum_transfer_amount": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "maximum amount of transfered tokens in the period"
+          },
+          "minimum_transfer_amount": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "minimum amount of transfered tokens in the period"
+          },
+          "transfer_count": {
+            "type": "integer",
+            "description": "number of transfers in the period"
+          },
+          "last_block_num": {
+            "type": "integer",
+            "description": "last block number in time range"
+          }
+        }
+      },
+      "btracker_backend.array_of_transfer_stats": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.transfer_stats"
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
@@ -852,6 +918,93 @@ declare
                   "outgoing_recurrent_transfers": [],
                   "incoming_recurrent_transfers": []
                 }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/transfer-statistics": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Aggregated transfer statistics",
+        "description": "History of amount of transfers per hour, day, month or year.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_transfer_statistics(''HBD'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/transfer-statistics''`\n",
+        "operationId": "btracker_endpoints.get_transfer_statistics",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "coin-type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.liquid_nai_type"
+            },
+            "description": "Coin types:\n\n* HBD\n\n* HIVE\n"
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.granularity_hourly",
+              "default": "yearly"
+            },
+            "description": "granularity types:\n\n* hourly\n\n* daily\n\n* monthly\n\n* yearly\n"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance change\n\n* Returns array of `btracker_backend.transfer_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_transfer_stats"
+                },
+                "example": [
+                  {
+                    "date": "2016-12-31T23:59:59",
+                    "total_transfer_amount": 69611921266,
+                    "average_transfer_amount": 1302405,
+                    "maximum_transfer_amount": 18000000,
+                    "minimum_transfer_amount": 1,
+                    "transfer_count": 54665,
+                    "last_block_num": 5000000
+                  }
+                ]
               }
             }
           },
