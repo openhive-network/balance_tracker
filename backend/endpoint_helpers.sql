@@ -482,6 +482,64 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
+    kind      TEXT,
+    page_num  INT
+)
+RETURNS TABLE(
+    rank  INT,
+    name  TEXT,
+    value NUMERIC
+)
+LANGUAGE plpgsql
+STABLE
+AS
+$BODY$
+DECLARE
+    asset_nai  INT;
+    src_table  TEXT;
+    src_column TEXT;
+BEGIN
+    -- 1) map the kind to NAI, table and column
+    CASE UPPER(TRIM(kind))
+      WHEN 'HIVE'        THEN asset_nai := 21; src_table := 'current_account_balances'; src_column := 'balance';
+      WHEN 'HBD'         THEN asset_nai := 13; src_table := 'current_account_balances'; src_column := 'balance';
+      WHEN 'VESTS'       THEN asset_nai := 37; src_table := 'current_account_balances'; src_column := 'balance';
+      WHEN 'HIVESAVING'  THEN asset_nai := 21; src_table := 'account_savings';           src_column := 'saving_balance';
+      WHEN 'HBDSAVING'   THEN asset_nai := 13; src_table := 'account_savings';           src_column := 'saving_balance';
+      ELSE
+        RAISE EXCEPTION 'Unsupported kind: %', kind;
+    END CASE;
+
+    -- 2) perform the ranking + paging (100 rows/page)
+    RETURN QUERY EXECUTE format($fmt$
+      WITH filtered AS (
+        SELECT
+          av.name::text        AS name,
+          src.%1$I::numeric    AS value
+        FROM %2$I src
+        JOIN hive.accounts_view av
+          ON av.id = src.account
+        WHERE src.nai = %3$s
+          AND src.%1$I > 0
+      )
+      SELECT
+        ROW_NUMBER() OVER (ORDER BY value DESC)::INT AS rank,
+        name,
+        value
+      FROM filtered
+      ORDER BY value DESC
+      LIMIT 100
+      OFFSET ((%4$s - 1) * 100)
+    $fmt$,
+      src_column,   -- %1$I
+      src_table,    -- %2$I
+      asset_nai,    -- %3$s
+      page_num      -- %4$s
+    );
+END;
+$BODY$;
+
 
 
 RESET ROLE;
