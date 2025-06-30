@@ -198,16 +198,35 @@ BEGIN
             COALESCE(bh.last_block_num,NULL) AS last_block_num
           FROM date_series ds
           LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
+        ),
+        join_missing_block AS (
+          SELECT
+            fb.date,
+            fb.sum_transfer_amount,
+            fb.avg_transfer_amount,
+            fb.max_transfer_amount,
+            fb.min_transfer_amount,
+            fb.transfer_count,
+            COALESCE(fb.last_block_num, jl.last_block_num) AS last_block_num
+          FROM transfer_records fb
+          LEFT JOIN LATERAL (
+            SELECT
+              b.num AS last_block_num
+            FROM hive.blocks_view b
+            WHERE b.created_at <= fb.date + __one_period
+            ORDER BY b.created_at DESC
+            LIMIT 1
+          ) jl ON fb.last_block_num IS NULL
         )
         SELECT 
-          LEAST(fb.date + __one_period - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
+          LEAST(fb.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
           fb.sum_transfer_amount::BIGINT,
           fb.avg_transfer_amount::BIGINT,
           fb.max_transfer_amount::BIGINT,
           fb.min_transfer_amount::BIGINT,
           fb.transfer_count::INT,
           fb.last_block_num::INT
-        FROM transfer_records fb
+        FROM join_missing_block fb
         ORDER BY
           (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
           (CASE WHEN _direction = 'asc' THEN fb.date ELSE NULL END) ASC
