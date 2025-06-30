@@ -102,10 +102,10 @@ SET ROLE btracker_owner;
             example: [
               {
                 "date": "2016-12-31T23:59:59",
-                "total_transfer_amount": 69611921266,
-                "average_transfer_amount": 1302405,
-                "maximum_transfer_amount": 18000000,
-                "minimum_transfer_amount": 1,
+                "total_transfer_amount": "69611921266",
+                "average_transfer_amount": "1302405",
+                "maximum_transfer_amount": "18000000",
+                "minimum_transfer_amount": "1",
                 "transfer_count": 54665,
                 "last_block_num": 5000000
               }
@@ -140,11 +140,11 @@ BEGIN
 
   RETURN QUERY
   SELECT 
-    ah.date,
-    ah.total_transfer_amount,
-    ah.average_transfer_amount,
-    ah.maximum_transfer_amount,
-    ah.minimum_transfer_amount,
+    ah.updated_at,
+    ah.sum_transfer_amount::TEXT,
+    ah.avg_transfer_amount::TEXT,
+    ah.max_transfer_amount::TEXT,
+    ah.min_transfer_amount::TEXT,
     ah.transfer_count,
     ah.last_block_num
   FROM btracker_backend.get_transfer_aggregation(
