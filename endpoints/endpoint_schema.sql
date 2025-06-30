@@ -509,23 +509,19 @@ declare
             "description": "the time transfers were included in the blockchain"
           },
           "total_transfer_amount": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "sum of a amount of transfered tokens in the period"
           },
           "average_transfer_amount": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "average amount of transfered tokens in the period"
           },
           "maximum_transfer_amount": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "maximum amount of transfered tokens in the period"
           },
           "minimum_transfer_amount": {
-            "type": "integer",
-            "x-sql-datatype": "BIGINT",
+            "type": "string",
             "description": "minimum amount of transfered tokens in the period"
           },
           "transfer_count": {
@@ -997,10 +993,10 @@ declare
                 "example": [
                   {
                     "date": "2016-12-31T23:59:59",
-                    "total_transfer_amount": 69611921266,
-                    "average_transfer_amount": 1302405,
-                    "maximum_transfer_amount": 18000000,
-                    "minimum_transfer_amount": 1,
+                    "total_transfer_amount": "69611921266",
+                    "average_transfer_amount": "1302405",
+                    "maximum_transfer_amount": "18000000",
+                    "minimum_transfer_amount": "1",
                     "transfer_count": 54665,
                     "last_block_num": 5000000
                   }
