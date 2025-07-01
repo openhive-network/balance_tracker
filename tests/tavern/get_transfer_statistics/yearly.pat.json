@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2017-01-01T00:00:00",
+    "total_transfer_amount": "38838711792",
+    "average_transfer_amount": "102796",
+    "maximum_transfer_amount": "222105144",
+    "minimum_transfer_amount": "1",
+    "transfer_count": 48131,
+    "last_block_num": 4999997
+  }
+]
