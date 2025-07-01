@@ -1,0 +1,65 @@
+[
+  {
+    "date": "2016-10-01T00:00:00",
+    "total_transfer_amount": "798493511",
+    "average_transfer_amount": "55801",
+    "maximum_transfer_amount": "18000000",
+    "minimum_transfer_amount": "1",
+    "transfer_count": 13755,
+    "last_block_num": 4999997
+  },
+  {
+    "date": "2016-09-01T00:00:00",
+    "total_transfer_amount": "2540310729",
+    "average_transfer_amount": "46063",
+    "maximum_transfer_amount": "24999990",
+    "minimum_transfer_amount": "1",
+    "transfer_count": 24381,
+    "last_block_num": 4574686
+  },
+  {
+    "date": "2016-08-01T00:00:00",
+    "total_transfer_amount": "35499907552",
+    "average_transfer_amount": "206524",
+    "maximum_transfer_amount": "222105144",
+    "minimum_transfer_amount": "1",
+    "transfer_count": 9995,
+    "last_block_num": 3686716
+  },
+  {
+    "date": "2016-07-01T00:00:00",
+    "total_transfer_amount": "0",
+    "average_transfer_amount": "0",
+    "maximum_transfer_amount": "0",
+    "minimum_transfer_amount": "0",
+    "transfer_count": 0,
+    "last_block_num": 2802786
+  },
+  {
+    "date": "2016-06-01T00:00:00",
+    "total_transfer_amount": "0",
+    "average_transfer_amount": "0",
+    "maximum_transfer_amount": "0",
+    "minimum_transfer_amount": "0",
+    "transfer_count": 0,
+    "last_block_num": 1942556
+  },
+  {
+    "date": "2016-05-01T00:00:00",
+    "total_transfer_amount": "0",
+    "average_transfer_amount": "0",
+    "maximum_transfer_amount": "0",
+    "minimum_transfer_amount": "0",
+    "transfer_count": 0,
+    "last_block_num": 1052191
+  },
+  {
+    "date": "2016-04-01T00:00:00",
+    "total_transfer_amount": "0",
+    "average_transfer_amount": "0",
+    "maximum_transfer_amount": "0",
+    "minimum_transfer_amount": "0",
+    "transfer_count": 0,
+    "last_block_num": 209769
+  }
+]
