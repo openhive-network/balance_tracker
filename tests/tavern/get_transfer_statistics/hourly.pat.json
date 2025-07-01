@@ -2,7 +2,7 @@
   {
     "date": "2016-09-15T20:00:00",
     "total_transfer_amount": "31985645",
-    "average_transfer_amount": "5330941",
+    "average_transfer_amount": "5330940",
     "maximum_transfer_amount": "28941000",
     "minimum_transfer_amount": "336",
     "transfer_count": 6,
@@ -11,7 +11,7 @@
   {
     "date": "2016-09-15T19:00:00",
     "total_transfer_amount": "944423",
-    "average_transfer_amount": "157404",
+    "average_transfer_amount": "157403",
     "maximum_transfer_amount": "890736",
     "minimum_transfer_amount": "1094",
     "transfer_count": 6,
@@ -20,7 +20,7 @@
   {
     "date": "2016-09-15T18:00:00",
     "total_transfer_amount": "1379782",
-    "average_transfer_amount": "197112",
+    "average_transfer_amount": "197111",
     "maximum_transfer_amount": "900000",
     "minimum_transfer_amount": "744",
     "transfer_count": 7,
@@ -47,7 +47,7 @@
   {
     "date": "2016-09-15T15:00:00",
     "total_transfer_amount": "1210073",
-    "average_transfer_amount": "80672",
+    "average_transfer_amount": "80671",
     "maximum_transfer_amount": "1166574",
     "minimum_transfer_amount": "1",
     "transfer_count": 15,
@@ -56,7 +56,7 @@
   {
     "date": "2016-09-15T14:00:00",
     "total_transfer_amount": "1047074",
-    "average_transfer_amount": "261769",
+    "average_transfer_amount": "261768",
     "maximum_transfer_amount": "812190",
     "minimum_transfer_amount": "6601",
     "transfer_count": 4,
@@ -65,7 +65,7 @@
   {
     "date": "2016-09-15T13:00:00",
     "total_transfer_amount": "4107816",
-    "average_transfer_amount": "83833",
+    "average_transfer_amount": "83832",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "11",
     "transfer_count": 49,
@@ -74,7 +74,7 @@
   {
     "date": "2016-09-15T12:00:00",
     "total_transfer_amount": "4912284",
-    "average_transfer_amount": "386841",
+    "average_transfer_amount": "350877",
     "maximum_transfer_amount": "3532326",
     "minimum_transfer_amount": "523",
     "transfer_count": 14,
@@ -110,7 +110,7 @@
   {
     "date": "2016-09-15T08:00:00",
     "total_transfer_amount": "5821895",
-    "average_transfer_amount": "1455474",
+    "average_transfer_amount": "1455473",
     "maximum_transfer_amount": "5791904",
     "minimum_transfer_amount": "1",
     "transfer_count": 4,
@@ -128,7 +128,7 @@
   {
     "date": "2016-09-15T06:00:00",
     "total_transfer_amount": "4208322",
-    "average_transfer_amount": "1052081",
+    "average_transfer_amount": "1052080",
     "maximum_transfer_amount": "3196210",
     "minimum_transfer_amount": "2112",
     "transfer_count": 4,
@@ -137,7 +137,7 @@
   {
     "date": "2016-09-15T05:00:00",
     "total_transfer_amount": "1418995",
-    "average_transfer_amount": "202714",
+    "average_transfer_amount": "202713",
     "maximum_transfer_amount": "890736",
     "minimum_transfer_amount": "1104",
     "transfer_count": 7,
@@ -146,7 +146,7 @@
   {
     "date": "2016-09-15T04:00:00",
     "total_transfer_amount": "3062520",
-    "average_transfer_amount": "437503",
+    "average_transfer_amount": "437502",
     "maximum_transfer_amount": "1097178",
     "minimum_transfer_amount": "34000",
     "transfer_count": 7,
@@ -155,7 +155,7 @@
   {
     "date": "2016-09-15T03:00:00",
     "total_transfer_amount": "15058239",
-    "average_transfer_amount": "3011648",
+    "average_transfer_amount": "3011647",
     "maximum_transfer_amount": "14062500",
     "minimum_transfer_amount": "14432",
     "transfer_count": 5,
@@ -164,7 +164,7 @@
   {
     "date": "2016-09-15T02:00:00",
     "total_transfer_amount": "1432845",
-    "average_transfer_amount": "119404",
+    "average_transfer_amount": "119403",
     "maximum_transfer_amount": "890736",
     "minimum_transfer_amount": "1",
     "transfer_count": 12,
@@ -182,7 +182,7 @@
   {
     "date": "2016-09-15T00:00:00",
     "total_transfer_amount": "3134602",
-    "average_transfer_amount": "522434",
+    "average_transfer_amount": "522433",
     "maximum_transfer_amount": "1534834",
     "minimum_transfer_amount": "7840",
     "transfer_count": 6,
@@ -191,7 +191,7 @@
   {
     "date": "2016-09-14T23:00:00",
     "total_transfer_amount": "3575072",
-    "average_transfer_amount": "510725",
+    "average_transfer_amount": "510724",
     "maximum_transfer_amount": "2795318",
     "minimum_transfer_amount": "2047",
     "transfer_count": 7,
@@ -209,7 +209,7 @@
   {
     "date": "2016-09-14T21:00:00",
     "total_transfer_amount": "1337938",
-    "average_transfer_amount": "267588",
+    "average_transfer_amount": "267587",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "588",
     "transfer_count": 5,
@@ -227,7 +227,7 @@
   {
     "date": "2016-09-14T19:00:00",
     "total_transfer_amount": "1507247",
-    "average_transfer_amount": "175527",
+    "average_transfer_amount": "167471",
     "maximum_transfer_amount": "891368",
     "minimum_transfer_amount": "1000",
     "transfer_count": 9,
@@ -245,7 +245,7 @@
   {
     "date": "2016-09-14T17:00:00",
     "total_transfer_amount": "14267937",
-    "average_transfer_amount": "1426794",
+    "average_transfer_amount": "1426793",
     "maximum_transfer_amount": "5927000",
     "minimum_transfer_amount": "8544",
     "transfer_count": 10,
@@ -254,7 +254,7 @@
   {
     "date": "2016-09-14T16:00:00",
     "total_transfer_amount": "9276495",
-    "average_transfer_amount": "1159562",
+    "average_transfer_amount": "1159561",
     "maximum_transfer_amount": "4053000",
     "minimum_transfer_amount": "1053",
     "transfer_count": 8,
@@ -263,7 +263,7 @@
   {
     "date": "2016-09-14T15:00:00",
     "total_transfer_amount": "12141304",
-    "average_transfer_amount": "527883",
+    "average_transfer_amount": "527882",
     "maximum_transfer_amount": "9621586",
     "minimum_transfer_amount": "84",
     "transfer_count": 23,
@@ -281,7 +281,7 @@
   {
     "date": "2016-09-14T13:00:00",
     "total_transfer_amount": "1274698",
-    "average_transfer_amount": "182100",
+    "average_transfer_amount": "182099",
     "maximum_transfer_amount": "748568",
     "minimum_transfer_amount": "3092",
     "transfer_count": 7,
@@ -299,7 +299,7 @@
   {
     "date": "2016-09-14T11:00:00",
     "total_transfer_amount": "2019044",
-    "average_transfer_amount": "212548",
+    "average_transfer_amount": "252380",
     "maximum_transfer_amount": "731202",
     "minimum_transfer_amount": "6137",
     "transfer_count": 8,
@@ -308,7 +308,7 @@
   {
     "date": "2016-09-14T10:00:00",
     "total_transfer_amount": "17915617",
-    "average_transfer_amount": "1279687",
+    "average_transfer_amount": "1279686",
     "maximum_transfer_amount": "5158944",
     "minimum_transfer_amount": "1654",
     "transfer_count": 14,
@@ -317,7 +317,7 @@
   {
     "date": "2016-09-14T09:00:00",
     "total_transfer_amount": "718678",
-    "average_transfer_amount": "19424",
+    "average_transfer_amount": "19423",
     "maximum_transfer_amount": "249929",
     "minimum_transfer_amount": "97",
     "transfer_count": 37,
@@ -326,7 +326,7 @@
   {
     "date": "2016-09-14T08:00:00",
     "total_transfer_amount": "1114546",
-    "average_transfer_amount": "30123",
+    "average_transfer_amount": "30122",
     "maximum_transfer_amount": "257853",
     "minimum_transfer_amount": "1000",
     "transfer_count": 37,
@@ -353,7 +353,7 @@
   {
     "date": "2016-09-14T05:00:00",
     "total_transfer_amount": "41105",
-    "average_transfer_amount": "13702",
+    "average_transfer_amount": "13701",
     "maximum_transfer_amount": "27990",
     "minimum_transfer_amount": "4765",
     "transfer_count": 3,
@@ -362,7 +362,7 @@
   {
     "date": "2016-09-14T04:00:00",
     "total_transfer_amount": "3594398",
-    "average_transfer_amount": "359440",
+    "average_transfer_amount": "359439",
     "maximum_transfer_amount": "2435283",
     "minimum_transfer_amount": "1218",
     "transfer_count": 10,
@@ -389,7 +389,7 @@
   {
     "date": "2016-09-14T01:00:00",
     "total_transfer_amount": "11321284",
-    "average_transfer_amount": "665958",
+    "average_transfer_amount": "665957",
     "maximum_transfer_amount": "4000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 17,
@@ -416,7 +416,7 @@
   {
     "date": "2016-09-13T22:00:00",
     "total_transfer_amount": "2379973",
-    "average_transfer_amount": "158665",
+    "average_transfer_amount": "158664",
     "maximum_transfer_amount": "1059892",
     "minimum_transfer_amount": "1775",
     "transfer_count": 15,
@@ -425,7 +425,7 @@
   {
     "date": "2016-09-13T21:00:00",
     "total_transfer_amount": "3885400",
-    "average_transfer_amount": "242838",
+    "average_transfer_amount": "242837",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "1",
     "transfer_count": 16,
@@ -434,7 +434,7 @@
   {
     "date": "2016-09-13T20:00:00",
     "total_transfer_amount": "12408685",
-    "average_transfer_amount": "1240869",
+    "average_transfer_amount": "1240868",
     "maximum_transfer_amount": "10836814",
     "minimum_transfer_amount": "1157",
     "transfer_count": 10,
@@ -443,7 +443,7 @@
   {
     "date": "2016-09-13T19:00:00",
     "total_transfer_amount": "20113226",
-    "average_transfer_amount": "1340882",
+    "average_transfer_amount": "1340881",
     "maximum_transfer_amount": "10000000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 15,
@@ -452,7 +452,7 @@
   {
     "date": "2016-09-13T18:00:00",
     "total_transfer_amount": "1749722",
-    "average_transfer_amount": "249764",
+    "average_transfer_amount": "249960",
     "maximum_transfer_amount": "813272",
     "minimum_transfer_amount": "14022",
     "transfer_count": 7,
@@ -461,7 +461,7 @@
   {
     "date": "2016-09-13T17:00:00",
     "total_transfer_amount": "8160045",
-    "average_transfer_amount": "680004",
+    "average_transfer_amount": "680003",
     "maximum_transfer_amount": "2844105",
     "minimum_transfer_amount": "39294",
     "transfer_count": 12,
@@ -470,7 +470,7 @@
   {
     "date": "2016-09-13T16:00:00",
     "total_transfer_amount": "5515698",
-    "average_transfer_amount": "551570",
+    "average_transfer_amount": "551569",
     "maximum_transfer_amount": "3671071",
     "minimum_transfer_amount": "745",
     "transfer_count": 10,
@@ -515,7 +515,7 @@
   {
     "date": "2016-09-13T11:00:00",
     "total_transfer_amount": "3064846",
-    "average_transfer_amount": "383106",
+    "average_transfer_amount": "383105",
     "maximum_transfer_amount": "921268",
     "minimum_transfer_amount": "404",
     "transfer_count": 8,
@@ -524,7 +524,7 @@
   {
     "date": "2016-09-13T10:00:00",
     "total_transfer_amount": "3233971",
-    "average_transfer_amount": "233778",
+    "average_transfer_amount": "215598",
     "maximum_transfer_amount": "845065",
     "minimum_transfer_amount": "5485",
     "transfer_count": 15,
@@ -533,7 +533,7 @@
   {
     "date": "2016-09-13T09:00:00",
     "total_transfer_amount": "1850655",
-    "average_transfer_amount": "185066",
+    "average_transfer_amount": "185065",
     "maximum_transfer_amount": "786675",
     "minimum_transfer_amount": "1990",
     "transfer_count": 10,
@@ -542,7 +542,7 @@
   {
     "date": "2016-09-13T08:00:00",
     "total_transfer_amount": "8498539",
-    "average_transfer_amount": "2124635",
+    "average_transfer_amount": "2124634",
     "maximum_transfer_amount": "8433006",
     "minimum_transfer_amount": "1502",
     "transfer_count": 4,
@@ -551,7 +551,7 @@
   {
     "date": "2016-09-13T07:00:00",
     "total_transfer_amount": "1023595",
-    "average_transfer_amount": "255899",
+    "average_transfer_amount": "255898",
     "maximum_transfer_amount": "997530",
     "minimum_transfer_amount": "138",
     "transfer_count": 4,
@@ -569,7 +569,7 @@
   {
     "date": "2016-09-13T05:00:00",
     "total_transfer_amount": "7022348",
-    "average_transfer_amount": "585196",
+    "average_transfer_amount": "585195",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "1509",
     "transfer_count": 12,
@@ -578,7 +578,7 @@
   {
     "date": "2016-09-13T04:00:00",
     "total_transfer_amount": "1733668",
-    "average_transfer_amount": "247667",
+    "average_transfer_amount": "247666",
     "maximum_transfer_amount": "616002",
     "minimum_transfer_amount": "1400",
     "transfer_count": 7,
@@ -587,7 +587,7 @@
   {
     "date": "2016-09-13T03:00:00",
     "total_transfer_amount": "935170",
-    "average_transfer_amount": "103908",
+    "average_transfer_amount": "103907",
     "maximum_transfer_amount": "440966",
     "minimum_transfer_amount": "1",
     "transfer_count": 9,
@@ -596,7 +596,7 @@
   {
     "date": "2016-09-13T02:00:00",
     "total_transfer_amount": "8076572",
-    "average_transfer_amount": "734234",
+    "average_transfer_amount": "734233",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "990",
     "transfer_count": 11,
@@ -605,7 +605,7 @@
   {
     "date": "2016-09-13T01:00:00",
     "total_transfer_amount": "1762207",
-    "average_transfer_amount": "151834",
+    "average_transfer_amount": "195800",
     "maximum_transfer_amount": "762987",
     "minimum_transfer_amount": "941",
     "transfer_count": 9,
@@ -641,7 +641,7 @@
   {
     "date": "2016-09-12T21:00:00",
     "total_transfer_amount": "5460726",
-    "average_transfer_amount": "303374",
+    "average_transfer_amount": "303373",
     "maximum_transfer_amount": "1931305",
     "minimum_transfer_amount": "1",
     "transfer_count": 18,
@@ -650,7 +650,7 @@
   {
     "date": "2016-09-12T20:00:00",
     "total_transfer_amount": "30271120",
-    "average_transfer_amount": "976488",
+    "average_transfer_amount": "976487",
     "maximum_transfer_amount": "10000000",
     "minimum_transfer_amount": "5000",
     "transfer_count": 31,
@@ -677,7 +677,7 @@
   {
     "date": "2016-09-12T17:00:00",
     "total_transfer_amount": "3276015",
-    "average_transfer_amount": "435548",
+    "average_transfer_amount": "364001",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "1389",
     "transfer_count": 9,
@@ -686,7 +686,7 @@
   {
     "date": "2016-09-12T16:00:00",
     "total_transfer_amount": "4433909",
-    "average_transfer_amount": "403083",
+    "average_transfer_amount": "403082",
     "maximum_transfer_amount": "2276813",
     "minimum_transfer_amount": "10",
     "transfer_count": 11,
@@ -704,7 +704,7 @@
   {
     "date": "2016-09-12T14:00:00",
     "total_transfer_amount": "4708357",
-    "average_transfer_amount": "470836",
+    "average_transfer_amount": "470835",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "4069",
     "transfer_count": 10,
@@ -722,7 +722,7 @@
   {
     "date": "2016-09-12T12:00:00",
     "total_transfer_amount": "2633159",
-    "average_transfer_amount": "438860",
+    "average_transfer_amount": "438859",
     "maximum_transfer_amount": "2437145",
     "minimum_transfer_amount": "997",
     "transfer_count": 6,
@@ -749,7 +749,7 @@
   {
     "date": "2016-09-12T09:00:00",
     "total_transfer_amount": "37705",
-    "average_transfer_amount": "18853",
+    "average_transfer_amount": "18852",
     "maximum_transfer_amount": "18995",
     "minimum_transfer_amount": "18710",
     "transfer_count": 2,
@@ -776,7 +776,7 @@
   {
     "date": "2016-09-12T06:00:00",
     "total_transfer_amount": "228541",
-    "average_transfer_amount": "114271",
+    "average_transfer_amount": "114270",
     "maximum_transfer_amount": "212766",
     "minimum_transfer_amount": "15775",
     "transfer_count": 2,
@@ -785,7 +785,7 @@
   {
     "date": "2016-09-12T05:00:00",
     "total_transfer_amount": "1425605",
-    "average_transfer_amount": "203658",
+    "average_transfer_amount": "203657",
     "maximum_transfer_amount": "1139339",
     "minimum_transfer_amount": "1028",
     "transfer_count": 7,
@@ -794,7 +794,7 @@
   {
     "date": "2016-09-12T04:00:00",
     "total_transfer_amount": "3586629",
-    "average_transfer_amount": "512376",
+    "average_transfer_amount": "512375",
     "maximum_transfer_amount": "3098316",
     "minimum_transfer_amount": "18406",
     "transfer_count": 7,
@@ -803,7 +803,7 @@
   {
     "date": "2016-09-12T03:00:00",
     "total_transfer_amount": "694084",
-    "average_transfer_amount": "115681",
+    "average_transfer_amount": "115680",
     "maximum_transfer_amount": "397544",
     "minimum_transfer_amount": "1",
     "transfer_count": 6,
@@ -830,7 +830,7 @@
   {
     "date": "2016-09-12T00:00:00",
     "total_transfer_amount": "1334408",
-    "average_transfer_amount": "134100",
+    "average_transfer_amount": "166801",
     "maximum_transfer_amount": "964508",
     "minimum_transfer_amount": "41",
     "transfer_count": 8,
@@ -839,7 +839,7 @@
   {
     "date": "2016-09-11T23:00:00",
     "total_transfer_amount": "1344335",
-    "average_transfer_amount": "168042",
+    "average_transfer_amount": "168041",
     "maximum_transfer_amount": "958690",
     "minimum_transfer_amount": "12311",
     "transfer_count": 8,
@@ -848,7 +848,7 @@
   {
     "date": "2016-09-11T22:00:00",
     "total_transfer_amount": "2413639",
-    "average_transfer_amount": "482728",
+    "average_transfer_amount": "482727",
     "maximum_transfer_amount": "965659",
     "minimum_transfer_amount": "5848",
     "transfer_count": 5,
@@ -857,7 +857,7 @@
   {
     "date": "2016-09-11T21:00:00",
     "total_transfer_amount": "1148047",
-    "average_transfer_amount": "164007",
+    "average_transfer_amount": "164006",
     "maximum_transfer_amount": "557299",
     "minimum_transfer_amount": "2450",
     "transfer_count": 7,
@@ -875,7 +875,7 @@
   {
     "date": "2016-09-11T19:00:00",
     "total_transfer_amount": "2271271",
-    "average_transfer_amount": "283909",
+    "average_transfer_amount": "283908",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "600",
     "transfer_count": 8,
@@ -902,7 +902,7 @@
   {
     "date": "2016-09-11T16:00:00",
     "total_transfer_amount": "3111860",
-    "average_transfer_amount": "159479",
+    "average_transfer_amount": "222275",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "423",
     "transfer_count": 14,
@@ -911,7 +911,7 @@
   {
     "date": "2016-09-11T15:00:00",
     "total_transfer_amount": "1623738",
-    "average_transfer_amount": "147613",
+    "average_transfer_amount": "147612",
     "maximum_transfer_amount": "1465784",
     "minimum_transfer_amount": "1",
     "transfer_count": 11,
@@ -929,7 +929,7 @@
   {
     "date": "2016-09-11T13:00:00",
     "total_transfer_amount": "9153416",
-    "average_transfer_amount": "1307631",
+    "average_transfer_amount": "1307630",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "1294",
     "transfer_count": 7,
@@ -956,7 +956,7 @@
   {
     "date": "2016-09-11T10:00:00",
     "total_transfer_amount": "204273",
-    "average_transfer_amount": "34046",
+    "average_transfer_amount": "34045",
     "maximum_transfer_amount": "142484",
     "minimum_transfer_amount": "97",
     "transfer_count": 6,
@@ -983,7 +983,7 @@
   {
     "date": "2016-09-11T07:00:00",
     "total_transfer_amount": "402357",
-    "average_transfer_amount": "67346",
+    "average_transfer_amount": "100589",
     "maximum_transfer_amount": "399990",
     "minimum_transfer_amount": "541",
     "transfer_count": 4,
@@ -1010,7 +1010,7 @@
   {
     "date": "2016-09-11T04:00:00",
     "total_transfer_amount": "8872052",
-    "average_transfer_amount": "1109007",
+    "average_transfer_amount": "1109006",
     "maximum_transfer_amount": "8550000",
     "minimum_transfer_amount": "7975",
     "transfer_count": 8,
@@ -1028,7 +1028,7 @@
   {
     "date": "2016-09-11T02:00:00",
     "total_transfer_amount": "2318828",
-    "average_transfer_amount": "463766",
+    "average_transfer_amount": "463765",
     "maximum_transfer_amount": "2267402",
     "minimum_transfer_amount": "330",
     "transfer_count": 5,
@@ -1046,7 +1046,7 @@
   {
     "date": "2016-09-11T00:00:00",
     "total_transfer_amount": "87583",
-    "average_transfer_amount": "21896",
+    "average_transfer_amount": "21895",
     "maximum_transfer_amount": "58708",
     "minimum_transfer_amount": "63",
     "transfer_count": 4,
@@ -1055,7 +1055,7 @@
   {
     "date": "2016-09-10T23:00:00",
     "total_transfer_amount": "2643090",
-    "average_transfer_amount": "380810",
+    "average_transfer_amount": "264309",
     "maximum_transfer_amount": "2006660",
     "minimum_transfer_amount": "832",
     "transfer_count": 10,
@@ -1064,7 +1064,7 @@
   {
     "date": "2016-09-10T22:00:00",
     "total_transfer_amount": "5943770",
-    "average_transfer_amount": "540343",
+    "average_transfer_amount": "540342",
     "maximum_transfer_amount": "4401919",
     "minimum_transfer_amount": "10000",
     "transfer_count": 11,
@@ -1073,7 +1073,7 @@
   {
     "date": "2016-09-10T21:00:00",
     "total_transfer_amount": "149463",
-    "average_transfer_amount": "21352",
+    "average_transfer_amount": "21351",
     "maximum_transfer_amount": "102220",
     "minimum_transfer_amount": "500",
     "transfer_count": 7,
@@ -1082,7 +1082,7 @@
   {
     "date": "2016-09-10T20:00:00",
     "total_transfer_amount": "1416457",
-    "average_transfer_amount": "141646",
+    "average_transfer_amount": "141645",
     "maximum_transfer_amount": "707563",
     "minimum_transfer_amount": "6007",
     "transfer_count": 10,
@@ -1091,7 +1091,7 @@
   {
     "date": "2016-09-10T19:00:00",
     "total_transfer_amount": "1102712",
-    "average_transfer_amount": "91893",
+    "average_transfer_amount": "91892",
     "maximum_transfer_amount": "332990",
     "minimum_transfer_amount": "48",
     "transfer_count": 12,
@@ -1100,7 +1100,7 @@
   {
     "date": "2016-09-10T18:00:00",
     "total_transfer_amount": "4276633",
-    "average_transfer_amount": "237591",
+    "average_transfer_amount": "237590",
     "maximum_transfer_amount": "2003337",
     "minimum_transfer_amount": "173",
     "transfer_count": 18,
@@ -1118,7 +1118,7 @@
   {
     "date": "2016-09-10T16:00:00",
     "total_transfer_amount": "45476",
-    "average_transfer_amount": "15159",
+    "average_transfer_amount": "15158",
     "maximum_transfer_amount": "40109",
     "minimum_transfer_amount": "1567",
     "transfer_count": 3,
@@ -1163,7 +1163,7 @@
   {
     "date": "2016-09-10T11:00:00",
     "total_transfer_amount": "515358",
-    "average_transfer_amount": "103072",
+    "average_transfer_amount": "103071",
     "maximum_transfer_amount": "397722",
     "minimum_transfer_amount": "50",
     "transfer_count": 5,
@@ -1190,7 +1190,7 @@
   {
     "date": "2016-09-10T08:00:00",
     "total_transfer_amount": "37210743",
-    "average_transfer_amount": "2862365",
+    "average_transfer_amount": "2862364",
     "maximum_transfer_amount": "29999990",
     "minimum_transfer_amount": "1000",
     "transfer_count": 13,
@@ -1208,7 +1208,7 @@
   {
     "date": "2016-09-10T06:00:00",
     "total_transfer_amount": "489767",
-    "average_transfer_amount": "81628",
+    "average_transfer_amount": "81627",
     "maximum_transfer_amount": "165847",
     "minimum_transfer_amount": "6358",
     "transfer_count": 6,
@@ -1226,7 +1226,7 @@
   {
     "date": "2016-09-10T04:00:00",
     "total_transfer_amount": "150599",
-    "average_transfer_amount": "75300",
+    "average_transfer_amount": "75299",
     "maximum_transfer_amount": "127254",
     "minimum_transfer_amount": "23345",
     "transfer_count": 2,
@@ -1235,7 +1235,7 @@
   {
     "date": "2016-09-10T03:00:00",
     "total_transfer_amount": "103935",
-    "average_transfer_amount": "51968",
+    "average_transfer_amount": "51967",
     "maximum_transfer_amount": "102193",
     "minimum_transfer_amount": "1742",
     "transfer_count": 2,
@@ -1244,7 +1244,7 @@
   {
     "date": "2016-09-10T02:00:00",
     "total_transfer_amount": "6045458",
-    "average_transfer_amount": "671718",
+    "average_transfer_amount": "671717",
     "maximum_transfer_amount": "2500000",
     "minimum_transfer_amount": "33013",
     "transfer_count": 9,
@@ -1262,7 +1262,7 @@
   {
     "date": "2016-09-10T00:00:00",
     "total_transfer_amount": "3830068",
-    "average_transfer_amount": "478759",
+    "average_transfer_amount": "478758",
     "maximum_transfer_amount": "1550818",
     "minimum_transfer_amount": "6649",
     "transfer_count": 8,
@@ -1280,7 +1280,7 @@
   {
     "date": "2016-09-09T22:00:00",
     "total_transfer_amount": "15224687",
-    "average_transfer_amount": "765534",
+    "average_transfer_amount": "634361",
     "maximum_transfer_amount": "5900000",
     "minimum_transfer_amount": "100",
     "transfer_count": 24,
@@ -1289,7 +1289,7 @@
   {
     "date": "2016-09-09T21:00:00",
     "total_transfer_amount": "7697088",
-    "average_transfer_amount": "116623",
+    "average_transfer_amount": "116622",
     "maximum_transfer_amount": "3109750",
     "minimum_transfer_amount": "526",
     "transfer_count": 66,
@@ -1298,7 +1298,7 @@
   {
     "date": "2016-09-09T20:00:00",
     "total_transfer_amount": "1653874",
-    "average_transfer_amount": "236268",
+    "average_transfer_amount": "236267",
     "maximum_transfer_amount": "1113294",
     "minimum_transfer_amount": "990",
     "transfer_count": 7,
@@ -1307,7 +1307,7 @@
   {
     "date": "2016-09-09T19:00:00",
     "total_transfer_amount": "2946058",
-    "average_transfer_amount": "210433",
+    "average_transfer_amount": "210432",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "3000",
     "transfer_count": 14,
@@ -1325,7 +1325,7 @@
   {
     "date": "2016-09-09T17:00:00",
     "total_transfer_amount": "3959181",
-    "average_transfer_amount": "329932",
+    "average_transfer_amount": "329931",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 12,
@@ -1334,7 +1334,7 @@
   {
     "date": "2016-09-09T16:00:00",
     "total_transfer_amount": "349542",
-    "average_transfer_amount": "31777",
+    "average_transfer_amount": "31776",
     "maximum_transfer_amount": "142878",
     "minimum_transfer_amount": "1000",
     "transfer_count": 11,
@@ -1397,7 +1397,7 @@
   {
     "date": "2016-09-09T09:00:00",
     "total_transfer_amount": "3459209",
-    "average_transfer_amount": "384357",
+    "average_transfer_amount": "384356",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "995",
     "transfer_count": 9,
@@ -1433,7 +1433,7 @@
   {
     "date": "2016-09-09T05:00:00",
     "total_transfer_amount": "5671561",
-    "average_transfer_amount": "337464",
+    "average_transfer_amount": "378104",
     "maximum_transfer_amount": "2137706",
     "minimum_transfer_amount": "200",
     "transfer_count": 15,
@@ -1460,7 +1460,7 @@
   {
     "date": "2016-09-09T02:00:00",
     "total_transfer_amount": "27498896",
-    "average_transfer_amount": "1249950",
+    "average_transfer_amount": "1249949",
     "maximum_transfer_amount": "16271000",
     "minimum_transfer_amount": "1",
     "transfer_count": 22,
@@ -1469,7 +1469,7 @@
   {
     "date": "2016-09-09T01:00:00",
     "total_transfer_amount": "1517097",
-    "average_transfer_amount": "52314",
+    "average_transfer_amount": "52313",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "5211",
     "transfer_count": 29,
@@ -1478,7 +1478,7 @@
   {
     "date": "2016-09-09T00:00:00",
     "total_transfer_amount": "6041904",
-    "average_transfer_amount": "167831",
+    "average_transfer_amount": "167830",
     "maximum_transfer_amount": "1123088",
     "minimum_transfer_amount": "5189",
     "transfer_count": 36,
@@ -1487,7 +1487,7 @@
   {
     "date": "2016-09-08T23:00:00",
     "total_transfer_amount": "8949294",
-    "average_transfer_amount": "186444",
+    "average_transfer_amount": "186443",
     "maximum_transfer_amount": "1573480",
     "minimum_transfer_amount": "90",
     "transfer_count": 48,
@@ -1505,7 +1505,7 @@
   {
     "date": "2016-09-08T21:00:00",
     "total_transfer_amount": "5692463",
-    "average_transfer_amount": "463585",
+    "average_transfer_amount": "517496",
     "maximum_transfer_amount": "4498256",
     "minimum_transfer_amount": "1969",
     "transfer_count": 11,
@@ -1523,7 +1523,7 @@
   {
     "date": "2016-09-08T19:00:00",
     "total_transfer_amount": "29061019",
-    "average_transfer_amount": "1162441",
+    "average_transfer_amount": "1162440",
     "maximum_transfer_amount": "20215000",
     "minimum_transfer_amount": "323",
     "transfer_count": 25,
@@ -1550,7 +1550,7 @@
   {
     "date": "2016-09-08T16:00:00",
     "total_transfer_amount": "21419038",
-    "average_transfer_amount": "1070952",
+    "average_transfer_amount": "1070951",
     "maximum_transfer_amount": "18200000",
     "minimum_transfer_amount": "620",
     "transfer_count": 20,
@@ -1559,7 +1559,7 @@
   {
     "date": "2016-09-08T15:00:00",
     "total_transfer_amount": "4522590",
-    "average_transfer_amount": "347892",
+    "average_transfer_amount": "347891",
     "maximum_transfer_amount": "2117058",
     "minimum_transfer_amount": "1138",
     "transfer_count": 13,
@@ -1586,7 +1586,7 @@
   {
     "date": "2016-09-08T12:00:00",
     "total_transfer_amount": "1699921",
-    "average_transfer_amount": "121939",
+    "average_transfer_amount": "188880",
     "maximum_transfer_amount": "1167641",
     "minimum_transfer_amount": "100",
     "transfer_count": 9,
@@ -1604,7 +1604,7 @@
   {
     "date": "2016-09-08T10:00:00",
     "total_transfer_amount": "2641679",
-    "average_transfer_amount": "330210",
+    "average_transfer_amount": "330209",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "10",
     "transfer_count": 8,
@@ -1613,7 +1613,7 @@
   {
     "date": "2016-09-08T09:00:00",
     "total_transfer_amount": "241695",
-    "average_transfer_amount": "40283",
+    "average_transfer_amount": "40282",
     "maximum_transfer_amount": "132004",
     "minimum_transfer_amount": "1",
     "transfer_count": 6,
@@ -1631,7 +1631,7 @@
   {
     "date": "2016-09-08T07:00:00",
     "total_transfer_amount": "1104171",
-    "average_transfer_amount": "157739",
+    "average_transfer_amount": "157738",
     "maximum_transfer_amount": "557008",
     "minimum_transfer_amount": "396",
     "transfer_count": 7,
@@ -1640,7 +1640,7 @@
   {
     "date": "2016-09-08T06:00:00",
     "total_transfer_amount": "6013019",
-    "average_transfer_amount": "231270",
+    "average_transfer_amount": "231269",
     "maximum_transfer_amount": "1115610",
     "minimum_transfer_amount": "845",
     "transfer_count": 26,
@@ -1658,7 +1658,7 @@
   {
     "date": "2016-09-08T04:00:00",
     "total_transfer_amount": "3437258",
-    "average_transfer_amount": "461771",
+    "average_transfer_amount": "343725",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "53",
     "transfer_count": 10,
@@ -1667,7 +1667,7 @@
   {
     "date": "2016-09-08T03:00:00",
     "total_transfer_amount": "456831",
-    "average_transfer_amount": "76139",
+    "average_transfer_amount": "76138",
     "maximum_transfer_amount": "200000",
     "minimum_transfer_amount": "5224",
     "transfer_count": 6,
@@ -1685,7 +1685,7 @@
   {
     "date": "2016-09-08T01:00:00",
     "total_transfer_amount": "1687118",
-    "average_transfer_amount": "337424",
+    "average_transfer_amount": "337423",
     "maximum_transfer_amount": "1041094",
     "minimum_transfer_amount": "28344",
     "transfer_count": 5,
@@ -1703,7 +1703,7 @@
   {
     "date": "2016-09-07T23:00:00",
     "total_transfer_amount": "341801",
-    "average_transfer_amount": "56967",
+    "average_transfer_amount": "56966",
     "maximum_transfer_amount": "154444",
     "minimum_transfer_amount": "2302",
     "transfer_count": 6,
@@ -1721,7 +1721,7 @@
   {
     "date": "2016-09-07T21:00:00",
     "total_transfer_amount": "3109268",
-    "average_transfer_amount": "388659",
+    "average_transfer_amount": "388658",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "990",
     "transfer_count": 8,
@@ -1730,7 +1730,7 @@
   {
     "date": "2016-09-07T20:00:00",
     "total_transfer_amount": "2487111",
-    "average_transfer_amount": "414775",
+    "average_transfer_amount": "497422",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "1",
     "transfer_count": 5,
@@ -1739,7 +1739,7 @@
   {
     "date": "2016-09-07T19:00:00",
     "total_transfer_amount": "1151876",
-    "average_transfer_amount": "13713",
+    "average_transfer_amount": "13712",
     "maximum_transfer_amount": "137569",
     "minimum_transfer_amount": "1",
     "transfer_count": 84,
@@ -1748,7 +1748,7 @@
   {
     "date": "2016-09-07T18:00:00",
     "total_transfer_amount": "665141",
-    "average_transfer_amount": "83143",
+    "average_transfer_amount": "83142",
     "maximum_transfer_amount": "498990",
     "minimum_transfer_amount": "1",
     "transfer_count": 8,
@@ -1793,7 +1793,7 @@
   {
     "date": "2016-09-07T13:00:00",
     "total_transfer_amount": "959136",
-    "average_transfer_amount": "73780",
+    "average_transfer_amount": "73779",
     "maximum_transfer_amount": "327412",
     "minimum_transfer_amount": "992",
     "transfer_count": 13,
@@ -1811,7 +1811,7 @@
   {
     "date": "2016-09-07T11:00:00",
     "total_transfer_amount": "1382607",
-    "average_transfer_amount": "73805",
+    "average_transfer_amount": "98757",
     "maximum_transfer_amount": "1170078",
     "minimum_transfer_amount": "1",
     "transfer_count": 14,
@@ -1847,7 +1847,7 @@
   {
     "date": "2016-09-07T07:00:00",
     "total_transfer_amount": "1487263",
-    "average_transfer_amount": "297453",
+    "average_transfer_amount": "297452",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "1572",
     "transfer_count": 5,
@@ -1865,7 +1865,7 @@
   {
     "date": "2016-09-07T05:00:00",
     "total_transfer_amount": "2278724",
-    "average_transfer_amount": "455745",
+    "average_transfer_amount": "455744",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "2289",
     "transfer_count": 5,
@@ -1874,7 +1874,7 @@
   {
     "date": "2016-09-07T04:00:00",
     "total_transfer_amount": "2344865",
-    "average_transfer_amount": "334981",
+    "average_transfer_amount": "334980",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "1000",
     "transfer_count": 7,
@@ -1883,7 +1883,7 @@
   {
     "date": "2016-09-07T03:00:00",
     "total_transfer_amount": "14854",
-    "average_transfer_amount": "3078",
+    "average_transfer_amount": "2475",
     "maximum_transfer_amount": "5415",
     "minimum_transfer_amount": "457",
     "transfer_count": 6,
@@ -1901,7 +1901,7 @@
   {
     "date": "2016-09-07T01:00:00",
     "total_transfer_amount": "7166363",
-    "average_transfer_amount": "325744",
+    "average_transfer_amount": "325743",
     "maximum_transfer_amount": "1701174",
     "minimum_transfer_amount": "1000",
     "transfer_count": 22,
@@ -1910,7 +1910,7 @@
   {
     "date": "2016-09-07T00:00:00",
     "total_transfer_amount": "2669695",
-    "average_transfer_amount": "266970",
+    "average_transfer_amount": "266969",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "500",
     "transfer_count": 10,
@@ -1919,7 +1919,7 @@
   {
     "date": "2016-09-06T23:00:00",
     "total_transfer_amount": "128358",
-    "average_transfer_amount": "16045",
+    "average_transfer_amount": "16044",
     "maximum_transfer_amount": "60091",
     "minimum_transfer_amount": "990",
     "transfer_count": 8,
@@ -1928,7 +1928,7 @@
   {
     "date": "2016-09-06T22:00:00",
     "total_transfer_amount": "1789668",
-    "average_transfer_amount": "223709",
+    "average_transfer_amount": "223708",
     "maximum_transfer_amount": "1032806",
     "minimum_transfer_amount": "1",
     "transfer_count": 8,
@@ -1937,7 +1937,7 @@
   {
     "date": "2016-09-06T21:00:00",
     "total_transfer_amount": "2785130",
-    "average_transfer_amount": "309459",
+    "average_transfer_amount": "309458",
     "maximum_transfer_amount": "2242342",
     "minimum_transfer_amount": "1",
     "transfer_count": 9,
@@ -1946,7 +1946,7 @@
   {
     "date": "2016-09-06T20:00:00",
     "total_transfer_amount": "17497045",
-    "average_transfer_amount": "833193",
+    "average_transfer_amount": "833192",
     "maximum_transfer_amount": "11712784",
     "minimum_transfer_amount": "1",
     "transfer_count": 21,
@@ -1955,7 +1955,7 @@
   {
     "date": "2016-09-06T19:00:00",
     "total_transfer_amount": "304183587",
-    "average_transfer_amount": "11702606",
+    "average_transfer_amount": "20278905",
     "maximum_transfer_amount": "200000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 15,
@@ -1964,7 +1964,7 @@
   {
     "date": "2016-09-06T18:00:00",
     "total_transfer_amount": "2697677",
-    "average_transfer_amount": "299742",
+    "average_transfer_amount": "299741",
     "maximum_transfer_amount": "1997221",
     "minimum_transfer_amount": "109",
     "transfer_count": 9,
@@ -1973,7 +1973,7 @@
   {
     "date": "2016-09-06T17:00:00",
     "total_transfer_amount": "2220635",
-    "average_transfer_amount": "317234",
+    "average_transfer_amount": "317233",
     "maximum_transfer_amount": "1100000",
     "minimum_transfer_amount": "1",
     "transfer_count": 7,
@@ -1982,7 +1982,7 @@
   {
     "date": "2016-09-06T16:00:00",
     "total_transfer_amount": "4030702",
-    "average_transfer_amount": "575815",
+    "average_transfer_amount": "575814",
     "maximum_transfer_amount": "2124372",
     "minimum_transfer_amount": "11704",
     "transfer_count": 7,
@@ -1991,7 +1991,7 @@
   {
     "date": "2016-09-06T15:00:00",
     "total_transfer_amount": "4554669",
-    "average_transfer_amount": "325334",
+    "average_transfer_amount": "325333",
     "maximum_transfer_amount": "1241668",
     "minimum_transfer_amount": "1963",
     "transfer_count": 14,
@@ -2000,7 +2000,7 @@
   {
     "date": "2016-09-06T14:00:00",
     "total_transfer_amount": "5112526",
-    "average_transfer_amount": "730361",
+    "average_transfer_amount": "730360",
     "maximum_transfer_amount": "4575000",
     "minimum_transfer_amount": "1",
     "transfer_count": 7,
@@ -2009,7 +2009,7 @@
   {
     "date": "2016-09-06T13:00:00",
     "total_transfer_amount": "3841614",
-    "average_transfer_amount": "320135",
+    "average_transfer_amount": "320134",
     "maximum_transfer_amount": "1394896",
     "minimum_transfer_amount": "2257",
     "transfer_count": 12,
@@ -2018,7 +2018,7 @@
   {
     "date": "2016-09-06T12:00:00",
     "total_transfer_amount": "6372387",
-    "average_transfer_amount": "455171",
+    "average_transfer_amount": "455170",
     "maximum_transfer_amount": "3650000",
     "minimum_transfer_amount": "4280",
     "transfer_count": 14,
@@ -2036,7 +2036,7 @@
   {
     "date": "2016-09-06T10:00:00",
     "total_transfer_amount": "8788338",
-    "average_transfer_amount": "1133306",
+    "average_transfer_amount": "1464723",
     "maximum_transfer_amount": "8000000",
     "minimum_transfer_amount": "6665",
     "transfer_count": 6,
@@ -2054,7 +2054,7 @@
   {
     "date": "2016-09-06T08:00:00",
     "total_transfer_amount": "629484",
-    "average_transfer_amount": "125897",
+    "average_transfer_amount": "125896",
     "maximum_transfer_amount": "446441",
     "minimum_transfer_amount": "638",
     "transfer_count": 5,
@@ -2081,7 +2081,7 @@
   {
     "date": "2016-09-06T05:00:00",
     "total_transfer_amount": "3136271",
-    "average_transfer_amount": "348475",
+    "average_transfer_amount": "348474",
     "maximum_transfer_amount": "2430947",
     "minimum_transfer_amount": "2662",
     "transfer_count": 9,
@@ -2090,7 +2090,7 @@
   {
     "date": "2016-09-06T04:00:00",
     "total_transfer_amount": "2571159",
-    "average_transfer_amount": "428527",
+    "average_transfer_amount": "428526",
     "maximum_transfer_amount": "1238298",
     "minimum_transfer_amount": "2985",
     "transfer_count": 6,
@@ -2144,7 +2144,7 @@
   {
     "date": "2016-09-05T22:00:00",
     "total_transfer_amount": "5297125",
-    "average_transfer_amount": "311596",
+    "average_transfer_amount": "311595",
     "maximum_transfer_amount": "4000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 17,
@@ -2153,7 +2153,7 @@
   {
     "date": "2016-09-05T21:00:00",
     "total_transfer_amount": "3903707",
-    "average_transfer_amount": "325309",
+    "average_transfer_amount": "325308",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "674",
     "transfer_count": 12,
@@ -2162,7 +2162,7 @@
   {
     "date": "2016-09-05T20:00:00",
     "total_transfer_amount": "9701",
-    "average_transfer_amount": "4851",
+    "average_transfer_amount": "4850",
     "maximum_transfer_amount": "9699",
     "minimum_transfer_amount": "2",
     "transfer_count": 2,
@@ -2180,7 +2180,7 @@
   {
     "date": "2016-09-05T18:00:00",
     "total_transfer_amount": "15288724",
-    "average_transfer_amount": "383161",
+    "average_transfer_amount": "728034",
     "maximum_transfer_amount": "4999990",
     "minimum_transfer_amount": "1000",
     "transfer_count": 21,
@@ -2198,7 +2198,7 @@
   {
     "date": "2016-09-05T16:00:00",
     "total_transfer_amount": "7264157",
-    "average_transfer_amount": "454010",
+    "average_transfer_amount": "454009",
     "maximum_transfer_amount": "1996006",
     "minimum_transfer_amount": "1",
     "transfer_count": 16,
@@ -2216,7 +2216,7 @@
   {
     "date": "2016-09-05T14:00:00",
     "total_transfer_amount": "1999003",
-    "average_transfer_amount": "124938",
+    "average_transfer_amount": "124937",
     "maximum_transfer_amount": "1600000",
     "minimum_transfer_amount": "170",
     "transfer_count": 16,
@@ -2261,7 +2261,7 @@
   {
     "date": "2016-09-05T09:00:00",
     "total_transfer_amount": "735204",
-    "average_transfer_amount": "161062",
+    "average_transfer_amount": "122534",
     "maximum_transfer_amount": "541292",
     "minimum_transfer_amount": "884",
     "transfer_count": 6,
@@ -2279,7 +2279,7 @@
   {
     "date": "2016-09-05T07:00:00",
     "total_transfer_amount": "52231",
-    "average_transfer_amount": "4018",
+    "average_transfer_amount": "4017",
     "maximum_transfer_amount": "46915",
     "minimum_transfer_amount": "1",
     "transfer_count": 13,
@@ -2288,7 +2288,7 @@
   {
     "date": "2016-09-05T06:00:00",
     "total_transfer_amount": "512148",
-    "average_transfer_amount": "102430",
+    "average_transfer_amount": "102429",
     "maximum_transfer_amount": "500000",
     "minimum_transfer_amount": "982",
     "transfer_count": 5,
@@ -2297,7 +2297,7 @@
   {
     "date": "2016-09-05T05:00:00",
     "total_transfer_amount": "340063",
-    "average_transfer_amount": "85016",
+    "average_transfer_amount": "85015",
     "maximum_transfer_amount": "278871",
     "minimum_transfer_amount": "54",
     "transfer_count": 4,
@@ -2306,7 +2306,7 @@
   {
     "date": "2016-09-05T04:00:00",
     "total_transfer_amount": "13358435",
-    "average_transfer_amount": "2226406",
+    "average_transfer_amount": "2226405",
     "maximum_transfer_amount": "10460745",
     "minimum_transfer_amount": "574",
     "transfer_count": 6,
@@ -2333,7 +2333,7 @@
   {
     "date": "2016-09-05T01:00:00",
     "total_transfer_amount": "1465255",
-    "average_transfer_amount": "248204",
+    "average_transfer_amount": "293051",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "1933",
     "transfer_count": 5,
@@ -2360,7 +2360,7 @@
   {
     "date": "2016-09-04T22:00:00",
     "total_transfer_amount": "2743484",
-    "average_transfer_amount": "228624",
+    "average_transfer_amount": "228623",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "5",
     "transfer_count": 12,
@@ -2414,7 +2414,7 @@
   {
     "date": "2016-09-04T16:00:00",
     "total_transfer_amount": "11045335",
-    "average_transfer_amount": "1380667",
+    "average_transfer_amount": "1380666",
     "maximum_transfer_amount": "7674408",
     "minimum_transfer_amount": "736",
     "transfer_count": 8,
@@ -2441,7 +2441,7 @@
   {
     "date": "2016-09-04T13:00:00",
     "total_transfer_amount": "8506019",
-    "average_transfer_amount": "1215146",
+    "average_transfer_amount": "1215145",
     "maximum_transfer_amount": "2840224",
     "minimum_transfer_amount": "3800",
     "transfer_count": 7,
@@ -2450,7 +2450,7 @@
   {
     "date": "2016-09-04T12:00:00",
     "total_transfer_amount": "1391925",
-    "average_transfer_amount": "173991",
+    "average_transfer_amount": "173990",
     "maximum_transfer_amount": "643431",
     "minimum_transfer_amount": "535",
     "transfer_count": 8,
@@ -2459,7 +2459,7 @@
   {
     "date": "2016-09-04T11:00:00",
     "total_transfer_amount": "2696442",
-    "average_transfer_amount": "299605",
+    "average_transfer_amount": "299604",
     "maximum_transfer_amount": "1409843",
     "minimum_transfer_amount": "227",
     "transfer_count": 9,
@@ -2468,7 +2468,7 @@
   {
     "date": "2016-09-04T10:00:00",
     "total_transfer_amount": "11188",
-    "average_transfer_amount": "2238",
+    "average_transfer_amount": "2237",
     "maximum_transfer_amount": "3279",
     "minimum_transfer_amount": "473",
     "transfer_count": 5,
@@ -2477,7 +2477,7 @@
   {
     "date": "2016-09-04T09:00:00",
     "total_transfer_amount": "400749",
-    "average_transfer_amount": "80150",
+    "average_transfer_amount": "80149",
     "maximum_transfer_amount": "251360",
     "minimum_transfer_amount": "57",
     "transfer_count": 5,
@@ -2540,7 +2540,7 @@
   {
     "date": "2016-09-04T02:00:00",
     "total_transfer_amount": "1049865",
-    "average_transfer_amount": "116652",
+    "average_transfer_amount": "116651",
     "maximum_transfer_amount": "700000",
     "minimum_transfer_amount": "77",
     "transfer_count": 9,
@@ -2576,7 +2576,7 @@
   {
     "date": "2016-09-03T22:00:00",
     "total_transfer_amount": "1412956",
-    "average_transfer_amount": "201851",
+    "average_transfer_amount": "201850",
     "maximum_transfer_amount": "699576",
     "minimum_transfer_amount": "500",
     "transfer_count": 7,
@@ -2594,7 +2594,7 @@
   {
     "date": "2016-09-03T20:00:00",
     "total_transfer_amount": "10285163",
-    "average_transfer_amount": "605010",
+    "average_transfer_amount": "605009",
     "maximum_transfer_amount": "4152811",
     "minimum_transfer_amount": "1000",
     "transfer_count": 17,
@@ -2612,7 +2612,7 @@
   {
     "date": "2016-09-03T18:00:00",
     "total_transfer_amount": "11653319",
-    "average_transfer_amount": "1456665",
+    "average_transfer_amount": "1456664",
     "maximum_transfer_amount": "10068618",
     "minimum_transfer_amount": "3153",
     "transfer_count": 8,
@@ -2639,7 +2639,7 @@
   {
     "date": "2016-09-03T15:00:00",
     "total_transfer_amount": "5964899",
-    "average_transfer_amount": "542264",
+    "average_transfer_amount": "542263",
     "maximum_transfer_amount": "5000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 11,
@@ -2666,7 +2666,7 @@
   {
     "date": "2016-09-03T12:00:00",
     "total_transfer_amount": "696564",
-    "average_transfer_amount": "139313",
+    "average_transfer_amount": "139312",
     "maximum_transfer_amount": "668672",
     "minimum_transfer_amount": "834",
     "transfer_count": 5,
@@ -2711,7 +2711,7 @@
   {
     "date": "2016-09-03T07:00:00",
     "total_transfer_amount": "5913681",
-    "average_transfer_amount": "531905",
+    "average_transfer_amount": "537607",
     "maximum_transfer_amount": "3303836",
     "minimum_transfer_amount": "215",
     "transfer_count": 11,
@@ -2765,7 +2765,7 @@
   {
     "date": "2016-09-03T01:00:00",
     "total_transfer_amount": "1875574",
-    "average_transfer_amount": "234447",
+    "average_transfer_amount": "234446",
     "maximum_transfer_amount": "1197831",
     "minimum_transfer_amount": "1",
     "transfer_count": 8,
@@ -2783,7 +2783,7 @@
   {
     "date": "2016-09-02T23:00:00",
     "total_transfer_amount": "5444534",
-    "average_transfer_amount": "243072",
+    "average_transfer_amount": "272226",
     "maximum_transfer_amount": "1499990",
     "minimum_transfer_amount": "1000",
     "transfer_count": 20,
@@ -2792,7 +2792,7 @@
   {
     "date": "2016-09-02T22:00:00",
     "total_transfer_amount": "4545371",
-    "average_transfer_amount": "284086",
+    "average_transfer_amount": "284085",
     "maximum_transfer_amount": "2999990",
     "minimum_transfer_amount": "185",
     "transfer_count": 16,
@@ -2810,7 +2810,7 @@
   {
     "date": "2016-09-02T20:00:00",
     "total_transfer_amount": "768655",
-    "average_transfer_amount": "96082",
+    "average_transfer_amount": "96081",
     "maximum_transfer_amount": "499980",
     "minimum_transfer_amount": "1",
     "transfer_count": 8,
@@ -2828,7 +2828,7 @@
   {
     "date": "2016-09-02T18:00:00",
     "total_transfer_amount": "29828",
-    "average_transfer_amount": "290",
+    "average_transfer_amount": "289",
     "maximum_transfer_amount": "6417",
     "minimum_transfer_amount": "11",
     "transfer_count": 103,
@@ -2864,7 +2864,7 @@
   {
     "date": "2016-09-02T14:00:00",
     "total_transfer_amount": "635508",
-    "average_transfer_amount": "73788",
+    "average_transfer_amount": "90786",
     "maximum_transfer_amount": "261128",
     "minimum_transfer_amount": "6950",
     "transfer_count": 7,
@@ -2873,7 +2873,7 @@
   {
     "date": "2016-09-02T13:00:00",
     "total_transfer_amount": "2590489",
-    "average_transfer_amount": "136342",
+    "average_transfer_amount": "136341",
     "maximum_transfer_amount": "788880",
     "minimum_transfer_amount": "1000",
     "transfer_count": 19,
@@ -2891,7 +2891,7 @@
   {
     "date": "2016-09-02T11:00:00",
     "total_transfer_amount": "2571806",
-    "average_transfer_amount": "233801",
+    "average_transfer_amount": "233800",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "3561",
     "transfer_count": 11,
@@ -2918,7 +2918,7 @@
   {
     "date": "2016-09-02T08:00:00",
     "total_transfer_amount": "5085102",
-    "average_transfer_amount": "635638",
+    "average_transfer_amount": "635637",
     "maximum_transfer_amount": "4000000",
     "minimum_transfer_amount": "164",
     "transfer_count": 8,
@@ -2927,7 +2927,7 @@
   {
     "date": "2016-09-02T07:00:00",
     "total_transfer_amount": "2469904",
-    "average_transfer_amount": "137217",
+    "average_transfer_amount": "137216",
     "maximum_transfer_amount": "496864",
     "minimum_transfer_amount": "178",
     "transfer_count": 18,
@@ -2954,7 +2954,7 @@
   {
     "date": "2016-09-02T04:00:00",
     "total_transfer_amount": "2411682",
-    "average_transfer_amount": "602921",
+    "average_transfer_amount": "602920",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "300",
     "transfer_count": 4,
@@ -2963,7 +2963,7 @@
   {
     "date": "2016-09-02T03:00:00",
     "total_transfer_amount": "8095652",
-    "average_transfer_amount": "899517",
+    "average_transfer_amount": "899516",
     "maximum_transfer_amount": "6703064",
     "minimum_transfer_amount": "706",
     "transfer_count": 9,
@@ -2981,7 +2981,7 @@
   {
     "date": "2016-09-02T01:00:00",
     "total_transfer_amount": "1671314",
-    "average_transfer_amount": "87964",
+    "average_transfer_amount": "87963",
     "maximum_transfer_amount": "633820",
     "minimum_transfer_amount": "216",
     "transfer_count": 19,
@@ -2990,7 +2990,7 @@
   {
     "date": "2016-09-02T00:00:00",
     "total_transfer_amount": "5372032",
-    "average_transfer_amount": "282739",
+    "average_transfer_amount": "282738",
     "maximum_transfer_amount": "1644070",
     "minimum_transfer_amount": "1000",
     "transfer_count": 19,
@@ -3008,7 +3008,7 @@
   {
     "date": "2016-09-01T22:00:00",
     "total_transfer_amount": "47973499",
-    "average_transfer_amount": "2640405",
+    "average_transfer_amount": "1499171",
     "maximum_transfer_amount": "18000000",
     "minimum_transfer_amount": "5194",
     "transfer_count": 32,
@@ -3017,7 +3017,7 @@
   {
     "date": "2016-09-01T21:00:00",
     "total_transfer_amount": "8211839",
-    "average_transfer_amount": "684320",
+    "average_transfer_amount": "684319",
     "maximum_transfer_amount": "4238735",
     "minimum_transfer_amount": "2213",
     "transfer_count": 12,
@@ -3026,7 +3026,7 @@
   {
     "date": "2016-09-01T20:00:00",
     "total_transfer_amount": "16215300",
-    "average_transfer_amount": "2026913",
+    "average_transfer_amount": "2026912",
     "maximum_transfer_amount": "15127343",
     "minimum_transfer_amount": "300",
     "transfer_count": 8,
@@ -3044,7 +3044,7 @@
   {
     "date": "2016-09-01T18:00:00",
     "total_transfer_amount": "4667682",
-    "average_transfer_amount": "424335",
+    "average_transfer_amount": "424334",
     "maximum_transfer_amount": "1735489",
     "minimum_transfer_amount": "988",
     "transfer_count": 11,
@@ -3053,7 +3053,7 @@
   {
     "date": "2016-09-01T17:00:00",
     "total_transfer_amount": "23338592",
-    "average_transfer_amount": "3334085",
+    "average_transfer_amount": "3334084",
     "maximum_transfer_amount": "21000000",
     "minimum_transfer_amount": "1990",
     "transfer_count": 7,
@@ -3062,7 +3062,7 @@
   {
     "date": "2016-09-01T16:00:00",
     "total_transfer_amount": "6866155",
-    "average_transfer_amount": "572180",
+    "average_transfer_amount": "572179",
     "maximum_transfer_amount": "6000000",
     "minimum_transfer_amount": "24",
     "transfer_count": 12,
@@ -3071,7 +3071,7 @@
   {
     "date": "2016-09-01T15:00:00",
     "total_transfer_amount": "8087527",
-    "average_transfer_amount": "577681",
+    "average_transfer_amount": "577680",
     "maximum_transfer_amount": "2035244",
     "minimum_transfer_amount": "890",
     "transfer_count": 14,
@@ -3080,7 +3080,7 @@
   {
     "date": "2016-09-01T14:00:00",
     "total_transfer_amount": "1319614",
-    "average_transfer_amount": "101509",
+    "average_transfer_amount": "101508",
     "maximum_transfer_amount": "879206",
     "minimum_transfer_amount": "345",
     "transfer_count": 13,
@@ -3125,7 +3125,7 @@
   {
     "date": "2016-09-01T09:00:00",
     "total_transfer_amount": "2482595",
-    "average_transfer_amount": "620649",
+    "average_transfer_amount": "620648",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "9885",
     "transfer_count": 4,
@@ -3134,7 +3134,7 @@
   {
     "date": "2016-09-01T08:00:00",
     "total_transfer_amount": "151477",
-    "average_transfer_amount": "21640",
+    "average_transfer_amount": "21639",
     "maximum_transfer_amount": "122000",
     "minimum_transfer_amount": "1",
     "transfer_count": 7,
@@ -3143,7 +3143,7 @@
   {
     "date": "2016-09-01T07:00:00",
     "total_transfer_amount": "58783",
-    "average_transfer_amount": "8398",
+    "average_transfer_amount": "8397",
     "maximum_transfer_amount": "15155",
     "minimum_transfer_amount": "2337",
     "transfer_count": 7,
@@ -3152,7 +3152,7 @@
   {
     "date": "2016-09-01T06:00:00",
     "total_transfer_amount": "2251016",
-    "average_transfer_amount": "112551",
+    "average_transfer_amount": "112550",
     "maximum_transfer_amount": "1559831",
     "minimum_transfer_amount": "1147",
     "transfer_count": 20,
@@ -3161,7 +3161,7 @@
   {
     "date": "2016-09-01T05:00:00",
     "total_transfer_amount": "1144080",
-    "average_transfer_amount": "89423",
+    "average_transfer_amount": "104007",
     "maximum_transfer_amount": "897098",
     "minimum_transfer_amount": "251",
     "transfer_count": 11,
@@ -3170,7 +3170,7 @@
   {
     "date": "2016-09-01T04:00:00",
     "total_transfer_amount": "774488",
-    "average_transfer_amount": "77449",
+    "average_transfer_amount": "77448",
     "maximum_transfer_amount": "643389",
     "minimum_transfer_amount": "1",
     "transfer_count": 10,
@@ -3188,7 +3188,7 @@
   {
     "date": "2016-09-01T02:00:00",
     "total_transfer_amount": "829379",
-    "average_transfer_amount": "23697",
+    "average_transfer_amount": "23696",
     "maximum_transfer_amount": "593391",
     "minimum_transfer_amount": "4987",
     "transfer_count": 35,
@@ -3197,7 +3197,7 @@
   {
     "date": "2016-09-01T01:00:00",
     "total_transfer_amount": "2559278",
-    "average_transfer_amount": "170619",
+    "average_transfer_amount": "170618",
     "maximum_transfer_amount": "869273",
     "minimum_transfer_amount": "1000",
     "transfer_count": 15,
@@ -3215,7 +3215,7 @@
   {
     "date": "2016-08-31T23:00:00",
     "total_transfer_amount": "466605",
-    "average_transfer_amount": "58326",
+    "average_transfer_amount": "58325",
     "maximum_transfer_amount": "154937",
     "minimum_transfer_amount": "15",
     "transfer_count": 8,
@@ -3224,7 +3224,7 @@
   {
     "date": "2016-08-31T22:00:00",
     "total_transfer_amount": "1199608",
-    "average_transfer_amount": "171373",
+    "average_transfer_amount": "171372",
     "maximum_transfer_amount": "1037699",
     "minimum_transfer_amount": "257",
     "transfer_count": 7,
@@ -3251,7 +3251,7 @@
   {
     "date": "2016-08-31T19:00:00",
     "total_transfer_amount": "2869215",
-    "average_transfer_amount": "286922",
+    "average_transfer_amount": "286921",
     "maximum_transfer_amount": "1243500",
     "minimum_transfer_amount": "63",
     "transfer_count": 10,
@@ -3278,7 +3278,7 @@
   {
     "date": "2016-08-31T16:00:00",
     "total_transfer_amount": "1813086",
-    "average_transfer_amount": "181309",
+    "average_transfer_amount": "181308",
     "maximum_transfer_amount": "619946",
     "minimum_transfer_amount": "2547",
     "transfer_count": 10,
@@ -3287,7 +3287,7 @@
   {
     "date": "2016-08-31T15:00:00",
     "total_transfer_amount": "4271021",
-    "average_transfer_amount": "533878",
+    "average_transfer_amount": "533877",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "1251",
     "transfer_count": 8,
@@ -3296,7 +3296,7 @@
   {
     "date": "2016-08-31T14:00:00",
     "total_transfer_amount": "442239",
-    "average_transfer_amount": "40204",
+    "average_transfer_amount": "40203",
     "maximum_transfer_amount": "194888",
     "minimum_transfer_amount": "622",
     "transfer_count": 11,
@@ -3314,7 +3314,7 @@
   {
     "date": "2016-08-31T12:00:00",
     "total_transfer_amount": "103628",
-    "average_transfer_amount": "19379",
+    "average_transfer_amount": "20725",
     "maximum_transfer_amount": "76337",
     "minimum_transfer_amount": "1000",
     "transfer_count": 5,
@@ -3332,7 +3332,7 @@
   {
     "date": "2016-08-31T10:00:00",
     "total_transfer_amount": "7183053",
-    "average_transfer_amount": "552543",
+    "average_transfer_amount": "552542",
     "maximum_transfer_amount": "2999990",
     "minimum_transfer_amount": "3078",
     "transfer_count": 13,
@@ -3341,7 +3341,7 @@
   {
     "date": "2016-08-31T09:00:00",
     "total_transfer_amount": "4201693",
-    "average_transfer_amount": "175071",
+    "average_transfer_amount": "175070",
     "maximum_transfer_amount": "1200000",
     "minimum_transfer_amount": "3519",
     "transfer_count": 24,
@@ -3350,7 +3350,7 @@
   {
     "date": "2016-08-31T08:00:00",
     "total_transfer_amount": "13724909",
-    "average_transfer_amount": "193309",
+    "average_transfer_amount": "193308",
     "maximum_transfer_amount": "4396000",
     "minimum_transfer_amount": "100",
     "transfer_count": 71,
@@ -3377,7 +3377,7 @@
   {
     "date": "2016-08-31T05:00:00",
     "total_transfer_amount": "723248",
-    "average_transfer_amount": "241083",
+    "average_transfer_amount": "241082",
     "maximum_transfer_amount": "697572",
     "minimum_transfer_amount": "2200",
     "transfer_count": 3,
@@ -3386,7 +3386,7 @@
   {
     "date": "2016-08-31T04:00:00",
     "total_transfer_amount": "526189",
-    "average_transfer_amount": "71418",
+    "average_transfer_amount": "58465",
     "maximum_transfer_amount": "329594",
     "minimum_transfer_amount": "230",
     "transfer_count": 9,
@@ -3404,7 +3404,7 @@
   {
     "date": "2016-08-31T02:00:00",
     "total_transfer_amount": "41519",
-    "average_transfer_amount": "10380",
+    "average_transfer_amount": "10379",
     "maximum_transfer_amount": "22592",
     "minimum_transfer_amount": "974",
     "transfer_count": 4,
@@ -3413,7 +3413,7 @@
   {
     "date": "2016-08-31T01:00:00",
     "total_transfer_amount": "5214729",
-    "average_transfer_amount": "347649",
+    "average_transfer_amount": "347648",
     "maximum_transfer_amount": "3185000",
     "minimum_transfer_amount": "100",
     "transfer_count": 15,
@@ -3422,7 +3422,7 @@
   {
     "date": "2016-08-31T00:00:00",
     "total_transfer_amount": "254193",
-    "average_transfer_amount": "50839",
+    "average_transfer_amount": "50838",
     "maximum_transfer_amount": "166731",
     "minimum_transfer_amount": "1351",
     "transfer_count": 5,
@@ -3458,7 +3458,7 @@
   {
     "date": "2016-08-30T20:00:00",
     "total_transfer_amount": "13575080",
-    "average_transfer_amount": "325441",
+    "average_transfer_amount": "590220",
     "maximum_transfer_amount": "4603283",
     "minimum_transfer_amount": "500",
     "transfer_count": 23,
@@ -3467,7 +3467,7 @@
   {
     "date": "2016-08-30T19:00:00",
     "total_transfer_amount": "16380313",
-    "average_transfer_amount": "862122",
+    "average_transfer_amount": "862121",
     "maximum_transfer_amount": "11270918",
     "minimum_transfer_amount": "48",
     "transfer_count": 19,
@@ -3476,7 +3476,7 @@
   {
     "date": "2016-08-30T18:00:00",
     "total_transfer_amount": "10466669",
-    "average_transfer_amount": "475758",
+    "average_transfer_amount": "475757",
     "maximum_transfer_amount": "5033449",
     "minimum_transfer_amount": "1242",
     "transfer_count": 22,
@@ -3503,7 +3503,7 @@
   {
     "date": "2016-08-30T15:00:00",
     "total_transfer_amount": "947013",
-    "average_transfer_amount": "67644",
+    "average_transfer_amount": "67643",
     "maximum_transfer_amount": "261691",
     "minimum_transfer_amount": "449",
     "transfer_count": 14,
@@ -3539,7 +3539,7 @@
   {
     "date": "2016-08-30T11:00:00",
     "total_transfer_amount": "265331",
-    "average_transfer_amount": "24278",
+    "average_transfer_amount": "26533",
     "maximum_transfer_amount": "115529",
     "minimum_transfer_amount": "481",
     "transfer_count": 10,
@@ -3557,7 +3557,7 @@
   {
     "date": "2016-08-30T09:00:00",
     "total_transfer_amount": "5301918",
-    "average_transfer_amount": "331370",
+    "average_transfer_amount": "331369",
     "maximum_transfer_amount": "2242322",
     "minimum_transfer_amount": "888",
     "transfer_count": 16,
@@ -3593,7 +3593,7 @@
   {
     "date": "2016-08-30T05:00:00",
     "total_transfer_amount": "4896647",
-    "average_transfer_amount": "612081",
+    "average_transfer_amount": "612080",
     "maximum_transfer_amount": "2174397",
     "minimum_transfer_amount": "1000",
     "transfer_count": 8,
@@ -3602,7 +3602,7 @@
   {
     "date": "2016-08-30T04:00:00",
     "total_transfer_amount": "2971868",
-    "average_transfer_amount": "270170",
+    "average_transfer_amount": "270169",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "168",
     "transfer_count": 11,
@@ -3611,7 +3611,7 @@
   {
     "date": "2016-08-30T03:00:00",
     "total_transfer_amount": "4592487",
-    "average_transfer_amount": "253127",
+    "average_transfer_amount": "255138",
     "maximum_transfer_amount": "869191",
     "minimum_transfer_amount": "5883",
     "transfer_count": 18,
@@ -3620,7 +3620,7 @@
   {
     "date": "2016-08-30T02:00:00",
     "total_transfer_amount": "7417069",
-    "average_transfer_amount": "741707",
+    "average_transfer_amount": "741706",
     "maximum_transfer_amount": "7200000",
     "minimum_transfer_amount": "139",
     "transfer_count": 10,
@@ -3629,7 +3629,7 @@
   {
     "date": "2016-08-30T01:00:00",
     "total_transfer_amount": "4608726",
-    "average_transfer_amount": "271102",
+    "average_transfer_amount": "271101",
     "maximum_transfer_amount": "1787611",
     "minimum_transfer_amount": "1652",
     "transfer_count": 17,
@@ -3638,7 +3638,7 @@
   {
     "date": "2016-08-30T00:00:00",
     "total_transfer_amount": "3432701",
-    "average_transfer_amount": "214544",
+    "average_transfer_amount": "214543",
     "maximum_transfer_amount": "1023656",
     "minimum_transfer_amount": "636",
     "transfer_count": 16,
@@ -3647,7 +3647,7 @@
   {
     "date": "2016-08-29T23:00:00",
     "total_transfer_amount": "4657791",
-    "average_transfer_amount": "273988",
+    "average_transfer_amount": "273987",
     "maximum_transfer_amount": "1522000",
     "minimum_transfer_amount": "1071",
     "transfer_count": 17,
@@ -3665,7 +3665,7 @@
   {
     "date": "2016-08-29T21:00:00",
     "total_transfer_amount": "30684432",
-    "average_transfer_amount": "767111",
+    "average_transfer_amount": "767110",
     "maximum_transfer_amount": "10000000",
     "minimum_transfer_amount": "990",
     "transfer_count": 40,
@@ -3683,7 +3683,7 @@
   {
     "date": "2016-08-29T19:00:00",
     "total_transfer_amount": "1149338",
-    "average_transfer_amount": "71834",
+    "average_transfer_amount": "71833",
     "maximum_transfer_amount": "256863",
     "minimum_transfer_amount": "1455",
     "transfer_count": 16,
@@ -3692,7 +3692,7 @@
   {
     "date": "2016-08-29T18:00:00",
     "total_transfer_amount": "2434932",
-    "average_transfer_amount": "125032",
+    "average_transfer_amount": "173923",
     "maximum_transfer_amount": "822799",
     "minimum_transfer_amount": "1987",
     "transfer_count": 14,
@@ -3701,7 +3701,7 @@
   {
     "date": "2016-08-29T17:00:00",
     "total_transfer_amount": "936816",
-    "average_transfer_amount": "93682",
+    "average_transfer_amount": "93681",
     "maximum_transfer_amount": "433314",
     "minimum_transfer_amount": "390",
     "transfer_count": 10,
@@ -3737,7 +3737,7 @@
   {
     "date": "2016-08-29T13:00:00",
     "total_transfer_amount": "2983031",
-    "average_transfer_amount": "198869",
+    "average_transfer_amount": "198868",
     "maximum_transfer_amount": "1097014",
     "minimum_transfer_amount": "837",
     "transfer_count": 15,
@@ -3755,7 +3755,7 @@
   {
     "date": "2016-08-29T11:00:00",
     "total_transfer_amount": "2179380",
-    "average_transfer_amount": "272423",
+    "average_transfer_amount": "272422",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "25174",
     "transfer_count": 8,
@@ -3764,7 +3764,7 @@
   {
     "date": "2016-08-29T10:00:00",
     "total_transfer_amount": "4828824",
-    "average_transfer_amount": "447141",
+    "average_transfer_amount": "438984",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "689",
     "transfer_count": 11,
@@ -3836,7 +3836,7 @@
   {
     "date": "2016-08-29T02:00:00",
     "total_transfer_amount": "3716473",
-    "average_transfer_amount": "301338",
+    "average_transfer_amount": "337861",
     "maximum_transfer_amount": "1235519",
     "minimum_transfer_amount": "229",
     "transfer_count": 11,
@@ -3854,7 +3854,7 @@
   {
     "date": "2016-08-29T00:00:00",
     "total_transfer_amount": "5151059",
-    "average_transfer_amount": "515106",
+    "average_transfer_amount": "515105",
     "maximum_transfer_amount": "3650000",
     "minimum_transfer_amount": "3334",
     "transfer_count": 10,
@@ -3863,7 +3863,7 @@
   {
     "date": "2016-08-28T23:00:00",
     "total_transfer_amount": "1006767",
-    "average_transfer_amount": "125846",
+    "average_transfer_amount": "125845",
     "maximum_transfer_amount": "713204",
     "minimum_transfer_amount": "909",
     "transfer_count": 8,
@@ -3881,7 +3881,7 @@
   {
     "date": "2016-08-28T21:00:00",
     "total_transfer_amount": "3262772",
-    "average_transfer_amount": "141860",
+    "average_transfer_amount": "141859",
     "maximum_transfer_amount": "1000333",
     "minimum_transfer_amount": "11",
     "transfer_count": 23,
@@ -3890,7 +3890,7 @@
   {
     "date": "2016-08-28T20:00:00",
     "total_transfer_amount": "637288",
-    "average_transfer_amount": "63729",
+    "average_transfer_amount": "63728",
     "maximum_transfer_amount": "347468",
     "minimum_transfer_amount": "10",
     "transfer_count": 10,
@@ -3899,7 +3899,7 @@
   {
     "date": "2016-08-28T19:00:00",
     "total_transfer_amount": "2522097",
-    "average_transfer_amount": "252210",
+    "average_transfer_amount": "252209",
     "maximum_transfer_amount": "959206",
     "minimum_transfer_amount": "3068",
     "transfer_count": 10,
@@ -3917,7 +3917,7 @@
   {
     "date": "2016-08-28T17:00:00",
     "total_transfer_amount": "2193476",
-    "average_transfer_amount": "187198",
+    "average_transfer_amount": "313353",
     "maximum_transfer_amount": "1138828",
     "minimum_transfer_amount": "149",
     "transfer_count": 7,
@@ -3935,7 +3935,7 @@
   {
     "date": "2016-08-28T15:00:00",
     "total_transfer_amount": "1795978",
-    "average_transfer_amount": "149665",
+    "average_transfer_amount": "149664",
     "maximum_transfer_amount": "977744",
     "minimum_transfer_amount": "1556",
     "transfer_count": 12,
@@ -3944,7 +3944,7 @@
   {
     "date": "2016-08-28T14:00:00",
     "total_transfer_amount": "542812",
-    "average_transfer_amount": "77545",
+    "average_transfer_amount": "77544",
     "maximum_transfer_amount": "225611",
     "minimum_transfer_amount": "6630",
     "transfer_count": 7,
@@ -3962,7 +3962,7 @@
   {
     "date": "2016-08-28T12:00:00",
     "total_transfer_amount": "4390196",
-    "average_transfer_amount": "46213",
+    "average_transfer_amount": "46212",
     "maximum_transfer_amount": "1821000",
     "minimum_transfer_amount": "11",
     "transfer_count": 95,
@@ -3980,7 +3980,7 @@
   {
     "date": "2016-08-28T10:00:00",
     "total_transfer_amount": "848418",
-    "average_transfer_amount": "212105",
+    "average_transfer_amount": "212104",
     "maximum_transfer_amount": "560752",
     "minimum_transfer_amount": "2049",
     "transfer_count": 4,
@@ -3989,7 +3989,7 @@
   {
     "date": "2016-08-28T09:00:00",
     "total_transfer_amount": "5901428",
-    "average_transfer_amount": "915324",
+    "average_transfer_amount": "843061",
     "maximum_transfer_amount": "3988031",
     "minimum_transfer_amount": "55",
     "transfer_count": 7,
@@ -4034,7 +4034,7 @@
   {
     "date": "2016-08-28T04:00:00",
     "total_transfer_amount": "4791275",
-    "average_transfer_amount": "684468",
+    "average_transfer_amount": "684467",
     "maximum_transfer_amount": "2500000",
     "minimum_transfer_amount": "2",
     "transfer_count": 7,
@@ -4061,7 +4061,7 @@
   {
     "date": "2016-08-28T01:00:00",
     "total_transfer_amount": "2504529",
-    "average_transfer_amount": "376769",
+    "average_transfer_amount": "417421",
     "maximum_transfer_amount": "2094603",
     "minimum_transfer_amount": "1",
     "transfer_count": 6,
@@ -4106,7 +4106,7 @@
   {
     "date": "2016-08-27T20:00:00",
     "total_transfer_amount": "5641058",
-    "average_transfer_amount": "331827",
+    "average_transfer_amount": "331826",
     "maximum_transfer_amount": "2500000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 17,
@@ -4124,7 +4124,7 @@
   {
     "date": "2016-08-27T18:00:00",
     "total_transfer_amount": "12798687",
-    "average_transfer_amount": "752864",
+    "average_transfer_amount": "752863",
     "maximum_transfer_amount": "6099421",
     "minimum_transfer_amount": "90",
     "transfer_count": 17,
@@ -4142,7 +4142,7 @@
   {
     "date": "2016-08-27T16:00:00",
     "total_transfer_amount": "1369683",
-    "average_transfer_amount": "168545",
+    "average_transfer_amount": "76093",
     "maximum_transfer_amount": "554833",
     "minimum_transfer_amount": "693",
     "transfer_count": 18,
@@ -4151,7 +4151,7 @@
   {
     "date": "2016-08-27T15:00:00",
     "total_transfer_amount": "4069486",
-    "average_transfer_amount": "290678",
+    "average_transfer_amount": "290677",
     "maximum_transfer_amount": "3172672",
     "minimum_transfer_amount": "371",
     "transfer_count": 14,
@@ -4169,7 +4169,7 @@
   {
     "date": "2016-08-27T13:00:00",
     "total_transfer_amount": "3772205",
-    "average_transfer_amount": "342928",
+    "average_transfer_amount": "342927",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "874",
     "transfer_count": 11,
@@ -4214,7 +4214,7 @@
   {
     "date": "2016-08-27T08:00:00",
     "total_transfer_amount": "11169376",
-    "average_transfer_amount": "368899",
+    "average_transfer_amount": "465390",
     "maximum_transfer_amount": "5000000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 24,
@@ -4223,7 +4223,7 @@
   {
     "date": "2016-08-27T07:00:00",
     "total_transfer_amount": "5225221",
-    "average_transfer_amount": "275012",
+    "average_transfer_amount": "275011",
     "maximum_transfer_amount": "888000",
     "minimum_transfer_amount": "30482",
     "transfer_count": 19,
@@ -4259,7 +4259,7 @@
   {
     "date": "2016-08-27T03:00:00",
     "total_transfer_amount": "9282791",
-    "average_transfer_amount": "189445",
+    "average_transfer_amount": "189444",
     "maximum_transfer_amount": "3032349",
     "minimum_transfer_amount": "92",
     "transfer_count": 49,
@@ -4268,7 +4268,7 @@
   {
     "date": "2016-08-27T02:00:00",
     "total_transfer_amount": "6117509",
-    "average_transfer_amount": "278069",
+    "average_transfer_amount": "278068",
     "maximum_transfer_amount": "1059000",
     "minimum_transfer_amount": "5914",
     "transfer_count": 22,
@@ -4277,7 +4277,7 @@
   {
     "date": "2016-08-27T01:00:00",
     "total_transfer_amount": "11663129",
-    "average_transfer_amount": "364473",
+    "average_transfer_amount": "364472",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 32,
@@ -4286,7 +4286,7 @@
   {
     "date": "2016-08-27T00:00:00",
     "total_transfer_amount": "14323119",
-    "average_transfer_amount": "493901",
+    "average_transfer_amount": "493900",
     "maximum_transfer_amount": "5292000",
     "minimum_transfer_amount": "340",
     "transfer_count": 29,
@@ -4313,7 +4313,7 @@
   {
     "date": "2016-08-26T21:00:00",
     "total_transfer_amount": "5324086",
-    "average_transfer_amount": "313182",
+    "average_transfer_amount": "313181",
     "maximum_transfer_amount": "2268389",
     "minimum_transfer_amount": "2859",
     "transfer_count": 17,
@@ -4340,7 +4340,7 @@
   {
     "date": "2016-08-26T18:00:00",
     "total_transfer_amount": "2912909",
-    "average_transfer_amount": "291291",
+    "average_transfer_amount": "291290",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "3086",
     "transfer_count": 10,
@@ -4358,7 +4358,7 @@
   {
     "date": "2016-08-26T16:00:00",
     "total_transfer_amount": "5752691",
-    "average_transfer_amount": "230108",
+    "average_transfer_amount": "230107",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "3300",
     "transfer_count": 25,
@@ -4367,7 +4367,7 @@
   {
     "date": "2016-08-26T15:00:00",
     "total_transfer_amount": "13011968",
-    "average_transfer_amount": "397019",
+    "average_transfer_amount": "448688",
     "maximum_transfer_amount": "4323002",
     "minimum_transfer_amount": "33",
     "transfer_count": 29,
@@ -4376,7 +4376,7 @@
   {
     "date": "2016-08-26T14:00:00",
     "total_transfer_amount": "5063195",
-    "average_transfer_amount": "389477",
+    "average_transfer_amount": "389476",
     "maximum_transfer_amount": "2995491",
     "minimum_transfer_amount": "2258",
     "transfer_count": 13,
@@ -4430,7 +4430,7 @@
   {
     "date": "2016-08-26T08:00:00",
     "total_transfer_amount": "2842961",
-    "average_transfer_amount": "109345",
+    "average_transfer_amount": "109344",
     "maximum_transfer_amount": "850000",
     "minimum_transfer_amount": "1",
     "transfer_count": 26,
@@ -4439,7 +4439,7 @@
   {
     "date": "2016-08-26T07:00:00",
     "total_transfer_amount": "4445946",
-    "average_transfer_amount": "283934",
+    "average_transfer_amount": "158783",
     "maximum_transfer_amount": "1077597",
     "minimum_transfer_amount": "1",
     "transfer_count": 28,
@@ -4466,7 +4466,7 @@
   {
     "date": "2016-08-26T04:00:00",
     "total_transfer_amount": "3331446",
-    "average_transfer_amount": "333145",
+    "average_transfer_amount": "333144",
     "maximum_transfer_amount": "1973236",
     "minimum_transfer_amount": "3980",
     "transfer_count": 10,
@@ -4484,7 +4484,7 @@
   {
     "date": "2016-08-26T02:00:00",
     "total_transfer_amount": "20802611",
-    "average_transfer_amount": "1040131",
+    "average_transfer_amount": "1040130",
     "maximum_transfer_amount": "11623873",
     "minimum_transfer_amount": "90",
     "transfer_count": 20,
@@ -4520,7 +4520,7 @@
   {
     "date": "2016-08-25T22:00:00",
     "total_transfer_amount": "15863362",
-    "average_transfer_amount": "363509",
+    "average_transfer_amount": "660973",
     "maximum_transfer_amount": "2784990",
     "minimum_transfer_amount": "1",
     "transfer_count": 24,
@@ -4538,7 +4538,7 @@
   {
     "date": "2016-08-25T20:00:00",
     "total_transfer_amount": "34739638",
-    "average_transfer_amount": "2315976",
+    "average_transfer_amount": "2315975",
     "maximum_transfer_amount": "18000000",
     "minimum_transfer_amount": "1533",
     "transfer_count": 15,
@@ -4547,7 +4547,7 @@
   {
     "date": "2016-08-25T19:00:00",
     "total_transfer_amount": "2437447",
-    "average_transfer_amount": "187496",
+    "average_transfer_amount": "187495",
     "maximum_transfer_amount": "998005",
     "minimum_transfer_amount": "865",
     "transfer_count": 13,
@@ -4556,7 +4556,7 @@
   {
     "date": "2016-08-25T18:00:00",
     "total_transfer_amount": "12247027",
-    "average_transfer_amount": "583192",
+    "average_transfer_amount": "583191",
     "maximum_transfer_amount": "3400000",
     "minimum_transfer_amount": "87",
     "transfer_count": 21,
@@ -4574,7 +4574,7 @@
   {
     "date": "2016-08-25T16:00:00",
     "total_transfer_amount": "9779010",
-    "average_transfer_amount": "752232",
+    "average_transfer_amount": "752231",
     "maximum_transfer_amount": "3054000",
     "minimum_transfer_amount": "625",
     "transfer_count": 13,
@@ -4583,7 +4583,7 @@
   {
     "date": "2016-08-25T15:00:00",
     "total_transfer_amount": "4128598",
-    "average_transfer_amount": "688100",
+    "average_transfer_amount": "688099",
     "maximum_transfer_amount": "1953914",
     "minimum_transfer_amount": "3692",
     "transfer_count": 6,
@@ -4592,7 +4592,7 @@
   {
     "date": "2016-08-25T14:00:00",
     "total_transfer_amount": "6739013",
-    "average_transfer_amount": "783497",
+    "average_transfer_amount": "748779",
     "maximum_transfer_amount": "3825763",
     "minimum_transfer_amount": "711",
     "transfer_count": 9,
@@ -4601,7 +4601,7 @@
   {
     "date": "2016-08-25T13:00:00",
     "total_transfer_amount": "319298",
-    "average_transfer_amount": "79825",
+    "average_transfer_amount": "79824",
     "maximum_transfer_amount": "216813",
     "minimum_transfer_amount": "972",
     "transfer_count": 4,
@@ -4610,7 +4610,7 @@
   {
     "date": "2016-08-25T12:00:00",
     "total_transfer_amount": "280499",
-    "average_transfer_amount": "93500",
+    "average_transfer_amount": "93499",
     "maximum_transfer_amount": "273117",
     "minimum_transfer_amount": "1133",
     "transfer_count": 3,
@@ -4646,7 +4646,7 @@
   {
     "date": "2016-08-25T08:00:00",
     "total_transfer_amount": "560729",
-    "average_transfer_amount": "112146",
+    "average_transfer_amount": "112145",
     "maximum_transfer_amount": "460319",
     "minimum_transfer_amount": "2400",
     "transfer_count": 5,
@@ -4655,7 +4655,7 @@
   {
     "date": "2016-08-25T07:00:00",
     "total_transfer_amount": "290483",
-    "average_transfer_amount": "72621",
+    "average_transfer_amount": "72620",
     "maximum_transfer_amount": "233953",
     "minimum_transfer_amount": "2540",
     "transfer_count": 4,
@@ -4664,7 +4664,7 @@
   {
     "date": "2016-08-25T06:00:00",
     "total_transfer_amount": "244894",
-    "average_transfer_amount": "48979",
+    "average_transfer_amount": "48978",
     "maximum_transfer_amount": "198481",
     "minimum_transfer_amount": "6500",
     "transfer_count": 5,
@@ -4673,7 +4673,7 @@
   {
     "date": "2016-08-25T05:00:00",
     "total_transfer_amount": "2427930",
-    "average_transfer_amount": "162566",
+    "average_transfer_amount": "115615",
     "maximum_transfer_amount": "698484",
     "minimum_transfer_amount": "186",
     "transfer_count": 21,
@@ -4691,7 +4691,7 @@
   {
     "date": "2016-08-25T03:00:00",
     "total_transfer_amount": "9302531",
-    "average_transfer_amount": "465127",
+    "average_transfer_amount": "465126",
     "maximum_transfer_amount": "3832501",
     "minimum_transfer_amount": "3887",
     "transfer_count": 20,
@@ -4700,7 +4700,7 @@
   {
     "date": "2016-08-25T02:00:00",
     "total_transfer_amount": "5155547",
-    "average_transfer_amount": "429629",
+    "average_transfer_amount": "429628",
     "maximum_transfer_amount": "1600000",
     "minimum_transfer_amount": "290",
     "transfer_count": 12,
@@ -4727,7 +4727,7 @@
   {
     "date": "2016-08-24T23:00:00",
     "total_transfer_amount": "920679",
-    "average_transfer_amount": "31748",
+    "average_transfer_amount": "31747",
     "maximum_transfer_amount": "320786",
     "minimum_transfer_amount": "2000",
     "transfer_count": 29,
@@ -4736,7 +4736,7 @@
   {
     "date": "2016-08-24T22:00:00",
     "total_transfer_amount": "808063",
-    "average_transfer_amount": "89785",
+    "average_transfer_amount": "89784",
     "maximum_transfer_amount": "475348",
     "minimum_transfer_amount": "61",
     "transfer_count": 9,
@@ -4745,7 +4745,7 @@
   {
     "date": "2016-08-24T21:00:00",
     "total_transfer_amount": "4867319",
-    "average_transfer_amount": "486732",
+    "average_transfer_amount": "486731",
     "maximum_transfer_amount": "1499990",
     "minimum_transfer_amount": "1810",
     "transfer_count": 10,
@@ -4754,7 +4754,7 @@
   {
     "date": "2016-08-24T20:00:00",
     "total_transfer_amount": "319974",
-    "average_transfer_amount": "39997",
+    "average_transfer_amount": "39996",
     "maximum_transfer_amount": "250014",
     "minimum_transfer_amount": "90",
     "transfer_count": 8,
@@ -4790,7 +4790,7 @@
   {
     "date": "2016-08-24T16:00:00",
     "total_transfer_amount": "6395107",
-    "average_transfer_amount": "355284",
+    "average_transfer_amount": "355283",
     "maximum_transfer_amount": "2200000",
     "minimum_transfer_amount": "927",
     "transfer_count": 18,
@@ -4808,7 +4808,7 @@
   {
     "date": "2016-08-24T14:00:00",
     "total_transfer_amount": "3828556",
-    "average_transfer_amount": "239285",
+    "average_transfer_amount": "239284",
     "maximum_transfer_amount": "1211856",
     "minimum_transfer_amount": "934",
     "transfer_count": 16,
@@ -4817,7 +4817,7 @@
   {
     "date": "2016-08-24T13:00:00",
     "total_transfer_amount": "313839",
-    "average_transfer_amount": "78460",
+    "average_transfer_amount": "78459",
     "maximum_transfer_amount": "302060",
     "minimum_transfer_amount": "1045",
     "transfer_count": 4,
@@ -4826,7 +4826,7 @@
   {
     "date": "2016-08-24T12:00:00",
     "total_transfer_amount": "957058",
-    "average_transfer_amount": "63804",
+    "average_transfer_amount": "63803",
     "maximum_transfer_amount": "177374",
     "minimum_transfer_amount": "1301",
     "transfer_count": 15,
@@ -4844,7 +4844,7 @@
   {
     "date": "2016-08-24T10:00:00",
     "total_transfer_amount": "1469574",
-    "average_transfer_amount": "133598",
+    "average_transfer_amount": "133597",
     "maximum_transfer_amount": "636132",
     "minimum_transfer_amount": "1",
     "transfer_count": 11,
@@ -4853,7 +4853,7 @@
   {
     "date": "2016-08-24T09:00:00",
     "total_transfer_amount": "2712634",
-    "average_transfer_amount": "226053",
+    "average_transfer_amount": "226052",
     "maximum_transfer_amount": "1781401",
     "minimum_transfer_amount": "1",
     "transfer_count": 12,
@@ -4862,7 +4862,7 @@
   {
     "date": "2016-08-24T08:00:00",
     "total_transfer_amount": "957983",
-    "average_transfer_amount": "136855",
+    "average_transfer_amount": "136854",
     "maximum_transfer_amount": "500238",
     "minimum_transfer_amount": "1",
     "transfer_count": 7,
@@ -4871,7 +4871,7 @@
   {
     "date": "2016-08-24T07:00:00",
     "total_transfer_amount": "3811551",
-    "average_transfer_amount": "56889",
+    "average_transfer_amount": "56888",
     "maximum_transfer_amount": "1581573",
     "minimum_transfer_amount": "1",
     "transfer_count": 67,
@@ -4880,7 +4880,7 @@
   {
     "date": "2016-08-24T06:00:00",
     "total_transfer_amount": "7995506",
-    "average_transfer_amount": "444195",
+    "average_transfer_amount": "444194",
     "maximum_transfer_amount": "2481584",
     "minimum_transfer_amount": "1",
     "transfer_count": 18,
@@ -4898,7 +4898,7 @@
   {
     "date": "2016-08-24T04:00:00",
     "total_transfer_amount": "462096",
-    "average_transfer_amount": "47329",
+    "average_transfer_amount": "51344",
     "maximum_transfer_amount": "262244",
     "minimum_transfer_amount": "75",
     "transfer_count": 9,
@@ -4907,7 +4907,7 @@
   {
     "date": "2016-08-24T03:00:00",
     "total_transfer_amount": "5464118",
-    "average_transfer_amount": "546412",
+    "average_transfer_amount": "546411",
     "maximum_transfer_amount": "2129575",
     "minimum_transfer_amount": "950",
     "transfer_count": 10,
@@ -4934,7 +4934,7 @@
   {
     "date": "2016-08-24T00:00:00",
     "total_transfer_amount": "4248994",
-    "average_transfer_amount": "354083",
+    "average_transfer_amount": "354082",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "958",
     "transfer_count": 12,
@@ -4943,7 +4943,7 @@
   {
     "date": "2016-08-23T23:00:00",
     "total_transfer_amount": "1755449",
-    "average_transfer_amount": "109716",
+    "average_transfer_amount": "109715",
     "maximum_transfer_amount": "999000",
     "minimum_transfer_amount": "300",
     "transfer_count": 16,
@@ -4970,7 +4970,7 @@
   {
     "date": "2016-08-23T20:00:00",
     "total_transfer_amount": "2372774",
-    "average_transfer_amount": "218426",
+    "average_transfer_amount": "237277",
     "maximum_transfer_amount": "1600000",
     "minimum_transfer_amount": "116",
     "transfer_count": 10,
@@ -4988,7 +4988,7 @@
   {
     "date": "2016-08-23T18:00:00",
     "total_transfer_amount": "5707930",
-    "average_transfer_amount": "211405",
+    "average_transfer_amount": "211404",
     "maximum_transfer_amount": "3000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 27,
@@ -5033,7 +5033,7 @@
   {
     "date": "2016-08-23T13:00:00",
     "total_transfer_amount": "2232803",
-    "average_transfer_amount": "159486",
+    "average_transfer_amount": "159485",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "823",
     "transfer_count": 14,
@@ -5042,7 +5042,7 @@
   {
     "date": "2016-08-23T12:00:00",
     "total_transfer_amount": "2488990",
-    "average_transfer_amount": "191461",
+    "average_transfer_amount": "191460",
     "maximum_transfer_amount": "772000",
     "minimum_transfer_amount": "1",
     "transfer_count": 13,
@@ -5051,7 +5051,7 @@
   {
     "date": "2016-08-23T11:00:00",
     "total_transfer_amount": "1773810",
-    "average_transfer_amount": "94184",
+    "average_transfer_amount": "147817",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "1000",
     "transfer_count": 12,
@@ -5078,7 +5078,7 @@
   {
     "date": "2016-08-23T08:00:00",
     "total_transfer_amount": "4511496",
-    "average_transfer_amount": "451150",
+    "average_transfer_amount": "451149",
     "maximum_transfer_amount": "3604000",
     "minimum_transfer_amount": "1",
     "transfer_count": 10,
@@ -5123,7 +5123,7 @@
   {
     "date": "2016-08-23T03:00:00",
     "total_transfer_amount": "7600486",
-    "average_transfer_amount": "459539",
+    "average_transfer_amount": "542891",
     "maximum_transfer_amount": "2216281",
     "minimum_transfer_amount": "227",
     "transfer_count": 14,
@@ -5132,7 +5132,7 @@
   {
     "date": "2016-08-23T02:00:00",
     "total_transfer_amount": "2477834",
-    "average_transfer_amount": "165189",
+    "average_transfer_amount": "165188",
     "maximum_transfer_amount": "1399990",
     "minimum_transfer_amount": "4997",
     "transfer_count": 15,
@@ -5150,7 +5150,7 @@
   {
     "date": "2016-08-23T00:00:00",
     "total_transfer_amount": "1871657",
-    "average_transfer_amount": "187166",
+    "average_transfer_amount": "187165",
     "maximum_transfer_amount": "1211325",
     "minimum_transfer_amount": "1",
     "transfer_count": 10,
@@ -5186,7 +5186,7 @@
   {
     "date": "2016-08-22T20:00:00",
     "total_transfer_amount": "5362238",
-    "average_transfer_amount": "670280",
+    "average_transfer_amount": "670279",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "3408",
     "transfer_count": 8,
@@ -5204,7 +5204,7 @@
   {
     "date": "2016-08-22T18:00:00",
     "total_transfer_amount": "670841",
-    "average_transfer_amount": "31945",
+    "average_transfer_amount": "31944",
     "maximum_transfer_amount": "199219",
     "minimum_transfer_amount": "2194",
     "transfer_count": 21,
@@ -5213,7 +5213,7 @@
   {
     "date": "2016-08-22T17:00:00",
     "total_transfer_amount": "1210263",
-    "average_transfer_amount": "134474",
+    "average_transfer_amount": "134473",
     "maximum_transfer_amount": "663650",
     "minimum_transfer_amount": "684",
     "transfer_count": 9,
@@ -5231,7 +5231,7 @@
   {
     "date": "2016-08-22T15:00:00",
     "total_transfer_amount": "26473518",
-    "average_transfer_amount": "945483",
+    "average_transfer_amount": "945482",
     "maximum_transfer_amount": "10994240",
     "minimum_transfer_amount": "90",
     "transfer_count": 28,
@@ -5249,7 +5249,7 @@
   {
     "date": "2016-08-22T13:00:00",
     "total_transfer_amount": "19052878",
-    "average_transfer_amount": "3175480",
+    "average_transfer_amount": "3175479",
     "maximum_transfer_amount": "17000000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 6,
@@ -5267,7 +5267,7 @@
   {
     "date": "2016-08-22T11:00:00",
     "total_transfer_amount": "4158407",
-    "average_transfer_amount": "415841",
+    "average_transfer_amount": "415840",
     "maximum_transfer_amount": "2527291",
     "minimum_transfer_amount": "30",
     "transfer_count": 10,
@@ -5276,7 +5276,7 @@
   {
     "date": "2016-08-22T10:00:00",
     "total_transfer_amount": "305356",
-    "average_transfer_amount": "54951",
+    "average_transfer_amount": "43622",
     "maximum_transfer_amount": "162358",
     "minimum_transfer_amount": "19",
     "transfer_count": 7,
@@ -5303,7 +5303,7 @@
   {
     "date": "2016-08-22T07:00:00",
     "total_transfer_amount": "10691614",
-    "average_transfer_amount": "1336452",
+    "average_transfer_amount": "1336451",
     "maximum_transfer_amount": "9406722",
     "minimum_transfer_amount": "40",
     "transfer_count": 8,
@@ -5321,7 +5321,7 @@
   {
     "date": "2016-08-22T05:00:00",
     "total_transfer_amount": "21122791",
-    "average_transfer_amount": "5280698",
+    "average_transfer_amount": "5280697",
     "maximum_transfer_amount": "20269990",
     "minimum_transfer_amount": "588",
     "transfer_count": 4,
@@ -5330,7 +5330,7 @@
   {
     "date": "2016-08-22T04:00:00",
     "total_transfer_amount": "3404969",
-    "average_transfer_amount": "680994",
+    "average_transfer_amount": "680993",
     "maximum_transfer_amount": "2662264",
     "minimum_transfer_amount": "10754",
     "transfer_count": 5,
@@ -5348,7 +5348,7 @@
   {
     "date": "2016-08-22T02:00:00",
     "total_transfer_amount": "767600",
-    "average_transfer_amount": "49078",
+    "average_transfer_amount": "76760",
     "maximum_transfer_amount": "388985",
     "minimum_transfer_amount": "675",
     "transfer_count": 10,
@@ -5357,7 +5357,7 @@
   {
     "date": "2016-08-22T01:00:00",
     "total_transfer_amount": "5120460",
-    "average_transfer_amount": "640058",
+    "average_transfer_amount": "640057",
     "maximum_transfer_amount": "1799990",
     "minimum_transfer_amount": "1286",
     "transfer_count": 8,
@@ -5411,7 +5411,7 @@
   {
     "date": "2016-08-21T19:00:00",
     "total_transfer_amount": "823036",
-    "average_transfer_amount": "137173",
+    "average_transfer_amount": "137172",
     "maximum_transfer_amount": "676942",
     "minimum_transfer_amount": "10",
     "transfer_count": 6,
@@ -5420,7 +5420,7 @@
   {
     "date": "2016-08-21T18:00:00",
     "total_transfer_amount": "257831",
-    "average_transfer_amount": "42972",
+    "average_transfer_amount": "42971",
     "maximum_transfer_amount": "240659",
     "minimum_transfer_amount": "338",
     "transfer_count": 6,
@@ -5429,7 +5429,7 @@
   {
     "date": "2016-08-21T17:00:00",
     "total_transfer_amount": "529134",
-    "average_transfer_amount": "38729",
+    "average_transfer_amount": "66141",
     "maximum_transfer_amount": "512990",
     "minimum_transfer_amount": "1",
     "transfer_count": 8,
@@ -5438,7 +5438,7 @@
   {
     "date": "2016-08-21T16:00:00",
     "total_transfer_amount": "1002884",
-    "average_transfer_amount": "200577",
+    "average_transfer_amount": "200576",
     "maximum_transfer_amount": "588551",
     "minimum_transfer_amount": "1100",
     "transfer_count": 5,
@@ -5483,7 +5483,7 @@
   {
     "date": "2016-08-21T11:00:00",
     "total_transfer_amount": "125195",
-    "average_transfer_amount": "41732",
+    "average_transfer_amount": "41731",
     "maximum_transfer_amount": "99990",
     "minimum_transfer_amount": "5433",
     "transfer_count": 3,
@@ -5501,7 +5501,7 @@
   {
     "date": "2016-08-21T09:00:00",
     "total_transfer_amount": "1574755",
-    "average_transfer_amount": "144821",
+    "average_transfer_amount": "174972",
     "maximum_transfer_amount": "1101648",
     "minimum_transfer_amount": "90",
     "transfer_count": 9,
@@ -5528,7 +5528,7 @@
   {
     "date": "2016-08-21T06:00:00",
     "total_transfer_amount": "920455",
-    "average_transfer_amount": "61364",
+    "average_transfer_amount": "61363",
     "maximum_transfer_amount": "460249",
     "minimum_transfer_amount": "10",
     "transfer_count": 15,
@@ -5564,7 +5564,7 @@
   {
     "date": "2016-08-21T02:00:00",
     "total_transfer_amount": "11850256",
-    "average_transfer_amount": "623698",
+    "average_transfer_amount": "623697",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "30",
     "transfer_count": 19,
@@ -5582,7 +5582,7 @@
   {
     "date": "2016-08-21T00:00:00",
     "total_transfer_amount": "1252421",
-    "average_transfer_amount": "62482",
+    "average_transfer_amount": "69578",
     "maximum_transfer_amount": "674308",
     "minimum_transfer_amount": "40",
     "transfer_count": 18,
@@ -5591,7 +5591,7 @@
   {
     "date": "2016-08-20T23:00:00",
     "total_transfer_amount": "1051869",
-    "average_transfer_amount": "210374",
+    "average_transfer_amount": "210373",
     "maximum_transfer_amount": "674763",
     "minimum_transfer_amount": "629",
     "transfer_count": 5,
@@ -5600,7 +5600,7 @@
   {
     "date": "2016-08-20T22:00:00",
     "total_transfer_amount": "135170",
-    "average_transfer_amount": "33793",
+    "average_transfer_amount": "33792",
     "maximum_transfer_amount": "100000",
     "minimum_transfer_amount": "5146",
     "transfer_count": 4,
@@ -5609,7 +5609,7 @@
   {
     "date": "2016-08-20T21:00:00",
     "total_transfer_amount": "644164",
-    "average_transfer_amount": "107361",
+    "average_transfer_amount": "107360",
     "maximum_transfer_amount": "201972",
     "minimum_transfer_amount": "5984",
     "transfer_count": 6,
@@ -5618,7 +5618,7 @@
   {
     "date": "2016-08-20T20:00:00",
     "total_transfer_amount": "511036",
-    "average_transfer_amount": "51104",
+    "average_transfer_amount": "51103",
     "maximum_transfer_amount": "458427",
     "minimum_transfer_amount": "102",
     "transfer_count": 10,
@@ -5627,7 +5627,7 @@
   {
     "date": "2016-08-20T19:00:00",
     "total_transfer_amount": "2028214",
-    "average_transfer_amount": "405643",
+    "average_transfer_amount": "405642",
     "maximum_transfer_amount": "1999990",
     "minimum_transfer_amount": "20",
     "transfer_count": 5,
@@ -5654,7 +5654,7 @@
   {
     "date": "2016-08-20T16:00:00",
     "total_transfer_amount": "1245333",
-    "average_transfer_amount": "129608",
+    "average_transfer_amount": "138370",
     "maximum_transfer_amount": "750000",
     "minimum_transfer_amount": "1538",
     "transfer_count": 9,
@@ -5672,7 +5672,7 @@
   {
     "date": "2016-08-20T14:00:00",
     "total_transfer_amount": "2375338",
-    "average_transfer_amount": "197945",
+    "average_transfer_amount": "197944",
     "maximum_transfer_amount": "1276802",
     "minimum_transfer_amount": "1300",
     "transfer_count": 12,
@@ -5690,7 +5690,7 @@
   {
     "date": "2016-08-20T12:00:00",
     "total_transfer_amount": "1266066",
-    "average_transfer_amount": "180867",
+    "average_transfer_amount": "180866",
     "maximum_transfer_amount": "1143990",
     "minimum_transfer_amount": "10",
     "transfer_count": 7,
@@ -5699,7 +5699,7 @@
   {
     "date": "2016-08-20T11:00:00",
     "total_transfer_amount": "9302779",
-    "average_transfer_amount": "216344",
+    "average_transfer_amount": "216343",
     "maximum_transfer_amount": "4850000",
     "minimum_transfer_amount": "45",
     "transfer_count": 43,
@@ -5708,7 +5708,7 @@
   {
     "date": "2016-08-20T10:00:00",
     "total_transfer_amount": "11748768",
-    "average_transfer_amount": "839198",
+    "average_transfer_amount": "839197",
     "maximum_transfer_amount": "6500000",
     "minimum_transfer_amount": "2692",
     "transfer_count": 14,
@@ -5726,7 +5726,7 @@
   {
     "date": "2016-08-20T08:00:00",
     "total_transfer_amount": "3283432",
-    "average_transfer_amount": "201967",
+    "average_transfer_amount": "273619",
     "maximum_transfer_amount": "1245635",
     "minimum_transfer_amount": "19",
     "transfer_count": 12,
@@ -5735,7 +5735,7 @@
   {
     "date": "2016-08-20T07:00:00",
     "total_transfer_amount": "8610900",
-    "average_transfer_amount": "956767",
+    "average_transfer_amount": "956766",
     "maximum_transfer_amount": "3824536",
     "minimum_transfer_amount": "1",
     "transfer_count": 9,
@@ -5753,7 +5753,7 @@
   {
     "date": "2016-08-20T05:00:00",
     "total_transfer_amount": "3284637",
-    "average_transfer_amount": "218976",
+    "average_transfer_amount": "218975",
     "maximum_transfer_amount": "1091687",
     "minimum_transfer_amount": "5",
     "transfer_count": 15,
@@ -5798,7 +5798,7 @@
   {
     "date": "2016-08-20T00:00:00",
     "total_transfer_amount": "2192950",
-    "average_transfer_amount": "95346",
+    "average_transfer_amount": "95345",
     "maximum_transfer_amount": "801097",
     "minimum_transfer_amount": "1146",
     "transfer_count": 23,
@@ -5807,7 +5807,7 @@
   {
     "date": "2016-08-19T23:00:00",
     "total_transfer_amount": "921685",
-    "average_transfer_amount": "354046",
+    "average_transfer_amount": "115210",
     "maximum_transfer_amount": "672494",
     "minimum_transfer_amount": "62",
     "transfer_count": 8,
@@ -5834,7 +5834,7 @@
   {
     "date": "2016-08-19T20:00:00",
     "total_transfer_amount": "705038",
-    "average_transfer_amount": "78338",
+    "average_transfer_amount": "78337",
     "maximum_transfer_amount": "542125",
     "minimum_transfer_amount": "1265",
     "transfer_count": 9,
@@ -5870,7 +5870,7 @@
   {
     "date": "2016-08-19T16:00:00",
     "total_transfer_amount": "3650114",
-    "average_transfer_amount": "214713",
+    "average_transfer_amount": "214712",
     "maximum_transfer_amount": "1384771",
     "minimum_transfer_amount": "222",
     "transfer_count": 17,
@@ -5879,7 +5879,7 @@
   {
     "date": "2016-08-19T15:00:00",
     "total_transfer_amount": "2001284",
-    "average_transfer_amount": "189566",
+    "average_transfer_amount": "181934",
     "maximum_transfer_amount": "919000",
     "minimum_transfer_amount": "20",
     "transfer_count": 11,
@@ -5897,7 +5897,7 @@
   {
     "date": "2016-08-19T13:00:00",
     "total_transfer_amount": "7169474",
-    "average_transfer_amount": "341404",
+    "average_transfer_amount": "341403",
     "maximum_transfer_amount": "4527477",
     "minimum_transfer_amount": "90",
     "transfer_count": 21,
@@ -5915,7 +5915,7 @@
   {
     "date": "2016-08-19T11:00:00",
     "total_transfer_amount": "17340672",
-    "average_transfer_amount": "963371",
+    "average_transfer_amount": "963370",
     "maximum_transfer_amount": "10000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 18,
@@ -5942,7 +5942,7 @@
   {
     "date": "2016-08-19T08:00:00",
     "total_transfer_amount": "6290496",
-    "average_transfer_amount": "273500",
+    "average_transfer_amount": "273499",
     "maximum_transfer_amount": "2374083",
     "minimum_transfer_amount": "5",
     "transfer_count": 23,
@@ -5951,7 +5951,7 @@
   {
     "date": "2016-08-19T07:00:00",
     "total_transfer_amount": "655296",
-    "average_transfer_amount": "65530",
+    "average_transfer_amount": "65529",
     "maximum_transfer_amount": "404390",
     "minimum_transfer_amount": "5",
     "transfer_count": 10,
@@ -5960,7 +5960,7 @@
   {
     "date": "2016-08-19T06:00:00",
     "total_transfer_amount": "3618121",
-    "average_transfer_amount": "354775",
+    "average_transfer_amount": "516874",
     "maximum_transfer_amount": "2841307",
     "minimum_transfer_amount": "11253",
     "transfer_count": 7,
@@ -5969,7 +5969,7 @@
   {
     "date": "2016-08-19T05:00:00",
     "total_transfer_amount": "3295036",
-    "average_transfer_amount": "549173",
+    "average_transfer_amount": "549172",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "310",
     "transfer_count": 6,
@@ -5978,7 +5978,7 @@
   {
     "date": "2016-08-19T04:00:00",
     "total_transfer_amount": "1402492",
-    "average_transfer_amount": "36908",
+    "average_transfer_amount": "36907",
     "maximum_transfer_amount": "600000",
     "minimum_transfer_amount": "719",
     "transfer_count": 38,
@@ -5987,7 +5987,7 @@
   {
     "date": "2016-08-19T03:00:00",
     "total_transfer_amount": "2172257",
-    "average_transfer_amount": "724086",
+    "average_transfer_amount": "724085",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "70000",
     "transfer_count": 3,
@@ -6005,7 +6005,7 @@
   {
     "date": "2016-08-19T01:00:00",
     "total_transfer_amount": "918100",
-    "average_transfer_amount": "114763",
+    "average_transfer_amount": "114762",
     "maximum_transfer_amount": "394160",
     "minimum_transfer_amount": "1881",
     "transfer_count": 8,
@@ -6032,7 +6032,7 @@
   {
     "date": "2016-08-18T22:00:00",
     "total_transfer_amount": "4889560",
-    "average_transfer_amount": "286404",
+    "average_transfer_amount": "325970",
     "maximum_transfer_amount": "3102234",
     "minimum_transfer_amount": "348",
     "transfer_count": 15,
@@ -6104,7 +6104,7 @@
   {
     "date": "2016-08-18T14:00:00",
     "total_transfer_amount": "3859597",
-    "average_transfer_amount": "235233",
+    "average_transfer_amount": "385959",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "1",
     "transfer_count": 10,
@@ -6113,7 +6113,7 @@
   {
     "date": "2016-08-18T13:00:00",
     "total_transfer_amount": "775198",
-    "average_transfer_amount": "110743",
+    "average_transfer_amount": "110742",
     "maximum_transfer_amount": "368634",
     "minimum_transfer_amount": "206",
     "transfer_count": 7,
@@ -6149,7 +6149,7 @@
   {
     "date": "2016-08-18T09:00:00",
     "total_transfer_amount": "5014357",
-    "average_transfer_amount": "501436",
+    "average_transfer_amount": "501435",
     "maximum_transfer_amount": "3148647",
     "minimum_transfer_amount": "100",
     "transfer_count": 10,
@@ -6176,7 +6176,7 @@
   {
     "date": "2016-08-18T06:00:00",
     "total_transfer_amount": "1563519",
-    "average_transfer_amount": "111680",
+    "average_transfer_amount": "111679",
     "maximum_transfer_amount": "414480",
     "minimum_transfer_amount": "589",
     "transfer_count": 14,
@@ -6185,7 +6185,7 @@
   {
     "date": "2016-08-18T05:00:00",
     "total_transfer_amount": "3556671",
-    "average_transfer_amount": "236712",
+    "average_transfer_amount": "273590",
     "maximum_transfer_amount": "1090000",
     "minimum_transfer_amount": "34000",
     "transfer_count": 13,
@@ -6239,7 +6239,7 @@
   {
     "date": "2016-08-17T23:00:00",
     "total_transfer_amount": "6665192",
-    "average_transfer_amount": "201976",
+    "average_transfer_amount": "201975",
     "maximum_transfer_amount": "4700000",
     "minimum_transfer_amount": "374",
     "transfer_count": 33,
@@ -6248,7 +6248,7 @@
   {
     "date": "2016-08-17T22:00:00",
     "total_transfer_amount": "5511249",
-    "average_transfer_amount": "367417",
+    "average_transfer_amount": "367416",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "895",
     "transfer_count": 15,
@@ -6257,7 +6257,7 @@
   {
     "date": "2016-08-17T21:00:00",
     "total_transfer_amount": "9650465",
-    "average_transfer_amount": "503776",
+    "average_transfer_amount": "438657",
     "maximum_transfer_amount": "4700000",
     "minimum_transfer_amount": "100",
     "transfer_count": 22,
@@ -6266,7 +6266,7 @@
   {
     "date": "2016-08-17T20:00:00",
     "total_transfer_amount": "304992083",
-    "average_transfer_amount": "14523433",
+    "average_transfer_amount": "14523432",
     "maximum_transfer_amount": "200000000",
     "minimum_transfer_amount": "56",
     "transfer_count": 21,
@@ -6284,7 +6284,7 @@
   {
     "date": "2016-08-17T18:00:00",
     "total_transfer_amount": "5013811",
-    "average_transfer_amount": "227901",
+    "average_transfer_amount": "227900",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "246",
     "transfer_count": 22,
@@ -6293,7 +6293,7 @@
   {
     "date": "2016-08-17T17:00:00",
     "total_transfer_amount": "1415937",
-    "average_transfer_amount": "70797",
+    "average_transfer_amount": "70796",
     "maximum_transfer_amount": "620146",
     "minimum_transfer_amount": "150",
     "transfer_count": 20,
@@ -6302,7 +6302,7 @@
   {
     "date": "2016-08-17T16:00:00",
     "total_transfer_amount": "72915",
-    "average_transfer_amount": "12153",
+    "average_transfer_amount": "12152",
     "maximum_transfer_amount": "54116",
     "minimum_transfer_amount": "30",
     "transfer_count": 6,
@@ -6320,7 +6320,7 @@
   {
     "date": "2016-08-17T14:00:00",
     "total_transfer_amount": "26643193",
-    "average_transfer_amount": "1665200",
+    "average_transfer_amount": "1665199",
     "maximum_transfer_amount": "22049738",
     "minimum_transfer_amount": "678",
     "transfer_count": 16,
@@ -6338,7 +6338,7 @@
   {
     "date": "2016-08-17T12:00:00",
     "total_transfer_amount": "1057768",
-    "average_transfer_amount": "62222",
+    "average_transfer_amount": "62221",
     "maximum_transfer_amount": "613235",
     "minimum_transfer_amount": "570",
     "transfer_count": 17,
@@ -6347,7 +6347,7 @@
   {
     "date": "2016-08-17T11:00:00",
     "total_transfer_amount": "10047729",
-    "average_transfer_amount": "669849",
+    "average_transfer_amount": "669848",
     "maximum_transfer_amount": "5127558",
     "minimum_transfer_amount": "70",
     "transfer_count": 15,
@@ -6356,7 +6356,7 @@
   {
     "date": "2016-08-17T10:00:00",
     "total_transfer_amount": "3072975",
-    "average_transfer_amount": "384122",
+    "average_transfer_amount": "384121",
     "maximum_transfer_amount": "1836010",
     "minimum_transfer_amount": "30",
     "transfer_count": 8,
@@ -6374,7 +6374,7 @@
   {
     "date": "2016-08-17T08:00:00",
     "total_transfer_amount": "5303058",
-    "average_transfer_amount": "68871",
+    "average_transfer_amount": "68870",
     "maximum_transfer_amount": "1740613",
     "minimum_transfer_amount": "788",
     "transfer_count": 77,
@@ -6392,7 +6392,7 @@
   {
     "date": "2016-08-17T06:00:00",
     "total_transfer_amount": "21372804",
-    "average_transfer_amount": "628612",
+    "average_transfer_amount": "628611",
     "maximum_transfer_amount": "14999990",
     "minimum_transfer_amount": "178",
     "transfer_count": 34,
@@ -6401,7 +6401,7 @@
   {
     "date": "2016-08-17T05:00:00",
     "total_transfer_amount": "6787079",
-    "average_transfer_amount": "399240",
+    "average_transfer_amount": "399239",
     "maximum_transfer_amount": "2377800",
     "minimum_transfer_amount": "4077",
     "transfer_count": 17,
@@ -6410,7 +6410,7 @@
   {
     "date": "2016-08-17T04:00:00",
     "total_transfer_amount": "2449967",
-    "average_transfer_amount": "203549",
+    "average_transfer_amount": "188459",
     "maximum_transfer_amount": "599000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 13,
@@ -6419,7 +6419,7 @@
   {
     "date": "2016-08-17T03:00:00",
     "total_transfer_amount": "859659",
-    "average_transfer_amount": "95518",
+    "average_transfer_amount": "95517",
     "maximum_transfer_amount": "212327",
     "minimum_transfer_amount": "1127",
     "transfer_count": 9,
@@ -6428,7 +6428,7 @@
   {
     "date": "2016-08-17T02:00:00",
     "total_transfer_amount": "722885",
-    "average_transfer_amount": "55607",
+    "average_transfer_amount": "55606",
     "maximum_transfer_amount": "159590",
     "minimum_transfer_amount": "4109",
     "transfer_count": 13,
@@ -6437,7 +6437,7 @@
   {
     "date": "2016-08-17T01:00:00",
     "total_transfer_amount": "8875096",
-    "average_transfer_amount": "554694",
+    "average_transfer_amount": "554693",
     "maximum_transfer_amount": "6000000",
     "minimum_transfer_amount": "798",
     "transfer_count": 16,
@@ -6464,7 +6464,7 @@
   {
     "date": "2016-08-16T22:00:00",
     "total_transfer_amount": "9689478",
-    "average_transfer_amount": "484474",
+    "average_transfer_amount": "484473",
     "maximum_transfer_amount": "4372070",
     "minimum_transfer_amount": "460",
     "transfer_count": 20,
@@ -6482,7 +6482,7 @@
   {
     "date": "2016-08-16T20:00:00",
     "total_transfer_amount": "6278441",
-    "average_transfer_amount": "306554",
+    "average_transfer_amount": "348802",
     "maximum_transfer_amount": "2729037",
     "minimum_transfer_amount": "825",
     "transfer_count": 18,
@@ -6491,7 +6491,7 @@
   {
     "date": "2016-08-16T19:00:00",
     "total_transfer_amount": "2932352",
-    "average_transfer_amount": "244363",
+    "average_transfer_amount": "244362",
     "maximum_transfer_amount": "1500000",
     "minimum_transfer_amount": "754",
     "transfer_count": 12,
@@ -6518,7 +6518,7 @@
   {
     "date": "2016-08-16T16:00:00",
     "total_transfer_amount": "12154863",
-    "average_transfer_amount": "868205",
+    "average_transfer_amount": "868204",
     "maximum_transfer_amount": "3901000",
     "minimum_transfer_amount": "4896",
     "transfer_count": 14,
@@ -6527,7 +6527,7 @@
   {
     "date": "2016-08-16T15:00:00",
     "total_transfer_amount": "2394275",
-    "average_transfer_amount": "171020",
+    "average_transfer_amount": "171019",
     "maximum_transfer_amount": "1256000",
     "minimum_transfer_amount": "1224",
     "transfer_count": 14,
@@ -6545,7 +6545,7 @@
   {
     "date": "2016-08-16T13:00:00",
     "total_transfer_amount": "4891711",
-    "average_transfer_amount": "349408",
+    "average_transfer_amount": "349407",
     "maximum_transfer_amount": "1907125",
     "minimum_transfer_amount": "420",
     "transfer_count": 14,
@@ -6554,7 +6554,7 @@
   {
     "date": "2016-08-16T12:00:00",
     "total_transfer_amount": "2201178",
-    "average_transfer_amount": "19309",
+    "average_transfer_amount": "19308",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "10",
     "transfer_count": 114,
@@ -6563,7 +6563,7 @@
   {
     "date": "2016-08-16T11:00:00",
     "total_transfer_amount": "2544266",
-    "average_transfer_amount": "213092",
+    "average_transfer_amount": "231296",
     "maximum_transfer_amount": "1830000",
     "minimum_transfer_amount": "2101",
     "transfer_count": 11,
@@ -6572,7 +6572,7 @@
   {
     "date": "2016-08-16T10:00:00",
     "total_transfer_amount": "1781004",
-    "average_transfer_amount": "356201",
+    "average_transfer_amount": "356200",
     "maximum_transfer_amount": "926101",
     "minimum_transfer_amount": "7890",
     "transfer_count": 5,
@@ -6581,7 +6581,7 @@
   {
     "date": "2016-08-16T09:00:00",
     "total_transfer_amount": "7177345",
-    "average_transfer_amount": "797483",
+    "average_transfer_amount": "797482",
     "maximum_transfer_amount": "4500000",
     "minimum_transfer_amount": "1990",
     "transfer_count": 9,
@@ -6590,7 +6590,7 @@
   {
     "date": "2016-08-16T08:00:00",
     "total_transfer_amount": "11423963",
-    "average_transfer_amount": "951997",
+    "average_transfer_amount": "951996",
     "maximum_transfer_amount": "10980127",
     "minimum_transfer_amount": "216",
     "transfer_count": 12,
@@ -6599,7 +6599,7 @@
   {
     "date": "2016-08-16T07:00:00",
     "total_transfer_amount": "3170838",
-    "average_transfer_amount": "317084",
+    "average_transfer_amount": "317083",
     "maximum_transfer_amount": "1200000",
     "minimum_transfer_amount": "104",
     "transfer_count": 10,
@@ -6617,7 +6617,7 @@
   {
     "date": "2016-08-16T05:00:00",
     "total_transfer_amount": "8896439",
-    "average_transfer_amount": "423640",
+    "average_transfer_amount": "423639",
     "maximum_transfer_amount": "1859005",
     "minimum_transfer_amount": "1151",
     "transfer_count": 21,
@@ -6635,7 +6635,7 @@
   {
     "date": "2016-08-16T03:00:00",
     "total_transfer_amount": "4285359",
-    "average_transfer_amount": "1028536",
+    "average_transfer_amount": "714226",
     "maximum_transfer_amount": "2595990",
     "minimum_transfer_amount": "51",
     "transfer_count": 6,
@@ -6644,7 +6644,7 @@
   {
     "date": "2016-08-16T02:00:00",
     "total_transfer_amount": "507905",
-    "average_transfer_amount": "253953",
+    "average_transfer_amount": "253952",
     "maximum_transfer_amount": "393754",
     "minimum_transfer_amount": "114151",
     "transfer_count": 2,
@@ -6653,7 +6653,7 @@
   {
     "date": "2016-08-16T01:00:00",
     "total_transfer_amount": "1113641",
-    "average_transfer_amount": "159092",
+    "average_transfer_amount": "159091",
     "maximum_transfer_amount": "651900",
     "minimum_transfer_amount": "4990",
     "transfer_count": 7,
@@ -6662,7 +6662,7 @@
   {
     "date": "2016-08-16T00:00:00",
     "total_transfer_amount": "1033799",
-    "average_transfer_amount": "103380",
+    "average_transfer_amount": "103379",
     "maximum_transfer_amount": "450697",
     "minimum_transfer_amount": "1000",
     "transfer_count": 10,
@@ -6671,7 +6671,7 @@
   {
     "date": "2016-08-15T23:00:00",
     "total_transfer_amount": "217098",
-    "average_transfer_amount": "13569",
+    "average_transfer_amount": "13568",
     "maximum_transfer_amount": "64167",
     "minimum_transfer_amount": "1",
     "transfer_count": 16,
@@ -6698,7 +6698,7 @@
   {
     "date": "2016-08-15T20:00:00",
     "total_transfer_amount": "6402574",
-    "average_transfer_amount": "533548",
+    "average_transfer_amount": "533547",
     "maximum_transfer_amount": "6000000",
     "minimum_transfer_amount": "1",
     "transfer_count": 12,
@@ -6716,7 +6716,7 @@
   {
     "date": "2016-08-15T18:00:00",
     "total_transfer_amount": "831905",
-    "average_transfer_amount": "138651",
+    "average_transfer_amount": "138650",
     "maximum_transfer_amount": "689347",
     "minimum_transfer_amount": "10",
     "transfer_count": 6,
@@ -6734,7 +6734,7 @@
   {
     "date": "2016-08-15T16:00:00",
     "total_transfer_amount": "280598",
-    "average_transfer_amount": "56120",
+    "average_transfer_amount": "56119",
     "maximum_transfer_amount": "187902",
     "minimum_transfer_amount": "1",
     "transfer_count": 5,
@@ -6761,7 +6761,7 @@
   {
     "date": "2016-08-15T13:00:00",
     "total_transfer_amount": "11225578",
-    "average_transfer_amount": "1122558",
+    "average_transfer_amount": "1122557",
     "maximum_transfer_amount": "5000000",
     "minimum_transfer_amount": "1000",
     "transfer_count": 10,
@@ -6770,7 +6770,7 @@
   {
     "date": "2016-08-15T12:00:00",
     "total_transfer_amount": "4795757",
-    "average_transfer_amount": "599470",
+    "average_transfer_amount": "599469",
     "maximum_transfer_amount": "2248401",
     "minimum_transfer_amount": "304",
     "transfer_count": 8,
@@ -6806,7 +6806,7 @@
   {
     "date": "2016-08-15T08:00:00",
     "total_transfer_amount": "549141",
-    "average_transfer_amount": "49922",
+    "average_transfer_amount": "49921",
     "maximum_transfer_amount": "420074",
     "minimum_transfer_amount": "10",
     "transfer_count": 11,
@@ -6815,7 +6815,7 @@
   {
     "date": "2016-08-15T07:00:00",
     "total_transfer_amount": "2992074",
-    "average_transfer_amount": "272007",
+    "average_transfer_amount": "272006",
     "maximum_transfer_amount": "1885371",
     "minimum_transfer_amount": "22",
     "transfer_count": 11,
@@ -6851,7 +6851,7 @@
   {
     "date": "2016-08-15T03:00:00",
     "total_transfer_amount": "4365477",
-    "average_transfer_amount": "242527",
+    "average_transfer_amount": "242526",
     "maximum_transfer_amount": "3830000",
     "minimum_transfer_amount": "403",
     "transfer_count": 18,
@@ -6860,7 +6860,7 @@
   {
     "date": "2016-08-15T02:00:00",
     "total_transfer_amount": "4789552",
-    "average_transfer_amount": "440493",
+    "average_transfer_amount": "598694",
     "maximum_transfer_amount": "2842179",
     "minimum_transfer_amount": "14517",
     "transfer_count": 8,
@@ -6869,7 +6869,7 @@
   {
     "date": "2016-08-15T01:00:00",
     "total_transfer_amount": "2226871",
-    "average_transfer_amount": "278359",
+    "average_transfer_amount": "278358",
     "maximum_transfer_amount": "1250000",
     "minimum_transfer_amount": "5000",
     "transfer_count": 8,
@@ -6878,7 +6878,7 @@
   {
     "date": "2016-08-15T00:00:00",
     "total_transfer_amount": "4110575",
-    "average_transfer_amount": "456731",
+    "average_transfer_amount": "456730",
     "maximum_transfer_amount": "3800000",
     "minimum_transfer_amount": "96",
     "transfer_count": 9,
@@ -6905,7 +6905,7 @@
   {
     "date": "2016-08-14T21:00:00",
     "total_transfer_amount": "1993072",
-    "average_transfer_amount": "284725",
+    "average_transfer_amount": "284724",
     "maximum_transfer_amount": "1002990",
     "minimum_transfer_amount": "5632",
     "transfer_count": 7,
@@ -6914,7 +6914,7 @@
   {
     "date": "2016-08-14T20:00:00",
     "total_transfer_amount": "168563",
-    "average_transfer_amount": "56188",
+    "average_transfer_amount": "56187",
     "maximum_transfer_amount": "85237",
     "minimum_transfer_amount": "778",
     "transfer_count": 3,
@@ -6950,7 +6950,7 @@
   {
     "date": "2016-08-14T16:00:00",
     "total_transfer_amount": "1030699",
-    "average_transfer_amount": "93700",
+    "average_transfer_amount": "93699",
     "maximum_transfer_amount": "480099",
     "minimum_transfer_amount": "9",
     "transfer_count": 11,
@@ -6959,7 +6959,7 @@
   {
     "date": "2016-08-14T15:00:00",
     "total_transfer_amount": "4243987",
-    "average_transfer_amount": "1060997",
+    "average_transfer_amount": "1060996",
     "maximum_transfer_amount": "3880998",
     "minimum_transfer_amount": "459",
     "transfer_count": 4,
@@ -6977,7 +6977,7 @@
   {
     "date": "2016-08-14T13:00:00",
     "total_transfer_amount": "14092368",
-    "average_transfer_amount": "1565819",
+    "average_transfer_amount": "1565818",
     "maximum_transfer_amount": "4326696",
     "minimum_transfer_amount": "8198",
     "transfer_count": 9,
@@ -6986,7 +6986,7 @@
   {
     "date": "2016-08-14T12:00:00",
     "total_transfer_amount": "178469",
-    "average_transfer_amount": "35694",
+    "average_transfer_amount": "35693",
     "maximum_transfer_amount": "94999",
     "minimum_transfer_amount": "769",
     "transfer_count": 5,
@@ -6995,7 +6995,7 @@
   {
     "date": "2016-08-14T11:00:00",
     "total_transfer_amount": "5828171",
-    "average_transfer_amount": "388545",
+    "average_transfer_amount": "388544",
     "maximum_transfer_amount": "5000000",
     "minimum_transfer_amount": "10",
     "transfer_count": 15,
@@ -7013,7 +7013,7 @@
   {
     "date": "2016-08-14T09:00:00",
     "total_transfer_amount": "442887",
-    "average_transfer_amount": "221444",
+    "average_transfer_amount": "221443",
     "maximum_transfer_amount": "381721",
     "minimum_transfer_amount": "61166",
     "transfer_count": 2,
@@ -7031,7 +7031,7 @@
   {
     "date": "2016-08-14T07:00:00",
     "total_transfer_amount": "230459",
-    "average_transfer_amount": "32923",
+    "average_transfer_amount": "32922",
     "maximum_transfer_amount": "144711",
     "minimum_transfer_amount": "1",
     "transfer_count": 7,
@@ -7049,7 +7049,7 @@
   {
     "date": "2016-08-14T05:00:00",
     "total_transfer_amount": "1422982",
-    "average_transfer_amount": "355746",
+    "average_transfer_amount": "355745",
     "maximum_transfer_amount": "1249990",
     "minimum_transfer_amount": "3039",
     "transfer_count": 4,
@@ -7085,7 +7085,7 @@
   {
     "date": "2016-08-14T01:00:00",
     "total_transfer_amount": "1701770",
-    "average_transfer_amount": "137020",
+    "average_transfer_amount": "130905",
     "maximum_transfer_amount": "785990",
     "minimum_transfer_amount": "439",
     "transfer_count": 13,
@@ -7139,7 +7139,7 @@
   {
     "date": "2016-08-13T19:00:00",
     "total_transfer_amount": "3346501",
-    "average_transfer_amount": "42361",
+    "average_transfer_amount": "42360",
     "maximum_transfer_amount": "2095041",
     "minimum_transfer_amount": "10",
     "transfer_count": 79,
@@ -7148,7 +7148,7 @@
   {
     "date": "2016-08-13T18:00:00",
     "total_transfer_amount": "2281738",
-    "average_transfer_amount": "114087",
+    "average_transfer_amount": "114086",
     "maximum_transfer_amount": "699990",
     "minimum_transfer_amount": "761",
     "transfer_count": 20,
@@ -7166,7 +7166,7 @@
   {
     "date": "2016-08-13T16:00:00",
     "total_transfer_amount": "2435897",
-    "average_transfer_amount": "429647",
+    "average_transfer_amount": "143288",
     "maximum_transfer_amount": "999990",
     "minimum_transfer_amount": "1090",
     "transfer_count": 17,
@@ -7175,7 +7175,7 @@
   {
     "date": "2016-08-13T15:00:00",
     "total_transfer_amount": "4580361",
-    "average_transfer_amount": "327169",
+    "average_transfer_amount": "327168",
     "maximum_transfer_amount": "2000000",
     "minimum_transfer_amount": "1195",
     "transfer_count": 14,
@@ -7184,7 +7184,7 @@
   {
     "date": "2016-08-13T14:00:00",
     "total_transfer_amount": "18756939",
-    "average_transfer_amount": "669891",
+    "average_transfer_amount": "669890",
     "maximum_transfer_amount": "4500000",
     "minimum_transfer_amount": "792",
     "transfer_count": 28,
@@ -7220,7 +7220,7 @@
   {
     "date": "2016-08-13T10:00:00",
     "total_transfer_amount": "1371818",
-    "average_transfer_amount": "457273",
+    "average_transfer_amount": "457272",
     "maximum_transfer_amount": "786000",
     "minimum_transfer_amount": "36558",
     "transfer_count": 3,
@@ -7229,7 +7229,7 @@
   {
     "date": "2016-08-13T09:00:00",
     "total_transfer_amount": "3012213",
-    "average_transfer_amount": "136919",
+    "average_transfer_amount": "136918",
     "maximum_transfer_amount": "574164",
     "minimum_transfer_amount": "100",
     "transfer_count": 22,
@@ -7238,7 +7238,7 @@
   {
     "date": "2016-08-13T08:00:00",
     "total_transfer_amount": "3103113",
-    "average_transfer_amount": "170817",
+    "average_transfer_amount": "182536",
     "maximum_transfer_amount": "1390852",
     "minimum_transfer_amount": "3000",
     "transfer_count": 17,
@@ -7256,7 +7256,7 @@
   {
     "date": "2016-08-13T06:00:00",
     "total_transfer_amount": "1333370",
-    "average_transfer_amount": "83336",
+    "average_transfer_amount": "83335",
     "maximum_transfer_amount": "444730",
     "minimum_transfer_amount": "990",
     "transfer_count": 16,
@@ -7265,7 +7265,7 @@
   {
     "date": "2016-08-13T05:00:00",
     "total_transfer_amount": "1793383",
-    "average_transfer_amount": "54345",
+    "average_transfer_amount": "54344",
     "maximum_transfer_amount": "661760",
     "minimum_transfer_amount": "446",
     "transfer_count": 33,
@@ -7283,7 +7283,7 @@
   {
     "date": "2016-08-13T03:00:00",
     "total_transfer_amount": "524975",
-    "average_transfer_amount": "65622",
+    "average_transfer_amount": "65621",
     "maximum_transfer_amount": "193856",
     "minimum_transfer_amount": "444",
     "transfer_count": 8,
@@ -7310,7 +7310,7 @@
   {
     "date": "2016-08-13T00:00:00",
     "total_transfer_amount": "1348646",
-    "average_transfer_amount": "64813",
+    "average_transfer_amount": "70981",
     "maximum_transfer_amount": "1000000",
     "minimum_transfer_amount": "50",
     "transfer_count": 19,
@@ -7319,7 +7319,7 @@
   {
     "date": "2016-08-12T23:00:00",
     "total_transfer_amount": "938833",
-    "average_transfer_amount": "72218",
+    "average_transfer_amount": "72217",
     "maximum_transfer_amount": "557740",
     "minimum_transfer_amount": "100",
     "transfer_count": 13,
@@ -7328,7 +7328,7 @@
   {
     "date": "2016-08-12T22:00:00",
     "total_transfer_amount": "2017327",
-    "average_transfer_amount": "126083",
+    "average_transfer_amount": "126082",
     "maximum_transfer_amount": "398636",
     "minimum_transfer_amount": "6",
     "transfer_count": 16,
@@ -7337,7 +7337,7 @@
   {
     "date": "2016-08-12T21:00:00",
     "total_transfer_amount": "1237011",
-    "average_transfer_amount": "176716",
+    "average_transfer_amount": "176715",
     "maximum_transfer_amount": "787298",
     "minimum_transfer_amount": "2407",
     "transfer_count": 7,
@@ -7346,7 +7346,7 @@
   {
     "date": "2016-08-12T20:00:00",
     "total_transfer_amount": "3895916",
-    "average_transfer_amount": "324660",
+    "average_transfer_amount": "324659",
     "maximum_transfer_amount": "2081455",
     "minimum_transfer_amount": "834",
     "transfer_count": 12,
@@ -7355,7 +7355,7 @@
   {
     "date": "2016-08-12T19:00:00",
     "total_transfer_amount": "13267484",
-    "average_transfer_amount": "631785",
+    "average_transfer_amount": "631784",
     "maximum_transfer_amount": "3611059",
     "minimum_transfer_amount": "2735",
     "transfer_count": 21,
@@ -7364,7 +7364,7 @@
   {
     "date": "2016-08-12T18:00:00",
     "total_transfer_amount": "4424364",
-    "average_transfer_amount": "184349",
+    "average_transfer_amount": "184348",
     "maximum_transfer_amount": "1325174",
     "minimum_transfer_amount": "736",
     "transfer_count": 24,
@@ -7373,7 +7373,7 @@
   {
     "date": "2016-08-12T17:00:00",
     "total_transfer_amount": "6267358",
-    "average_transfer_amount": "522280",
+    "average_transfer_amount": "522279",
     "maximum_transfer_amount": "2429248",
     "minimum_transfer_amount": "6",
     "transfer_count": 12,
@@ -7391,7 +7391,7 @@
   {
     "date": "2016-08-12T15:00:00",
     "total_transfer_amount": "5123298",
-    "average_transfer_amount": "638499",
+    "average_transfer_amount": "640412",
     "maximum_transfer_amount": "3394890",
     "minimum_transfer_amount": "15105",
     "transfer_count": 8,
@@ -7400,7 +7400,7 @@
   {
     "date": "2016-08-12T14:00:00",
     "total_transfer_amount": "14625406",
-    "average_transfer_amount": "1044672",
+    "average_transfer_amount": "1044671",
     "maximum_transfer_amount": "9999990",
     "minimum_transfer_amount": "443",
     "transfer_count": 14,
@@ -7409,7 +7409,7 @@
   {
     "date": "2016-08-12T13:00:00",
     "total_transfer_amount": "1168965",
-    "average_transfer_amount": "68763",
+    "average_transfer_amount": "68762",
     "maximum_transfer_amount": "700000",
     "minimum_transfer_amount": "86",
     "transfer_count": 17,
@@ -7445,7 +7445,7 @@
   {
     "date": "2016-08-12T09:00:00",
     "total_transfer_amount": "3962571",
-    "average_transfer_amount": "198129",
+    "average_transfer_amount": "198128",
     "maximum_transfer_amount": "1046554",
     "minimum_transfer_amount": "994",
     "transfer_count": 20,
@@ -7463,7 +7463,7 @@
   {
     "date": "2016-08-12T07:00:00",
     "total_transfer_amount": "2695930",
-    "average_transfer_amount": "169909",
+    "average_transfer_amount": "192566",
     "maximum_transfer_amount": "740000",
     "minimum_transfer_amount": "160",
     "transfer_count": 14,
@@ -7481,7 +7481,7 @@
   {
     "date": "2016-08-12T05:00:00",
     "total_transfer_amount": "3475611",
-    "average_transfer_amount": "173781",
+    "average_transfer_amount": "173780",
     "maximum_transfer_amount": "1810013",
     "minimum_transfer_amount": "93",
     "transfer_count": 20,
@@ -7526,7 +7526,7 @@
   {
     "date": "2016-08-12T00:00:00",
     "total_transfer_amount": "5524715",
-    "average_transfer_amount": "306929",
+    "average_transfer_amount": "306928",
     "maximum_transfer_amount": "1565000",
     "minimum_transfer_amount": "183",
     "transfer_count": 18,
@@ -7535,7 +7535,7 @@
   {
     "date": "2016-08-11T23:00:00",
     "total_transfer_amount": "4358689",
-    "average_transfer_amount": "572379",
+    "average_transfer_amount": "161432",
     "maximum_transfer_amount": "1767628",
     "minimum_transfer_amount": "974",
     "transfer_count": 27,

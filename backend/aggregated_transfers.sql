@@ -221,7 +221,7 @@ BEGIN
         SELECT 
           LEAST(fb.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
           fb.sum_transfer_amount::BIGINT,
-          fb.avg_transfer_amount::BIGINT,
+          (CASE WHEN fb.transfer_count = 0 THEN 0 ELSE (fb.sum_transfer_amount / fb.transfer_count) END)::BIGINT,
           fb.max_transfer_amount::BIGINT,
           fb.min_transfer_amount::BIGINT,
           fb.transfer_count::INT,
