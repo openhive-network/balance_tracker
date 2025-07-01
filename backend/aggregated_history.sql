@@ -690,7 +690,7 @@ BEGIN
       SELECT * FROM agg_history
     )
     SELECT 
-      LEAST(fb.date + __one_period - INTERVAL '1 second', CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
+      LEAST(fb.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
       (
         fb.balance::TEXT,
         fb.savings_balance::TEXT
