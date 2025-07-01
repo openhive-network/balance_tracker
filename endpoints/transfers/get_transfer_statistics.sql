@@ -101,7 +101,7 @@ SET ROLE btracker_owner;
               $ref: '#/components/schemas/btracker_backend.array_of_transfer_stats'
             example: [
               {
-                "date": "2016-12-31T23:59:59",
+                "date": "2017-01-01T00:00:00",
                 "total_transfer_amount": "69611921266",
                 "average_transfer_amount": "1302405",
                 "maximum_transfer_amount": "18000000",

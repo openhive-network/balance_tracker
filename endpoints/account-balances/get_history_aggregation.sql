@@ -114,7 +114,7 @@ btracker_backend.array_of_aggregated_history:
               $ref: '#/components/schemas/btracker_backend.array_of_aggregated_history'
             example: 
               - {
-                  "date":"2016-12-31T23:59:59",
+                  "date": "2017-01-01T00:00:00",
                   "balance": {
                     "balance": "8172549681941451",
                     "savings_balance": "0"
