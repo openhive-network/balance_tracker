@@ -95,6 +95,36 @@ btracker_backend.balance:
     delayed_vests:
       type: string
       description: blocked VESTS by a withdrawal
+      conversion_pending_amount_hbd:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: "total HBD currently pending conversion"
+    conversion_pending_count_hbd:
+      type: integer
+      description: "number of HBD conversion requests"
+    conversion_pending_amount_hive:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: "total HIVE currently pending conversion"
+    conversion_pending_count_hive:
+      type: integer
+      description: "number of HIVE conversion requests"
+    open_orders_hbd_count:
+      type: integer
+      description: "count of open HBD orders"
+    open_orders_hive_count:
+      type: integer
+      description: "count of open HIVE orders"
+    open_orders_hive_amount:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: "total amount of HIVE in open orders"
+    open_orders_hbd_amount:
+      type: number
+      x-sql-datatype: NUMERIC
+      description: "total amount of HBD in open orders"
+
+
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.balance CASCADE;
@@ -119,7 +149,16 @@ CREATE TYPE btracker_backend.balance AS (
     "to_withdraw" TEXT,
     "withdrawn" TEXT,
     "withdraw_routes" INT,
-    "delayed_vests" TEXT
+    "delayed_vests" TEXT,
+    "conversion_pending_amount_hbd" NUMERIC,
+    "conversion_pending_count_hbd" INT,
+    "conversion_pending_amount_hive" NUMERIC,
+    "conversion_pending_count_hive" INT,
+    "open_orders_hbd_count" INT,
+    "open_orders_hive_count" INT,
+    "open_orders_hive_amount" NUMERIC,
+    "open_orders_hbd_amount" NUMERIC
+
 );
 -- openapi-generated-code-end
 

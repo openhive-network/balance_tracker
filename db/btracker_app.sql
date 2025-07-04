@@ -321,6 +321,39 @@ CREATE TABLE IF NOT EXISTS transfer_saving_id
 );
 PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
+CREATE TABLE IF NOT EXISTS btracker_app.account_convert_operations (
+  op_id         SERIAL       PRIMARY KEY,
+  account_name  TEXT         NOT NULL,
+  request_id    BIGINT       NOT NULL,
+  nai           TEXT         NOT NULL,
+  op_type       TEXT         NOT NULL,    -- 'convert' or 'fill'
+  amount        NUMERIC      NULL,        -- only for 'convert'
+  block_num     INT          NOT NULL,
+  raw           JSONB        NOT NULL,
+  inserted_at   TIMESTAMPTZ  DEFAULT NOW()
+);
+
+PERFORM hive.app_register_table(
+  __schema_name,
+  'account_convert_operations',
+  __schema_name
+);
+
+CREATE TABLE IF NOT EXISTS btracker_app.account_operations (
+  op_id         SERIAL      PRIMARY KEY,
+  account_name  TEXT        NOT NULL,
+  order_id      BIGINT      NOT NULL,
+  nai           TEXT        NULL,
+  op_type       TEXT        NOT NULL,
+  block_num     INT         NOT NULL,
+  amount        NUMERIC     NULL,
+  raw           JSONB       NOT NULL,
+  inserted_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+PERFORM hive.app_register_table(__schema_name, 'account_operations', __schema_name);
+
+
 END
 $$;
 
@@ -433,6 +466,8 @@ BEGIN
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
+    PERFORM process_block_range_converts       (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_orders         (_from,        __hardfork_23_blk);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -447,6 +482,8 @@ BEGIN
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_converts       (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_orders         (__hardfork_23_blk+1, _to);
 
     END IF;
 
@@ -459,6 +496,8 @@ BEGIN
     PERFORM process_block_range_delegations(_from, _to);
     PERFORM process_block_range_recurrent_transfers(_from, _to);
     PERFORM process_transfer_stats(_from, _to);
+    PERFORM process_block_range_converts(_from, _to);
+    PERFORM process_block_range_orders(_from, _to);
 
   END IF;
 
@@ -495,6 +534,9 @@ BEGIN
   PERFORM process_block_range_delegations(_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
   PERFORM process_transfer_stats(_block, _block);
+  PERFORM process_block_range_converts(_block, _block);
+  PERFORM process_block_range_orders(_block, _block);
+
 
   IF _logs THEN
     __end_ts := clock_timestamp();
@@ -576,6 +618,18 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_source_op_idx ON account_savings_history(account,nai,source_op DESC);
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
+   CREATE INDEX IF NOT EXISTS
+    idx_conv_ops_accname_opt_block_desc
+    ON btracker_app.account_convert_operations
+        (account_name, op_type, block_num DESC)
+    INCLUDE (request_id, nai, amount);
+
+  CREATE INDEX IF NOT EXISTS
+    idx_acc_ops_accname_opt_block_desc
+    ON btracker_app.account_operations
+        (account_name, op_type, block_num DESC)
+    INCLUDE (order_id, nai, amount);
+
 END
 $$;
 

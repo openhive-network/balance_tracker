@@ -218,6 +218,43 @@ declare
           "delayed_vests": {
             "type": "string",
             "description": "blocked VESTS by a withdrawal"
+          },
+          "conversion_pending_amount_hbd": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "total HBD currently pending conversion"
+          },
+          "conversion_pending_count_hbd": {
+            "type": "integer",
+            "description": "number of HBD conversion requests"
+          },
+          "conversion_pending_amount_hive": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "total HIVE currently pending conversion"
+          },
+          "conversion_pending_count_hive": {
+            "type": "integer",
+            "description": "number of HIVE conversion requests"
+          },
+          "open_orders_hbd_count": {
+            "type": "integer",
+            "description": "count of open HBD orders"
+          },
+          "open_orders_hive_count": {
+            "type": "integer",
+            "description": "count of open HIVE orders"
+          },
+          "open_orders_hive_amount": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "total amount of HIVE in open orders"
+          },
+          "open_orders_hbd_amount": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "total amount of HBD in open orders"
+
           }
         }
       },

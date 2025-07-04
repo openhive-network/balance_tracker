@@ -19,5 +19,15 @@
   "vesting_withdraw_rate": "80404818220529",
   "vests_rewards": "6000",
   "withdraw_routes": 4,
-  "withdrawn": "884453000425819"
+  "withdrawn": "884453000425819",
+  "conversion_pending_amount_hbd": 0,
+  "conversion_pending_count_hbd": 0,
+  "conversion_pending_amount_hive": 0,
+  "conversion_pending_count_hive": 0,
+  "open_orders_hbd_count": 0,
+  "open_orders_hive_count": 0,
+  "open_orders_hive_amount": 0,
+  "open_orders_hbd_amount": 0
+
+
 }
