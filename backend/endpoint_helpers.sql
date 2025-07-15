@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_acc_balances(
+CREATE OR REPLACE FUNCTION btracker_backend.get_account_balances(
     _account_id INT
 )
 RETURNS btracker_backend.balance

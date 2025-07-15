@@ -321,7 +321,7 @@ CREATE TABLE IF NOT EXISTS transfer_saving_id
 );
 PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_convert_operations (
+CREATE TABLE IF NOT EXISTS account_convert_operations (
   op_id         SERIAL       PRIMARY KEY,
   account_name  TEXT         NOT NULL,
   request_id    BIGINT       NOT NULL,
@@ -339,7 +339,7 @@ PERFORM hive.app_register_table(
   __schema_name
 );
 
-CREATE TABLE IF NOT EXISTS btracker_app.account_operations (
+CREATE TABLE IF NOT EXISTS account_operations (
   op_id         SERIAL      PRIMARY KEY,
   account_name  TEXT        NOT NULL,
   order_id      BIGINT      NOT NULL,
@@ -620,13 +620,13 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
    CREATE INDEX IF NOT EXISTS
     idx_conv_ops_accname_opt_block_desc
-    ON btracker_app.account_convert_operations
+    ON account_convert_operations
         (account_name, op_type, block_num DESC)
     INCLUDE (request_id, nai, amount);
 
   CREATE INDEX IF NOT EXISTS
     idx_acc_ops_accname_opt_block_desc
-    ON btracker_app.account_operations
+    ON account_operations
         (account_name, op_type, block_num DESC)
     INCLUDE (order_id, nai, amount);
 

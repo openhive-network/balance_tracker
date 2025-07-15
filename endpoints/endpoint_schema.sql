@@ -216,13 +216,10 @@ declare
             "description": "list of account receiving the part of a withdrawal"
           },
           "delayed_vests": {
-            "type": "string",
-            "description": "blocked VESTS by a withdrawal"
-          },
-          "conversion_pending_amount_hbd": {
             "type": "number",
-            "x-sql-datatype": "NUMERIC",
-            "description": "total HBD currently pending conversion"
+            "description": "total HBD currently pending conversion",
+            "conversion_pending_amount_hbd": null,
+            "x-sql-datatype": "NUMERIC"
           },
           "conversion_pending_count_hbd": {
             "type": "integer",
@@ -254,7 +251,6 @@ declare
             "type": "number",
             "x-sql-datatype": "NUMERIC",
             "description": "total amount of HBD in open orders"
-
           }
         }
       },
@@ -634,7 +630,15 @@ declare
                   "to_withdraw": "8362101094935031",
                   "withdrawn": "804048182205290",
                   "withdraw_routes": 4,
-                  "delayed_vests": "0"
+                  "delayed_vests": "0",
+                  "conversion_pending_amount_hbd": 0,
+                  "conversion_pending_count_hbd": 0,
+                  "conversion_pending_amount_hive": 0,
+                  "conversion_pending_count_hive": 0,
+                  "open_orders_hbd_count": 0,
+                  "open_orders_hive_count": 0,
+                  "open_orders_hive_amount": 0,
+                  "open_orders_hbd_amount": 0
                 }
               }
             }
