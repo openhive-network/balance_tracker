@@ -89,7 +89,7 @@ BEGIN
   END IF;
 
   --balance
-  RETURN btracker_backend.get_acc_balances(_account_id);
+  RETURN btracker_backend.get_account_balances(_account_id);
 END
 $$;
 
