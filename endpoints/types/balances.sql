@@ -150,6 +150,7 @@ CREATE TYPE btracker_backend.balance AS (
     "withdrawn" TEXT,
     "withdraw_routes" INT,
     "delayed_vests" TEXT,
+    "conversion_pending_amount_hbd" NUMERIC,
     "conversion_pending_count_hbd" INT,
     "conversion_pending_amount_hive" NUMERIC,
     "conversion_pending_count_hive" INT,
