@@ -95,7 +95,7 @@ btracker_backend.balance:
     delayed_vests:
       type: string
       description: blocked VESTS by a withdrawal
-      conversion_pending_amount_hbd:
+    conversion_pending_amount_hbd:
       type: number
       x-sql-datatype: NUMERIC
       description: "total HBD currently pending conversion"
@@ -149,7 +149,7 @@ CREATE TYPE btracker_backend.balance AS (
     "to_withdraw" TEXT,
     "withdrawn" TEXT,
     "withdraw_routes" INT,
-    "delayed_vests" NUMERIC,
+    "delayed_vests" TEXT,
     "conversion_pending_count_hbd" INT,
     "conversion_pending_amount_hive" NUMERIC,
     "conversion_pending_count_hive" INT,

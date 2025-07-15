@@ -216,10 +216,8 @@ declare
             "description": "list of account receiving the part of a withdrawal"
           },
           "delayed_vests": {
-            "type": "number",
-            "description": "total HBD currently pending conversion",
-            "conversion_pending_amount_hbd": null,
-            "x-sql-datatype": "NUMERIC"
+            "type": "string",
+            "description": "blocked VESTS by a withdrawal"
           },
           "conversion_pending_count_hbd": {
             "type": "integer",
