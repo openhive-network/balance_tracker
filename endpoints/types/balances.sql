@@ -149,8 +149,7 @@ CREATE TYPE btracker_backend.balance AS (
     "to_withdraw" TEXT,
     "withdrawn" TEXT,
     "withdraw_routes" INT,
-    "delayed_vests" TEXT,
-    "conversion_pending_amount_hbd" NUMERIC,
+    "delayed_vests" NUMERIC,
     "conversion_pending_count_hbd" INT,
     "conversion_pending_amount_hive" NUMERIC,
     "conversion_pending_count_hive" INT,
@@ -158,7 +157,6 @@ CREATE TYPE btracker_backend.balance AS (
     "open_orders_hive_count" INT,
     "open_orders_hive_amount" NUMERIC,
     "open_orders_hbd_amount" NUMERIC
-
 );
 -- openapi-generated-code-end
 
