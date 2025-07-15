@@ -219,6 +219,11 @@ declare
             "type": "string",
             "description": "blocked VESTS by a withdrawal"
           },
+          "conversion_pending_amount_hbd": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "total HBD currently pending conversion"
+          },
           "conversion_pending_count_hbd": {
             "type": "integer",
             "description": "number of HBD conversion requests"
