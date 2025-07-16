@@ -9,12 +9,15 @@ SET ROLE btracker_owner;
     description: |
       Lists the top 100 accounts holding a given asset (HIVE, HBD, VESTS, HIVESAVING, HBDSAVING), paged 100 results per page.
 
-      SQL example
-      * `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'', 1);`
+      SQL example:
+      * `SELECT * FROM btracker_endpoints.get_top_holders('HIVE', 1);`
 
-      REST call example
-      * `GET ''https://%1$s/balance-api/top-holders?kind=HIVE&page_num=1''`
+      REST call example:
+      * `GET 'https://%1$s/balance-api/top-holders?kind=HIVE&page_num=1'`
     operationId: btracker_endpoints.get_top_holders
+    x-response-headers:
+      - name: Cache-Control
+        value: public, max-age=2
     parameters:
       - in: query
         name: kind
@@ -36,7 +39,9 @@ SET ROLE btracker_owner;
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/btracker_backend.get_top_holders'
+              type: array
+              items:
+                $ref: '#/components/schemas/btracker_backend.ranked_holder'
             example:
               - rank: 1
                 account: steemit
@@ -49,27 +54,34 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
     kind      TEXT,
     page_num  INT   DEFAULT 1
 )
-RETURNS TABLE(
-    rank  INT,
-    account  TEXT,
-    value NUMERIC
-)
+RETURNS SETOF btracker_backend.ranked_holder
 LANGUAGE plpgsql
 STABLE
 AS
 $$
 BEGIN
-  -- 0) page_num must be ≥ 1
+  -- Set HTTP cache headers
+  PERFORM set_config(
+    'response.headers',
+    '[{"Cache-Control":"public, max-age=2"}]',
+    true
+  );
+
+  -- 0) enforce page_num ≥ 1
   PERFORM btracker_backend.validate_negative_page(page_num);
 
-  -- 1) validate 'kind' is one of the supported values
+  -- 1) validate 'kind'
   IF UPPER(kind) NOT IN ('HIVE','HBD','VESTS','HIVESAVING','HBDSAVING') THEN
-    RAISE EXCEPTION 'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING', kind;
+    RAISE EXCEPTION 
+      'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING',
+      kind;
   END IF;
 
-  -- 2) delegate to your existing backend function
+  -- 2) delegate to core backend function
   RETURN QUERY
-    SELECT *
-      FROM btracker_backend.get_top_holders(kind, page_num);
+    SELECT * FROM btracker_backend.get_top_holders(kind, page_num);
 END;
 $$;
+-- openapi-generated-code-end
+
+RESET ROLE;
