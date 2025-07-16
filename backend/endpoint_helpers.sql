@@ -350,6 +350,65 @@ $BODY$;
 RESET ROLE;
 
 
+CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
+  kind     TEXT,
+  page_num INT  DEFAULT 1
+)
+RETURNS TABLE(
+  rank    INT,
+  account TEXT,
+  value   NUMERIC
+)
+LANGUAGE plpgsql
+STABLE
+AS
+$$
+DECLARE
+  asset_nai  INT;
+  src_table  TEXT;
+  src_column TEXT;
+BEGIN
+  -- 1) Map 'kind' to NAI, source table and column
+  CASE UPPER(TRIM(kind))
+    WHEN 'HIVE'       THEN asset_nai := 21; src_table := 'current_account_balances'; src_column := 'balance';
+    WHEN 'HBD'        THEN asset_nai := 13; src_table := 'current_account_balances'; src_column := 'balance';
+    WHEN 'VESTS'      THEN asset_nai := 37; src_table := 'current_account_balances'; src_column := 'balance';
+    WHEN 'HIVESAVING' THEN asset_nai := 21; src_table := 'account_savings';           src_column := 'saving_balance';
+    WHEN 'HBDSAVING'  THEN asset_nai := 13; src_table := 'account_savings';           src_column := 'saving_balance';
+    ELSE
+      RAISE EXCEPTION 'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING', kind;
+  END CASE;
+
+  -- 2) Delegate to dynamic SQL, ordering ties by account name
+  RETURN QUERY EXECUTE format($fmt$
+    WITH filtered AS (
+      SELECT
+        av.name::text       AS account,
+        src.%1$I::numeric   AS value
+      FROM btracker_app.%2$I AS src
+      JOIN hive.accounts_view AS av
+        ON av.id = src.account
+      WHERE src.nai     = %3$s
+        AND src.%1$I    >= 0
+    )
+    SELECT
+      ROW_NUMBER() OVER (ORDER BY value DESC, account ASC)::INT AS rank,
+      account,
+      value
+    FROM filtered
+    ORDER BY value DESC, account ASC
+    LIMIT 100
+    OFFSET ((%4$s - 1) * 100)
+  $fmt$,
+    src_column,
+    src_table,
+    asset_nai,
+    page_num
+  );
+END;
+$$;
+
+
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations
 LANGUAGE 'plpgsql' STABLE
@@ -674,64 +733,6 @@ BEGIN
     JOIN hive.operations_view ov ON ov.id = ab.source_op
   );
 END
-$$;
-
-CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
-  kind     TEXT,
-  page_num INT  DEFAULT 1
-)
-RETURNS TABLE(
-  rank    INT,
-  account TEXT,
-  value   NUMERIC
-)
-LANGUAGE plpgsql
-STABLE
-AS
-$$
-DECLARE
-  asset_nai  INT;
-  src_table  TEXT;
-  src_column TEXT;
-BEGIN
-  -- 1) Map 'kind' to NAI, source table and column
-  CASE UPPER(TRIM(kind))
-    WHEN 'HIVE'       THEN asset_nai := 21; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'HBD'        THEN asset_nai := 13; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'VESTS'      THEN asset_nai := 37; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'HIVESAVING' THEN asset_nai := 21; src_table := 'account_savings';           src_column := 'saving_balance';
-    WHEN 'HBDSAVING'  THEN asset_nai := 13; src_table := 'account_savings';           src_column := 'saving_balance';
-    ELSE
-      RAISE EXCEPTION 'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING', kind;
-  END CASE;
-
-  -- 2) Delegate to dynamic SQL, ordering ties by account name
-  RETURN QUERY EXECUTE format($fmt$
-    WITH filtered AS (
-      SELECT
-        av.name::text       AS account,
-        src.%1$I::numeric   AS value
-      FROM btracker_app.%2$I AS src
-      JOIN hive.accounts_view AS av
-        ON av.id = src.account
-      WHERE src.nai     = %3$s
-        AND src.%1$I    >= 0
-    )
-    SELECT
-      ROW_NUMBER() OVER (ORDER BY value DESC, account ASC)::INT AS rank,
-      account,
-      value
-    FROM filtered
-    ORDER BY value DESC, account ASC
-    LIMIT 100
-    OFFSET ((%4$s - 1) * 100)
-  $fmt$,
-    src_column,
-    src_table,
-    asset_nai,
-    page_num
-  );
-END;
 $$;
 
 DROP TYPE IF EXISTS btracker_backend.paging_return CASCADE;
