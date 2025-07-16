@@ -1,0 +1,19 @@
+---
+test_name: btracker PostgREST
+marks:
+  - patterntest
+includes:
+  - !include ../../common.yaml
+
+stages:
+  - name: Top-100 VESTS holders (page 1)
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        kind: VESTS
+        page_num: 1
+    response:
+      status_code: 200
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern
