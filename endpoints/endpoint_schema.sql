@@ -570,6 +570,24 @@ declare
           }
         }
       },
+       "btracker_backend.ranked_holder": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "description": "Position in the ranking"
+          },
+          "name": {
+            "type": "string",
+            "description": "Account name"
+          },
+          "value": {
+            "type": "number",
+            "description": "Asset balance for that account"
+          }
+        }
+      },
+
       "btracker_backend.array_of_transfer_stats": {
         "type": "array",
         "items": {
@@ -967,6 +985,66 @@ declare
         }
       }
     },
+      "/top-holders": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Returns the top 100 holders of a given asset",
+        "description": "Lists the top 100 accounts holding a given asset (HIVE, HBD, VESTS, HIVESAVING, HBDSAVING), paged 100 results per page.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'', 1);`\n\nREST call example:\n* `GET ''https://%1$s/balance-api/top-holders?kind=HIVE&page_num=1''`\n",
+        "operationId": "btracker_endpoints.get_top_holders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HIVE",
+                "HBD",
+                "VESTS",
+                "HIVESAVING",
+                "HBDSAVING"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_num",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked list of holders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.get_top_holders"
+                },
+                "example": [
+                  {
+                    "rank": 1,
+                    "account": "steemit",
+                    "value": 4778859891
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported kind parameter"
+          }
+        }
+
+      }
+    },
+
     "/transfer-statistics": {
       "get": {
         "tags": [
