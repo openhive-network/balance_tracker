@@ -1,5 +1,12 @@
 SET ROLE btracker_owner;
 
+/** openapi:components:schemas
+btracker_backend.array_of_ranked_holder:
+  type: array
+  items:
+    $ref: '#/components/schemas/btracker_backend.ranked_holder'
+*/
+
 /** openapi:paths
 /top-holders:
   get:
@@ -7,81 +14,108 @@ SET ROLE btracker_owner;
       - Accounts
     summary: Top 100 asset holders
     description: |
-      Lists the top 100 accounts holding a given asset (HIVE, HBD, VESTS, HIVESAVING, HBDSAVING), paged 100 results per page.
+      Lists the top 100 accounts holding a given coin, 100 results per page.
 
       SQL example:
-      * `SELECT * FROM btracker_endpoints.get_top_holders('HIVE', 1);`
+      * `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'',''balance'',1);`
 
       REST call example:
-      * `GET 'https://%1$s/balance-api/top-holders?kind=HIVE&page_num=1'`
+      * `GET ''https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1''`
+
     operationId: btracker_endpoints.get_top_holders
+
     x-response-headers:
       - name: Cache-Control
         value: public, max-age=2
+
     parameters:
       - in: query
-        name: kind
+        name: coin-type
         required: true
         schema:
-          type: string
-          enum: [HIVE, HBD, VESTS, HIVESAVING, HBDSAVING]
-        description: Asset kind
+          $ref: '#/components/schemas/btracker_backend.nai_type'
+        description: |
+          * HBD  
+          * HIVE  
+          * VESTS
+
       - in: query
-        name: page_num
+        name: balance-type
+        required: false
+        schema:
+          $ref: '#/components/schemas/btracker_backend.balance_type'
+          default: balance
+        description: |
+          `balance` or `savings_balance`  
+          (`savings_balance` not allowed with `VESTS`).
+
+      - in: query
+        name: page
+        required: false
         schema:
           type: integer
           minimum: 1
           default: 1
-        description: Page number (100 results per page)
+        description: 100 results per page (default `1`).
+
     responses:
       '200':
         description: Ranked list of holders
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/btracker_backend.ranked_holder'
-            example:
-              - rank: 1
-                account: steemit
-                value: 4778859891
+              $ref: '#/components/schemas/btracker_backend.array_of_ranked_holder'
       '400':
-        description: Unsupported kind parameter
+        description: Unsupported parameter combination
 */
 -- openapi-generated-code-begin
+DROP FUNCTION IF EXISTS btracker_endpoints.get_top_holders;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
-    kind      TEXT,
-    page_num  INT   DEFAULT 1
+    "coin-type" btracker_backend.nai_type,
+    "balance-type" btracker_backend.balance_type = 'balance',
+    "page" INT = 1
 )
-RETURNS SETOF btracker_backend.ranked_holder
+RETURNS SETOF btracker_backend.ranked_holder 
+-- openapi-generated-code-end
+
 LANGUAGE plpgsql
 STABLE
-AS
-$$
+AS $$
+DECLARE
+  _page_num INT := COALESCE("page", 1);
 BEGIN
-  -- Set HTTP cache headers
+  -- Cache header (2s)
   PERFORM set_config(
     'response.headers',
     '[{"Cache-Control":"public, max-age=2"}]',
     true
   );
 
-  -- 0) enforce page_num ≥ 1
-  PERFORM btracker_backend.validate_negative_page(page_num);
+  -- Validate page ≥ 1
+  PERFORM btracker_backend.validate_negative_page(_page_num);
 
-  -- 1) validate 'kind'
-  IF UPPER(kind) NOT IN ('HIVE','HBD','VESTS','HIVESAVING','HBDSAVING') THEN
-    RAISE EXCEPTION 
-      'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING',
-      kind;
+  -- Forbid savings_balance on VESTS
+  IF "balance-type" = 'savings_balance'
+     AND "coin-type" = 'VESTS'
+  THEN
+    PERFORM btracker_backend.rest_raise_vest_saving_balance(
+      "balance-type",
+      "coin-type"
+    );
   END IF;
 
-  -- 2) delegate to core backend function
+  -- Return exactly the composite type fields
   RETURN QUERY
-    SELECT * FROM btracker_backend.get_top_holders(kind, page_num);
+    SELECT
+      r.rank,
+      r.account,
+      r.value
+    FROM btracker_backend.get_top_holders(
+           "coin-type",
+           "balance-type",
+           _page_num
+         ) AS r;
 END;
 $$;
--- openapi-generated-code-end
 
 RESET ROLE;

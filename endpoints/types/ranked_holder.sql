@@ -10,6 +10,7 @@ btracker_backend.ranked_holder:
       description: Account name
     value:
       type: number
+      x-sql-datatype: NUMERIC
       description: Asset balance for that account
 */
 -- openapi-generated-code-begin

@@ -954,7 +954,7 @@
         </HTTPSamplerProxy>
         <hashTree/>
       </hashTree>
-         <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="get_top_holders" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="get_top_holders" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
                     guiclass="LoopControlPanel" testclass="LoopController"
@@ -970,23 +970,22 @@
         <boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
       </ThreadGroup>
       <hashTree>
-        <!-- HIVE sampler -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="GET /top-holders (HIVE)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments"
                       guiclass="HTTPArgumentsPanel" testclass="Arguments"
                       testname="Query Params" enabled="true">
             <collectionProp name="Arguments.arguments">
-              <elementProp name="kind" elementType="HTTPArgument">
+              <elementProp name="coin-type" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">kind</stringProp>
+                <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="Argument.value">HIVE</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
               </elementProp>
-              <elementProp name="page_num" elementType="HTTPArgument">
+              <elementProp name="page" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">page_num</stringProp>
+                <stringProp name="Argument.name">page</stringProp>
                 <stringProp name="Argument.value">1</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
@@ -1009,16 +1008,16 @@
                       guiclass="HTTPArgumentsPanel" testclass="Arguments"
                       testname="Query Params" enabled="true">
             <collectionProp name="Arguments.arguments">
-              <elementProp name="kind" elementType="HTTPArgument">
+              <elementProp name="coin-type" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">kind</stringProp>
+                <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="Argument.value">HBD</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
               </elementProp>
-              <elementProp name="page_num" elementType="HTTPArgument">
+              <elementProp name="page" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">page_num</stringProp>
+                <stringProp name="Argument.name">page</stringProp>
                 <stringProp name="Argument.value">1</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
@@ -1041,16 +1040,16 @@
                       guiclass="HTTPArgumentsPanel" testclass="Arguments"
                       testname="Query Params" enabled="true">
             <collectionProp name="Arguments.arguments">
-              <elementProp name="kind" elementType="HTTPArgument">
+              <elementProp name="coin-type" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">kind</stringProp>
+                <stringProp name="Argument.name">coin-type</stringProp>
                 <stringProp name="Argument.value">VESTS</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
               </elementProp>
-              <elementProp name="page_num" elementType="HTTPArgument">
+              <elementProp name="page" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.name">page_num</stringProp>
+                <stringProp name="Argument.name">page</stringProp>
                 <stringProp name="Argument.value">1</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
                 <boolProp name="HTTPArgument.use_equals">true</boolProp>
@@ -1067,6 +1066,7 @@
         </HTTPSamplerProxy>
         <hashTree/>
       </hashTree>
+
   
       <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="Test Configuration" enabled="true">
         <collectionProp name="Arguments.arguments">

@@ -11,8 +11,7 @@ stages:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
-        kind: HBD
-        page_num: 1
+        coin-type: HBD
     response:
       status_code: 200
       verify_response_with:

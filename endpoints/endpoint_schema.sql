@@ -570,34 +570,40 @@ declare
           }
         }
       },
-       "btracker_backend.ranked_holder": {
-        "type": "object",
-        "properties": {
-          "rank": {
-            "type": "integer",
-            "description": "Position in the ranking"
-          },
-          "name": {
-            "type": "string",
-            "description": "Account name"
-          },
-          "value": {
-            "type": "number",
-            "description": "Asset balance for that account"
-          }
-        }
-      },
-
       "btracker_backend.array_of_transfer_stats": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/btracker_backend.transfer_stats"
         }
       },
+      "btracker_backend.ranked_holder": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "description": "Position in the ranking"
+          },
+          "account": {
+            "type": "string",
+            "description": "Account name"
+          },
+          "value": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "Asset balance for that account"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/btracker_backend.aggregated_history"
+        }
+      },
+      "btracker_backend.array_of_ranked_holder": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.ranked_holder"
         }
       }
     }
@@ -985,38 +991,50 @@ declare
         }
       }
     },
-      "/top-holders": {
+    "/top-holders": {
       "get": {
         "tags": [
           "Accounts"
         ],
-        "summary": "Returns the top 100 holders of a given asset",
-        "description": "Lists the top 100 accounts holding a given asset (HIVE, HBD, VESTS, HIVESAVING, HBDSAVING), paged 100 results per page.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'', 1);`\n\nREST call example:\n* `GET ''https://%1$s/balance-api/top-holders?kind=HIVE&page_num=1''`\n",
+        "summary": "Top 100 asset holders",
+        "description": "Lists the top 100 accounts holding a given coin, 100 results per page.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'',''balance'',1);`\n\nREST call example:\n* `GET ''https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1''`\n",
         "operationId": "btracker_endpoints.get_top_holders",
+        "x-response-headers": [
+          {
+            "name": "Cache-Control",
+            "value": "public, max-age=2"
+          }
+        ],
         "parameters": [
           {
             "in": "query",
-            "name": "kind",
+            "name": "coin-type",
             "required": true,
             "schema": {
-              "type": "string",
-              "enum": [
-                "HIVE",
-                "HBD",
-                "VESTS",
-                "HIVESAVING",
-                "HBDSAVING"
-              ]
-            }
+              "$ref": "#/components/schemas/btracker_backend.nai_type"
+            },
+            "description": "* HBD  \n* HIVE  \n* VESTS\n"
           },
           {
             "in": "query",
-            "name": "page_num",
+            "name": "balance-type",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.balance_type",
+              "default": "balance"
+            },
+            "description": "`balance` or `savings_balance`  \n(`savings_balance` not allowed with `VESTS`).\n"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
             "schema": {
               "type": "integer",
               "minimum": 1,
               "default": 1
-            }
+            },
+            "description": "100 results per page (default `1`)."
           }
         ],
         "responses": {
@@ -1025,26 +1043,17 @@ declare
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_backend.get_top_holders"
-                },
-                "example": [
-                  {
-                    "rank": 1,
-                    "account": "steemit",
-                    "value": 4778859891
-                  }
-                ]
+                  "$ref": "#/components/schemas/btracker_backend.array_of_ranked_holder"
+                }
               }
             }
           },
           "400": {
-            "description": "Unsupported kind parameter"
+            "description": "Unsupported parameter combination"
           }
         }
-
       }
     },
-
     "/transfer-statistics": {
       "get": {
         "tags": [

@@ -349,65 +349,73 @@ $BODY$;
 
 RESET ROLE;
 
-
 CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
-  kind     TEXT,
-  page_num INT  DEFAULT 1
+    _coin_type    btracker_backend.nai_type,
+    _balance_type btracker_backend.balance_type DEFAULT 'balance',
+    _page         INT                             DEFAULT 1
 )
 RETURNS TABLE(
-  rank    INT,
-  account TEXT,
-  value   NUMERIC
+    rank    INT,
+    account TEXT,
+    value   NUMERIC(38,0)        -- zero scale numeric
 )
 LANGUAGE plpgsql
 STABLE
 AS
 $$
 DECLARE
-  asset_nai  INT;
-  src_table  TEXT;
-  src_column TEXT;
+  asset_nai INT := CASE UPPER(_coin_type::TEXT)
+    WHEN 'HBD'  THEN 13
+    WHEN 'HIVE' THEN 21
+    ELSE 37
+  END;
+  src_table  TEXT := CASE _balance_type
+    WHEN 'balance' THEN 'current_account_balances'
+    ELSE                    'account_savings'
+  END;
+  src_column TEXT := CASE _balance_type
+    WHEN 'balance' THEN 'balance'
+    ELSE                    'saving_balance'
+  END;
+  _offset    INT := (_page - 1) * 100;
 BEGIN
-  -- 1) Map 'kind' to NAI, source table and column
-  CASE UPPER(TRIM(kind))
-    WHEN 'HIVE'       THEN asset_nai := 21; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'HBD'        THEN asset_nai := 13; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'VESTS'      THEN asset_nai := 37; src_table := 'current_account_balances'; src_column := 'balance';
-    WHEN 'HIVESAVING' THEN asset_nai := 21; src_table := 'account_savings';           src_column := 'saving_balance';
-    WHEN 'HBDSAVING'  THEN asset_nai := 13; src_table := 'account_savings';           src_column := 'saving_balance';
-    ELSE
-      RAISE EXCEPTION 'Unsupported kind parameter: %, must be one of HIVE, HBD, VESTS, HIVESAVING, HBDSAVING', kind;
-  END CASE;
+  PERFORM btracker_backend.validate_negative_page(_page);
 
-  -- 2) Delegate to dynamic SQL, ordering ties by account name
-  RETURN QUERY EXECUTE format($fmt$
-    WITH filtered AS (
+  IF _balance_type = 'savings_balance' AND asset_nai = 37 THEN
+    PERFORM btracker_backend.rest_raise_vest_saving_balance(
+      'balance-type','coin-type'
+    );
+  END IF;
+
+  RETURN QUERY EXECUTE format($sql$
+    WITH ranked_rows AS (
       SELECT
-        av.name::text       AS account,
-        src.%1$I::numeric   AS value
+        av.name::TEXT                                AS account,
+        src.%1$I::NUMERIC(38,0)                      AS value,    
+        ROW_NUMBER() OVER (
+          ORDER BY src.%1$I DESC, av.name ASC
+        ) - 1                                       AS rn
       FROM btracker_app.%2$I AS src
       JOIN hive.accounts_view AS av
         ON av.id = src.account
-      WHERE src.nai     = %3$s
-        AND src.%1$I    >= 0
+      WHERE src.nai = %3$s
+        AND src.%1$I >= 0
     )
     SELECT
-      ROW_NUMBER() OVER (ORDER BY value DESC, account ASC)::INT AS rank,
+      (rn + 1)::INT    AS rank,
       account,
       value
-    FROM filtered
-    ORDER BY value DESC, account ASC
-    LIMIT 100
-    OFFSET ((%4$s - 1) * 100)
-  $fmt$,
-    src_column,
-    src_table,
-    asset_nai,
-    page_num
+    FROM ranked_rows
+    WHERE rn BETWEEN %4$s AND %4$s + 99
+    ORDER BY rn
+    $sql$,
+    src_column,   -- 1: column name
+    src_table,    -- 2: table name
+    asset_nai,    -- 3: numeric NAI
+    _offset       -- 4: zero-based offset
   );
 END;
 $$;
-
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations
