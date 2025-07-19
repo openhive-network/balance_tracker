@@ -349,6 +349,73 @@ $BODY$;
 
 RESET ROLE;
 
+CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
+    _coin_type    btracker_backend.nai_type,
+    _balance_type btracker_backend.balance_type DEFAULT 'balance',
+    _page         INT                             DEFAULT 1
+)
+RETURNS TABLE(
+    rank    INT,
+    account TEXT,
+    value   NUMERIC(38,0)        -- zero scale numeric
+)
+LANGUAGE plpgsql
+STABLE
+AS
+$$
+DECLARE
+  asset_nai INT := CASE UPPER(_coin_type::TEXT)
+    WHEN 'HBD'  THEN 13
+    WHEN 'HIVE' THEN 21
+    ELSE 37
+  END;
+  src_table  TEXT := CASE _balance_type
+    WHEN 'balance' THEN 'current_account_balances'
+    ELSE                    'account_savings'
+  END;
+  src_column TEXT := CASE _balance_type
+    WHEN 'balance' THEN 'balance'
+    ELSE                    'saving_balance'
+  END;
+  _offset    INT := (_page - 1) * 100;
+BEGIN
+  PERFORM btracker_backend.validate_negative_page(_page);
+
+  IF _balance_type = 'savings_balance' AND asset_nai = 37 THEN
+    PERFORM btracker_backend.rest_raise_vest_saving_balance(
+      'balance-type','coin-type'
+    );
+  END IF;
+
+  RETURN QUERY EXECUTE format($sql$
+    WITH ranked_rows AS (
+      SELECT
+        av.name::TEXT                                AS account,
+        src.%1$I::NUMERIC(38,0)                      AS value,    
+        ROW_NUMBER() OVER (
+          ORDER BY src.%1$I DESC, av.name ASC
+        ) - 1                                       AS rn
+      FROM btracker_app.%2$I AS src
+      JOIN hive.accounts_view AS av
+        ON av.id = src.account
+      WHERE src.nai = %3$s
+        AND src.%1$I >= 0
+    )
+    SELECT
+      (rn + 1)::INT    AS rank,
+      account,
+      value
+    FROM ranked_rows
+    WHERE rn BETWEEN %4$s AND %4$s + 99
+    ORDER BY rn
+    $sql$,
+    src_column,   -- 1: column name
+    src_table,    -- 2: table name
+    asset_nai,    -- 3: numeric NAI
+    _offset       -- 4: zero-based offset
+  );
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations

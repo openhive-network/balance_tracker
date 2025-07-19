@@ -576,10 +576,34 @@ declare
           "$ref": "#/components/schemas/btracker_backend.transfer_stats"
         }
       },
+      "btracker_backend.ranked_holder": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "description": "Position in the ranking"
+          },
+          "account": {
+            "type": "string",
+            "description": "Account name"
+          },
+          "value": {
+            "type": "number",
+            "x-sql-datatype": "NUMERIC",
+            "description": "Asset balance for that account"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/btracker_backend.aggregated_history"
+        }
+      },
+      "btracker_backend.array_of_ranked_holder": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.ranked_holder"
         }
       }
     }
@@ -963,6 +987,69 @@ declare
           },
           "404": {
             "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/top-holders": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Top 100 asset holders",
+        "description": "Lists the top 100 accounts holding a given coin, 100 results per page.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'',''balance'',1);`\n\nREST call example:\n* `GET ''https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1''`\n",
+        "operationId": "btracker_endpoints.get_top_holders",
+        "x-response-headers": [
+          {
+            "name": "Cache-Control",
+            "value": "public, max-age=2"
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "coin-type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.nai_type"
+            },
+            "description": "* HBD  \n* HIVE  \n* VESTS\n"
+          },
+          {
+            "in": "query",
+            "name": "balance-type",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.balance_type",
+              "default": "balance"
+            },
+            "description": "`balance` or `savings_balance`  \n(`savings_balance` not allowed with `VESTS`).\n"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "100 results per page (default `1`)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked list of holders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_ranked_holder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported parameter combination"
           }
         }
       }
