@@ -1,8 +1,7 @@
 SET ROLE btracker_owner;
 
-DROP FUNCTION IF EXISTS btracker_app.process_block_range_converts(INT, INT);
 
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_converts(
+CREATE OR REPLACE FUNCTION process_block_range_converts(
     _from_block INT,
     _to_block   INT
 )
@@ -40,7 +39,7 @@ BEGIN
   --------------------------------------------------------------------------------
   -- 2) Append them to the flat table, picking the correct NAI & amount fields
   --------------------------------------------------------------------------------
-  INSERT INTO btracker_app.account_convert_operations (
+  INSERT INTO account_convert_operations (
     account_name,
     request_id,
     nai,

@@ -1,6 +1,6 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_app.process_block_range_orders(
+CREATE OR REPLACE FUNCTION process_block_range_orders(
     p_from_block INT,
     p_to_block   INT
 )
@@ -39,7 +39,7 @@ BEGIN
   --------------------------------------------------------------------------------
   -- 2) Insert CREATEs
   --------------------------------------------------------------------------------
-  INSERT INTO btracker_app.account_operations
+  INSERT INTO account_operations
     (account_name, order_id, nai, op_type, block_num, amount, raw)
   SELECT
     (j->'value'->>'owner')::TEXT           AS account_name,
@@ -60,7 +60,7 @@ BEGIN
   --------------------------------------------------------------------------------
   -- 3) Insert FILLS
   --------------------------------------------------------------------------------
-  INSERT INTO btracker_app.account_operations
+  INSERT INTO account_operations
     (account_name, order_id, nai, op_type, block_num, amount, raw)
   SELECT
     (j->'value'->>'open_owner')::TEXT        AS account_name,
@@ -101,7 +101,7 @@ BEGIN
   --------------------------------------------------------------------------------
   -- 4) Insert CANCELs
   --------------------------------------------------------------------------------
-  INSERT INTO btracker_app.account_operations
+  INSERT INTO account_operations
     (account_name, order_id, nai, op_type, block_num, raw)
   SELECT
     COALESCE(
