@@ -466,8 +466,8 @@ BEGIN
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
-    PERFORM process_block_range_converts       (_from,        __hardfork_23_blk);
-    PERFORM process_block_range_orders         (_from,        __hardfork_23_blk);
+    PERFORM process_block_range_converts       (_from,        __hardfork_23_block);
+    PERFORM process_block_range_orders         (_from,        __hardfork_23_block);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -482,8 +482,8 @@ BEGIN
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
-      PERFORM process_block_range_converts       (__hardfork_23_blk+1, _to);
-      PERFORM process_block_range_orders         (__hardfork_23_blk+1, _to);
+      PERFORM process_block_range_converts       (__hardfork_23_block+1, _to);
+      PERFORM process_block_range_orders         (__hardfork_23_block+1, _to);
 
     END IF;
 
