@@ -588,8 +588,7 @@ declare
             "description": "Account name"
           },
           "value": {
-            "type": "number",
-            "x-sql-datatype": "NUMERIC",
+            "type": "string",
             "description": "Asset balance for that account"
           }
         }
