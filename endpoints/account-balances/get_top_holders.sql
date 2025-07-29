@@ -109,7 +109,7 @@ BEGIN
     SELECT
       r.rank,
       r.account,
-      r.value
+      r.value::TEXT
     FROM btracker_backend.get_top_holders(
            "coin-type",
            "balance-type",
