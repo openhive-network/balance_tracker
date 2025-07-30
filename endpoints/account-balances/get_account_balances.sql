@@ -80,13 +80,9 @@ STABLE
 AS
 $$
 DECLARE
-  _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
+  _account_id INT := btracker_backend.get_account_id("account-name", TRUE);
 BEGIN
   PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-
-  IF _account_id IS NULL THEN
-    PERFORM btracker_backend.rest_raise_missing_account("account-name");
-  END IF;
 
   --balance
   RETURN btracker_backend.get_account_balances(_account_id);

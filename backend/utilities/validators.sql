@@ -13,7 +13,10 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_backend.validate_balance_history(_balance_type btracker_backend.balance_type, _coin_type btracker_backend.nai_type)
+CREATE OR REPLACE FUNCTION btracker_backend.validate_balance_history(
+    _balance_type btracker_backend.balance_type,
+    _coin_type btracker_backend.nai_type
+)
 RETURNS VOID
 LANGUAGE 'plpgsql'
 IMMUTABLE
