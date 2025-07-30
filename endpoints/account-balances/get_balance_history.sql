@@ -169,8 +169,8 @@ AS
 $$
 DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
-  _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
-  _coin_type INT := (CASE WHEN "coin-type" = 'HBD' THEN 13 WHEN "coin-type" = 'HIVE' THEN 21 ELSE 37 END);
+  _account_id INT                := btracker_backend.get_account_id("account-name", TRUE);
+  _coin_type INT                 := btracker_backend.get_nai_type("coin-type");
   _result btracker_backend.balance_history[];
 
   _ops_count INT;
@@ -181,14 +181,7 @@ BEGIN
   PERFORM btracker_backend.validate_limit("page-size", 1000);
   PERFORM btracker_backend.validate_negative_limit("page-size");
   PERFORM btracker_backend.validate_negative_page("page");
-
-  IF _account_id IS NULL THEN
-    PERFORM btracker_backend.rest_raise_missing_account("account-name");
-  END IF;
-
-  IF "balance-type" = 'savings_balance' AND _coin_type = 37 THEN
-    PERFORM btracker_backend.rest_raise_vest_saving_balance("balance-type", "coin-type");
-  END IF;
+  PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
 
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
@@ -206,14 +199,7 @@ BEGIN
     _block_range.last_block
   );
 
-  __total_pages := (
-    CASE 
-      WHEN (_ops_count % "page-size") = 0 THEN 
-        _ops_count/"page-size" 
-      ELSE 
-        (_ops_count/"page-size") + 1
-    END
-  );
+  __total_pages := btracker_backend.total_pages(_ops_count, "page-size");
 
   PERFORM btracker_backend.validate_page("page", __total_pages);
 

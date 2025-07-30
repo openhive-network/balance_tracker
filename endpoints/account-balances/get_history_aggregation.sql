@@ -156,13 +156,9 @@ AS
 $$
 DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
-  _coin_type INT := (CASE WHEN "coin-type" = 'HBD' THEN 13 WHEN "coin-type" = 'HIVE' THEN 21 ELSE 37 END);
-  _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
+  _coin_type INT                 := btracker_backend.get_nai_type("coin-type");
+  _account_id INT                := btracker_backend.get_account_id("account-name", TRUE);
 BEGIN
-  IF _account_id IS NULL THEN
-    PERFORM btracker_backend.rest_raise_missing_account("account-name");
-  END IF;
-
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE

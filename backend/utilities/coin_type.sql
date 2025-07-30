@@ -16,7 +16,7 @@ LANGUAGE 'plpgsql'
 AS
 $$
 BEGIN
-  RETURN (CASE WHEN "coin-type" = 'HBD' THEN 13 ELSE 21 END);
+  RETURN (CASE WHEN _nai = 'HBD' THEN 13 ELSE 21 END);
 END
 $$;
 

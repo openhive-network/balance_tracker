@@ -53,15 +53,11 @@ SET jit = OFF
 AS
 $$
 DECLARE
-  _account_id INT = (SELECT av.id FROM hive.accounts_view av WHERE av.name = "account-name");
+  _account_id INT := btracker_backend.get_account_id("account-name", TRUE);
   _incoming_delegations btracker_backend.incoming_delegations[];
   _outgoing_delegations btracker_backend.outgoing_delegations[];
 BEGIN
   PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-
-  IF _account_id IS NULL THEN
-    PERFORM btracker_backend.rest_raise_missing_account("account-name");
-  END IF;
 
   _incoming_delegations := array_agg(row ORDER BY row.amount::BIGINT DESC) FROM (
       SELECT 
