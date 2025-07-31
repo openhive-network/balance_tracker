@@ -743,49 +743,4 @@ BEGIN
 END
 $$;
 
-DROP TYPE IF EXISTS btracker_backend.paging_return CASCADE;
-CREATE TYPE btracker_backend.paging_return AS
-(
-    from_block INT,
-    to_block INT
-);
-
-CREATE OR REPLACE FUNCTION btracker_backend.block_range(
-    _from INT, 
-    _to INT,
-    _current_block INT
-)
-RETURNS btracker_backend.paging_return -- noqa: LT01, CP05
-LANGUAGE 'plpgsql' IMMUTABLE
-SET JIT = OFF
-AS
-$$
-DECLARE 
-  __to INT;
-  __from INT;
-BEGIN
-  __to := (
-    CASE 
-      WHEN (_to IS NULL) THEN 
-        _current_block 
-      WHEN (_to IS NOT NULL) AND (_current_block < _to) THEN 
-        _current_block 
-      ELSE 
-        _to 
-      END
-  );
-
-  __from := (
-    CASE 
-      WHEN (_from IS NULL) THEN 
-        1 
-      ELSE 
-        _from 
-      END
-  );
-
-  RETURN (__from, __to)::btracker_backend.paging_return;
-END
-$$;
-
 RESET ROLE;
