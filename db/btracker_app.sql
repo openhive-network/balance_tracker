@@ -618,8 +618,17 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,balance_seq_no DESC) INCLUDE (balance, source_op);
-  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_source_op_idx ON account_savings_history(account,nai,balance_seq_no DESC) INCLUDE (saving_balance, source_op);
+  -- usage of include would be ideal
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON account_balance_history(account,nai,balance_seq_no);
+  -- INCLUDE (balance,source_op) to speed up balance_history function
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account,nai,source_op_block);
+  -- INCLUDE (balance_seq_no) to speed up balance_history function
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON account_savings_history(account,nai,balance_seq_no);
+  -- INCLUDE (saving_balance,source_op) to speed up balance_history function
+  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account,nai,source_op_block);
+  -- INCLUDE (balance_seq_no) to speed up balance_history function
+  
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
   CREATE INDEX IF NOT EXISTS

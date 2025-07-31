@@ -58,6 +58,7 @@ get_latest_balance AS (
     gan.account_id,
     gan.nai,
     COALESCE(cab.balance, 0) as balance,
+    COALESCE(cab.balance_change_count, 0) as balance_seq_no,
     0 AS source_op,
     0 AS source_op_block
 --    (CASE WHEN cab.balance IS NULL THEN FALSE ELSE TRUE END) AS prev_balance_exists
@@ -71,6 +72,7 @@ union_latest_balance_with_impacted_balances AS (
     cp.account_id, 
     cp.nai,
     cp.balance,
+    1 AS balance_seq_no,
     cp.source_op,
     cp.source_op_block
   FROM ops_in_range cp
@@ -82,6 +84,7 @@ union_latest_balance_with_impacted_balances AS (
     glb.account_id,
     glb.nai,
     glb.balance,
+    glb.balance_seq_no,
     glb.source_op,
     glb.source_op_block
   FROM get_latest_balance glb
@@ -101,7 +104,12 @@ prepare_balance_history AS MATERIALIZED (
   SELECT 
     ulb.account_id,
     ulb.nai,
-    SUM(ulb.balance) OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS balance,
+    SUM(ulb.balance) OVER (
+      PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS balance,
+    SUM(ulb.balance_seq_no) OVER (
+      PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS balance_seq_no,
     ulb.source_op,
     ulb.source_op_block,
     ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
@@ -110,10 +118,11 @@ prepare_balance_history AS MATERIALIZED (
 
 insert_current_account_balances AS (
   INSERT INTO current_account_balances AS acc_balances
-    (account, nai, source_op, source_op_block, balance)
+    (account, nai, balance_change_count, source_op, source_op_block, balance)
   SELECT 
     rd.account_id,
     rd.nai,
+    rd.balance_seq_no,
     rd.source_op,
     rd.source_op_block,
     rd.balance
@@ -122,6 +131,7 @@ insert_current_account_balances AS (
   ON CONFLICT ON CONSTRAINT pk_current_account_balances DO
   UPDATE SET 
     balance = EXCLUDED.balance,
+    balance_change_count = EXCLUDED.balance_change_count,
     source_op = EXCLUDED.source_op,
     source_op_block = EXCLUDED.source_op_block
   RETURNING (xmax = 0) as is_new_entry, acc_balances.account
@@ -131,6 +141,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
   SELECT 
     pbh.account_id,
     pbh.nai,
+    pbh.balance_seq_no,
     pbh.source_op,
     pbh.source_op_block,
     pbh.balance
@@ -141,10 +152,11 @@ remove_latest_stored_balance_record AS MATERIALIZED (
 ),
 insert_account_balance_history AS (
   INSERT INTO account_balance_history AS acc_history
-    (account, nai, source_op, source_op_block, balance)
+    (account, nai, balance_seq_no, source_op, source_op_block, balance)
   SELECT 
     pbh.account_id,
     pbh.nai,
+    pbh.balance_seq_no,
     pbh.source_op,
     pbh.source_op_block,
     pbh.balance

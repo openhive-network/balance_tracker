@@ -268,6 +268,7 @@ get_latest_balance AS (
     gan.nai,
     COALESCE(cab.saving_balance, 0) as balance,
     COALESCE(cab.savings_withdraw_requests, 0) AS savings_withdraw_request,
+    COALESCE(cab.balance_change_count, 0) as balance_seq_no,
     0 AS request_id,  
     0 AS op_type_id,
     0 AS source_op,
@@ -281,6 +282,7 @@ union_operations_with_latest_balance AS (
     account_id,
     nai,
     balance,
+    balance_seq_no,
     savings_withdraw_request,
     request_id,  
     op_type_id,
@@ -296,6 +298,7 @@ union_operations_with_latest_balance AS (
     account_id,
     nai,
     balance,
+    1 AS balance_seq_no,
     savings_withdraw_request,
     request_id,  
     op_type_id,
@@ -322,6 +325,12 @@ prepare_savings_history AS (
         ORDER BY uo.source_op, uo.balance 
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
       ) AS savings_withdraw_request,
+    SUM(uo.balance_seq_no) OVER 
+      (
+        PARTITION BY uo.account_id, uo.nai 
+        ORDER BY uo.source_op, uo.balance 
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) AS balance_seq_no,
     uo.source_op,
     uo.source_op_block,
     ROW_NUMBER() OVER (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC) AS rn
@@ -353,6 +362,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
   SELECT 
     pbh.account_id,
     pbh.nai,
+    pbh.balance_seq_no,
     pbh.balance,
     pbh.source_op,
     pbh.source_op_block,
@@ -365,10 +375,11 @@ remove_latest_stored_balance_record AS MATERIALIZED (
 ),
 insert_sum_of_transfers AS (
   INSERT INTO account_savings AS acc_history
-    (account, nai, saving_balance, source_op, source_op_block, savings_withdraw_requests)
+    (account, nai, balance_change_count, saving_balance, source_op, source_op_block, savings_withdraw_requests)
   SELECT
     ps.account_id,
     ps.nai,
+    ps.balance_seq_no,
     ps.balance,
     ps.source_op,
     ps.source_op_block,
@@ -378,6 +389,7 @@ insert_sum_of_transfers AS (
   ON CONFLICT ON CONSTRAINT pk_account_savings
   DO UPDATE SET
       saving_balance = EXCLUDED.saving_balance,
+      balance_change_count = EXCLUDED.balance_change_count,
       source_op = EXCLUDED.source_op,
       source_op_block = EXCLUDED.source_op_block,
       savings_withdraw_requests = EXCLUDED.savings_withdraw_requests
@@ -385,10 +397,11 @@ insert_sum_of_transfers AS (
 ),
 insert_saving_balance_history AS (
   INSERT INTO account_savings_history AS acc_history
-    (account, nai, source_op, source_op_block, saving_balance)
+    (account, nai, balance_seq_no, source_op, source_op_block, saving_balance)
   SELECT 
     pbh.account_id,
     pbh.nai,
+    pbh.balance_seq_no,
     pbh.source_op,
     pbh.source_op_block,
     pbh.balance
