@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS current_account_balances
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
+  balance_change_count INT NOT NULL, -- Number of balance changes
   source_op BIGINT NOT NULL,-- The operation triggered last balance change
   source_op_block INT NOT NULL, -- Block containing the source operation
 
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS account_balance_history
   account INT NOT NULL, -- Balance owner account
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value after a change
+  balance_seq_no INT NOT NULL, -- Sequence number of the balance change
   source_op BIGINT NOT NULL,-- The operation triggered given balance change
   source_op_block INT NOT NULL -- Block containing the source operation
   
@@ -196,10 +198,10 @@ PERFORM hive.app_register_table( __schema_name, 'account_withdraws', __schema_na
 CREATE TABLE IF NOT EXISTS account_routes
 (
   account INT NOT NULL,
-  to_account INT NOT NULL,     
+  to_account INT NOT NULL,
   percent INT NOT NULL,
   source_op BIGINT NOT NULL,
-    
+
   CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
 );
 PERFORM hive.app_register_table( __schema_name, 'account_routes', __schema_name );
@@ -209,8 +211,9 @@ PERFORM hive.app_register_table( __schema_name, 'account_routes', __schema_name 
 CREATE TABLE IF NOT EXISTS account_savings
 (
   account INT NOT NULL,
-  nai     INT NOT NULL, 
-  saving_balance BIGINT DEFAULT 0,         
+  nai     INT NOT NULL,
+  saving_balance BIGINT DEFAULT 0,
+  balance_change_count INT NOT NULL,
   source_op BIGINT NOT NULL,
   source_op_block INT NOT NULL,
   savings_withdraw_requests INT DEFAULT 0,
@@ -221,11 +224,12 @@ PERFORM hive.app_register_table( __schema_name, 'account_savings', __schema_name
 
 CREATE TABLE IF NOT EXISTS account_savings_history
 (
-  account INT NOT NULL, 
-  nai     INT NOT NULL, 
-  saving_balance BIGINT NOT NULL, 
+  account INT NOT NULL,
+  nai     INT NOT NULL,
+  saving_balance BIGINT NOT NULL,
+  balance_seq_no INT NOT NULL,
   source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL 
+  source_op_block INT NOT NULL
 );
 
 PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __schema_name );
@@ -614,11 +618,11 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,source_op DESC);
-  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_source_op_idx ON account_savings_history(account,nai,source_op DESC);
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_source_op_idx ON account_balance_history(account,nai,balance_seq_no DESC) INCLUDE (balance, source_op);
+  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_source_op_idx ON account_savings_history(account,nai,balance_seq_no DESC) INCLUDE (saving_balance, source_op);
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
-   CREATE INDEX IF NOT EXISTS
+  CREATE INDEX IF NOT EXISTS
     idx_conv_ops_accname_opt_block_desc
     ON account_convert_operations
         (account_name, op_type, block_num DESC)
