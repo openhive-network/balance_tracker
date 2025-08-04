@@ -102,8 +102,8 @@ DROP TYPE IF EXISTS btracker_backend.balance_history_range_return CASCADE;
 CREATE TYPE btracker_backend.balance_history_range_return AS
 (
     count INT,
-    from_op BIGINT,
-    to_op BIGINT
+    from_seq INT,
+    to_seq INT
 );
 
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_range(
@@ -118,54 +118,190 @@ LANGUAGE 'plpgsql' STABLE
 SET JIT = OFF
 AS
 $$
-DECLARE 
-  __to_op BIGINT;
-  __from_op BIGINT;
-  __count INT;
 BEGIN
-  __to_op := (
-    SELECT 
-      ov.id
-		FROM hive.operations_view ov
-		WHERE 
-      (_to IS NULL OR ov.block_num <= _to)
-		ORDER BY ov.block_num DESC, ov.id DESC LIMIT 1
-  );
+  IF _balance_type = 'balance' THEN
+    RETURN btracker_backend.bh_balance(_account_id, _coin_type, _from, _to);
+  END IF;
 
-  __from_op := (
-    SELECT 
-      ov.id 
-		FROM hive.operations_view ov
-		WHERE 
-      (_from IS NULL OR ov.block_num >= _from)
-		ORDER BY ov.block_num, ov.id
-		LIMIT 1
-  );
+  RETURN btracker_backend.bh_savings_balance(_account_id, _coin_type, _from, _to);
+END
+$$;
 
-    __count := CASE 
-      WHEN _balance_type = 'balance' THEN
-        (
-          SELECT COUNT(*)
-          FROM account_balance_history 
-          WHERE 
-            account = _account_id AND 
-            nai = _coin_type AND
-            source_op < __to_op AND
-            source_op >= __from_op
-        )
-      ELSE
-        (
-          SELECT COUNT(*)
-          FROM account_savings_history 
-          WHERE 
-            account = _account_id AND 
-            nai = _coin_type AND
-            source_op < __to_op AND
-            source_op >= __from_op
-        )
-      END;
-    
-  RETURN (__count, __from_op, __to_op)::btracker_backend.balance_history_range_return;
+CREATE OR REPLACE FUNCTION btracker_backend.bh_balance(
+    _account_id INT,
+    _coin_type INT,
+    _from INT, 
+    _to INT
+)
+RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql' STABLE
+SET JIT = OFF
+AS
+$$
+DECLARE
+  __to_seq INT;
+  __from_seq INT;
+BEGIN
+  IF _to IS NULL THEN
+    __to_seq := (
+      SELECT
+        ab.balance_seq_no
+      FROM account_balance_history ab
+      WHERE ab.account = _account_id
+        AND ab.nai = _coin_type
+      ORDER BY ab.balance_seq_no DESC LIMIT 1
+    );
+  ELSE
+    __to_seq := (
+      WITH last_block AS (
+        SELECT
+          ab.source_op_block
+        FROM account_balance_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block <= _to
+        ORDER BY ab.source_op_block DESC LIMIT 1
+      ),
+      get_sequence AS (
+        SELECT
+          ab.balance_seq_no
+        FROM account_balance_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block = (SELECT source_op_block FROM last_block)
+      )
+      SELECT MAX(gs.balance_seq_no)
+      FROM get_sequence gs
+    );
+  END IF;
+
+  IF _from IS NULL THEN
+    __from_seq := (
+      SELECT
+        ab.balance_seq_no
+      FROM account_balance_history ab
+      WHERE ab.account = _account_id
+        AND ab.nai = _coin_type
+      ORDER BY ab.balance_seq_no ASC LIMIT 1
+    );
+  ELSE
+    __from_seq := (
+      WITH first_block AS (
+        SELECT
+          ab.source_op_block
+        FROM account_balance_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block >= _from
+        ORDER BY ab.source_op_block ASC LIMIT 1
+      ),
+      get_sequence AS (
+        SELECT
+          ab.balance_seq_no
+        FROM account_balance_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block = (SELECT source_op_block FROM first_block)
+      )
+      SELECT MIN(gs.balance_seq_no)
+      FROM get_sequence gs
+    );
+  END IF;
+
+  RETURN (
+    COALESCE((__to_seq - __from_seq + 1), 0),
+    COALESCE(__from_seq, 0),
+    COALESCE(__to_seq, 0)
+  )::btracker_backend.balance_history_range_return;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.bh_savings_balance(
+    _account_id INT,
+    _coin_type INT,
+    _from INT, 
+    _to INT
+)
+RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql' STABLE
+SET JIT = OFF
+AS
+$$
+DECLARE
+  __to_seq INT;
+  __from_seq INT;
+BEGIN
+  IF _to IS NULL THEN
+    __to_seq := (
+      SELECT
+        ab.balance_seq_no
+      FROM account_savings_history ab
+      WHERE ab.account = _account_id
+        AND ab.nai = _coin_type
+      ORDER BY ab.balance_seq_no DESC LIMIT 1
+    );
+  ELSE
+    __to_seq := (
+      WITH last_block AS (
+        SELECT
+          ab.source_op_block
+        FROM account_savings_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block <= _to
+        ORDER BY ab.source_op_block DESC LIMIT 1
+      ),
+      get_sequence AS (
+        SELECT
+          ab.balance_seq_no
+        FROM account_savings_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block = (SELECT source_op_block FROM last_block)
+      )
+      SELECT MAX(gs.balance_seq_no)
+      FROM get_sequence gs
+    );
+  END IF;
+
+  IF _from IS NULL THEN
+    __from_seq := (
+      SELECT
+        ab.balance_seq_no
+      FROM account_savings_history ab
+      WHERE ab.account = _account_id
+        AND ab.nai = _coin_type
+      ORDER BY ab.balance_seq_no ASC LIMIT 1
+    );
+  ELSE
+    __from_seq := (
+      WITH first_block AS (
+        SELECT
+          ab.source_op_block
+        FROM account_savings_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block >= _from
+        ORDER BY ab.source_op_block ASC LIMIT 1
+      ),
+      get_sequence AS (
+        SELECT
+          ab.balance_seq_no
+        FROM account_savings_history ab
+        WHERE ab.account = _account_id
+          AND ab.nai = _coin_type
+          AND ab.source_op_block = (SELECT source_op_block FROM first_block)
+      )
+      SELECT MIN(gs.balance_seq_no)
+      FROM get_sequence gs
+    );
+  END IF;
+
+  RETURN (
+    COALESCE((__to_seq - __from_seq + 1), 0),
+    COALESCE(__from_seq, 0),
+    COALESCE(__to_seq, 0)
+  )::btracker_backend.balance_history_range_return;
 END
 $$;
 
