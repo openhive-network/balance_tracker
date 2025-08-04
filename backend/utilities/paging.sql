@@ -20,6 +20,84 @@ BEGIN
 END
 $$;
 
+DROP TYPE IF EXISTS btracker_backend.calculate_pages_return CASCADE;
+CREATE TYPE btracker_backend.calculate_pages_return AS
+(
+    rest_of_division INT,
+    total_pages INT,
+    page_num INT,
+    offset_filter INT,
+    limit_filter INT
+);
+
+CREATE OR REPLACE FUNCTION btracker_backend.calculate_pages(
+    _count INT,
+    _page INT,
+    _order_is btracker_backend.sort_direction, -- noqa: LT01, CP05
+    _limit INT
+)
+RETURNS btracker_backend.calculate_pages_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql' STABLE
+SET JIT = OFF
+AS
+$$
+DECLARE 
+  __rest_of_division INT;
+  __total_pages INT;
+  __page INT;
+  __offset INT;
+  __limit INT;
+BEGIN
+  __rest_of_division := (_count % _limit)::INT;
+
+  __total_pages := (
+    CASE 
+      WHEN (__rest_of_division = 0) THEN 
+        _count / _limit 
+      ELSE 
+        (_count / _limit) + 1
+      END
+  )::INT;
+
+  __page := (
+    CASE 
+      WHEN (_page IS NULL) THEN 
+        1
+      WHEN (_page IS NOT NULL) AND _order_is = 'desc' THEN 
+        __total_pages - _page + 1
+      ELSE 
+        _page 
+      END
+  );
+
+  __offset := (
+    CASE
+      WHEN _order_is = 'desc' AND __page != 1 AND __rest_of_division != 0 THEN 
+        ((__page - 2) * _limit) + __rest_of_division
+      WHEN __page = 1 THEN 
+        0
+      ELSE
+        (__page - 1) * _limit
+      END
+    );
+
+  __limit := (
+      CASE
+        WHEN _order_is = 'desc' AND __page = 1             AND __rest_of_division != 0 THEN
+          __rest_of_division 
+        WHEN _order_is = 'asc'  AND __page = __total_pages AND __rest_of_division != 0 THEN
+          __rest_of_division 
+        ELSE 
+          _limit 
+        END
+    );
+
+  PERFORM btracker_backend.validate_page(_page, __total_pages);
+
+  RETURN (__rest_of_division, __total_pages, __page, __offset, __limit)::btracker_backend.calculate_pages_return;
+END
+$$;
+
 DROP TYPE IF EXISTS btracker_backend.balance_history_range_return CASCADE;
 CREATE TYPE btracker_backend.balance_history_range_return AS
 (
