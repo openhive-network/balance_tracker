@@ -107,7 +107,7 @@ BEGIN
       WITH
         ops AS (
           SELECT block_num, op_type, request_id, nai, amount
-          FROM btracker_app.account_convert_operations
+          FROM account_convert_operations
           WHERE account_name = (
             SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
           )
@@ -167,7 +167,7 @@ BEGIN
     /* 1) pull only create / fill / cancel rows for this account */
     ops AS (
       SELECT block_num, op_type, order_id, nai, amount
-      FROM btracker_app.account_operations
+      FROM account_operations
       WHERE account_name = (
               SELECT name::TEXT
               FROM hive.accounts_view
@@ -395,7 +395,7 @@ BEGIN
         ROW_NUMBER() OVER (
           ORDER BY src.%1$I DESC, av.name ASC
         ) - 1                                       AS rn
-      FROM btracker_app.%2$I AS src
+      FROM %2$I AS src
       JOIN hive.accounts_view AS av
         ON av.id = src.account
       WHERE src.nai = %3$s
