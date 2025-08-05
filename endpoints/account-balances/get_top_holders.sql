@@ -82,7 +82,8 @@ LANGUAGE plpgsql
 STABLE
 AS $$
 DECLARE
-  _page_num INT := COALESCE("page", 1);
+  _page_num INT  := COALESCE("page", 1);
+  _coin_type INT := btracker_backend.get_nai_type("coin-type");
 BEGIN
   -- Validate first - then we can cache the response
   PERFORM btracker_backend.validate_negative_page(_page_num);
@@ -102,7 +103,7 @@ BEGIN
       r.account,
       r.value::TEXT
     FROM btracker_backend.get_top_holders(
-           "coin-type",
+           _coin_type,
            "balance-type",
            _page_num
          ) AS r;
