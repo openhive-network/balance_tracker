@@ -1,103 +1,502 @@
 [
-    { "rank": 1,   "account": "poloniex",           "value": 158946758  },
-    { "rank": 2,   "account": "dantheman",          "value": 152926978  },
-    { "rank": 3,   "account": "steemit1",           "value": 134872472  },
-    { "rank": 4,   "account": "imadev",             "value": 117353589  },
-    { "rank": 5,   "account": "steemit2",           "value": 106543552  },
-    { "rank": 6,   "account": "alittle",            "value": 105465430  },
-    { "rank": 7,   "account": "bittrex",            "value": 81920425   },
-    { "rank": 8,   "account": "blocktrades",        "value": 77246982   },
-    { "rank": 9,   "account": "steemit",            "value": 70337438   },
-    { "rank": 10,  "account": "jamesc",             "value": 53229187   },
-    { "rank": 11,  "account": "xeroc",              "value": 35670079   },
-    { "rank": 12,  "account": "abit",               "value": 33155325   },
-    { "rank": 13,  "account": "steemit60",          "value": 31005142   },
-    { "rank": 14,  "account": "adm",                "value": 30233691   },
-    { "rank": 15,  "account": "steempower",         "value": 26076170   },
-    { "rank": 16,  "account": "cass",               "value": 22774878   },
-    { "rank": 17,  "account": "alot",               "value": 21636683   },
-    { "rank": 18,  "account": "azeroth",            "value": 20227800   },
-    { "rank": 19,  "account": "null",               "value": 19777631   },
-    { "rank": 20,  "account": "openledger",         "value": 18607380   },
-    { "rank": 21,  "account": "arhag",              "value": 17405083   },
-    { "rank": 22,  "account": "aspray",             "value": 16191278   },
-    { "rank": 23,  "account": "gavvet",             "value": 16161667   },
-    { "rank": 24,  "account": "afew",               "value": 15569318   },
-    { "rank": 25,  "account": "apiece",             "value": 15558089   },
-    { "rank": 26,  "account": "mr11acdee",          "value": 15308972   },
-    { "rank": 27,  "account": "dan",                "value": 14332676   },
-    { "rank": 28,  "account": "steemrollin",        "value": 12210260   },
-    { "rank": 29,  "account": "dana-edwards",       "value": 11752939   },
-    { "rank": 30,  "account": "asmolokalo",         "value": 11112828   },
-    { "rank": 31,  "account": "mika",               "value": 11000001   },
-    { "rank": 32,  "account": "infovore",           "value": 10385468   },
-    { "rank": 33,  "account": "kush",               "value": 10313896   },
-    { "rank": 34,  "account": "atip",               "value": 10159969   },
-    { "rank": 35,  "account": "aton",               "value": 10158315   },
-    { "rank": 36,  "account": "adeal",              "value": 10124026   },
-    { "rank": 37,  "account": "adrop",              "value": 10119441   },
-    { "rank": 38,  "account": "abunch",             "value": 10117537   },
-    { "rank": 39,  "account": "aload",              "value": 10117455   },
-    { "rank": 40,  "account": "apinch",             "value": 10111880   },
-    { "rank": 41,  "account": "adash",              "value": 10110672   },
-    { "rank": 42,  "account": "apuff",              "value": 10110647   },
-    { "rank": 43,  "account": "ahint",              "value": 10109359   },
-    { "rank": 44,  "account": "inventor",           "value": 10000000   },
-    { "rank": 45,  "account": "fairytalelife",      "value": 9919807    },
-    { "rank": 46,  "account": "modprobe",           "value": 9457967    },
-    { "rank": 47,  "account": "neilstrauss",        "value": 9138409    },
-    { "rank": 48,  "account": "officialfuzzy",      "value": 9038696    },
-    { "rank": 49,  "account": "void",               "value": 7553999    },
-    { "rank": 50,  "account": "wackou",             "value": 6726821    },
-    { "rank": 51,  "account": "steemfest",          "value": 6517920    },
-    { "rank": 52,  "account": "neoxian",            "value": 6382652    },
-    { "rank": 53,  "account": "furion",             "value": 6317359    },
-    { "rank": 54,  "account": "help-yourself",      "value": 6246798    },
-    { "rank": 55,  "account": "witness.svk",        "value": 6223222    },
-    { "rank": 56,  "account": "riverhead",          "value": 6010244    },
-    { "rank": 57,  "account": "alex90342fastn1",    "value": 6000111    },
-    { "rank": 58,  "account": "theoretical",        "value": 5762000    },
-    { "rank": 59,  "account": "cyrano.witness",     "value": 5673926    },
-    { "rank": 60,  "account": "steemdrive",         "value": 5578636    },
-    { "rank": 61,  "account": "anwenbaumeister",    "value": 5283247    },
-    { "rank": 62,  "account": "jesta",              "value": 5243229    },
-    { "rank": 63,  "account": "jacor",              "value": 5232147    },
-    { "rank": 64,  "account": "unobservant",        "value": 5000980    },
-    { "rank": 65,  "account": "christianity",       "value": 5000000    },
-    { "rank": 66,  "account": "wintzingerode",      "value": 5000000    },
-    { "rank": 67,  "account": "teamsmooth",         "value": 4992303    },
-    { "rank": 68,  "account": "anyx",               "value": 4522471    },
-    { "rank": 69,  "account": "steemitblog",        "value": 4473510    },
-    { "rank": 70,  "account": "enki",               "value": 4285402    },
-    { "rank": 71,  "account": "stan",               "value": 4249417    },
-    { "rank": 72,  "account": "ned",                "value": 4153073    },
-    { "rank": 73,  "account": "cryptoctopus",       "value": 4020334    },
-    { "rank": 74,  "account": "ozchartart",         "value": 3972426    },
-    { "rank": 75,  "account": "chicana",            "value": 3854070    },
-    { "rank": 76,  "account": "kushed1",            "value": 3830440    },
-    { "rank": 77,  "account": "steems",             "value": 3681039    },
-    { "rank": 78,  "account": "blockchaingirl",     "value": 3608543    },
-    { "rank": 79,  "account": "wmougayar",          "value": 3596066    },
-    { "rank": 80,  "account": "sweetsssj",          "value": 3576777    },
-    { "rank": 81,  "account": "aizensou",           "value": 3552873    },
-    { "rank": 82,  "account": "smooth-d",           "value": 3528443    },
-    { "rank": 83,  "account": "jlwkolb",            "value": 3421912    },
-    { "rank": 84,  "account": "rainman",            "value": 3304828    },
-    { "rank": 85,  "account": "andrarchy",          "value": 3245693    },
-    { "rank": 86,  "account": "wingz",              "value": 3176241    },
-    { "rank": 87,  "account": "peerplays",          "value": 3152560    },
-    { "rank": 88,  "account": "cyrano",             "value": 3144983    },
-    { "rank": 89,  "account": "mecon",              "value": 3000121    },
-    { "rank": 90,  "account": "mrosenquist",        "value": 2943257    },
-    { "rank": 91,  "account": "serejandmyself",     "value": 2924545    },
-    { "rank": 92,  "account": "the-alien",          "value": 2908013    },
-    { "rank": 93,  "account": "awgbibb",            "value": 2890892    },
-    { "rank": 94,  "account": "laivi",              "value": 2835923    },
-    { "rank": 95,  "account": "natureofbeing",      "value": 2824885    },
-    { "rank": 96,  "account": "kevinwong",          "value": 2711820    },
-    { "rank": 97,  "account": "kushed",             "value": 2653292    },
-    { "rank": 98,  "account": "clains",             "value": 2621759    },
-    { "rank": 99,  "account": "samupaha",           "value": 2614864    },
-    { "rank": 100, "account": "pfunk3",             "value": 2575974    }
-  ]
-  
+  {
+    "account": "poloniex",
+    "rank": 1,
+    "value": "158946758"
+  },
+  {
+    "account": "dantheman",
+    "rank": 2,
+    "value": "152926978"
+  },
+  {
+    "account": "steemit1",
+    "rank": 3,
+    "value": "134872472"
+  },
+  {
+    "account": "imadev",
+    "rank": 4,
+    "value": "117353589"
+  },
+  {
+    "account": "steemit2",
+    "rank": 5,
+    "value": "106543552"
+  },
+  {
+    "account": "alittle",
+    "rank": 6,
+    "value": "105465430"
+  },
+  {
+    "account": "bittrex",
+    "rank": 7,
+    "value": "81920425"
+  },
+  {
+    "account": "blocktrades",
+    "rank": 8,
+    "value": "77246982"
+  },
+  {
+    "account": "steemit",
+    "rank": 9,
+    "value": "70337438"
+  },
+  {
+    "account": "jamesc",
+    "rank": 10,
+    "value": "53229187"
+  },
+  {
+    "account": "xeroc",
+    "rank": 11,
+    "value": "35670079"
+  },
+  {
+    "account": "abit",
+    "rank": 12,
+    "value": "33155325"
+  },
+  {
+    "account": "steemit60",
+    "rank": 13,
+    "value": "31005142"
+  },
+  {
+    "account": "adm",
+    "rank": 14,
+    "value": "30233691"
+  },
+  {
+    "account": "steempower",
+    "rank": 15,
+    "value": "26076170"
+  },
+  {
+    "account": "cass",
+    "rank": 16,
+    "value": "22774878"
+  },
+  {
+    "account": "alot",
+    "rank": 17,
+    "value": "21636683"
+  },
+  {
+    "account": "azeroth",
+    "rank": 18,
+    "value": "20227800"
+  },
+  {
+    "account": "null",
+    "rank": 19,
+    "value": "19777631"
+  },
+  {
+    "account": "openledger",
+    "rank": 20,
+    "value": "18607380"
+  },
+  {
+    "account": "arhag",
+    "rank": 21,
+    "value": "17405083"
+  },
+  {
+    "account": "aspray",
+    "rank": 22,
+    "value": "16191278"
+  },
+  {
+    "account": "gavvet",
+    "rank": 23,
+    "value": "16161667"
+  },
+  {
+    "account": "afew",
+    "rank": 24,
+    "value": "15569318"
+  },
+  {
+    "account": "apiece",
+    "rank": 25,
+    "value": "15558089"
+  },
+  {
+    "account": "mr11acdee",
+    "rank": 26,
+    "value": "15308972"
+  },
+  {
+    "account": "dan",
+    "rank": 27,
+    "value": "14332676"
+  },
+  {
+    "account": "steemrollin",
+    "rank": 28,
+    "value": "12210260"
+  },
+  {
+    "account": "dana-edwards",
+    "rank": 29,
+    "value": "11752939"
+  },
+  {
+    "account": "asmolokalo",
+    "rank": 30,
+    "value": "11112828"
+  },
+  {
+    "account": "mika",
+    "rank": 31,
+    "value": "11000001"
+  },
+  {
+    "account": "infovore",
+    "rank": 32,
+    "value": "10385468"
+  },
+  {
+    "account": "kush",
+    "rank": 33,
+    "value": "10313896"
+  },
+  {
+    "account": "atip",
+    "rank": 34,
+    "value": "10159969"
+  },
+  {
+    "account": "aton",
+    "rank": 35,
+    "value": "10158315"
+  },
+  {
+    "account": "adeal",
+    "rank": 36,
+    "value": "10124026"
+  },
+  {
+    "account": "adrop",
+    "rank": 37,
+    "value": "10119441"
+  },
+  {
+    "account": "abunch",
+    "rank": 38,
+    "value": "10117537"
+  },
+  {
+    "account": "aload",
+    "rank": 39,
+    "value": "10117455"
+  },
+  {
+    "account": "apinch",
+    "rank": 40,
+    "value": "10111880"
+  },
+  {
+    "account": "adash",
+    "rank": 41,
+    "value": "10110672"
+  },
+  {
+    "account": "apuff",
+    "rank": 42,
+    "value": "10110647"
+  },
+  {
+    "account": "ahint",
+    "rank": 43,
+    "value": "10109359"
+  },
+  {
+    "account": "inventor",
+    "rank": 44,
+    "value": "10000000"
+  },
+  {
+    "account": "fairytalelife",
+    "rank": 45,
+    "value": "9919807"
+  },
+  {
+    "account": "modprobe",
+    "rank": 46,
+    "value": "9457967"
+  },
+  {
+    "account": "neilstrauss",
+    "rank": 47,
+    "value": "9138409"
+  },
+  {
+    "account": "officialfuzzy",
+    "rank": 48,
+    "value": "9038696"
+  },
+  {
+    "account": "void",
+    "rank": 49,
+    "value": "7553999"
+  },
+  {
+    "account": "wackou",
+    "rank": 50,
+    "value": "6726821"
+  },
+  {
+    "account": "steemfest",
+    "rank": 51,
+    "value": "6517920"
+  },
+  {
+    "account": "neoxian",
+    "rank": 52,
+    "value": "6382652"
+  },
+  {
+    "account": "furion",
+    "rank": 53,
+    "value": "6317359"
+  },
+  {
+    "account": "help-yourself",
+    "rank": 54,
+    "value": "6246798"
+  },
+  {
+    "account": "witness.svk",
+    "rank": 55,
+    "value": "6223222"
+  },
+  {
+    "account": "riverhead",
+    "rank": 56,
+    "value": "6010244"
+  },
+  {
+    "account": "alex90342fastn1",
+    "rank": 57,
+    "value": "6000111"
+  },
+  {
+    "account": "theoretical",
+    "rank": 58,
+    "value": "5762000"
+  },
+  {
+    "account": "cyrano.witness",
+    "rank": 59,
+    "value": "5673926"
+  },
+  {
+    "account": "steemdrive",
+    "rank": 60,
+    "value": "5578636"
+  },
+  {
+    "account": "anwenbaumeister",
+    "rank": 61,
+    "value": "5283247"
+  },
+  {
+    "account": "jesta",
+    "rank": 62,
+    "value": "5243229"
+  },
+  {
+    "account": "jacor",
+    "rank": 63,
+    "value": "5232147"
+  },
+  {
+    "account": "unobservant",
+    "rank": 64,
+    "value": "5000980"
+  },
+  {
+    "account": "christianity",
+    "rank": 65,
+    "value": "5000000"
+  },
+  {
+    "account": "wintzingerode",
+    "rank": 66,
+    "value": "5000000"
+  },
+  {
+    "account": "teamsmooth",
+    "rank": 67,
+    "value": "4992303"
+  },
+  {
+    "account": "anyx",
+    "rank": 68,
+    "value": "4522471"
+  },
+  {
+    "account": "steemitblog",
+    "rank": 69,
+    "value": "4473510"
+  },
+  {
+    "account": "enki",
+    "rank": 70,
+    "value": "4285402"
+  },
+  {
+    "account": "stan",
+    "rank": 71,
+    "value": "4249417"
+  },
+  {
+    "account": "ned",
+    "rank": 72,
+    "value": "4153073"
+  },
+  {
+    "account": "cryptoctopus",
+    "rank": 73,
+    "value": "4020334"
+  },
+  {
+    "account": "ozchartart",
+    "rank": 74,
+    "value": "3972426"
+  },
+  {
+    "account": "chicana",
+    "rank": 75,
+    "value": "3854070"
+  },
+  {
+    "account": "kushed1",
+    "rank": 76,
+    "value": "3830440"
+  },
+  {
+    "account": "steems",
+    "rank": 77,
+    "value": "3681039"
+  },
+  {
+    "account": "blockchaingirl",
+    "rank": 78,
+    "value": "3608543"
+  },
+  {
+    "account": "wmougayar",
+    "rank": 79,
+    "value": "3596066"
+  },
+  {
+    "account": "sweetsssj",
+    "rank": 80,
+    "value": "3576777"
+  },
+  {
+    "account": "aizensou",
+    "rank": 81,
+    "value": "3552873"
+  },
+  {
+    "account": "smooth-d",
+    "rank": 82,
+    "value": "3528443"
+  },
+  {
+    "account": "jlwkolb",
+    "rank": 83,
+    "value": "3421912"
+  },
+  {
+    "account": "rainman",
+    "rank": 84,
+    "value": "3304828"
+  },
+  {
+    "account": "andrarchy",
+    "rank": 85,
+    "value": "3245693"
+  },
+  {
+    "account": "wingz",
+    "rank": 86,
+    "value": "3176241"
+  },
+  {
+    "account": "peerplays",
+    "rank": 87,
+    "value": "3152560"
+  },
+  {
+    "account": "cyrano",
+    "rank": 88,
+    "value": "3144983"
+  },
+  {
+    "account": "mecon",
+    "rank": 89,
+    "value": "3000121"
+  },
+  {
+    "account": "mrosenquist",
+    "rank": 90,
+    "value": "2943257"
+  },
+  {
+    "account": "serejandmyself",
+    "rank": 91,
+    "value": "2924545"
+  },
+  {
+    "account": "the-alien",
+    "rank": 92,
+    "value": "2908013"
+  },
+  {
+    "account": "awgbibb",
+    "rank": 93,
+    "value": "2890892"
+  },
+  {
+    "account": "laivi",
+    "rank": 94,
+    "value": "2835923"
+  },
+  {
+    "account": "natureofbeing",
+    "rank": 95,
+    "value": "2824885"
+  },
+  {
+    "account": "kevinwong",
+    "rank": 96,
+    "value": "2711820"
+  },
+  {
+    "account": "kushed",
+    "rank": 97,
+    "value": "2653292"
+  },
+  {
+    "account": "clains",
+    "rank": 98,
+    "value": "2621759"
+  },
+  {
+    "account": "samupaha",
+    "rank": 99,
+    "value": "2614864"
+  },
+  {
+    "account": "pfunk3",
+    "rank": 100,
+    "value": "2575974"
+  }
+]
