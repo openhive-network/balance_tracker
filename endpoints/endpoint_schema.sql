@@ -718,9 +718,9 @@ declare
             "required": false,
             "schema": {
               "type": "integer",
-              "default": 1
+              "default": null
             },
-            "description": "Return page on `page` number, defaults to `1`\n"
+            "description": "Return page on `page` number, default null due to reversed order of pages,\nthe first page is the oldest,\nexample: first call returns the newest page and total_pages is 100 - the newest page is number 100, next 99 etc.\n"
           },
           {
             "in": "query",
