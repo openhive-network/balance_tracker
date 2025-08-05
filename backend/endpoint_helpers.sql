@@ -379,14 +379,6 @@ DECLARE
   END;
   _offset    INT := (_page - 1) * 100;
 BEGIN
-  PERFORM btracker_backend.validate_negative_page(_page);
-
-  IF _balance_type = 'savings_balance' AND asset_nai = 37 THEN
-    PERFORM btracker_backend.rest_raise_vest_saving_balance(
-      'balance-type','coin-type'
-    );
-  END IF;
-
   RETURN QUERY EXECUTE format($sql$
     WITH ranked_rows AS (
       SELECT
