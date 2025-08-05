@@ -623,26 +623,22 @@ BEGIN
   -- INCLUDE (balance,source_op) to speed up balance_history function
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account,nai,source_op_block);
   -- INCLUDE (balance_seq_no) to speed up balance_history function
-
   CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON account_savings_history(account,nai,balance_seq_no);
   -- INCLUDE (saving_balance,source_op) to speed up balance_history function
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account,nai,source_op_block);
   -- INCLUDE (balance_seq_no) to speed up balance_history function
-  
+
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
-  CREATE INDEX IF NOT EXISTS
-    idx_conv_ops_accname_opt_block_desc
-    ON account_convert_operations
-        (account_name, op_type, block_num DESC)
-    INCLUDE (request_id, nai, amount);
 
-  CREATE INDEX IF NOT EXISTS
-    idx_acc_ops_accname_opt_block_desc
-    ON account_operations
-        (account_name, op_type, block_num DESC)
-    INCLUDE (order_id, nai, amount);
+  CREATE INDEX IF NOT EXISTS idx_conv_ops_accname_opt_block_desc ON account_convert_operations(account_name, op_type, block_num DESC)
+  INCLUDE (request_id, nai, amount);
 
+  CREATE INDEX IF NOT EXISTS idx_acc_ops_accname_opt_block_desc ON account_operations(account_name, op_type, block_num DESC)
+  INCLUDE (order_id, nai, amount);
+
+  CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai,balance DESC);
+  CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,saving_balance DESC);
 END
 $$;
 
