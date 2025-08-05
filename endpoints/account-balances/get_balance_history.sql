@@ -53,9 +53,11 @@ SET ROLE btracker_owner;
         required: false
         schema:
           type: integer
-          default: 1
+          default: NULL
         description: |
-          Return page on `page` number, defaults to `1`
+          Return page on `page` number, default null due to reversed order of pages,
+          the first page is the oldest,
+          example: first call returns the newest page and total_pages is 100 - the newest page is number 100, next 99 etc.
       - in: query
         name: page-size
         required: false
@@ -153,7 +155,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_history(
     "account-name" TEXT,
     "coin-type" btracker_backend.nai_type,
     "balance-type" btracker_backend.balance_type = 'balance',
-    "page" INT = 1,
+    "page" INT = NULL,
     "page-size" INT = 100,
     "direction" btracker_backend.sort_direction = 'desc',
     "from-block" TEXT = NULL,
@@ -162,8 +164,8 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_balance_history(
 RETURNS btracker_backend.operation_history 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql' STABLE
-SET from_collapse_limit = 1
-SET join_collapse_limit = 1
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
 SET jit = OFF
 AS
 $$
@@ -171,12 +173,6 @@ DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
   _account_id INT                := btracker_backend.get_account_id("account-name", TRUE);
   _coin_type INT                 := btracker_backend.get_nai_type("coin-type");
-  _result btracker_backend.balance_history[];
-
-  _ops_count INT;
-  _from_op BIGINT;
-  _to_op BIGINT;
-  __total_pages INT;
 BEGIN
   PERFORM btracker_backend.validate_limit("page-size", 1000);
   PERFORM btracker_backend.validate_negative_limit("page-size");
@@ -189,78 +185,16 @@ BEGIN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
-  SELECT count, from_op, to_op 
-  INTO _ops_count, _from_op, _to_op
-  FROM btracker_backend.balance_history_range(
+  RETURN btracker_backend.balance_history(
     _account_id,
     _coin_type,
     "balance-type",
-    _block_range.first_block, 
+    "page",
+    "page-size",
+    "direction",
+    _block_range.first_block,
     _block_range.last_block
   );
-
-  __total_pages := btracker_backend.total_pages(_ops_count, "page-size");
-
-  PERFORM btracker_backend.validate_page("page", __total_pages);
-
-  _result := CASE 
-    WHEN "balance-type" = 'balance' THEN
-      (
-        SELECT array_agg(row ORDER BY
-          (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
-          (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
-        ) FROM (
-          SELECT 
-            ba.block_num,
-            ba.operation_id,
-            ba.op_type_id,
-            ba.balance,
-            ba.prev_balance,
-            ba.balance_change,
-            ba.timestamp
-          FROM btracker_backend.balance_history(
-            _account_id,
-            _coin_type,
-            "page",
-            "page-size",
-            "direction",
-            _from_op,
-            _to_op
-          ) ba
-        ) row
-      )
-    ELSE
-      (
-        SELECT array_agg(row ORDER BY
-          (CASE WHEN "direction" = 'desc' THEN row.operation_id::BIGINT ELSE NULL END) DESC,
-          (CASE WHEN "direction" = 'asc' THEN row.operation_id::BIGINT ELSE NULL END) ASC
-        ) FROM (
-          SELECT 
-            ba.block_num,
-            ba.operation_id,
-            ba.op_type_id,
-            ba.balance,
-            ba.prev_balance,
-            ba.balance_change,
-            ba.timestamp
-          FROM btracker_backend.savings_history(
-            _account_id,
-            _coin_type,
-            "page",
-            "page-size",
-            "direction",
-            _from_op,
-            _to_op
-          ) ba
-        ) row
-      )
-    END;
-
-  RETURN (
-    COALESCE(_ops_count, 0),
-    COALESCE(__total_pages, 0),
-    COALESCE(_result, '{}'::btracker_backend.balance_history[])
-  )::btracker_backend.operation_history;
 
 END
 $$;
