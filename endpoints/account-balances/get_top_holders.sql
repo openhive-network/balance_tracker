@@ -84,25 +84,16 @@ AS $$
 DECLARE
   _page_num INT := COALESCE("page", 1);
 BEGIN
+  -- Validate first - then we can cache the response
+  PERFORM btracker_backend.validate_negative_page(_page_num);
+  PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
+
   -- Cache header (2s)
   PERFORM set_config(
     'response.headers',
     '[{"Cache-Control":"public, max-age=2"}]',
     true
   );
-
-  -- Validate page ≥ 1
-  PERFORM btracker_backend.validate_negative_page(_page_num);
-
-  -- Forbid savings_balance on VESTS
-  IF "balance-type" = 'savings_balance'
-     AND "coin-type" = 'VESTS'
-  THEN
-    PERFORM btracker_backend.rest_raise_vest_saving_balance(
-      "balance-type",
-      "coin-type"
-    );
-  END IF;
 
   -- Return exactly the composite type fields
   RETURN QUERY
