@@ -100,8 +100,8 @@ whole table is inserted into history (without id = 0) and the newest record is u
 
 */
 
-prepare_balance_history AS MATERIALIZED (
-  SELECT 
+sum_balances AS (
+  SELECT
     ulb.account_id,
     ulb.nai,
     SUM(ulb.balance) OVER (
@@ -111,9 +111,24 @@ prepare_balance_history AS MATERIALIZED (
       PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS balance_seq_no,
     ulb.source_op,
-    ulb.source_op_block,
-    ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
+    ulb.source_op_block
+    --ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
   FROM union_latest_balance_with_impacted_balances ulb
+),
+
+-- the row number must be calculated after the sum,
+-- some operations like escrow_rejected_operation can trigger multiple balance changes
+-- for the same asset, which can lead to multiple rows with the same source_op and the same balance
+prepare_balance_history AS MATERIALIZED (
+  SELECT
+    sb.account_id,
+    sb.nai,
+    sb.balance,
+    sb.balance_seq_no,
+    sb.source_op,
+    sb.source_op_block,
+    ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
+  FROM sum_balances sb
 ),
 
 insert_current_account_balances AS (
