@@ -87,6 +87,34 @@ extract-swagger-json:
   tags:
   - public-runner-docker
 
+generate_python_api_client:
+  extends: .project_develop_configuration_template
+  stage: build
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  needs:
+  - job: extract-swagger-json
+    artifacts: true
+  script:
+    - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
+  artifacts:
+    paths:
+      - "${PYPROJECT_DIR}/balance_api"
+      - "${PYPROJECT_DIR}/balance_api/balance_api_client"
+  tags:
+    - public-runner-docker
+
+build_python_api_client_wheel:
+  extends: .build_wheel_template
+  stage: build
+  needs:
+  - job: generate_python_api_client
+    artifacts: true
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  tags:
+    - public-runner-docker
+
 generate-wax-spec:
   extends: .generate_swagger_package
   stage: build
@@ -535,6 +563,19 @@ pattern-test-with-mock-data:
   tags:
   - data-cache-storage
 
+python_api_client_test:
+  extends: .project_develop_configuration_template
+  stage: test
+  needs:
+    - job: generate_python_api_client
+      artifacts: true
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  script:
+    - pytest "${PYPROJECT_DIR}/tests"
+  tags:
+    - public-runner-docker
+
 build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
@@ -550,6 +591,21 @@ build_and_publish_image:
   tags:
   - public-runner-docker
   - hived-for-tests
+
+deploy_python_api_packages_to_gitlab:
+  stage: publish
+  needs:
+    - job: build_python_api_client_wheel
+      artifacts: true
+    - job: generate_python_api_client
+      artifacts: true
+    - job: python_api_client_test
+  extends: .deploy_wheel_to_gitlab_template
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  when: on_success
+  tags:
+    - public-runner-docker
 
 deploy-wax-spec-dev-package:
   extends: .npm_deploy_package_template
