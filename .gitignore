@@ -27,3 +27,7 @@ docker-compose.override.yml
 
 # IDEs
 .vscode/
+
+# Python API client generaration
+scripts/python_api_package/balance_api/balance_api_client
+scripts/python_api_package/dist
