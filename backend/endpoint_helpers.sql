@@ -350,9 +350,10 @@ $BODY$;
 RESET ROLE;
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
-    _coin_type    btracker_backend.nai_type,
-    _balance_type btracker_backend.balance_type DEFAULT 'balance',
-    _page         INT                             DEFAULT 1
+    _coin_type    INT,
+    _balance_type btracker_backend.balance_type,
+    _page         INT,
+    _limit        INT
 )
 RETURNS TABLE(
     rank    INT,
@@ -364,48 +365,56 @@ STABLE
 AS
 $$
 DECLARE
-  asset_nai INT := CASE UPPER(_coin_type::TEXT)
-    WHEN 'HBD'  THEN 13
-    WHEN 'HIVE' THEN 21
-    ELSE 37
-  END;
-  src_table  TEXT := CASE _balance_type
-    WHEN 'balance' THEN 'current_account_balances'
-    ELSE                    'account_savings'
-  END;
-  src_column TEXT := CASE _balance_type
-    WHEN 'balance' THEN 'balance'
-    ELSE                    'saving_balance'
-  END;
-  _offset    INT := (_page - 1) * 100;
+  _offset INT := (_page - 1) * _limit;
 BEGIN
-  RETURN QUERY EXECUTE format($sql$
-    WITH ranked_rows AS (
+  IF _balance_type = 'balance' THEN
+    RETURN QUERY
+      --first gather top holders ordered by balance and name
+      --this query uses index (nai, balance) to speed up the process
+      WITH ordered_holders AS MATERIALIZED (
+        SELECT
+          av.name,
+          src.balance
+        FROM current_account_balances AS src
+        JOIN hive.accounts_view av ON av.id = src.account
+        WHERE src.nai = _coin_type
+        ORDER BY src.balance DESC, av.name ASC
+        OFFSET _offset
+        LIMIT _limit
+      )
+      --to already found records add row number
       SELECT
-        av.name::TEXT                                AS account,
-        src.%1$I::NUMERIC(38,0)                      AS value,    
-        ROW_NUMBER() OVER (
-          ORDER BY src.%1$I DESC, av.name ASC
-        ) - 1                                       AS rn
-      FROM %2$I AS src
-      JOIN hive.accounts_view AS av
-        ON av.id = src.account
-      WHERE src.nai = %3$s
-        AND src.%1$I >= 0
-    )
-    SELECT
-      (rn + 1)::INT    AS rank,
-      account,
-      value
-    FROM ranked_rows
-    WHERE rn BETWEEN %4$s AND %4$s + 99
-    ORDER BY rn
-    $sql$,
-    src_column,   -- 1: column name
-    src_table,    -- 2: table name
-    asset_nai,    -- 3: numeric NAI
-    _offset       -- 4: zero-based offset
-  );
+        (
+          ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _offset
+        )::INT AS rank,
+        o.name::TEXT,
+        o.balance::NUMERIC(38,0)
+      FROM ordered_holders o;
+
+  ELSIF _balance_type = 'savings_balance' THEN
+    RETURN QUERY
+      WITH ordered_holders AS MATERIALIZED (
+        SELECT
+          av.name,
+          src.saving_balance
+        FROM account_savings AS src
+        JOIN hive.accounts_view av ON av.id = src.account
+        WHERE src.nai = _coin_type
+        ORDER BY src.saving_balance DESC, av.name ASC
+        OFFSET _offset
+        LIMIT _limit
+      )
+      SELECT
+        (
+          ROW_NUMBER() OVER (ORDER BY o.saving_balance DESC, o.name ASC) + _offset
+        )::INT AS rank,
+        o.name::TEXT,
+        o.saving_balance::NUMERIC(38,0)
+      FROM ordered_holders o;
+
+  ELSE
+    RAISE EXCEPTION 'Unsupported balance type: %', _balance_type;
+  END IF;
 END;
 $$;
 
