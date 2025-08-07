@@ -404,7 +404,7 @@ BEGIN
   RETURN EXISTS(
       SELECT true FROM pg_index WHERE indexrelid = 
       (
-        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_history_account_source_op_idx' LIMIT 1
+        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_nai_balance_idx' LIMIT 1
       )
     );
 END

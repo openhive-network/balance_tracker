@@ -105,7 +105,8 @@ BEGIN
     FROM btracker_backend.get_top_holders(
            _coin_type,
            "balance-type",
-           _page_num
+           _page_num,
+           100
          ) AS r;
 END;
 $$;
