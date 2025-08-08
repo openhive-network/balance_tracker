@@ -81,9 +81,8 @@ BEGIN
       current.source_op,
       current.op_type_id,
       current.balance,
-      prev.balance AS prev_balance
+      LAG(current.balance) OVER (ORDER BY current.balance_seq_no) AS prev_balance
     FROM gather_page current
-    LEFT JOIN gather_page prev ON prev.balance_seq_no = current.balance_seq_no - 1
     ORDER BY
       (CASE WHEN _order_is = 'desc' THEN current.balance_seq_no ELSE NULL END) DESC,
       (CASE WHEN _order_is = 'asc'  THEN current.balance_seq_no ELSE NULL END) ASC
