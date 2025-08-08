@@ -53,7 +53,7 @@ BEGIN
   _calculate_pages := btracker_backend.calculate_pages(_bh_range.count, _page, _order_is, _page_size);
 
   -- Fetching operations
-	WITH gather_page AS (
+	WITH gather_page AS MATERIALIZED (
     SELECT
       ab.balance_seq_no,
       ab.balance,
