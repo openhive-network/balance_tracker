@@ -54,7 +54,6 @@ CREATE TABLE IF NOT EXISTS current_account_balances
   balance BIGINT NOT NULL,  -- Balance value (amount of held tokens)
   balance_change_count INT NOT NULL, -- Number of balance changes
   source_op BIGINT NOT NULL,-- The operation triggered last balance change
-  source_op_block INT NOT NULL, -- Block containing the source operation
 
   CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
 );
@@ -67,9 +66,8 @@ CREATE TABLE IF NOT EXISTS account_balance_history
   nai     INT NOT NULL,     -- Balance type (currency)
   balance BIGINT NOT NULL,  -- Balance value after a change
   balance_seq_no INT NOT NULL, -- Sequence number of the balance change
-  source_op BIGINT NOT NULL,-- The operation triggered given balance change
-  source_op_block INT NOT NULL -- Block containing the source operation
-  
+  source_op BIGINT NOT NULL-- The operation triggered given balance change
+
   /** Because of bugs in blockchain at very begin, it was possible to make a transfer to self. See summon transfer in block 118570,
       like also `register` transfer in block 818601
       That's why constraint has been eliminated.
@@ -81,14 +79,15 @@ PERFORM hive.app_register_table( __schema_name, 'account_balance_history', __sch
 
 CREATE TABLE IF NOT EXISTS balance_history_by_month
 (
-  account INT NOT NULL,
-  nai     INT NOT NULL,
-  balance BIGINT NOT NULL,
+  account    INT NOT NULL,
+  nai        INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL, -- period start time
+
+  balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
   max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+
+  source_op   BIGINT NOT NULL, -- The operation triggered last balance change
 
   CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at)
 );
@@ -97,14 +96,15 @@ PERFORM hive.app_register_table( __schema_name, 'balance_history_by_month', __sc
 
 CREATE TABLE IF NOT EXISTS balance_history_by_day
 (
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  balance BIGINT NOT NULL,
+  account    INT NOT NULL,
+  nai        INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,  -- period start time
+
+  balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
   max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+
+  source_op   BIGINT NOT NULL, -- The operation triggered last balance change
 
   CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at)
 );
@@ -212,10 +212,9 @@ CREATE TABLE IF NOT EXISTS account_savings
 (
   account INT NOT NULL,
   nai     INT NOT NULL,
-  saving_balance BIGINT DEFAULT 0,
+  balance BIGINT DEFAULT 0,
   balance_change_count INT NOT NULL,
   source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
   savings_withdraw_requests INT DEFAULT 0,
 
   CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
@@ -226,24 +225,24 @@ CREATE TABLE IF NOT EXISTS account_savings_history
 (
   account INT NOT NULL,
   nai     INT NOT NULL,
-  saving_balance BIGINT NOT NULL,
+  balance BIGINT NOT NULL,
   balance_seq_no INT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL
+  source_op BIGINT NOT NULL
 );
 
 PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __schema_name );
 
 CREATE TABLE IF NOT EXISTS saving_history_by_month
 (
-  account INT NOT NULL,
-  nai     INT NOT NULL,
-  balance BIGINT NOT NULL,
+  account    INT NOT NULL,
+  nai        INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL, -- period start time
+
+  balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
   max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+
+  source_op   BIGINT NOT NULL, -- The operation triggered last balance change
 
   CONSTRAINT pk_saving_history_by_month PRIMARY KEY (account, nai, updated_at)
 );
@@ -252,14 +251,15 @@ PERFORM hive.app_register_table( __schema_name, 'saving_history_by_month', __sch
 
 CREATE TABLE IF NOT EXISTS saving_history_by_day
 (
-  account INT NOT NULL,
-  nai     INT NOT NULL, 
-  balance BIGINT NOT NULL,
+  account    INT NOT NULL,
+  nai        INT NOT NULL,
+  updated_at TIMESTAMP NOT NULL, -- period start time
+
+  balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
   max_balance BIGINT NOT NULL,
-  source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+
+  source_op   BIGINT NOT NULL, -- The operation triggered last balance change
 
   CONSTRAINT pk_saving_history_by_day PRIMARY KEY (account, nai, updated_at)
 );
@@ -621,11 +621,11 @@ BEGIN
   -- usage of include would be ideal
   CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON account_balance_history(account,nai,balance_seq_no);
   -- INCLUDE (balance,source_op) to speed up balance_history function
-  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account,nai,source_op_block);
+  CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account,nai,hafd.operation_id_to_block_num( source_op ));
   -- INCLUDE (balance_seq_no) to speed up balance_history function
   CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON account_savings_history(account,nai,balance_seq_no);
-  -- INCLUDE (saving_balance,source_op) to speed up balance_history function
-  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account,nai,source_op_block);
+  -- INCLUDE (balance,source_op) to speed up balance_history function
+  CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account,nai,hafd.operation_id_to_block_num( source_op ));
   -- INCLUDE (balance_seq_no) to speed up balance_history function
 
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
@@ -638,7 +638,7 @@ BEGIN
   INCLUDE (order_id, nai, amount);
 
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai,balance DESC);
-  CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,saving_balance DESC);
+  CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
 END
 $$;
 
