@@ -266,7 +266,7 @@ get_latest_balance AS (
   SELECT 
     gan.account_id,
     gan.nai,
-    COALESCE(cab.saving_balance, 0) as balance,
+    COALESCE(cab.balance, 0) as balance,
     COALESCE(cab.savings_withdraw_requests, 0) AS savings_withdraw_request,
     COALESCE(cab.balance_change_count, 0) as balance_seq_no,
     0 AS request_id,  
@@ -375,35 +375,32 @@ remove_latest_stored_balance_record AS MATERIALIZED (
 ),
 insert_sum_of_transfers AS (
   INSERT INTO account_savings AS acc_history
-    (account, nai, balance_change_count, saving_balance, source_op, source_op_block, savings_withdraw_requests)
+    (account, nai, balance_change_count, balance, source_op, savings_withdraw_requests)
   SELECT
     ps.account_id,
     ps.nai,
     ps.balance_seq_no,
     ps.balance,
     ps.source_op,
-    ps.source_op_block,
     ps.savings_withdraw_request
   FROM remove_latest_stored_balance_record ps
   WHERE rn = 1
   ON CONFLICT ON CONSTRAINT pk_account_savings
   DO UPDATE SET
-      saving_balance = EXCLUDED.saving_balance,
+      balance = EXCLUDED.balance,
       balance_change_count = EXCLUDED.balance_change_count,
       source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block,
       savings_withdraw_requests = EXCLUDED.savings_withdraw_requests
   RETURNING acc_history.account
 ),
 insert_saving_balance_history AS (
   INSERT INTO account_savings_history AS acc_history
-    (account, nai, balance_seq_no, source_op, source_op_block, saving_balance)
+    (account, nai, balance_seq_no, source_op, balance)
   SELECT 
     pbh.account_id,
     pbh.nai,
     pbh.balance_seq_no,
     pbh.source_op,
-    pbh.source_op_block,
     pbh.balance
   FROM remove_latest_stored_balance_record pbh
   RETURNING acc_history.account
@@ -455,12 +452,11 @@ get_min_max_balances_by_month AS (
 ),
 insert_saving_balance_history_by_day AS (
   INSERT INTO saving_history_by_day AS acc_history
-    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
   SELECT 
     gl.account_id,
     gl.nai,
     gl.source_op,
-    gl.source_op_block,
     gl.by_day,
     gl.balance,
     gm.min_balance,
@@ -474,7 +470,6 @@ insert_saving_balance_history_by_day AS (
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO 
   UPDATE SET 
     source_op = EXCLUDED.source_op,
-    source_op_block = EXCLUDED.source_op_block,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
@@ -482,12 +477,11 @@ insert_saving_balance_history_by_day AS (
 ),
 insert_saving_balance_history_by_month AS (
   INSERT INTO saving_history_by_month AS acc_history
-    (account, nai, source_op, source_op_block, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
   SELECT 
     gl.account_id,
     gl.nai,
     gl.source_op,
-    gl.source_op_block,
     gl.by_month,
     gl.balance,
     gm.min_balance,
@@ -501,7 +495,6 @@ insert_saving_balance_history_by_month AS (
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO 
   UPDATE SET
     source_op = EXCLUDED.source_op,
-    source_op_block = EXCLUDED.source_op_block,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
