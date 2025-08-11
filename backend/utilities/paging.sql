@@ -146,7 +146,7 @@ BEGIN
     __to_seq := (
       SELECT
         ab.balance_seq_no
-      FROM account_balance_history ab
+      FROM btracker_backend.account_balance_history_view ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no DESC LIMIT 1
@@ -156,7 +156,7 @@ BEGIN
       WITH last_block AS (
         SELECT
           ab.source_op_block
-        FROM account_balance_history ab
+        FROM btracker_backend.account_balance_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block <= _to
@@ -165,7 +165,7 @@ BEGIN
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM account_balance_history ab
+        FROM btracker_backend.account_balance_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block = (SELECT source_op_block FROM last_block)
@@ -179,7 +179,7 @@ BEGIN
     __from_seq := (
       SELECT
         ab.balance_seq_no
-      FROM account_balance_history ab
+      FROM btracker_backend.account_balance_history_view ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no ASC LIMIT 1
@@ -189,7 +189,7 @@ BEGIN
       WITH first_block AS (
         SELECT
           ab.source_op_block
-        FROM account_balance_history ab
+        FROM btracker_backend.account_balance_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block >= _from
@@ -198,7 +198,7 @@ BEGIN
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM account_balance_history ab
+        FROM btracker_backend.account_balance_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block = (SELECT source_op_block FROM first_block)
@@ -235,7 +235,7 @@ BEGIN
     __to_seq := (
       SELECT
         ab.balance_seq_no
-      FROM account_savings_history ab
+      FROM btracker_backend.account_savings_history_view ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no DESC LIMIT 1
@@ -245,7 +245,7 @@ BEGIN
       WITH last_block AS (
         SELECT
           ab.source_op_block
-        FROM account_savings_history ab
+        FROM btracker_backend.account_savings_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block <= _to
@@ -254,7 +254,7 @@ BEGIN
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM account_savings_history ab
+        FROM btracker_backend.account_savings_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block = (SELECT source_op_block FROM last_block)
@@ -268,7 +268,7 @@ BEGIN
     __from_seq := (
       SELECT
         ab.balance_seq_no
-      FROM account_savings_history ab
+      FROM btracker_backend.account_savings_history_view ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no ASC LIMIT 1
@@ -278,7 +278,7 @@ BEGIN
       WITH first_block AS (
         SELECT
           ab.source_op_block
-        FROM account_savings_history ab
+        FROM btracker_backend.account_savings_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block >= _from
@@ -287,7 +287,7 @@ BEGIN
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM account_savings_history ab
+        FROM btracker_backend.account_savings_history_view ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
           AND ab.source_op_block = (SELECT source_op_block FROM first_block)

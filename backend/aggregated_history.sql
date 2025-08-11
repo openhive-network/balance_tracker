@@ -9,7 +9,6 @@ CREATE TYPE btracker_backend.balance_history_return AS (
     balance BIGINT,
     min_balance BIGINT,
     max_balance BIGINT,
-    source_op_block INT,
     updated_at TIMESTAMP
 );
 
@@ -33,7 +32,6 @@ BEGIN
             balance,
             min_balance,
             max_balance,
-            source_op_block,
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM balance_history_by_month
@@ -46,7 +44,6 @@ BEGIN
             account,
             nai,
             balance,
-            source_op_block,
             by_year,
             ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
         FROM get_year
@@ -69,7 +66,6 @@ BEGIN
         gl.balance,
         gm.min_balance,
         gm.max_balance,
-        gl.source_op_block,
         gl.by_year AS updated_at
     FROM get_latest_updates gl
     JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
@@ -98,7 +94,6 @@ BEGIN
             balance,
             min_balance,
             max_balance,
-            source_op_block,
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM balance_history_by_month
@@ -111,7 +106,6 @@ BEGIN
             account,
             nai,
             balance,
-            source_op_block,
             by_year,
             ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
         FROM get_year
@@ -134,7 +128,6 @@ BEGIN
         gl.balance,
         gm.min_balance,
         gm.max_balance,
-        gl.source_op_block,
         gl.by_year
     )::btracker_backend.balance_history_return
     FROM get_latest_updates gl
@@ -168,12 +161,11 @@ BEGIN
             balance,
             min_balance,
             max_balance,
-            source_op_block,
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM saving_history_by_month
         WHERE account = _account_id AND nai = _coin_type AND
-              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to 
+              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
     ),
 
     get_latest_updates AS (
@@ -181,7 +173,6 @@ BEGIN
             account,
             nai,
             balance,
-            source_op_block,
             by_year,
             ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
         FROM get_year
@@ -204,7 +195,6 @@ BEGIN
         gl.balance,
         gm.min_balance,
         gm.max_balance,
-        gl.source_op_block,
         gl.by_year AS updated_at
     FROM get_latest_updates gl
     JOIN get_min_max_balances_by_year gm ON gl.account = gm.account AND gl.nai = gm.nai AND gl.by_year = gm.by_year
@@ -233,7 +223,6 @@ BEGIN
             balance,
             min_balance,
             max_balance,
-            source_op_block,
             updated_at,
             DATE_TRUNC('year', updated_at) AS by_year
         FROM saving_history_by_month
@@ -246,7 +235,6 @@ BEGIN
             account,
             nai,
             balance,
-            source_op_block,
             by_year,
             ROW_NUMBER() OVER (PARTITION BY account, nai, by_year ORDER BY updated_at DESC) AS rn_by_year
         FROM get_year
@@ -269,7 +257,6 @@ BEGIN
         gl.balance,
         gm.min_balance,
         gm.max_balance,
-        gl.source_op_block,
         gl.by_year
     )::btracker_backend.balance_history_return
     FROM get_latest_updates gl
@@ -304,7 +291,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh
       WHERE _granularity = 'yearly'
@@ -317,7 +303,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM balance_history_by_day bh
       WHERE 
@@ -334,7 +319,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM balance_history_by_month bh
       WHERE 
@@ -350,7 +334,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh
       WHERE _granularity = 'yearly'
@@ -363,7 +346,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM saving_history_by_day bh
       WHERE 
@@ -380,7 +362,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM saving_history_by_month bh
       WHERE 
@@ -412,7 +393,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM btracker_backend.balance_history_by_year_last_record(_account_id, _coin_type, _from) bh;
@@ -424,7 +404,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM balance_history_by_month bh
@@ -442,7 +421,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM balance_history_by_day bh
@@ -460,7 +438,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM btracker_backend.saving_history_by_year_last_record(_account_id, _coin_type, _from) bh;
@@ -472,7 +449,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM saving_history_by_month bh
@@ -490,7 +466,6 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.source_op_block,
       bh.updated_at
     )::btracker_backend.balance_history_return
     FROM saving_history_by_day bh
@@ -577,7 +552,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM btracker_backend.balance_history(
         _account_id,
@@ -595,7 +569,6 @@ BEGIN
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.source_op_block,
         bh.updated_at
       FROM btracker_backend.balance_history(
         _account_id,
@@ -615,8 +588,7 @@ BEGIN
         bh.max_balance,
         sa.balance AS savings_balance,
         sa.min_balance AS min_savings_balance,
-        sa.max_balance AS max_savings_balance,
-        bh.source_op_block
+        sa.max_balance AS max_savings_balance
       FROM add_row_num_to_series ds
       LEFT JOIN get_balance_aggregation bh ON ds.date = bh.updated_at
       LEFT JOIN get_savings_aggregation sa ON ds.date = sa.updated_at
@@ -634,16 +606,13 @@ BEGIN
           COALESCE(ds.savings_balance, savings_prev_balance.balance, 0) AS savings_balance,
           COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,
           COALESCE(ds.min_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS min_savings_balance,
-          COALESCE(ds.max_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS max_savings_balance,
-
-          COALESCE(ds.source_op_block, prev_balance.source_op_block, NULL) AS source_op_block
+          COALESCE(ds.max_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS max_savings_balance
         FROM balance_records ds
         LEFT JOIN LATERAL (
           SELECT 
             bh.balance,
             bh.min_balance,
-            bh.max_balance,
-            bh.source_op_block 
+            bh.max_balance
           FROM btracker_backend.balance_history_last_record(
             _account_id,
             _coin_type,
@@ -656,8 +625,7 @@ BEGIN
           SELECT 
             bh.balance,
             bh.min_balance,
-            bh.max_balance,
-            bh.source_op_block 
+            bh.max_balance
           FROM btracker_backend.balance_history_last_record(
             _account_id,
             _coin_type,
@@ -681,9 +649,7 @@ BEGIN
           COALESCE(next_b.savings_balance, prev_b.savings_balance, 0) AS savings_balance,
           COALESCE(prev_b.savings_balance, 0) AS prev_savings_balance,
           COALESCE(next_b.min_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS min_savings_balance,
-          COALESCE(next_b.max_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS max_savings_balance,
-
-          COALESCE(next_b.source_op_block, prev_b.source_op_block, NULL) AS source_op_block
+          COALESCE(next_b.max_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS max_savings_balance
         FROM agg_history prev_b
         JOIN balance_records next_b ON next_b.row_num = prev_b.row_num + 1
       )

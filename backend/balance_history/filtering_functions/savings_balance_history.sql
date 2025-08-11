@@ -16,8 +16,8 @@ BEGIN
   END IF;
 
   _prev_balance := (
-    SELECT abh.saving_balance
-    FROM account_savings_history abh
+    SELECT abh.balance
+    FROM btracker_backend.account_savings_history_view abh
     WHERE
       abh.account = _account_id AND
       abh.nai = _coin_type AND
@@ -56,11 +56,11 @@ BEGIN
 	WITH gather_page AS MATERIALIZED (
     SELECT
       ab.balance_seq_no,
-      ab.saving_balance AS balance,
+      ab.balance,
       ab.source_op,
       ab.source_op_block,
-      hafd.operation_id_to_type_id(ab.source_op) AS op_type_id
-    FROM account_savings_history ab
+      ab.op_type_id
+    FROM btracker_backend.account_savings_history_view ab
     WHERE ab.account         = _account_id
       AND ab.nai             = _coin_type
       AND ab.balance_seq_no >= _bh_range.from_seq
