@@ -27,7 +27,7 @@ BEGIN
         COALESCE(MAX(CASE WHEN cab.nai=13 THEN cab.balance END),0)::BIGINT AS hbd_balance,
         COALESCE(MAX(CASE WHEN cab.nai=21 THEN cab.balance END),0)::BIGINT AS hive_balance,
         COALESCE(MAX(CASE WHEN cab.nai=37 THEN cab.balance END),0)::BIGINT AS vesting_shares
-      FROM current_account_balances cab
+      FROM btracker_backend.current_account_balances_view cab
       WHERE cab.account = _account_id
     ),
 
@@ -82,10 +82,10 @@ BEGIN
     -- 7) Savings + withdraw‐requests count
     get_savings AS (
       SELECT
-        COALESCE(MAX(CASE WHEN ats.nai=13 THEN ats.saving_balance END),0)::BIGINT AS hbd_savings,
-        COALESCE(MAX(CASE WHEN ats.nai=21 THEN ats.saving_balance END),0)::BIGINT AS hive_savings,
+        COALESCE(MAX(CASE WHEN ats.nai=13 THEN ats.balance END),0)::BIGINT AS hbd_savings,
+        COALESCE(MAX(CASE WHEN ats.nai=21 THEN ats.balance END),0)::BIGINT AS hive_savings,
         COALESCE(SUM(ats.savings_withdraw_requests),0)::INT              AS savings_withdraw_requests
-      FROM account_savings ats
+      FROM btracker_backend.account_savings_view ats
       WHERE ats.account = _account_id
     ),
 
@@ -375,7 +375,7 @@ BEGIN
         SELECT
           av.name,
           src.balance
-        FROM current_account_balances AS src
+        FROM btracker_backend.current_account_balances_view AS src
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
         ORDER BY src.balance DESC, av.name ASC
@@ -396,20 +396,20 @@ BEGIN
       WITH ordered_holders AS MATERIALIZED (
         SELECT
           av.name,
-          src.saving_balance
-        FROM account_savings AS src
+          src.balance
+        FROM btracker_backend.account_savings_view AS src
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
-        ORDER BY src.saving_balance DESC, av.name ASC
+        ORDER BY src.balance DESC, av.name ASC
         OFFSET _offset
         LIMIT _limit
       )
       SELECT
         (
-          ROW_NUMBER() OVER (ORDER BY o.saving_balance DESC, o.name ASC) + _offset
+          ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _offset
         )::INT AS rank,
         o.name::TEXT,
-        o.saving_balance::NUMERIC(38,0)
+        o.balance::NUMERIC(38,0)
       FROM ordered_holders o;
 
   ELSE

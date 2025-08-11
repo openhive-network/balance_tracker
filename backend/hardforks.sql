@@ -33,7 +33,7 @@ BEGIN
   ),
   update_savings AS (
     UPDATE account_savings acs SET
-      saving_balance = 0,
+      balance = 0,
       savings_withdraw_requests = 0
     FROM hardfork_hive_operation hho
     WHERE acs.account = hho.account_id

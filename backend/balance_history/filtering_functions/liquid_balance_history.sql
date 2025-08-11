@@ -17,7 +17,7 @@ BEGIN
 
   _prev_balance := (
     SELECT abh.balance
-    FROM account_balance_history abh
+    FROM btracker_backend.account_balance_history_view abh
     WHERE
       abh.account = _account_id AND
       abh.nai = _coin_type AND
@@ -59,8 +59,8 @@ BEGIN
       ab.balance,
       ab.source_op,
       ab.source_op_block,
-      hafd.operation_id_to_type_id(ab.source_op) AS op_type_id
-    FROM account_balance_history ab
+      ab.op_type_id
+    FROM btracker_backend.account_balance_history_view ab
     WHERE ab.account         = _account_id
       AND ab.nai             = _coin_type
       AND ab.balance_seq_no >= _bh_range.from_seq

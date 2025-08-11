@@ -36,7 +36,7 @@ account_hive_hbd_vests AS MATERIALIZED (
     MAX(CASE WHEN cab.nai = 13 THEN cab.balance END) AS hbd_balance,
     MAX(CASE WHEN cab.nai = 21 THEN cab.balance END) AS balance,
     MAX(CASE WHEN cab.nai = 37 THEN cab.balance END) AS vesting_shares
-  FROM current_account_balances cab
+  FROM btracker_backend.current_account_balances_view cab
   GROUP BY cab.account
 ),
 account_delegations AS MATERIALIZED (
@@ -60,16 +60,16 @@ account_rewards AS MATERIALIZED (
 account_savings_cte AS MATERIALIZED (
   SELECT  
     asv.account as account_id,
-    MAX(CASE WHEN nai = 13 THEN asv.saving_balance END) AS savings_hbd_balance,
-    MAX(CASE WHEN nai = 21 THEN asv.saving_balance END) AS savings_balance
-  FROM account_savings asv
+    MAX(CASE WHEN nai = 13 THEN asv.balance END) AS savings_hbd_balance,
+    MAX(CASE WHEN nai = 21 THEN asv.balance END) AS savings_balance
+  FROM btracker_backend.account_savings_view asv
   GROUP BY asv.account
 ),
 account_withdraw_savings AS MATERIALIZED (
   SELECT 
     asv.account as account_id,
     SUM (asv.savings_withdraw_requests) AS savings_withdraw_requests
-  FROM account_savings asv
+  FROM btracker_backend.account_savings_view asv
   GROUP BY asv.account
 ),
 account_info_rewards AS MATERIALIZED (
