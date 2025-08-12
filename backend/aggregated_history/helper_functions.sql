@@ -4,9 +4,9 @@ SET ROLE btracker_owner;
 
 DROP TYPE IF EXISTS btracker_backend.balance_history_return CASCADE;
 CREATE TYPE btracker_backend.balance_history_return AS (
-    account INT,
-    nai INT,
-    balance BIGINT,
+    account     INT,
+    nai         SMALLINT,
+    balance     BIGINT,
     min_balance BIGINT,
     max_balance BIGINT,
     updated_at TIMESTAMP
