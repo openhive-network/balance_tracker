@@ -75,7 +75,7 @@ BEGIN
         COALESCE(MAX(CASE WHEN ar.nai=21 THEN ar.balance END),0)::BIGINT AS hive_rewards,
         COALESCE(MAX(CASE WHEN ar.nai=37 THEN ar.balance END),0)::BIGINT AS vests_rewards,
         COALESCE(MAX(CASE WHEN ar.nai=38 THEN ar.balance END),0)::BIGINT AS hive_vesting_rewards
-      FROM account_rewards ar
+      FROM btracker_backend.account_rewards_view ar
       WHERE ar.account = _account_id
     ),
 
