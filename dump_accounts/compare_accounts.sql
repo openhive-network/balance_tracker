@@ -131,7 +131,7 @@ SELECT
 FROM account_balances ab
 LEFT JOIN account_hive_hbd_vests ahhv ON ahhv.account_id = ab.account_id
 LEFT JOIN account_delegations ad ON ad.account_id = ab.account_id
-LEFT JOIN btracker_backend.account_rewards_view ar ON ar.account_id = ab.account_id
+LEFT JOIN account_rewards ar ON ar.account_id = ab.account_id
 LEFT JOIN account_savings_cte asa ON asa.account_id = ab.account_id
 LEFT JOIN account_withdraw_savings aws ON aws.account_id = ab.account_id
 LEFT JOIN account_info_rewards air ON air.account_id = ab.account_id
