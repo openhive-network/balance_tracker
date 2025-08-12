@@ -430,7 +430,7 @@ BEGIN
       d.balance::TEXT AS amount,
       d.source_op::TEXT AS operation_id,
       d.source_op_block AS block_num 
-    FROM current_accounts_delegations d
+    FROM btracker_backend.current_accounts_delegations_view d
     WHERE delegatee = _account_id
   );
 END
@@ -448,7 +448,7 @@ BEGIN
       d.balance::TEXT AS amount,
       d.source_op::TEXT AS operation_id,
       d.source_op_block AS block_num 
-    FROM current_accounts_delegations d
+    FROM btracker_backend.current_accounts_delegations_view d
     WHERE delegator = _account_id
   );
 END
