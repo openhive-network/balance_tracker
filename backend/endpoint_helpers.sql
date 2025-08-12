@@ -471,8 +471,8 @@ BEGIN
       d.memo AS memo,
       bv.created_at + (d.recurrence::TEXT || 'hour')::INTERVAL  AS trigger_date,
       d.source_op::TEXT AS operation_id,
-      d.source_op_block AS block_num 
-    FROM recurrent_transfers d
+      d.source_op_block AS block_num
+    FROM btracker_backend.recurrent_transfers_view d
     JOIN hive.blocks_view bv ON bv.num = d.source_op_block
     WHERE to_account = _account_id
   );
@@ -497,7 +497,7 @@ BEGIN
       bv.created_at + (d.recurrence::TEXT || 'hour')::INTERVAL  AS trigger_date,
       d.source_op::TEXT AS operation_id,
       d.source_op_block AS block_num 
-    FROM recurrent_transfers d
+    FROM btracker_backend.recurrent_transfers_view d
     JOIN hive.blocks_view bv ON bv.num = d.source_op_block
     WHERE from_account = _account_id
   );
