@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS current_accounts_delegations
   delegatee INT NOT NULL,
   balance BIGINT NOT NULL,
   source_op BIGINT NOT NULL,
-  source_op_block INT NOT NULL,
+  --source_op_block INT NOT NULL,
 
   CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
 );
