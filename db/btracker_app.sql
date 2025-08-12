@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS recurrent_transfers
   recurrence           INT NOT NULL,
   memo                 TEXT NOT NULL,
   source_op            BIGINT NOT NULL,
-  source_op_block      INT NOT NULL, 
+  --source_op_block      INT NOT NULL, 
 
   CONSTRAINT pk_recurrent_transfers PRIMARY KEY (from_account, to_account, transfer_id)
 );

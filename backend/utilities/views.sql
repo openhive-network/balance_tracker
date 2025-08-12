@@ -71,6 +71,23 @@ CREATE OR REPLACE VIEW btracker_backend.current_accounts_delegations_view AS
     hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
   FROM current_accounts_delegations t;
 
+CREATE OR REPLACE VIEW btracker_backend.recurrent_transfers_view AS
+  SELECT
+    t.from_account,
+    t.to_account,
+    t.transfer_id,
+    t.nai,
+    t.amount,
+    t.consecutive_failures,
+    t.remaining_executions,
+    t.recurrence,
+    t.memo,
+    t.source_op,
+    -- since extra column was removed, extract the block number from the operation ID
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
+  FROM recurrent_transfers t;
+
 CREATE OR REPLACE VIEW btracker_backend.balance_history_by_month_view AS
   SELECT
     t.account,
