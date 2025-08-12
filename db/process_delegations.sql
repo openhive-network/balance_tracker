@@ -218,20 +218,18 @@ prepare_newest_delegation_pairs AS MATERIALIZED (
 ---------------------------------------------------------------------------------------
 insert_current_delegations AS (
   INSERT INTO current_accounts_delegations AS cab
-    (delegator, delegatee, balance, source_op, source_op_block)
+    (delegator, delegatee, balance, source_op)
   SELECT 
     delegator,
     delegatee,
     balance,
-    source_op,
-    source_op_block
+    source_op
   FROM prepare_newest_delegation_pairs
   WHERE balance > 0
   ON CONFLICT ON CONSTRAINT pk_current_accounts_delegations
   DO UPDATE SET
       balance = EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block
+      source_op = EXCLUDED.source_op
   RETURNING cab.delegator AS delegator
 ),
 ---------------------------------------------------------------------------------------
