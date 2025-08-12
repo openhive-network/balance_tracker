@@ -54,7 +54,7 @@ account_rewards AS MATERIALIZED (
     MAX(CASE WHEN nai = 21 THEN ar.balance END) AS reward_hive_balance,
     MAX(CASE WHEN nai = 37 THEN ar.balance END) AS reward_vesting_balance,
     MAX(CASE WHEN nai = 38 THEN ar.balance END) AS reward_vesting_hive
-  FROM account_rewards ar
+  FROM btracker_backend.account_rewards_view ar
   GROUP BY ar.account
 ),
 account_savings_cte AS MATERIALIZED (
@@ -131,7 +131,7 @@ SELECT
 FROM account_balances ab
 LEFT JOIN account_hive_hbd_vests ahhv ON ahhv.account_id = ab.account_id
 LEFT JOIN account_delegations ad ON ad.account_id = ab.account_id
-LEFT JOIN account_rewards ar ON ar.account_id = ab.account_id
+LEFT JOIN btracker_backend.account_rewards_view ar ON ar.account_id = ab.account_id
 LEFT JOIN account_savings_cte asa ON asa.account_id = ab.account_id
 LEFT JOIN account_withdraw_savings aws ON aws.account_id = ab.account_id
 LEFT JOIN account_info_rewards air ON air.account_id = ab.account_id

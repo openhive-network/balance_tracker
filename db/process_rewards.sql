@@ -369,19 +369,17 @@ prepare_ops_before_insert AS (
 ------------------------------------------------------------------------------
 insert_sum_of_rewards AS (
   INSERT INTO account_rewards
-    (account, nai, balance, source_op, source_op_block) 
+    (account, nai, balance, source_op) 
   SELECT
     po.account_id,
     po.nai,
     po.balance,
-    po.source_op,
-    po.source_op_block
+    po.source_op
   FROM prepare_ops_before_insert po
   ON CONFLICT ON CONSTRAINT pk_account_rewards
   DO UPDATE SET
       balance = account_rewards.balance + EXCLUDED.balance,
-      source_op = EXCLUDED.source_op,
-      source_op_block = EXCLUDED.source_op_block
+      source_op = EXCLUDED.source_op
   RETURNING account AS new_updated_acccounts
 ),
 insert_sum_of_info_rewards AS (
