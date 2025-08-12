@@ -49,6 +49,17 @@ CREATE OR REPLACE VIEW btracker_backend.account_savings_history_view AS
     hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
   FROM account_savings_history t;
 
+CREATE OR REPLACE VIEW btracker_backend.account_rewards_view AS
+  SELECT
+    t.account,
+    t.nai,
+    t.balance,
+    t.source_op,
+    -- since extra column was removed, extract the block number from the operation ID
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
+  FROM account_rewards t;
+
 CREATE OR REPLACE VIEW btracker_backend.balance_history_by_month_view AS
   SELECT
     t.account,
