@@ -181,70 +181,83 @@ join_created_at_to_balance_history AS MATERIALIZED (
   SELECT
     rls.account_id,
     rls.nai,
-    rls.source_op,
-    rls.source_op_block,
+    date_trunc('day', bv.created_at) AS timestamp_by_day, -- truncate to day
+    date_trunc('month', bv.created_at) AS timestamp_by_month, -- truncate to month
+
     rls.balance,
-    date_trunc('day', bv.created_at) AS by_day,
-    date_trunc('month', bv.created_at) AS by_month
+    rls.source_op
   FROM remove_latest_stored_balance_record rls
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
 ),
+
+-- determinate the latest balance for each day and month
 get_latest_updates AS (
-  SELECT 
+  SELECT
     account_id,
     nai,
-    source_op,
-    source_op_block,
+    timestamp_by_day,
+    timestamp_by_month,
+
     balance,
-    by_day,
-    by_month,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
-  FROM join_created_at_to_balance_history 
+    source_op,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, timestamp_by_day ORDER BY source_op DESC) AS rn_by_day,
+    ROW_NUMBER() OVER (PARTITION BY account_id, nai, timestamp_by_month ORDER BY source_op DESC) AS rn_by_month
+  FROM join_created_at_to_balance_history
 ),
 
 -- calculate min and max balances for each day and month
 get_min_max_balances_by_day AS (
-  SELECT 
+  SELECT
     account_id,
     nai,
-    by_day,
+    timestamp_by_day,
     MAX(balance) AS max_balance,
     MIN(balance) AS min_balance
   FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_day
+  GROUP BY account_id, nai, timestamp_by_day
 ),
 get_min_max_balances_by_month AS (
-  SELECT 
+  SELECT
     account_id,
     nai,
-    by_month,
+    timestamp_by_month,
     MAX(balance) AS max_balance,
     MIN(balance) AS min_balance
   FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_month
+  GROUP BY account_id, nai, timestamp_by_month
 ),
 
 -- insert aggregated balance history
 insert_account_balance_history_by_day AS (
   INSERT INTO balance_history_by_day AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
+    (account, nai, updated_at, balance, min_balance, max_balance, source_op)
+  SELECT
     gl.account_id,
     gl.nai,
-    gl.source_op,
-    gl.by_day,
+    bvd.source_op_block,
+
     gl.balance,
     gm.min_balance,
-    gm.max_balance
+    gm.max_balance,
+
+    gl.source_op
   FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_day gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_day = gl.by_day
+  JOIN get_min_max_balances_by_day gm ON
+    gm.account_id = gl.account_id AND
+    gm.nai = gl.nai AND
+    gm.timestamp_by_day = gl.timestamp_by_day
+
+  -- get the block number of the first record in the day
+  JOIN LATERAL (
+    SELECT bv.num AS source_op_block
+    FROM hive.blocks_view bv
+    WHERE bv.created_at >= gl.timestamp_by_day
+    ORDER BY bv.created_at ASC LIMIT 1
+  ) bvd ON TRUE
+
   WHERE gl.rn_by_day = 1
-  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO 
-  UPDATE SET 
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO
+  UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
@@ -253,22 +266,33 @@ insert_account_balance_history_by_day AS (
 ),
 insert_account_balance_history_by_month AS (
   INSERT INTO balance_history_by_month AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
+    (account, nai, updated_at, balance, min_balance, max_balance, source_op)
+  SELECT
     gl.account_id,
     gl.nai,
-    gl.source_op,
-    gl.by_month,
+    bvm.source_op_block,
+
     gl.balance,
     gm.min_balance,
-    gm.max_balance
+    gm.max_balance,
+
+    gl.source_op
   FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_month gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_month = gl.by_month
+  JOIN get_min_max_balances_by_month gm ON
+    gm.account_id = gl.account_id AND
+    gm.nai = gl.nai AND
+    gm.timestamp_by_month = gl.timestamp_by_month
+
+  -- get the block number of the first record in the month
+  JOIN LATERAL (
+    SELECT bv.num AS source_op_block
+    FROM hive.blocks_view bv
+    WHERE bv.created_at >= gl.timestamp_by_month
+    ORDER BY bv.created_at ASC LIMIT 1
+  ) bvm ON TRUE
+
   WHERE rn_by_month = 1
-  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO 
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,

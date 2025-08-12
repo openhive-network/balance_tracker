@@ -457,7 +457,7 @@ insert_saving_balance_history_by_day AS (
     gl.account_id,
     gl.nai,
     gl.source_op,
-    gl.by_day,
+    bvd.source_op_block,
     gl.balance,
     gm.min_balance,
     gm.max_balance
@@ -466,6 +466,15 @@ insert_saving_balance_history_by_day AS (
     gm.account_id = gl.account_id AND 
     gm.nai = gl.nai AND 
     gm.by_day = gl.by_day
+
+  -- get the block number of the first record in the day
+  JOIN LATERAL (
+    SELECT bv.num AS source_op_block
+    FROM hive.blocks_view bv
+    WHERE bv.created_at >= gl.by_day
+    ORDER BY bv.created_at ASC LIMIT 1
+  ) bvd ON TRUE
+
   WHERE gl.rn_by_day = 1
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO 
   UPDATE SET 
@@ -478,19 +487,28 @@ insert_saving_balance_history_by_day AS (
 insert_saving_balance_history_by_month AS (
   INSERT INTO saving_history_by_month AS acc_history
     (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
+  SELECT
     gl.account_id,
     gl.nai,
     gl.source_op,
-    gl.by_month,
+    bvm.source_op_block,
     gl.balance,
     gm.min_balance,
     gm.max_balance
   FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_month gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
+  JOIN get_min_max_balances_by_month gm ON
+    gm.account_id = gl.account_id AND
+    gm.nai = gl.nai AND
     gm.by_month = gl.by_month
+
+  -- get the block number of the first record in the month
+  JOIN LATERAL (
+    SELECT bv.num AS source_op_block
+    FROM hive.blocks_view bv
+    WHERE bv.created_at >= gl.by_month
+    ORDER BY bv.created_at ASC LIMIT 1
+  ) bvm ON TRUE
+
   WHERE rn_by_month = 1
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO 
   UPDATE SET

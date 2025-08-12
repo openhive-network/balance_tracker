@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS balance_history_by_month
 (
   account    INT NOT NULL,
   nai        INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL, -- period start time
+  updated_at INT NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS balance_history_by_day
 (
   account    INT NOT NULL,
   nai        INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,  -- period start time
+  updated_at INT NOT NULL,  -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS saving_history_by_month
 (
   account    INT NOT NULL,
   nai        INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL, -- period start time
+  updated_at INT NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS saving_history_by_day
 (
   account    INT NOT NULL,
   nai        INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL, -- period start time
+  updated_at INT NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
