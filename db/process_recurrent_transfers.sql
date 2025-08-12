@@ -26,7 +26,6 @@ BEGIN
       rto.memo AS memo,
       rto.delete_transfer AS delete_transfer,
       ov.id AS source_op,
-      ov.block_num as source_op_block,
       ov.op_type_id 
     FROM operations_view ov
     CROSS JOIN btracker_backend.get_recurrent_transfer_operations(ov.body, ov.op_type_id) AS rto
@@ -48,7 +47,6 @@ BEGIN
       ar.memo,
       ar.delete_transfer,
       ar.source_op,
-      ar.source_op_block,
       ar.op_type_id,
       ROW_NUMBER() OVER (PARTITION BY ar.from_account, ar.to_account, ar.transfer_id ORDER BY ar.source_op DESC) AS rn_per_transfer_desc
     FROM process_block_range_data_b ar
@@ -79,7 +77,6 @@ BEGIN
       lrt.memo,
       lrt.delete_transfer,
       lrt.source_op,
-      lrt.source_op_block,
       lrt.op_type_id,
       lrt.rn_per_transfer_desc,
       ROW_NUMBER() OVER (PARTITION BY lrt.from_account, lrt.to_account, lrt.transfer_id ORDER BY lrt.source_op) AS rn_per_transfer_asc
@@ -106,7 +103,6 @@ BEGIN
       rt.memo,
       FALSE AS delete_transfer,
       rt.source_op,
-      rt.source_op_block,
       49 AS op_type_id,
       0 as rn_per_transfer_desc,
       0 AS rn_per_transfer_asc
@@ -130,7 +126,6 @@ BEGIN
       ltin.memo,
       ltin.delete_transfer,
       ltin.source_op,
-      ltin.source_op_block,
       ltin.op_type_id,
       ltin.rn_per_transfer_desc,
       ltin.rn_per_transfer_asc
@@ -150,7 +145,6 @@ BEGIN
       edt.memo,
       edt.delete_transfer,
       edt.source_op,
-      edt.source_op_block,
       edt.op_type_id,
       edt.rn_per_transfer_desc,
       edt.rn_per_transfer_asc
@@ -170,7 +164,6 @@ BEGIN
         ed.memo,
         ed.delete_transfer,
         ed.source_op,
-        ed.source_op_block,
         ed.rn_per_transfer_asc,
         ed.rn_per_transfer_desc
       FROM union_total_transfers ed
@@ -189,7 +182,6 @@ BEGIN
         (CASE WHEN next_cp.op_type_id = 49 THEN next_cp.recurrence ELSE prev.recurrence END) AS recurrence,
         (CASE WHEN next_cp.op_type_id = 49 THEN next_cp.memo ELSE prev.memo END) AS memo,
         next_cp.delete_transfer,
-        next_cp.source_op,
         -- if the transfer is an update of previous transfer
         -- and between them there is no deletion of the transfer
         -- the block number that is used to update trigger date must not be changed
@@ -197,11 +189,11 @@ BEGIN
         (
           CASE 
             WHEN next_cp.op_type_id = 49 AND next_cp.recurrence = prev.recurrence AND NOT prev.delete_transfer THEN 
-              prev.source_op_block 
+              prev.source_op 
             ELSE 
-              next_cp.source_op_block 
+              next_cp.source_op 
           END
-        ) AS source_op_block,
+        ) AS source_op,
         next_cp.rn_per_transfer_asc,
         next_cp.rn_per_transfer_desc
       FROM calculated_transfers prev
@@ -228,8 +220,7 @@ BEGIN
         remaining_executions,
         recurrence,
         memo,
-        source_op,
-        source_op_block
+        source_op
       )
     SELECT 
       from_account_id,
@@ -241,8 +232,7 @@ BEGIN
       remaining_executions,
       recurrence,
       memo,
-      source_op,
-      source_op_block
+      source_op
     FROM recursive_transfers
     ON CONFLICT ON CONSTRAINT pk_recurrent_transfers
     DO UPDATE SET
@@ -252,8 +242,7 @@ BEGIN
         remaining_executions = EXCLUDED.remaining_executions,
         recurrence = EXCLUDED.recurrence,
         memo = EXCLUDED.memo,
-        source_op = EXCLUDED.source_op,
-        source_op_block = EXCLUDED.source_op_block
+        source_op = EXCLUDED.source_op
     RETURNING rt.from_account AS from_account
   ),
   ---------------------------------------------------------------------------------------
