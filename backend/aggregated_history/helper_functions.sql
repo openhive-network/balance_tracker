@@ -4,19 +4,19 @@ SET ROLE btracker_owner;
 
 DROP TYPE IF EXISTS btracker_backend.balance_history_return CASCADE;
 CREATE TYPE btracker_backend.balance_history_return AS (
-    account INT,
-    nai INT,
-    balance BIGINT,
+    account     INT,
+    nai         INT,
+    balance     BIGINT,
     min_balance BIGINT,
     max_balance BIGINT,
-    updated_at TIMESTAMP
+    updated_at  TIMESTAMP
 );
 
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year(
     _account_id INT,
     _coin_type INT,
-    _from TIMESTAMP,
-    _to TIMESTAMP
+    _from INT,
+    _to INT
 )
 RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -27,16 +27,18 @@ BEGIN
   RETURN QUERY (
     WITH get_year AS (
         SELECT
-            account,
-            nai,
-            balance,
-            min_balance,
-            max_balance,
-            updated_at,
-            DATE_TRUNC('year', updated_at) AS by_year
-        FROM balance_history_by_month
-        WHERE account = _account_id AND nai = _coin_type AND
-              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
+            bh.account,
+            bh.nai,
+            bh.balance,
+            bh.min_balance,
+            bh.max_balance,
+            bh.updated_at,
+            DATE_TRUNC('year', bv.created_at) AS by_year
+        FROM balance_history_by_month bh
+        JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+        WHERE   bh.account = _account_id
+            AND bh.nai     = _coin_type
+            AND bh.updated_at BETWEEN _from AND _to
     ),
 
     get_latest_updates AS (
@@ -78,7 +80,7 @@ $$;
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year_last_record(
     _account_id INT,
     _coin_type INT,
-    _from TIMESTAMP
+    _from INT
 )
 RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -89,16 +91,18 @@ BEGIN
   RETURN (
     WITH get_year AS (
         SELECT
-            account,
-            nai,
-            balance,
-            min_balance,
-            max_balance,
-            updated_at,
-            DATE_TRUNC('year', updated_at) AS by_year
-        FROM balance_history_by_month
-        WHERE account = _account_id AND nai = _coin_type AND
-              updated_at < _from 
+            bh.account,
+            bh.nai,
+            bh.balance,
+            bh.min_balance,
+            bh.max_balance,
+            bh.updated_at,
+            DATE_TRUNC('year', bv.created_at) AS by_year
+        FROM balance_history_by_month bh
+        JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+        WHERE   bh.account = _account_id
+            AND bh.nai     = _coin_type
+            AND bh.updated_at < _from
     ),
 
     get_latest_updates AS (
@@ -144,8 +148,8 @@ $$;
 CREATE OR REPLACE FUNCTION btracker_backend.saving_history_by_year(
     _account_id INT,
     _coin_type INT,
-    _from TIMESTAMP,
-    _to TIMESTAMP
+    _from INT,
+    _to INT
 )
 RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -156,16 +160,18 @@ BEGIN
   RETURN QUERY (
     WITH get_year AS (
         SELECT
-            account,
-            nai,
-            balance,
-            min_balance,
-            max_balance,
-            updated_at,
-            DATE_TRUNC('year', updated_at) AS by_year
-        FROM saving_history_by_month
-        WHERE account = _account_id AND nai = _coin_type AND
-              DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
+            bh.account,
+            bh.nai,
+            bh.balance,
+            bh.min_balance,
+            bh.max_balance,
+            bh.updated_at,
+            DATE_TRUNC('year', bv.created_at) AS by_year
+        FROM saving_history_by_month bh
+        JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+        WHERE   bh.account = _account_id
+            AND bh.nai     = _coin_type
+            AND bh.updated_at BETWEEN _from AND _to
     ),
 
     get_latest_updates AS (
@@ -207,7 +213,7 @@ $$;
 CREATE OR REPLACE FUNCTION btracker_backend.saving_history_by_year_last_record(
     _account_id INT,
     _coin_type INT,
-    _from TIMESTAMP
+    _from INT
 )
 RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -218,16 +224,18 @@ BEGIN
   RETURN (
     WITH get_year AS (
         SELECT
-            account,
-            nai,
-            balance,
-            min_balance,
-            max_balance,
-            updated_at,
-            DATE_TRUNC('year', updated_at) AS by_year
-        FROM saving_history_by_month
-        WHERE account = _account_id AND nai = _coin_type AND
-              updated_at < _from  
+            bh.account,
+            bh.nai,
+            bh.balance,
+            bh.min_balance,
+            bh.max_balance,
+            bh.updated_at,
+            DATE_TRUNC('year', bv.created_at) AS by_year
+        FROM saving_history_by_month bh
+        JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+        WHERE   bh.account = _account_id
+            AND bh.nai     = _coin_type
+            AND bh.updated_at < _from
     ),
 
     get_latest_updates AS (
@@ -274,8 +282,8 @@ CREATE OR REPLACE FUNCTION btracker_backend.balance_history(
     _coin_type INT,
     _granularity btracker_backend.granularity,
     _balance_type btracker_backend.balance_type,
-    _from TIMESTAMP,
-    _to TIMESTAMP
+    _from INT,
+    _to INT
 )
 RETURNS SETOF btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -283,92 +291,90 @@ STABLE
 AS
 $$
 BEGIN
-  IF _balance_type = 'balance' THEN
+  IF _balance_type = 'balance' AND _granularity = 'yearly' THEN
     RETURN QUERY
-      SELECT 
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
         bh.updated_at
-      FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh
-      WHERE _granularity = 'yearly'
+      FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'balance' AND _granularity = 'daily' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.updated_at
+        DATE_TRUNC('day', bv.created_at)
       FROM balance_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'daily'
+      JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+      WHERE bh.account = _account_id
+        AND bh.nai     = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
 
-      UNION ALL
-
-      SELECT 
-        bh.account,
-        bh.nai,
-        bh.balance,
-        bh.min_balance,
-        bh.max_balance,
-        bh.updated_at
-      FROM balance_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'monthly';
-  ELSE
+  ELSEIF _balance_type = 'balance' AND _granularity = 'monthly' THEN
     RETURN QUERY
-      SELECT 
+      SELECT
+        bh.account,
+        bh.nai,
+        bh.balance,
+        bh.min_balance,
+        bh.max_balance,
+        DATE_TRUNC('month', bv.created_at)
+      FROM balance_history_by_month bh
+      JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
+
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'yearly' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
         bh.updated_at
-      FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh
-      WHERE _granularity = 'yearly'
+      FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'daily' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.updated_at
+        DATE_TRUNC('day', bv.created_at)
       FROM saving_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'daily'
+      JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'monthly' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
-        bh.updated_at
+        DATE_TRUNC('month', bv.created_at)
       FROM saving_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'monthly';
+      JOIN hive.blocks_view bv ON bv.num = bh.updated_at
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
+
+  ELSE
+    RAISE EXCEPTION 'Invalid granularity: %, balance-type: %', _granularity, _balance_type;
   END IF;
 END
 $$;
@@ -378,7 +384,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.balance_history_last_record(
     _coin_type INT,
     _granularity btracker_backend.granularity,
     _balance_type btracker_backend.balance_type,
-    _from TIMESTAMP
+    _from INT
 )
 RETURNS btracker_backend.balance_history_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql'
@@ -404,9 +410,10 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.updated_at
+      DATE_TRUNC('month', bv.created_at)
     )::btracker_backend.balance_history_return
     FROM balance_history_by_month bh
+    JOIN hive.blocks_view bv ON bv.num = bh.updated_at
     WHERE 
       bh.account = _account_id AND 
       bh.nai = _coin_type AND
@@ -421,9 +428,10 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.updated_at
+      DATE_TRUNC('day', bv.created_at)
     )::btracker_backend.balance_history_return
     FROM balance_history_by_day bh
+    JOIN hive.blocks_view bv ON bv.num = bh.updated_at
     WHERE 
       bh.account = _account_id AND 
       bh.nai = _coin_type AND
@@ -449,9 +457,10 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.updated_at
+      DATE_TRUNC('month', bv.created_at)
     )::btracker_backend.balance_history_return
     FROM saving_history_by_month bh
+    JOIN hive.blocks_view bv ON bv.num = bh.updated_at
     WHERE 
       bh.account = _account_id AND 
       bh.nai = _coin_type AND
@@ -466,9 +475,10 @@ BEGIN
       bh.balance,
       bh.min_balance,
       bh.max_balance,
-      bh.updated_at
+      DATE_TRUNC('day', bv.created_at)
     )::btracker_backend.balance_history_return
     FROM saving_history_by_day bh
+    JOIN hive.blocks_view bv ON bv.num = bh.updated_at
     WHERE 
       bh.account = _account_id AND 
       bh.nai = _coin_type AND

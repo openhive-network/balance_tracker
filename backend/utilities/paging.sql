@@ -364,6 +364,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.aggregated_history_block_range(
     _from INT,
     _to INT,
     _current_block INT,
+    _granularity TEXT
 )
 RETURNS btracker_backend.aggregated_history_paging_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -375,6 +376,7 @@ DECLARE
   _to_timestamp TIMESTAMP;
 BEGIN
 
+  -- setting _from and _to based on current block
   _to := (
     CASE
       WHEN (_to IS NULL) THEN
@@ -395,10 +397,12 @@ BEGIN
       END
   );
 
-  _from_timestamp := DATE_TRUNC(__granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from)::TIMESTAMP);
+  -- setting timestamps based on granularity
+  _from_timestamp := DATE_TRUNC(_granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from)::TIMESTAMP);
+  _to_timestamp   := DATE_TRUNC(_granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to)::TIMESTAMP);
 
-  _to_timestamp   := DATE_TRUNC(__granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to)::TIMESTAMP);
-
+  --The switching of the first block to the first block from this period
+  _from           := (SELECT b.num FROM hive.blocks_view b WHERE b.created_at >= _from_timestamp ORDER BY b.created_at ASC LIMIT 1);
 
   RETURN (_from, _to, _from_timestamp, _to_timestamp)::btracker_backend.aggregated_history_paging_return;
 END
