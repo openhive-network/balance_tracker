@@ -88,6 +88,31 @@ CREATE OR REPLACE VIEW btracker_backend.recurrent_transfers_view AS
     hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
   FROM recurrent_transfers t;
 
+CREATE OR REPLACE VIEW btracker_backend.account_withdraws_view AS
+  SELECT
+    t.account,
+    t.vesting_withdraw_rate,
+    t.to_withdraw,
+    t.withdrawn,
+    t.withdraw_routes,
+    t.delayed_vests,
+    t.source_op,
+    -- since extra column was removed, extract the block number from the operation ID
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
+  FROM account_withdraws t;
+
+CREATE OR REPLACE VIEW btracker_backend.account_routes_view AS
+  SELECT
+    t.account,
+    t.to_account,
+    t.percent,
+    t.source_op,
+    -- since extra column was removed, extract the block number from the operation ID
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
+  FROM account_routes t;
+
 CREATE OR REPLACE VIEW btracker_backend.balance_history_by_month_view AS
   SELECT
     t.account,
