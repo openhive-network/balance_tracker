@@ -305,52 +305,6 @@ BEGIN
 END
 $$;
 
-DROP TYPE IF EXISTS btracker_backend.paging_return CASCADE;
-CREATE TYPE btracker_backend.paging_return AS
-(
-    from_block INT,
-    to_block INT
-);
-
-CREATE OR REPLACE FUNCTION btracker_backend.block_range(
-    _from INT, 
-    _to INT,
-    _current_block INT
-)
-RETURNS btracker_backend.paging_return -- noqa: LT01, CP05
-LANGUAGE 'plpgsql' IMMUTABLE
-SET JIT = OFF
-AS
-$$
-DECLARE 
-  __to INT;
-  __from INT;
-BEGIN
-  __to := (
-    CASE 
-      WHEN (_to IS NULL) THEN 
-        _current_block 
-      WHEN (_to IS NOT NULL) AND (_current_block < _to) THEN 
-        _current_block 
-      ELSE 
-        _to 
-      END
-  );
-
-  __from := (
-    CASE 
-      WHEN (_from IS NULL) THEN 
-        (SELECT b.num FROM hive.blocks_view b ORDER BY b.num ASC LIMIT 1) -- in pruned haf first block might not be 1
-      ELSE 
-        _from 
-      END
-  );
-
-  RETURN (__from, __to)::btracker_backend.paging_return;
-END
-$$;
-
-
 DROP TYPE IF EXISTS btracker_backend.aggregated_history_paging_return CASCADE;
 CREATE TYPE btracker_backend.aggregated_history_paging_return AS
 (
@@ -364,6 +318,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.aggregated_history_block_range(
     _from INT,
     _to INT,
     _current_block INT,
+    _granularity TEXT
 )
 RETURNS btracker_backend.aggregated_history_paging_return -- noqa: LT01, CP05
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -375,6 +330,7 @@ DECLARE
   _to_timestamp TIMESTAMP;
 BEGIN
 
+  -- setting _from and _to based on current block
   _to := (
     CASE
       WHEN (_to IS NULL) THEN
@@ -395,9 +351,10 @@ BEGIN
       END
   );
 
-  _from_timestamp := DATE_TRUNC(__granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from)::TIMESTAMP);
+  -- setting timestamps based on granularity
+  _from_timestamp := DATE_TRUNC(_granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _from)::TIMESTAMP);
 
-  _to_timestamp   := DATE_TRUNC(__granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to)::TIMESTAMP);
+  _to_timestamp   := DATE_TRUNC(_granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = _to)::TIMESTAMP);
 
 
   RETURN (_from, _to, _from_timestamp, _to_timestamp)::btracker_backend.aggregated_history_paging_return;
