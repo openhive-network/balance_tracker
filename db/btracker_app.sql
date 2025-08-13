@@ -80,9 +80,9 @@ PERFORM hive.app_register_table( __schema_name, 'account_balance_history', __sch
 
 CREATE TABLE IF NOT EXISTS balance_history_by_month
 (
-  account    INT NOT NULL,
-  nai        SMALLINT NOT NULL,
-  updated_at INT NOT NULL, -- period start time
+  account     INT NOT NULL,
+  nai         SMALLINT NOT NULL,
+  updated_at  TIMESTAMP NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -98,9 +98,9 @@ PERFORM hive.app_register_table( __schema_name, 'balance_history_by_month', __sc
 
 CREATE TABLE IF NOT EXISTS balance_history_by_day
 (
-  account    INT NOT NULL,
-  nai        SMALLINT NOT NULL,
-  updated_at INT NOT NULL,  -- period start time
+  account     INT NOT NULL,
+  nai         SMALLINT NOT NULL,
+  updated_at  TIMESTAMP NOT NULL,  -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -240,9 +240,9 @@ PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __sch
 
 CREATE TABLE IF NOT EXISTS saving_history_by_month
 (
-  account    INT NOT NULL,
-  nai        SMALLINT NOT NULL,
-  updated_at INT NOT NULL, -- period start time
+  account     INT NOT NULL,
+  nai         SMALLINT NOT NULL,
+  updated_at  TIMESTAMP NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -258,9 +258,9 @@ PERFORM hive.app_register_table( __schema_name, 'saving_history_by_month', __sch
 
 CREATE TABLE IF NOT EXISTS saving_history_by_day
 (
-  account    INT NOT NULL,
-  nai        SMALLINT NOT NULL,
-  updated_at INT NOT NULL, -- period start time
+  account     INT NOT NULL,
+  nai         SMALLINT NOT NULL,
+  updated_at  TIMESTAMP NOT NULL, -- period start time
 
   balance     BIGINT NOT NULL,
   min_balance BIGINT NOT NULL,
@@ -280,13 +280,12 @@ PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schem
 CREATE TABLE IF NOT EXISTS transfer_stats_by_month
 (
   sum_transfer_amount BIGINT NOT NULL,
-  avg_transfer_amount BIGINT NOT NULL,
   max_transfer_amount BIGINT NOT NULL,
   min_transfer_amount BIGINT NOT NULL,
-  transfer_count INT NOT NULL,
-  nai SMALLINT NOT NULL, -- NAI of the transfer
-  last_block_num INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  transfer_count      INT NOT NULL,
+  nai                 SMALLINT NOT NULL, -- NAI of the transfer
+  last_block_num      INT NOT NULL,
+  updated_at          TIMESTAMP NOT NULL,
 
   CONSTRAINT pk_transfer_stats_by_month PRIMARY KEY (nai, updated_at)
 );
@@ -295,13 +294,12 @@ PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_month', __sch
 CREATE TABLE IF NOT EXISTS transfer_stats_by_day
 (
   sum_transfer_amount BIGINT NOT NULL,
-  avg_transfer_amount BIGINT NOT NULL,
   max_transfer_amount BIGINT NOT NULL,
   min_transfer_amount BIGINT NOT NULL,
-  transfer_count INT NOT NULL,
-  nai SMALLINT NOT NULL, -- NAI of the transfer
-  last_block_num INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  transfer_count      INT NOT NULL,
+  nai                 SMALLINT NOT NULL, -- NAI of the transfer
+  last_block_num      INT NOT NULL,
+  updated_at          TIMESTAMP NOT NULL,
 
   CONSTRAINT pk_transfer_stats_by_day PRIMARY KEY (nai, updated_at)
 );
@@ -310,13 +308,12 @@ PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_day', __schem
 CREATE TABLE IF NOT EXISTS transfer_stats_by_hour
 (
   sum_transfer_amount BIGINT NOT NULL,
-  avg_transfer_amount BIGINT NOT NULL,
   max_transfer_amount BIGINT NOT NULL,
   min_transfer_amount BIGINT NOT NULL,
-  transfer_count INT NOT NULL,
-  nai SMALLINT NOT NULL, -- NAI of the transfer
-  last_block_num INT NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  transfer_count      INT NOT NULL,
+  nai                 SMALLINT NOT NULL, -- NAI of the transfer
+  last_block_num      INT NOT NULL,
+  updated_at          TIMESTAMP NOT NULL,
 
   CONSTRAINT pk_transfer_stats_by_hour PRIMARY KEY (nai, updated_at)
 );
@@ -324,9 +321,9 @@ PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __sche
 
 CREATE TABLE IF NOT EXISTS transfer_saving_id
 (
-  account INT NOT NULL,
-  nai     SMALLINT NOT NULL,
-  balance BIGINT NOT NULL,
+  account     INT NOT NULL,
+  nai         SMALLINT NOT NULL,
+  balance     BIGINT NOT NULL,
   request_id  BIGINT NOT NULL,
 
   CONSTRAINT pk_transfer_saving_id PRIMARY KEY (account, request_id)
