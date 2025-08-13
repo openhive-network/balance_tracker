@@ -39,7 +39,6 @@ BEGIN
   group_by_hour AS (
     SELECT 
       sum(transfer_amount)::BIGINT AS sum_transfer_amount,
-      avg(transfer_amount)::BIGINT AS avg_transfer_amount,
       max(transfer_amount)::BIGINT AS max_transfer_amount,
       min(transfer_amount)::BIGINT AS min_transfer_amount,
       count(*)::INT AS transfer_count,
@@ -52,7 +51,6 @@ BEGIN
   group_by_day AS (
     SELECT 
       sum(transfer_amount)::BIGINT AS sum_transfer_amount,
-      avg(transfer_amount)::BIGINT AS avg_transfer_amount,
       max(transfer_amount)::BIGINT AS max_transfer_amount,
       min(transfer_amount)::BIGINT AS min_transfer_amount,
       count(*)::INT AS transfer_count,
@@ -65,7 +63,6 @@ BEGIN
   group_by_month AS (
     SELECT 
       sum(transfer_amount)::BIGINT AS sum_transfer_amount,
-      avg(transfer_amount)::BIGINT AS avg_transfer_amount,
       max(transfer_amount)::BIGINT AS max_transfer_amount,
       min(transfer_amount)::BIGINT AS min_transfer_amount,
       count(*)::INT AS transfer_count,
@@ -79,7 +76,6 @@ BEGIN
     INSERT INTO transfer_stats_by_hour AS trx_agg
     (
       sum_transfer_amount,
-      avg_transfer_amount,
       max_transfer_amount,
       min_transfer_amount,
       transfer_count,
@@ -89,7 +85,6 @@ BEGIN
     )
     SELECT 
       gh.sum_transfer_amount,
-      gh.avg_transfer_amount,
       gh.max_transfer_amount,
       gh.min_transfer_amount,
       gh.transfer_count,
@@ -100,7 +95,6 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_hour DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
@@ -111,7 +105,6 @@ BEGIN
     INSERT INTO transfer_stats_by_day AS trx_agg
     (
       sum_transfer_amount,
-      avg_transfer_amount,
       max_transfer_amount,
       min_transfer_amount,
       transfer_count,
@@ -121,7 +114,6 @@ BEGIN
     )
     SELECT 
       gh.sum_transfer_amount,
-      gh.avg_transfer_amount,
       gh.max_transfer_amount,
       gh.min_transfer_amount,
       gh.transfer_count,
@@ -132,7 +124,6 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_day DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
@@ -143,7 +134,6 @@ BEGIN
     INSERT INTO transfer_stats_by_month AS trx_agg
     (
       sum_transfer_amount,
-      avg_transfer_amount,
       max_transfer_amount,
       min_transfer_amount,
       transfer_count,
@@ -153,7 +143,6 @@ BEGIN
     )
     SELECT 
       gh.sum_transfer_amount,
-      gh.avg_transfer_amount,
       gh.max_transfer_amount,
       gh.min_transfer_amount,
       gh.transfer_count,
@@ -164,7 +153,6 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_month DO 
     UPDATE SET 
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
-      avg_transfer_amount = ((EXCLUDED.avg_transfer_amount + trx_agg.avg_transfer_amount) / 2)::BIGINT,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
       transfer_count = trx_agg.transfer_count + EXCLUDED.transfer_count,
