@@ -28,7 +28,6 @@ BEGIN
     WITH get_year AS (
         SELECT
             sum_transfer_amount,
-            avg_transfer_amount,
             max_transfer_amount,
             min_transfer_amount,
             transfer_count,
@@ -41,7 +40,7 @@ BEGIN
     SELECT
         by_year AS updated_at,
         SUM(sum_transfer_amount)::BIGINT AS sum_transfer_amount,
-        AVG(avg_transfer_amount)::BIGINT AS avg_transfer_amount,
+        NULL::BIGINT,
         MAX(max_transfer_amount)::BIGINT AS max_transfer_amount,
         MIN(min_transfer_amount)::BIGINT AS min_transfer_amount,
         SUM(transfer_count)::INT AS transfer_count,
@@ -68,7 +67,7 @@ BEGIN
       SELECT 
         th.updated_at,
         th.sum_transfer_amount,
-        th.avg_transfer_amount,
+        NULL::BIGINT,
         th.max_transfer_amount,
         th.min_transfer_amount,
         th.transfer_count,
@@ -81,7 +80,7 @@ BEGIN
       SELECT 
         td.updated_at,
         td.sum_transfer_amount,
-        td.avg_transfer_amount,
+        NULL::BIGINT,
         td.max_transfer_amount,
         td.min_transfer_amount,
         td.transfer_count,
@@ -94,7 +93,7 @@ BEGIN
       SELECT 
         tm.updated_at,
         tm.sum_transfer_amount,
-        tm.avg_transfer_amount,
+        NULL::BIGINT,
         tm.max_transfer_amount,
         tm.min_transfer_amount,
         tm.transfer_count,
@@ -107,7 +106,7 @@ BEGIN
       SELECT 
         ty.updated_at,
         ty.sum_transfer_amount,
-        ty.avg_transfer_amount,
+        NULL::BIGINT,
         ty.max_transfer_amount,
         ty.min_transfer_amount,
         ty.transfer_count,
@@ -143,19 +142,12 @@ BEGIN
     AS
     $pb$
     DECLARE
-        __from INT;
-        __to INT;
-        __from_timestamp TIMESTAMP;
-        __to_timestamp TIMESTAMP;
         __granularity TEXT;
         __one_period INTERVAL;
         -- Get the current block number from the context
         __btracker_current_block INT := (SELECT current_block_num FROM hafd.contexts WHERE name = '%s');
+        __ah_range btracker_backend.aggregated_history_paging_return;
     BEGIN
-      SELECT from_block, to_block
-      INTO __from, __to
-      FROM btracker_backend.block_range(_from_block, _to_block, __btracker_current_block);
-
       __granularity := (
         CASE 
           WHEN _granularity_hourly = 'hourly' THEN 'hour'
@@ -166,15 +158,17 @@ BEGIN
         END
       );
 
-      __from_timestamp := DATE_TRUNC(__granularity,(SELECT b.created_at FROM hive.blocks_view b WHERE b.num = __from)::TIMESTAMP);
-      __to_timestamp := DATE_TRUNC(__granularity, (SELECT b.created_at FROM hive.blocks_view b WHERE b.num = __to)::TIMESTAMP);
-
+      __ah_range := btracker_backend.aggregated_history_block_range(_from_block, _to_block, __btracker_current_block, __granularity);
 
       __one_period := ('1 ' || __granularity )::INTERVAL;
 
       RETURN QUERY (
         WITH date_series AS (
-          SELECT generate_series(__from_timestamp, __to_timestamp, __one_period) AS date
+          SELECT generate_series(
+              __ah_range.from_timestamp,
+              __ah_range.to_timestamp,
+              __one_period
+          ) AS date
         ),
         get_daily_aggregation AS MATERIALIZED (
           SELECT 
@@ -185,7 +179,7 @@ BEGIN
             bh.min_transfer_amount,
             bh.transfer_count,
             bh.last_block_num
-          FROM btracker_backend.get_transfer_stats(_nai, _granularity_hourly, __from_timestamp, __to_timestamp) bh
+          FROM btracker_backend.get_transfer_stats(_nai, _granularity_hourly, __ah_range.from_timestamp, __ah_range.to_timestamp) bh
         ),
         transfer_records AS (
           SELECT 

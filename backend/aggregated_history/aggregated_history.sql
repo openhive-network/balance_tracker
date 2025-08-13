@@ -3,7 +3,7 @@
 SET ROLE btracker_owner;
 
 DO $$
-DECLARE 
+DECLARE
   __schema_name VARCHAR;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
@@ -25,7 +25,7 @@ BEGIN
   AS
   $bp$
   DECLARE
-    __ah_range btracker_backend.aggregated_history_range_return;
+    __ah_range btracker_backend.aggregated_history_paging_return;
     __granularity TEXT;
     __one_period INTERVAL;
 
@@ -40,7 +40,7 @@ BEGIN
       END
     );
 
-    __ah_range := btracker_backend.aggregated_history_block_range(_from_block, _to_block, __btracker_current_block);
+    __ah_range := btracker_backend.aggregated_history_block_range(_from_block, _to_block, __btracker_current_block, __granularity);
 
     __one_period := ('1 ' || __granularity )::INTERVAL;
 
@@ -76,8 +76,8 @@ BEGIN
             _coin_type,
             _granularity,
             'balance',
-            __ah_range.from_block,
-            __ah_range.to_block
+            __ah_range.from_timestamp,
+            __ah_range.to_timestamp
           )
         ) bh ON ds.date = bh.updated_at
         LEFT JOIN LATERAL (
@@ -86,8 +86,8 @@ BEGIN
             _coin_type,
             _granularity,
             'savings_balance',
-            __ah_range.from_block,
-            __ah_range.to_block
+            __ah_range.from_timestamp,
+            __ah_range.to_timestamp
           )
         ) sa ON ds.date = sa.updated_at
       ),
@@ -116,7 +116,7 @@ BEGIN
               _coin_type,
               _granularity,
               'balance',
-              __ah_range.from_block
+              __ah_range.from_timestamp
             ) bh
           ) prev_balance ON TRUE
           LEFT JOIN LATERAL (
@@ -129,7 +129,7 @@ BEGIN
               _coin_type,
               _granularity,
               'savings_balance',
-              __ah_range.from_block
+              __ah_range.from_timestamp
             ) bh
           ) savings_prev_balance ON TRUE
           WHERE ds.row_num = 1

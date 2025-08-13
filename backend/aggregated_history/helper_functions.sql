@@ -9,7 +9,7 @@ CREATE TYPE btracker_backend.balance_history_return AS (
     balance     BIGINT,
     min_balance BIGINT,
     max_balance BIGINT,
-    updated_at TIMESTAMP
+    updated_at  TIMESTAMP
 );
 
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history_by_year(
@@ -283,21 +283,20 @@ STABLE
 AS
 $$
 BEGIN
-  IF _balance_type = 'balance' THEN
+  IF _balance_type = 'balance' AND _granularity = 'yearly' THEN
     RETURN QUERY
-      SELECT 
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
         bh.updated_at
-      FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh
-      WHERE _granularity = 'yearly'
+      FROM btracker_backend.balance_history_by_year(_account_id, _coin_type, _from, _to) bh;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'balance' AND _granularity = 'daily' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
@@ -305,15 +304,13 @@ BEGIN
         bh.max_balance,
         bh.updated_at
       FROM balance_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'daily'
+      WHERE bh.account = _account_id
+        AND bh.nai     = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'balance' AND _granularity = 'monthly' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
@@ -321,26 +318,24 @@ BEGIN
         bh.max_balance,
         bh.updated_at
       FROM balance_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'monthly';
-  ELSE
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
+
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'yearly' THEN
     RETURN QUERY
-      SELECT 
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
         bh.min_balance,
         bh.max_balance,
         bh.updated_at
-      FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh
-      WHERE _granularity = 'yearly'
+      FROM btracker_backend.saving_history_by_year(_account_id, _coin_type, _from, _to) bh;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'daily' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
@@ -348,15 +343,13 @@ BEGIN
         bh.max_balance,
         bh.updated_at
       FROM saving_history_by_day bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'daily'
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
 
-      UNION ALL
-
-      SELECT 
+  ELSEIF _balance_type = 'savings_balance' AND _granularity = 'monthly' THEN
+    RETURN QUERY
+      SELECT
         bh.account,
         bh.nai,
         bh.balance,
@@ -364,11 +357,12 @@ BEGIN
         bh.max_balance,
         bh.updated_at
       FROM saving_history_by_month bh
-      WHERE 
-        bh.account = _account_id AND 
-        bh.nai = _coin_type AND
-        bh.updated_at BETWEEN _from AND _to AND
-        _granularity = 'monthly';
+      WHERE bh.account = _account_id
+        AND bh.nai = _coin_type
+        AND bh.updated_at BETWEEN _from AND _to;
+
+  ELSE
+    RAISE EXCEPTION 'Invalid granularity: %, balance-type: %', _granularity, _balance_type;
   END IF;
 END
 $$;
