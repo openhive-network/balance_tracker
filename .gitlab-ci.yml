@@ -24,7 +24,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 9776a3727dda2eed4c1b6142bfe8d45d5e6379bc   # develop
+  ref: b077291d37d71d482fd22fa68ab23c905a5c0912   # develop
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -284,8 +284,8 @@ sync_with_mock_data:
     HAF_SHM_DIRECTORY: ${SHM_DIR}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
-    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file overrides/dev.yml
-      --ansi never
+    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
+      overrides/dev.yml --ansi never
   timeout: 1 hours
   before_script:
   - |
@@ -345,7 +345,7 @@ sync_with_mock_data:
 
     # Manually remove the copy of the repaly data to preserve disk space on the replay server
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
-    
+
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
     paths:
