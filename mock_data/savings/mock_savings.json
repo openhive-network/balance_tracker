@@ -1,104 +1,206 @@
 {
     "operations": [
         {
-
             "block_num": 90000001,
             "op_type_id":32,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x200b626c6f636b7472616465730b626c6f636b7472616465731027000000000000035342440000000000"
-        
+            "body": {
+                "type": "transfer_to_savings_operation",
+                "value": {
+                        "to": "blocktrades",
+                        "from": "blocktrades",
+                        "memo": "",
+                        "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    }
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":32,
             "op_pos":2,
             "trx_in_block":-1,
-            "body_binary":"\\x200b626c6f636b7472616465730b626c6f636b747261646573102700000000000003535445454d000000"
-        
+            "body": {
+                "type": "transfer_to_savings_operation",
+                "value": {
+                        "to": "blocktrades",
+                        "from": "blocktrades",
+                        "memo": "",
+                        "amount": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    }
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":55,
             "op_pos":3,
             "trx_in_block":-1,
-            "body_binary":"\\x370b626c6f636b747261646573640000000000000000"
-        
+            "body": {
+                "type": "interest_operation",
+                "value": {
+                    "owner": "blocktrades",
+                    "interest": {
+                        "nai": "@@000000013",
+                        "amount": "100",
+                        "precision": 3
+                    },
+                    "is_saved_into_hbd_balance": false
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":33,
             "op_pos":4,
             "trx_in_block":-1,
-            "body_binary":"\\x210b626c6f636b7472616465737b0000000b626c6f636b747261646573e803000000000000035342440000000000"
-        
+            "body": {
+                "type": "transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "request_id": 123
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":33,
             "op_pos":5,
             "trx_in_block":-1,
-            "body_binary":"\\x210b626c6f636b747261646573410100000b626c6f636b747261646573d007000000000000035342440000000000"
-        
+            "body": {
+                "type": "transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "2000",
+                        "precision": 3
+                    },
+                    "request_id": 321
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":34,
             "op_pos":6,
             "trx_in_block":-1,
-            "body_binary":"\\x220b626c6f636b7472616465737b000000"
-        
+            "body": {
+                "type": "cancel_transfer_from_savings_operation",
+                "value": {
+                    "from": "blocktrades",
+                    "request_id": 123
+                }
+            }
         },
         {
-
             "block_num": 90000001,
             "op_type_id":59,
             "op_pos":7,
             "trx_in_block":-1,
-            "body_binary":"\\x3b0b626c6f636b7472616465730b626c6f636b747261646573d00700000000000003534244000000004101000000"
-        
+            "body": {
+                "type": "fill_transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "2000",
+                        "precision": 3
+                    },
+                    "request_id": 321
+                }
+            }
         },
         {
-
             "block_num": 90000002,
             "op_type_id":33,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x210b626c6f636b7472616465737b0000000b626c6f636b747261646573b80b00000000000003535445454d000000"
-        
+            "body": {
+                "type": "transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "3000",
+                        "precision": 3
+                    },
+                    "request_id": 123
+                }
+            }
         },
         {
-
             "block_num": 90000003,
             "op_type_id":33,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x210b626c6f636b747261646573410100000b626c6f636b747261646573a00f00000000000003535445454d000000"
-        
+            "body": {
+                "type": "transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "4000",
+                        "precision": 3
+                    },
+                    "request_id": 321
+                }
+            }
         },
         {
-
             "block_num": 90000004,
             "op_type_id":34,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x220b626c6f636b7472616465737b000000"
-        
+            "body": {
+                "type": "cancel_transfer_from_savings_operation",
+                "value": {
+                    "from": "blocktrades",
+                    "request_id": 123
+                }
+            }
         },
         {
-
             "block_num": 90000005,
             "op_type_id":59,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3b0b626c6f636b7472616465730b626c6f636b747261646573a00f00000000000003535445454d00004101000000"
-        
+            "body": {
+                "type": "fill_transfer_from_savings_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "4000",
+                        "precision": 3
+                    },
+                    "request_id": 321
+                }
+            }
         }
     ]
 }
-  

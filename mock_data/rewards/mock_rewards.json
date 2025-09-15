@@ -1,59 +1,186 @@
 {
     "operations": [
         {
-
             "block_num":90000006,
             "op_type_id":51,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x330b626c6f636b7472616465730474657374102700000000000010270000000000001027000000000000000000000000000001"
-        
+            "body": {
+                "type": "author_reward_operation",
+                "value": {
+                    "author": "blocktrades",
+                    "permlink": "test",
+                    "hbd_payout": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "hive_payout": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "10000",
+                        "precision": 6
+                    },
+                    "payout_must_be_claimed": true,
+                    "curators_vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "0",
+                        "precision": 6
+                    }
+                }
+            }
         },
         {
-
             "block_num":90000006,
             "op_type_id":63,
             "op_pos":2,
             "trx_in_block":-1,
-            "body_binary":"\\x3f0b626c6f636b74726164657303677467047465737410270000000000001027000000000000102700000000000001"
-        
+            "body": {
+                "type": "comment_benefactor_reward_operation",
+                "value": {
+                    "author": "gtg",
+                    "permlink": "test",
+                    "benefactor": "blocktrades",
+                    "hbd_payout": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "hive_payout": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "10000",
+                        "precision": 6
+                    },
+                    "payout_must_be_claimed": true
+                }
+            }
         },
         {
-
             "block_num":90000006,
             "op_type_id":39,
             "op_pos":3,
             "trx_in_block":-1,
-            "body_binary":"\\x270b626c6f636b747261646573983a00000000000003535445454d0000983a0000000000000353424400000000983a0000000000000656455354530000"
-        
+            "body": {
+                "type": "claim_reward_balance_operation",
+                "value": {
+                    "account": "blocktrades",
+                    "reward_hbd": {
+                        "nai": "@@000000013",
+                        "amount": "15000",
+                        "precision": 3
+                    },
+                    "reward_hive": {
+                        "nai": "@@000000021",
+                        "amount": "15000",
+                        "precision": 3
+                    },
+                    "reward_vests": {
+                        "nai": "@@000000037",
+                        "amount": "15000",
+                        "precision": 6
+                    }
+                }
+            }
         },
         {
-
             "block_num":90000007,
             "op_type_id":51,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x330b626c6f636b7472616465730474657374e803000000000000e803000000000000e803000000000000000000000000000001"
-        
+            "body": {
+                "type": "author_reward_operation",
+                "value": {
+                    "author": "blocktrades",
+                    "permlink": "test",
+                    "hbd_payout": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "hive_payout": {
+                        "nai": "@@000000021",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "1000",
+                        "precision": 6
+                    },
+                    "payout_must_be_claimed": true,
+                    "curators_vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "0",
+                        "precision": 6
+                    }
+                }
+            }
         },
         {
-
             "block_num":90000008,
             "op_type_id":63,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3f0b626c6f636b747261646573036774670474657374e803000000000000e803000000000000e80300000000000001"
-        
+            "body": {
+                "type": "comment_benefactor_reward_operation",
+                "value": {
+                    "author": "gtg",
+                    "permlink": "test",
+                    "benefactor": "blocktrades",
+                    "hbd_payout": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "hive_payout": {
+                        "nai": "@@000000021",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "vesting_payout": {
+                        "nai": "@@000000037",
+                        "amount": "1000",
+                        "precision": 6
+                    },
+                    "payout_must_be_claimed": true
+                }
+            }
         },
         {
-
             "block_num":90000009,
             "op_type_id":39,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x270b626c6f636b747261646573e80300000000000003535445454d0000e8030000000000000353424400000000e8030000000000000656455354530000"
-        
+            "body": {
+                "type": "claim_reward_balance_operation",
+                "value": {
+                    "account": "blocktrades",
+                    "reward_hbd": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "reward_hive": {
+                        "nai": "@@000000021",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "reward_vests": {
+                        "nai": "@@000000037",
+                        "amount": "1000",
+                        "precision": 6
+                    }
+                }
+            }
         }
     ]
 }
-  
