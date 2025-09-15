@@ -1,176 +1,418 @@
 {
     "operations": [
         {
-
             "block_num":90000010,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x310b626c6f636b74726164657303677467102700000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000010,
             "op_type_id":83,
             "op_pos":2,
             "trx_in_block":-1,
-            "body_binary":"\\x530b626c6f636b7472616465730367746710270000000000000353424400000000000900"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 9
+                }
+            }
         },
         {
-
             "block_num":90000010,
             "op_type_id":84,
             "op_pos":3,
             "trx_in_block":-1,
-            "body_binary":"\\x540b626c6f636b74726164657303677467102700000000000003534244000000000001080000"
-        
+            "body": {
+                "type": "failed_recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "deleted": false,
+                    "consecutive_failures": 1,
+                    "remaining_executions": 8
+                }
+            }
         },
         {
-
             "block_num":90000011,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x310b626c6f636b74726164657305737465656d102700000000000003535445454d00000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000011,
             "op_type_id":84,
             "op_pos":2,
             "trx_in_block":-1,
-            "body_binary":"\\x540b626c6f636b74726164657305737465656d102700000000000003535445454d00000001090000"
-        
+            "body": {
+                "type": "failed_recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "deleted": false,
+                    "consecutive_failures": 1,
+                    "remaining_executions": 9
+                }
+            }
         },
         {
-
             "block_num":90000011,
             "op_type_id":83,
             "op_pos":3,
             "trx_in_block":-1,
-            "body_binary":"\\x530b626c6f636b74726164657305737465656d102700000000000003535445454d0000000800"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "blocktrades",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 8
+                }
+            }
         },
         {
-
             "block_num":90000012,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3105737465656d0b626c6f636b747261646573102700000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000013,
             "op_type_id":83,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x5305737465656d0b626c6f636b74726164657310270000000000000353424400000000000900"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 9
+                }
+            }
         },
         {
-
             "block_num":90000014,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3105737465656d0b626c6f636b747261646573102700000000000003535445454d00000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000015,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3105737465656d03677467102700000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000016,
             "op_type_id":83,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x5305737465656d0367746710270000000000000353424400000000000900"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 9
+                }
+            }
         },
         {
-
             "block_num":90000017,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x3105737465656d03677467102700000000000003534244000000000030000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "gtg",
+                    "from": "steem",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 48
+                }
+            }
         },
         {
-
             "block_num":90000018,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x31036774670b626c6f636b747261646573e80300000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000019,
             "op_type_id":83,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x53036774670b626c6f636b747261646573e8030000000000000353424400000000000900"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 9
+                }
+            }
         },
         {
-
             "block_num":90000020,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x31036774670b626c6f636b747261646573e80300000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000021,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x310367746705737465656de80300000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1000",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000022,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x310367746705737465656d000000000000000003534244000000000018000a0000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "0",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000023,
             "op_type_id":49,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x310367746705737465656d01000000000000000353424400000000001800010000"
-        
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1",
+                        "precision": 3
+                    },
+                    "executions": 1,
+                    "extensions": [],
+                    "recurrence": 24
+                }
+            }
         },
         {
-
             "block_num":90000024,
             "op_type_id":83,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x530367746705737465656d01000000000000000353424400000000000000"
-        
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "steem",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "1",
+                        "precision": 3
+                    },
+                    "extensions": [],
+                    "remaining_executions": 0
+                }
+            }
         }
     ]
 }
-  

@@ -6,7 +6,7 @@ CREATE TYPE btracker_backend.operation_type AS (
     op_type_id INT,
     op_pos INT,
     trx_in_block INT,
-    body_binary hafd.operation
+    body JSON
 );
 
 DROP TYPE IF EXISTS btracker_backend.block_type CASCADE;
@@ -38,24 +38,25 @@ AS
 $BODY$
 BEGIN
   INSERT INTO hafd.blocks(
-    num, 
-    hash, 
-    prev, 
-    created_at, 
-    producer_account_id, 
-    transaction_merkle_root, 
-    extensions, 
-    witness_signature, 
-    signing_key, 
-    hbd_interest_rate, 
-    total_vesting_fund_hive, 
-    total_vesting_shares, 
-    total_reward_fund_hive, 
-    virtual_supply, 
-    current_supply, 
+    num,
+    hash,
+    prev,
+    created_at,
+    producer_account_id,
+    transaction_merkle_root,
+    extensions,
+    witness_signature,
+    signing_key,
+    hbd_interest_rate,
+    total_vesting_fund_hive,
+    total_vesting_shares,
+    total_reward_fund_hive,
+    virtual_supply,
+    current_supply,
     current_hbd_supply,
-    dhf_interval_ledger)
-  SELECT 
+    dhf_interval_ledger
+  )
+  SELECT
     block_num,
     decode(hash, 'hex'),
     decode(prev, 'hex'),
@@ -92,10 +93,12 @@ BEGIN
   INSERT INTO hafd.operations(
     id, trx_in_block, op_pos, body_binary)
   SELECT
+    --generate operation id from block num, operation type id and operation position
     hafd.operation_id(block_num, op_type_id, op_pos),
     trx_in_block,
     op_pos,
-    body_binary
+    --turn JSON text into binary representation of operation
+    hafd.operation_from_jsontext(body::TEXT)
   FROM json_populate_recordset(
     NULL::btracker_backend.operation_type,
     _block_json->'operations'
@@ -111,9 +114,11 @@ VOLATILE
 AS
 $BODY$
 BEGIN
+  -- set consistent block to the end of mock data range
   UPDATE hafd.hive_state
   SET consistent_block = _mock_end_block_num;
 
+  -- set current and irreversible block to the end of mock data range
   UPDATE hafd.contexts
   SET current_block_num = _mock_start_block_num,
     irreversible_block = _mock_start_block_num;

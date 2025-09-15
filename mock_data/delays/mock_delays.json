@@ -1,41 +1,86 @@
 {
     "operations": [
         {
-
             "block_num":90000028,
             "op_type_id":77,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x4d05737465656d05737465656d640000000000000040420f0000000000"
-        
+            "body": {
+                "type": "transfer_to_vesting_completed_operation",
+                "value": {
+                    "to_account": "steem",
+                    "hive_vested": {
+                        "nai": "@@000000021",
+                        "amount": "100",
+                        "precision": 3
+                    },
+                    "from_account": "steem",
+                    "vesting_shares_received": {
+                        "nai": "@@000000037",
+                        "amount": "1000000",
+                        "precision": 6
+                    }
+                }
+            }
         },
         {
-
             "block_num":90000028,
             "op_type_id":70,
             "op_pos":2,
             "trx_in_block":-1,
-            "body_binary":"\\x4605737465656d40420f0000000000"
-        
+            "body": {
+                "type": "delayed_voting_operation",
+                "value": {
+                    "voter": "steem",
+                    "votes": 1000000
+                }
+            }
         },
         {
-
             "block_num":90000029,
             "op_type_id":77,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x4d0b626c6f636b7472616465730b626c6f636b7472616465731027000000000000f175130339520000"
-        
+            "body": {
+                "type": "transfer_to_vesting_completed_operation",
+                "value": {
+                    "to_account": "blocktrades",
+                    "hive_vested": {
+                        "nai": "@@000000021",
+                        "amount": "10000",
+                        "precision": 3
+                    },
+                    "from_account": "blocktrades",
+                    "vesting_shares_received": {
+                        "nai": "@@000000037",
+                        "amount": "90404818220529",
+                        "precision": 6
+                    }
+                }
+            }
         },
         {
-
             "block_num":90000030,
             "op_type_id":56,
             "op_pos":1,
             "trx_in_block":-1,
-            "body_binary":"\\x380b626c6f636b7472616465730b626c6f636b747261646573f1d5a0b420490000282300000000000003535445454d0000"
-        
+            "body": {
+                "type": "fill_vesting_withdraw_operation",
+                "value": {
+                    "deposited": {
+                        "nai": "@@000000021",
+                        "amount": "9000",
+                        "precision": 3
+                    },
+                    "withdrawn": {
+                        "nai": "@@000000037",
+                        "amount": "80404818220529",
+                        "precision": 6
+                    },
+                    "to_account": "blocktrades",
+                    "from_account": "blocktrades"
+                }
+            }
         }
     ]
 }
-  
