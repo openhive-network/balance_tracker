@@ -220,8 +220,8 @@ declare
             "description": "blocked VESTS by a withdrawal"
           },
           "conversion_pending_amount_hbd": {
-            "type": "number",
-            "x-sql-datatype": "NUMERIC",
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
             "description": "total HBD currently pending conversion"
           },
           "conversion_pending_count_hbd": {
@@ -229,8 +229,8 @@ declare
             "description": "number of HBD conversion requests"
           },
           "conversion_pending_amount_hive": {
-            "type": "number",
-            "x-sql-datatype": "NUMERIC",
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
             "description": "total HIVE currently pending conversion"
           },
           "conversion_pending_count_hive": {
@@ -246,13 +246,13 @@ declare
             "description": "count of open HIVE orders"
           },
           "open_orders_hive_amount": {
-            "type": "number",
-            "x-sql-datatype": "NUMERIC",
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
             "description": "total amount of HIVE in open orders"
           },
           "open_orders_hbd_amount": {
-            "type": "number",
-            "x-sql-datatype": "NUMERIC",
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
             "description": "total amount of HBD in open orders"
           }
         }
@@ -681,7 +681,7 @@ declare
           "Accounts"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VEST&page-size=2''`\n",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VESTS&page-size=2''`\n",
         "operationId": "btracker_endpoints.get_balance_history",
         "parameters": [
           {

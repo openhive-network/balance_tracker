@@ -13,7 +13,7 @@ SET ROLE btracker_owner;
       * `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`
 
       REST call example
-      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VEST&page-size=2''`
+      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VESTS&page-size=2''`
     operationId: btracker_endpoints.get_balance_history
     parameters:
       - in: path

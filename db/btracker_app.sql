@@ -330,38 +330,25 @@ CREATE TABLE IF NOT EXISTS transfer_saving_id
 );
 PERFORM hive.app_register_table( __schema_name, 'transfer_saving_id', __schema_name );
 
-CREATE TABLE IF NOT EXISTS account_convert_operations (
-  op_id         SERIAL       PRIMARY KEY,
-  account_name  TEXT         NOT NULL,
-  request_id    BIGINT       NOT NULL,
-  nai           TEXT         NOT NULL,
-  op_type       TEXT         NOT NULL,    -- 'convert' or 'fill'
-  amount        NUMERIC      NULL,        -- only for 'convert'
-  block_num     INT          NOT NULL,
-  raw           JSONB        NOT NULL,
-  inserted_at   TIMESTAMPTZ  DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS convert_state (
+  owner_id      INT       NOT NULL,   -- hive.accounts_view.id
+  request_id    BIGINT    NOT NULL,   -- unique per owner
+  nai           SMALLINT  NOT NULL,   -- 13=HBD, 21=HIVE
+  remaining     BIGINT    NOT NULL,   -- satoshis (HIVE/HBD ×1000)
+  request_block INT       NOT NULL,
+  CONSTRAINT pk_convert_state PRIMARY KEY (owner_id, request_id,nai)
 );
+PERFORM hive.app_register_table(__schema_name, 'convert_state', __schema_name);
 
-PERFORM hive.app_register_table(
-  __schema_name,
-  'account_convert_operations',
-  __schema_name
+CREATE TABLE IF NOT EXISTS order_state (
+  owner_id      INT       NOT NULL,   -- hive.accounts_view.id
+  order_id      BIGINT    NOT NULL,   -- per-owner unique
+  nai           SMALLINT  NOT NULL,   -- 13=HBD, 21=HIVE
+  remaining     BIGINT    NOT NULL,   -- satoshis (HIVE/HBD ×1000)
+  block_created INT       NOT NULL,
+  CONSTRAINT pk_order_state PRIMARY KEY (owner_id, order_id)
 );
-
-CREATE TABLE IF NOT EXISTS account_operations (
-  op_id         SERIAL      PRIMARY KEY,
-  account_name  TEXT        NOT NULL,
-  order_id      BIGINT      NOT NULL,
-  nai           TEXT        NULL,
-  op_type       TEXT        NOT NULL,
-  block_num     INT         NOT NULL,
-  amount        NUMERIC     NULL,
-  raw           JSONB       NOT NULL,
-  inserted_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
-PERFORM hive.app_register_table(__schema_name, 'account_operations', __schema_name);
-
+PERFORM hive.app_register_table(__schema_name, 'order_state', __schema_name);
 
 END
 $$;
@@ -635,13 +622,8 @@ BEGIN
 
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
-
-  CREATE INDEX IF NOT EXISTS idx_conv_ops_accname_opt_block_desc ON account_convert_operations(account_name, op_type, block_num DESC)
-  INCLUDE (request_id, nai, amount);
-
-  CREATE INDEX IF NOT EXISTS idx_acc_ops_accname_opt_block_desc ON account_operations(account_name, op_type, block_num DESC)
-  INCLUDE (order_id, nai, amount);
-
+  CREATE INDEX IF NOT EXISTS order_state_owner_nai_idx ON order_state(owner_id, order_id);
+  CREATE INDEX IF NOT EXISTS convert_state_owner_nai_idx ON convert_state (owner_id, request_id, nai);
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai,balance DESC);
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
 END
