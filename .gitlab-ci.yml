@@ -24,7 +24,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: a2031fd663ef74d12e20d6aac5537ce20eca992f   # develop
+  ref: d4bca1524076323418802ea33995d8f7948b929c   # develop
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -120,6 +120,7 @@ generate-wax-spec:
   stage: build
   variables:
     INPUT_JSON_SWAGGER_FILE: "${BUILT_JSON_SWAGGER_FILE}"
+    API_TYPE: "rest"
     NAMESPACE: "balance_tracker"
     NPM_PACKAGE_SCOPE: "@hiveio"
     NPM_PACKAGE_NAME: "wax-api-balance-tracker"
