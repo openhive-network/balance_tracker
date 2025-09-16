@@ -24,7 +24,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: e72f0446b2b33f7016e6ad883a32fe82d5137347   # develop
+  ref: a2031fd663ef74d12e20d6aac5537ce20eca992f   # develop
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -96,13 +96,13 @@ generate_python_api_client:
   - job: extract-swagger-json
     artifacts: true
   script:
-    - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
+  - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
   artifacts:
     paths:
-      - "${PYPROJECT_DIR}/balance_api"
-      - "${PYPROJECT_DIR}/balance_api/balance_api_client"
+    - "${PYPROJECT_DIR}/balance_api"
+    - "${PYPROJECT_DIR}/balance_api/balance_api_client"
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 build_python_api_client_wheel:
   extends: .build_wheel_template
@@ -113,7 +113,7 @@ build_python_api_client_wheel:
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 generate-wax-spec:
   extends: .generate_swagger_package
@@ -312,8 +312,8 @@ sync_with_mock_data:
     HAF_SHM_DIRECTORY: ${SHM_DIR}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
-    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file overrides/dev.yml
-      --ansi never
+    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
+      overrides/dev.yml --ansi never
   timeout: 1 hours
   before_script:
   - |
@@ -373,7 +373,7 @@ sync_with_mock_data:
 
     # Manually remove the copy of the repaly data to preserve disk space on the replay server
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
-    
+
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
   artifacts:
     paths:
@@ -567,14 +567,14 @@ python_api_client_test:
   extends: .project_develop_configuration_template
   stage: test
   needs:
-    - job: generate_python_api_client
-      artifacts: true
+  - job: generate_python_api_client
+    artifacts: true
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   script:
-    - pytest "${PYPROJECT_DIR}/tests"
+  - pytest "${PYPROJECT_DIR}/tests"
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 build_and_publish_image:
   stage: publish
@@ -595,17 +595,17 @@ build_and_publish_image:
 deploy_python_api_packages_to_gitlab:
   stage: publish
   needs:
-    - job: build_python_api_client_wheel
-      artifacts: true
-    - job: generate_python_api_client
-      artifacts: true
-    - job: python_api_client_test
+  - job: build_python_api_client_wheel
+    artifacts: true
+  - job: generate_python_api_client
+    artifacts: true
+  - job: python_api_client_test
   extends: .deploy_wheel_to_gitlab_template
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   when: on_success
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 deploy-wax-spec-dev-package:
   extends: .npm_deploy_package_template
