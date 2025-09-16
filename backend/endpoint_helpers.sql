@@ -102,203 +102,28 @@ BEGIN
         ON aw.account = _account_id
     ),
 
-    -- 9) Pending‐converts summary, dynamic truncation
-    conv_pivot AS (
-      WITH
-        ops AS (
-          SELECT block_num, op_type, request_id, nai, amount
-          FROM account_convert_operations
-          WHERE account_name = (
-            SELECT name::TEXT FROM hive.accounts_view WHERE id = _account_id
-          )
-        ),
-        last_fill AS (
-          SELECT
-            request_id,
-            MAX(block_num) AS last_fill_block
-          FROM ops
-          WHERE op_type = 'fill'
-          GROUP BY request_id
-        ),
-        requests AS (
-          SELECT
-            request_id,
-            block_num AS request_block,
-            nai,
-            amount
-          FROM ops
-          WHERE op_type = 'convert'
-        ),
-        open_requests AS (
-          SELECT r.*
-          FROM requests r
-          LEFT JOIN last_fill lf USING (request_id)
-          WHERE r.request_block > COALESCE(lf.last_fill_block,0)
-        )
-      SELECT
-        -- dynamically drop trailing zeros from the text repr,
-        -- then cast back to numeric
-        COALESCE(
-          TRIM(TRAILING '.' 
-            FROM TRIM(TRAILING '0'
-              FROM (SUM(amount) FILTER (WHERE nai='@@000000013'))::TEXT
-            )
-          )::NUMERIC,
-        0) AS conversion_pending_amount_hbd,
-        COALESCE(
-          COUNT(*) FILTER (WHERE nai='@@000000013'),
-        0)::INT AS conversion_pending_count_hbd,
-        COALESCE(
-          TRIM(TRAILING '.'
-            FROM TRIM(TRAILING '0'
-              FROM (SUM(amount) FILTER (WHERE nai='@@000000021'))::TEXT
-            )
-          )::NUMERIC,
-        0) AS conversion_pending_amount_hive,
-        COALESCE(
-          COUNT(*) FILTER (WHERE nai='@@000000021'),
-        0)::INT AS conversion_pending_count_hive
-      FROM open_requests
-    ),
-
-    -- 10) Open‐orders summary, dynamic truncation
-    open_orders AS (
-  WITH
-    /* 1) pull only create / fill / cancel rows for this account */
-    ops AS (
-      SELECT block_num, op_type, order_id, nai, amount
-      FROM account_operations
-      WHERE account_name = (
-              SELECT name::TEXT
-              FROM hive.accounts_view
-              WHERE id = _account_id
-            )
-        AND op_type IN ('create','fill','cancel')
-    ),
-
-    /* 2) last cancel per order */
-    last_cancel AS (
-      SELECT order_id,
-             MAX(block_num) AS last_cancel_block
-      FROM ops
-      WHERE op_type = 'cancel'
-      GROUP BY order_id
-    ),
-
-    /* 3) creates and fills */
-    creates AS (
-      SELECT order_id,
-             block_num AS create_block,
-             amount    AS create_amount,
-             nai
-      FROM ops
-      WHERE op_type = 'create'
-    ),
-    fills AS (
-      SELECT order_id,
-             amount    AS fill_amt,
-             block_num,
-             nai
-      FROM ops
-      WHERE op_type = 'fill'
-    ),
-
-    /* 4) only creates that have not been cancelled after their block */
-    live_creates AS (
-      SELECT c.*
-      FROM creates c
-      LEFT JOIN last_cancel lc USING (order_id)
-      WHERE c.create_block > COALESCE(lc.last_cancel_block, 0)
-    ),
-
-    /* 5) sum fills that happened after the last cancel */
-    agg_fills AS (
-      SELECT f.order_id,
-             f.nai,
-             SUM(f.fill_amt) AS total_filled
-      FROM fills f
-      LEFT JOIN last_cancel lc USING (order_id)
-      WHERE f.block_num > COALESCE(lc.last_cancel_block, 0)
-      GROUP BY f.order_id, f.nai
-    ),
-
-    /* 6) create-vs-fill delta per order/asset */
-    cri AS (
-      SELECT
-        lc.order_id,
-        lc.create_block,
-        lc.create_amount,
-        COALESCE(af.total_filled, 0)                    AS total_filled,
-        lc.create_amount - COALESCE(af.total_filled, 0) AS amount_remaining,
-        lc.nai
-      FROM live_creates lc
-      LEFT JOIN agg_fills af
-        ON af.order_id = lc.order_id
-       AND af.nai      = lc.nai
-    )
-
-  /* 7) final per-account summary  */
+   -- 9) Pending conversions (BIGINT satoshis) — from convert_state
+conv_pivot AS (
   SELECT
-    /* counts (positive remainders only) */
-    COUNT(*) FILTER (
-      WHERE cri.amount_remaining > 0
-        AND cri.nai = '@@000000013'
-    )::INT                                          AS open_orders_hbd_count,
+    COALESCE(SUM(cs.remaining) FILTER (WHERE cs.nai = 13), 0)::BIGINT AS conversion_pending_amount_hbd,
+    COUNT(*)                      FILTER (WHERE cs.nai = 13)::INT      AS conversion_pending_count_hbd,
+    COALESCE(SUM(cs.remaining) FILTER (WHERE cs.nai = 21), 0)::BIGINT AS conversion_pending_amount_hive,
+    COUNT(*)                      FILTER (WHERE cs.nai = 21)::INT      AS conversion_pending_count_hive
+  FROM convert_state cs
+  WHERE cs.owner_id = _account_id
+),
 
-    COUNT(*) FILTER (
-      WHERE cri.amount_remaining > 0
-        AND cri.nai = '@@000000021'
-    )::INT                                          AS open_orders_hive_count,
-
-    /* HIVE amount (positive remainders only) */
-    COALESCE(
-      CASE
-        WHEN (SUM(cri.amount_remaining)
-               FILTER (WHERE cri.amount_remaining > 0
-                        AND cri.nai = '@@000000021')
-             )::TEXT LIKE '%.%'
-        THEN
-          TRIM(TRAILING '.'
-            FROM TRIM(TRAILING '0'
-              FROM (SUM(cri.amount_remaining)
-                     FILTER (WHERE cri.amount_remaining > 0
-                              AND cri.nai = '@@000000021')
-                   )::TEXT
-            )
-          )::NUMERIC
-        ELSE
-          SUM(cri.amount_remaining)
-            FILTER (WHERE cri.amount_remaining > 0
-                     AND cri.nai = '@@000000021')
-      END,
-      0
-    )                                              AS open_orders_hive_amount,
-
-    /* HBD amount (positive remainders only) */
-    COALESCE(
-      CASE
-        WHEN (SUM(cri.amount_remaining)
-               FILTER (WHERE cri.amount_remaining > 0
-                        AND cri.nai = '@@000000013')
-             )::TEXT LIKE '%.%'
-        THEN
-          TRIM(TRAILING '.'
-            FROM TRIM(TRAILING '0'
-              FROM (SUM(cri.amount_remaining)
-                     FILTER (WHERE cri.amount_remaining > 0
-                              AND cri.nai = '@@000000013')
-                   )::TEXT
-            )
-          )::NUMERIC
-        ELSE
-          SUM(cri.amount_remaining)
-            FILTER (WHERE cri.amount_remaining > 0
-                     AND cri.nai = '@@000000013')
-      END,
-      0
-    )                                              AS open_orders_hbd_amount
-  FROM cri
+-- 10) Open orders summary (BIGINT satoshis) — from order_state
+open_orders AS (
+  SELECT
+    COUNT(*)                                           FILTER (WHERE s.nai = 13)::INT      AS open_orders_hbd_count,
+    COUNT(*)                                           FILTER (WHERE s.nai = 21)::INT      AS open_orders_hive_count,
+    COALESCE(SUM(s.remaining) FILTER (WHERE s.nai = 21), 0)::BIGINT AS open_orders_hive_amount,
+    COALESCE(SUM(s.remaining) FILTER (WHERE s.nai = 13), 0)::BIGINT AS open_orders_hbd_amount
+  FROM order_state s
+  WHERE s.owner_id = _account_id
 )
+
 
   -- Final assembly
   SELECT
