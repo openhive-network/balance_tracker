@@ -120,6 +120,7 @@ generate-wax-spec:
   stage: build
   variables:
     INPUT_JSON_SWAGGER_FILE: "${BUILT_JSON_SWAGGER_FILE}"
+    API_TYPE: "rest"
     NAMESPACE: "balance_tracker"
     NPM_PACKAGE_SCOPE: "@hiveio"
     NPM_PACKAGE_NAME: "wax-api-balance-tracker"
