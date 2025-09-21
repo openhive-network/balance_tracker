@@ -123,6 +123,14 @@ btracker_backend.balance:
       type: integer
       x-sql-datatype: BIGINT
       description: "total amount of HBD in open orders"
+    savings_pending_amount_hbd:
+      type: integer
+      x-sql-datatype: BIGINT
+      description: "total HBD currently pending transfer"
+    savings_pending_amount_hive:
+      type: integer
+      x-sql-datatype: BIGINT
+      description: "total HIVE currently pending transfer"
 
 
  */
@@ -157,7 +165,9 @@ CREATE TYPE btracker_backend.balance AS (
     "open_orders_hbd_count" INT,
     "open_orders_hive_count" INT,
     "open_orders_hive_amount" BIGINT,
-    "open_orders_hbd_amount" BIGINT
+    "open_orders_hbd_amount" BIGINT,
+    "savings_pending_amount_hbd" BIGINT,
+    "savings_pending_amount_hive" BIGINT
 );
 -- openapi-generated-code-end
 

@@ -122,7 +122,16 @@ open_orders AS (
     COALESCE(SUM(s.remaining) FILTER (WHERE s.nai = 13), 0)::BIGINT AS open_orders_hbd_amount
   FROM order_state s
   WHERE s.owner_id = _account_id
+),
+-- 11) Pending Savings → liquid (from transfer_saving_id)
+savings_pivot AS (
+  SELECT
+    COALESCE(SUM(tsi.balance) FILTER (WHERE tsi.nai = 13), 0)::BIGINT AS savings_pending_amount_hbd,
+    COALESCE(SUM(tsi.balance) FILTER (WHERE tsi.nai = 21), 0)::BIGINT AS savings_pending_amount_hive
+  FROM transfer_saving_id tsi
+  WHERE tsi.account = _account_id
 )
+
 
 
   -- Final assembly
@@ -155,7 +164,10 @@ open_orders AS (
     oo.open_orders_hbd_count,
     oo.open_orders_hive_count,
     oo.open_orders_hive_amount,
-    oo.open_orders_hbd_amount
+    oo.open_orders_hbd_amount,
+    sp.savings_pending_amount_hbd,
+    sp.savings_pending_amount_hive
+
   INTO result_row
   FROM get_balances     gb
   CROSS JOIN get_vest_balance      gvb
@@ -166,7 +178,9 @@ open_orders AS (
   CROSS JOIN get_savings           sv
   CROSS JOIN get_withdraws         wd
   CROSS JOIN conv_pivot            cp
-  CROSS JOIN open_orders           oo;
+  CROSS JOIN open_orders           oo
+  CROSS JOIN savings_pivot         sp;
+
 
   RETURN result_row;
 END;
