@@ -254,6 +254,16 @@ declare
             "type": "integer",
             "x-sql-datatype": "BIGINT",
             "description": "total amount of HBD in open orders"
+          },
+          "savings_pending_amount_hbd": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "total HBD currently pending transfer"
+          },
+          "savings_pending_amount_hive": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "total HIVE currently pending transfer"
           }
         }
       },
@@ -664,7 +674,9 @@ declare
                   "open_orders_hbd_count": 0,
                   "open_orders_hive_count": 0,
                   "open_orders_hive_amount": 0,
-                  "open_orders_hbd_amount": 0
+                  "open_orders_hbd_amount": 0,
+                  "savings_pending_amount_hbd": 0,
+                  "savings_pending_amount_hive": 0
                 }
               }
             }
