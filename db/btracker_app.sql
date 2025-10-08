@@ -39,6 +39,7 @@ INSERT INTO btracker_app_status
 VALUES
 (True, False)
 ;
+/*kk
 
 CREATE TABLE IF NOT EXISTS version(
   git_hash TEXT
