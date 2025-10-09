@@ -64,7 +64,10 @@ SET ROLE btracker_owner;
               open_orders_hive_amount: 0,
               open_orders_hbd_amount: 0,
               savings_pending_amount_hbd: 0,
-              savings_pending_amount_hive: 0
+              savings_pending_amount_hive: 0,
+              escrow_pending_amount_hbd: 0,
+              escrow_pending_amount_hive: 0,
+              escrow_pending_count: 0
             }
       '404':
         description: No such account in the database

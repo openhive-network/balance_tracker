@@ -144,7 +144,7 @@ declare
           "vesting_balance_hive": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "the VEST balance, presented in HIVE,  is calculated based on the current HIVE price"
+            "description": "the VEST balance, presented in HIVE, is calculated based on the current HIVE price"
           },
           "post_voting_power_vests": {
             "type": "string",
@@ -152,11 +152,11 @@ declare
           },
           "delegated_vests": {
             "type": "string",
-            "description": "VESTS delegated to another user,  account''s power is lowered by delegated VESTS"
+            "description": "VESTS delegated to another user, account''s power is lowered by delegated VESTS"
           },
           "received_vests": {
             "type": "string",
-            "description": "VESTS received from another user,  account''s power is increased by received VESTS"
+            "description": "VESTS received from another user, account''s power is increased by received VESTS"
           },
           "curation_rewards": {
             "type": "string",
@@ -169,21 +169,21 @@ declare
           "hbd_rewards": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "not yet claimed HIVE backed dollars  stored in hbd reward balance"
+            "description": "not yet claimed HIVE backed dollars stored in hbd reward balance"
           },
           "hive_rewards": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "not yet claimed HIVE  stored in hive reward balance"
+            "description": "not yet claimed HIVE stored in hive reward balance"
           },
           "vests_rewards": {
             "type": "string",
-            "description": "not yet claimed VESTS  stored in vest reward balance"
+            "description": "not yet claimed VESTS stored in vest reward balance"
           },
           "hive_vesting_rewards": {
             "type": "integer",
             "x-sql-datatype": "BIGINT",
-            "description": "the reward vesting balance, denominated in HIVE,  is determined by the prevailing HIVE price at the time of reward reception"
+            "description": "the reward vesting balance, denominated in HIVE, is determined by the prevailing HIVE price at the time of reward reception"
           },
           "hbd_savings": {
             "type": "integer",
@@ -197,11 +197,11 @@ declare
           },
           "savings_withdraw_requests": {
             "type": "integer",
-            "description": "number representing how many payouts are pending  from user''s saving balance"
+            "description": "number representing how many payouts are pending from user''s saving balance"
           },
           "vesting_withdraw_rate": {
             "type": "string",
-            "description": "received until the withdrawal is complete,  with each installment amounting to 1/13 of the withdrawn total"
+            "description": "received until the withdrawal is complete, with each installment amounting to 1/13 of the withdrawn total"
           },
           "to_withdraw": {
             "type": "string",
@@ -264,6 +264,20 @@ declare
             "type": "integer",
             "x-sql-datatype": "BIGINT",
             "description": "total HIVE currently pending transfer"
+          },
+          "escrow_pending_amount_hbd": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "total HBD currently locked in escrows (sender-view)"
+          },
+          "escrow_pending_amount_hive": {
+            "type": "integer",
+            "x-sql-datatype": "BIGINT",
+            "description": "total HIVE currently locked in escrows (sender-view)"
+          },
+          "escrow_pending_count": {
+            "type": "integer",
+            "description": "number of distinct open escrows (sender-view)"
           }
         }
       },
@@ -676,7 +690,10 @@ declare
                   "open_orders_hive_amount": 0,
                   "open_orders_hbd_amount": 0,
                   "savings_pending_amount_hbd": 0,
-                  "savings_pending_amount_hive": 0
+                  "savings_pending_amount_hive": 0,
+                  "escrow_pending_amount_hbd": 0,
+                  "escrow_pending_amount_hive": 0,
+                  "escrow_pending_count": 0
                 }
               }
             }

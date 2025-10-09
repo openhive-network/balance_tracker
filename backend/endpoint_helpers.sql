@@ -130,8 +130,17 @@ savings_pivot AS (
     COALESCE(SUM(tsi.balance) FILTER (WHERE tsi.nai = 21), 0)::BIGINT AS savings_pending_amount_hive
   FROM transfer_saving_id tsi
   WHERE tsi.account = _account_id
-)
+),
 
+    -- 13) Escrows (INCOMING: you are the beneficiary)
+  escrow_pivot AS (
+    SELECT
+      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 13), 0)::BIGINT AS escrow_pending_amount_hbd,
+      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 21), 0)::BIGINT AS escrow_pending_amount_hive,
+      COUNT(*)::INT AS escrow_pending_count
+    FROM escrow_state es
+    WHERE es.from_id = _account_id
+)
 
 
   -- Final assembly
@@ -166,7 +175,10 @@ savings_pivot AS (
     oo.open_orders_hive_amount,
     oo.open_orders_hbd_amount,
     sp.savings_pending_amount_hbd,
-    sp.savings_pending_amount_hive
+    sp.savings_pending_amount_hive,
+    ep.escrow_pending_amount_hbd,      
+    ep.escrow_pending_amount_hive,     
+    ep.escrow_pending_count           
 
   INTO result_row
   FROM get_balances     gb
@@ -179,10 +191,12 @@ savings_pivot AS (
   CROSS JOIN get_withdraws         wd
   CROSS JOIN conv_pivot            cp
   CROSS JOIN open_orders           oo
-  CROSS JOIN savings_pivot         sp;
-
+  CROSS JOIN savings_pivot         sp   
+  CROSS JOIN escrow_pivot   ep;        
 
   RETURN result_row;
+
+
 END;
 $BODY$;
 

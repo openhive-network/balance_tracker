@@ -350,6 +350,18 @@ CREATE TABLE IF NOT EXISTS order_state (
 );
 PERFORM hive.app_register_table(__schema_name, 'order_state', __schema_name);
 
+CREATE TABLE IF NOT EXISTS escrow_state (
+  from_id        INT       NOT NULL,  -- hive.accounts_view.id
+  escrow_id      BIGINT    NOT NULL,  -- unique per "from"
+  to_id          INT       NOT NULL,  -- hive.accounts_view.id
+  nai            SMALLINT  NOT NULL,  -- 13=HBD, 21=HIVE
+  remaining      BIGINT    NOT NULL,  -- satoshis (×1000)
+  source_op      BIGINT    NOT NULL DEFAULT 0 ,
+  CONSTRAINT pk_escrow_state PRIMARY KEY (from_id, escrow_id, nai)
+);
+
+PERFORM hive.app_register_table(__schema_name, 'escrow_state', __schema_name);
+
 END
 $$;
 
@@ -464,6 +476,8 @@ BEGIN
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
     PERFORM process_block_range_converts       (_from,        __hardfork_23_block);
     PERFORM process_block_range_orders         (_from,        __hardfork_23_block);
+    PERFORM process_block_range_escrows         (_from,        __hardfork_23_block);
+
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -480,6 +494,8 @@ BEGIN
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_converts       (__hardfork_23_block+1, _to);
       PERFORM process_block_range_orders         (__hardfork_23_block+1, _to);
+      PERFORM process_block_range_escrows         (__hardfork_23_block+1, _to);
+      
 
     END IF;
 
@@ -494,6 +510,8 @@ BEGIN
     PERFORM process_transfer_stats(_from, _to);
     PERFORM process_block_range_converts(_from, _to);
     PERFORM process_block_range_orders(_from, _to);
+    PERFORM process_block_range_escrows(_from, _to);
+
 
   END IF;
 
@@ -532,6 +550,7 @@ BEGIN
   PERFORM process_transfer_stats(_block, _block);
   PERFORM process_block_range_converts(_block, _block);
   PERFORM process_block_range_orders(_block, _block);
+  PERFORM process_block_range_escrows(_block, _block);
 
 
   IF _logs THEN
