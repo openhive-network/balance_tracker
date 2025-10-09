@@ -87,4 +87,21 @@ BEGIN
 END
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.validate_block(
+  block_num BIGINT,
+  block_name TEXT DEFAULT 'block'
+)
+RETURNS VOID
+LANGUAGE 'plpgsql'
+IMMUTABLE
+AS
+$$
+BEGIN
+  IF block_num <= 0 THEN
+    RAISE EXCEPTION '% must be greater than zero.', block_name;
+  END IF;
+  RETURN;
+END
+$$;
+
 RESET ROLE;
