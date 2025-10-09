@@ -98,7 +98,7 @@ AS
 $$
 BEGIN
   IF block_num <= 0 THEN
-    RAISE EXCEPTION '% must be greater than zero.', block_name;
+    RAISE EXCEPTION '% must be greater than zero. Given %', block_name, block_num;
   END IF;
   RETURN;
 END
