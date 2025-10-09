@@ -180,6 +180,14 @@ BEGIN
   PERFORM btracker_backend.validate_negative_page("page");
   PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
 
+  IF _block_range.first_block IS NOT NULL THEN
+    PERFORM btracker_backend.validate_block(_block_range.first_block, 'from-block');
+  END IF;
+
+  IF _block_range.last_block IS NOT NULL THEN
+    PERFORM btracker_backend.validate_block(_block_range.last_block, 'to-block');
+  END IF;
+  
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
