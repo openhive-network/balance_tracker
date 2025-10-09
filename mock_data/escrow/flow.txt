@@ -1,0 +1,89 @@
+operation_types:
+  27  "hive::protocol::escrow_transfer_operation"     virtual:false
+  28  "hive::protocol::escrow_dispute_operation"      virtual:false
+  29  "hive::protocol::escrow_release_operation"      virtual:false
+  31  "hive::protocol::escrow_approve_operation"      virtual:false
+  89  "hive::protocol::escrow_approved_operation"     virtual:true
+  90  "hive::protocol::escrow_rejected_operation"     virtual:true
+
+# Scenario built from your cvk/fnait/kush blocks
+
+# (A) escrow_id 90003001 — transfer only (no approvals or releases in given range)
+block 90000031  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003001
+  hbd_amount: 0, hive_amount: 1000, fee: 40
+  ratification_deadline: 2025-10-01T12:00:00, escrow_expiration: 2025-10-08T12:00:00
+
+# (B) escrow_id 90003002 — approve → approve → approved (virtual) → release 300 to recipient, approved fee 20
+block 90000032  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  hbd_amount: 0, hive_amount: 2000, fee: 20
+  ratification_deadline: 2025-10-01T13:00:00, escrow_expiration: 2025-10-08T13:00:00
+
+block 90000033  [31] escrow_approve_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  who: fnait, approve: true
+
+block 90000034  [31] escrow_approve_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  who: kush, approve: true
+
+# virtual approvals emitted later as separate ops in your data:
+block 90000041  [89] escrow_approved_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  who: fnait
+
+block 90000042  [89] escrow_approved_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  who: kush, fee: 20
+
+block 90000043  [29] escrow_release_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
+  who: fnait, receiver: fnait
+  hbd_amount: 0, hive_amount: 300
+
+# (C) escrow_id 90003003 — approve → approve → dispute → rejected (virtual)
+block 90000035  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
+  hbd_amount: 0, hive_amount: 1500, fee: 10
+  ratification_deadline: 2025-10-01T14:00:00, escrow_expiration: 2025-10-08T14:00:00
+
+block 90000036  [31] escrow_approve_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
+  who: fnait, approve: true
+
+block 90000037  [31] escrow_approve_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
+  who: kush, approve: true
+
+block 90000038  [28] escrow_dispute_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
+  who: fnait
+
+block 90000044  [90] escrow_rejected_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
+  who: kush
+
+# (D) escrow_id 90003004 — transfer → approve → dispute → two releases (100 + 405) to recipient
+block 90000039  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
+  hbd_amount: 0, hive_amount: 500, fee: 5
+  ratification_deadline: 2025-10-01T15:00:00, escrow_expiration: 2025-10-08T15:00:00
+
+block 90000040  [31] escrow_approve_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
+  who: fnait, approve: true
+
+block 90000045  [28] escrow_dispute_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
+  who: fnait
+
+block 90000046  [29] escrow_release_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
+  who: fnait, receiver: fnait
+  hbd_amount: 0, hive_amount: 100
+
+block 90000047  [29] escrow_release_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
+  who: fnait, receiver: fnait
+  hbd_amount: 0, hive_amount: 405

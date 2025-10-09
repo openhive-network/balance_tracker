@@ -14,7 +14,7 @@
   "received_vests": "0",
   "savings_withdraw_requests": 0,
   "to_withdraw": "0",
-  "vesting_balance_hive": 5205648,
+  "vesting_balance_hive": 5205664,
   "vesting_shares": "15636872956265",
   "vesting_withdraw_rate": "0",
   "vests_rewards": "0",
@@ -29,6 +29,10 @@
   "open_orders_hive_amount": 0,
   "open_orders_hbd_amount": 0,
   "savings_pending_amount_hbd": 0,
-  "savings_pending_amount_hive": 0
+  "savings_pending_amount_hive": 0,
+  "escrow_pending_amount_hbd": 0,
+  "escrow_pending_amount_hive": 0,
+  "escrow_pending_count": 0
+
 
 }

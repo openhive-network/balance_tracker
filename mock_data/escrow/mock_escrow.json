@@ -1,0 +1,302 @@
+{
+  
+  "operations": [
+    {
+      "block_num": 90000031,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003001,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003001\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",    "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "1000", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "40",   "precision": 3 },
+          "ratification_deadline": "2025-10-01T12:00:00",
+          "escrow_expiration":     "2025-10-08T12:00:00"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000032,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003002\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",    "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "2000", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "20",   "precision": 3 },
+          "ratification_deadline": "2025-10-01T13:00:00",
+          "escrow_expiration":     "2025-10-08T13:00:00"
+        }
+      }
+    },
+    {
+      "block_num": 90000033,
+      "op_type_id": 31,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approve_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "who": "fnait",
+          "approve": true
+        }
+      }
+    },
+    {
+      "block_num": 90000034,
+      "op_type_id": 31,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approve_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "who": "kush",
+          "approve": true
+        }
+      }
+    },
+
+    {
+      "block_num": 90000035,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003003\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",    "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "1500", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "10",   "precision": 3 },
+          "ratification_deadline": "2025-10-01T14:00:00",
+          "escrow_expiration":     "2025-10-08T14:00:00"
+        }
+      }
+    },
+    {
+      "block_num": 90000036,
+      "op_type_id": 31,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approve_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003,
+          "who": "fnait",
+          "approve": true
+        }
+      }
+    },
+    {
+      "block_num": 90000037,
+      "op_type_id": 31,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approve_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003,
+          "who": "kush",
+          "approve": true
+        }
+      }
+    },
+    {
+      "block_num": 90000038,
+      "op_type_id": 28,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_dispute_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003,
+          "who": "fnait"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000039,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003004,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003004\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",  "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "500","precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "5",  "precision": 3 },
+          "ratification_deadline": "2025-10-01T15:00:00",
+          "escrow_expiration":     "2025-10-08T15:00:00"
+        }
+      }
+    },
+    {
+      "block_num": 90000040,
+      "op_type_id": 31,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approve_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003004,
+          "who": "fnait",
+          "approve": true
+        }
+      }
+    }
+  ,
+  {
+    "block_num": 90000041,
+    "op_type_id": 89,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_approved_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "escrow_id": 90003002,
+        "fee": { "nai": "@@000000021", "amount": "20", "precision": 3 }
+      }
+    }
+  },
+  {
+    "block_num": 90000042,
+    "op_type_id": 29,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_release_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "escrow_id": 90003002,
+        "who": "fnait",                 
+        "receiver": "fnait", 
+        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+        "hive_amount": { "nai": "@@000000021", "amount": "300", "precision": 3 }
+      }
+    }
+  },
+
+  {
+    "block_num": 90000043,
+    "op_type_id": 90,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_rejected_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "escrow_id": 90003003,
+        "who": "kush"
+      }
+    }
+  },
+
+  {
+    "block_num": 90000044,
+    "op_type_id": 28,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_dispute_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "escrow_id": 90003004,
+        "who": "fnait"
+      }
+    }
+  },
+  {
+    "block_num": 90000045,
+    "op_type_id": 29,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_release_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "who": "fnait",                 
+        "receiver": "fnait", 
+        "escrow_id": 90003004,
+        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+        "hive_amount": { "nai": "@@000000021", "amount": "100", "precision": 3 }
+      }
+    }
+  },
+  {
+    "block_num": 90000046,
+    "op_type_id": 29,
+    "op_pos": 1,
+    "trx_in_block": -1,
+    "body": {
+      "type": "escrow_release_operation",
+      "value": {
+        "from": "cvk",
+        "to": "fnait",
+        "agent": "kush",
+        "escrow_id": 90003004,
+        "who": "fnait",
+        "receiver": "fnait",
+        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+        "hive_amount": { "nai": "@@000000021", "amount": "405", "precision": 3 }
+      }
+    }
+  }
+  
+]
+}

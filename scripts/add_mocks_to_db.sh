@@ -62,8 +62,9 @@ MOCKED_REWARDS=$(cat "$SCRIPTPATH/../mock_data/rewards/mock_rewards.json")
 MOCKED_TRANSFERS=$(cat "$SCRIPTPATH/../mock_data/recurrent_transfers/mock_recurrent_transfers.json")
 MOCKED_DELEGATIONS=$(cat "$SCRIPTPATH/../mock_data/delegations/mock_delegations.json")
 MOCKED_DELAYS=$(cat "$SCRIPTPATH/../mock_data/delays/mock_delays.json")
+MOCKED_ESCROW=$(cat "$SCRIPTPATH/../mock_data/escrow/mock_escrow.json")
 MOCK_START=90000000
-MOCK_END=90000030
+MOCK_END=90000046
 
 # Create SQL scripts and functions
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -f "$SCRIPTPATH/../mock_data/fill_tables_with_mocks.sql"
@@ -77,6 +78,6 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_m
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_operations('$MOCKED_TRANSFERS')"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_operations('$MOCKED_DELEGATIONS')"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_operations('$MOCKED_DELAYS')"
-
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.insert_mock_operations('$MOCKED_ESCROW')"
 # Update app last block
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SELECT btracker_backend.update_irreversible_block($MOCK_START,$MOCK_END)"
