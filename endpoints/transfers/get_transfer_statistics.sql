@@ -132,12 +132,8 @@ DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
   _coin_type INT                 := btracker_backend.get_liquid_nai_type("coin-type");
 BEGIN
-  IF _block_range.first_block IS NOT NULL THEN
-    PERFORM btracker_backend.validate_block(_block_range.first_block, 'from-block');
-  END IF;
-
-  IF _block_range.last_block IS NOT NULL THEN
-    PERFORM btracker_backend.validate_block(_block_range.last_block, 'to-block');
+  IF (_block_range.first_block IS NOT NULL AND _block_range.first_block <= 0) OR (_block_range.last_block IS NOT NULL AND _block_range.last_block <= 0) THEN
+    RAISE EXCEPTION 'the block-num must be a positive integer, found invalid from-block: %, to-block: %', _block_range.first_block, _block_range.last_block;
   END IF;
   
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
