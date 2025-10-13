@@ -1,46 +1,56 @@
-stages:
-  - name: Test zero from_block
-    request:
-      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
-      method: POST
-      headers:
-        content-type: application/json
-        accept: application/json
-      json:
-        account-name: "blocktrades"
-        coin-type: "HBD"
-        balance-type: "balance"
-        page: 1
-        page-size: 100
-        direction: "asc"
-        from-block: 0
-        to-block: 10
-    response:
-      status_code: 400
-      verify_response_with:
-        function: validate_response:compare_rest_response_with_pattern
-        extra_kwargs:
-          error_response: true
+---
+  test_name: btracker PostgREST
 
-  - name: Test zero to_block
-    request:
-      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
-      method: POST
-      headers:
-        content-type: application/json
-        accept: application/json
-      json:
-        account-name: "blocktrades"
-        coin-type: "HBD"
-        balance-type: "balance"
-        page: 1
-        page-size: 100
-        direction: "asc"
-        from-block: 10
-        to-block: 0
-    response:
-      status_code: 400
-      verify_response_with:
-        function: validate_response:compare_rest_response_with_pattern
-        extra_kwargs:
-          error_response: true
+  marks:
+    - patterntest
+    - negative
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: Test zero from-block
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "blocktrades"
+          coin-type: "HBD"
+          balance-type: "balance"
+          page: 1
+          page-size: 100
+          direction: "asc"
+          from-block: 0
+          to-block: 10
+      response:
+        status_code: 400
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
+          extra_kwargs:
+            error_response: true
+
+    - name: Test zero to-block
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "blocktrades"
+          coin-type: "HBD"
+          balance-type: "balance"
+          page: 1
+          page-size: 100
+          direction: "asc"
+          from-block: 10
+          to-block: 0
+      response:
+        status_code: 400
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
+          extra_kwargs:
+            error_response: true
