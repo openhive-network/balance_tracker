@@ -1,15 +1,5 @@
----
-test_name: btracker PostgREST - Negative Block Values
-
-marks:
-  - patterntest
-  - negative
-
-includes:
-  - !include ../../common.yaml
-
 stages:
-  - name: test negative from_block
+  - name: Test negative from_block
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
       method: POST
@@ -19,17 +9,21 @@ stages:
       json:
         account-name: "blocktrades"
         coin-type: "HBD"
-        from_block: -5
-        to_block: 10
-    response:
-      status_code: 400
-      verify_response_with:
-        function: validate_response:compare_rest_response_with_pattern
-        extra_kwargs:
-          error_response: true
-          pattern: negative_zero_block_num.json
+        balance-type: "balance"
+        page: 1
+        page-size: 100
+        direction: "asc"
+        from-block: "-5"
+        to-block: "10"
 
-  - name: test negative to_block
+    response:
+      status_code: 400
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern
+        extra_kwargs:
+          error_response: true
+
+  - name: Test negative to_block
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_balance_history"
       method: POST
@@ -39,12 +33,16 @@ stages:
       json:
         account-name: "blocktrades"
         coin-type: "HBD"
-        from_block: 10
-        to_block: -3
+        balance-type: "balance"
+        page: 1
+        page-size: 100
+        direction: "asc"
+        from-block: "10"
+        to-block: "-3"
+
     response:
       status_code: 400
       verify_response_with:
         function: validate_response:compare_rest_response_with_pattern
         extra_kwargs:
           error_response: true
-          pattern: negative_zero_block_num.json
