@@ -18,9 +18,9 @@
           accept: application/json
         json:
           coin-type: "HBD"
-          granularity: "yearly"
           direction: "desc"
           from-block: "-1"
+          granularity: "yearly"
           to-block: "10"
       response:
         status_code: 400
