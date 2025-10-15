@@ -72,7 +72,7 @@ BEGIN
     LEFT JOIN hive.accounts_view av_to   ON av_to.name   = e.to_name
   ),
 
-  -- fee at transfer time (if any) — keep the latest transfer per key
+  -- fee at transfer time (if any) — keep the latest transfer per key (in this batch)
   transfer_rows AS (
     SELECT from_id, escrow_id, fee_nai AS nai,
            COALESCE(fee,0)::bigint AS fee_amount,
@@ -104,25 +104,48 @@ BEGIN
     GROUP BY r.from_id, r.escrow_id, r.nai
   ),
 
-  -- compute new remaining for pre-existing rows and capture last contributing release op_id
+  -- approvals in range whose creating transfer is NOT in this batch (cross-batch approvals)
+  pre_approvals AS (
+    SELECT a.from_id, a.escrow_id, a.nai,
+           SUM(a.fee_amount)::bigint AS sum_approve_fee,
+           MAX(a.op_id)              AS last_approve_op
+    FROM (
+      SELECT from_id, escrow_id, nai, op_id, COALESCE(fee,0)::bigint AS fee_amount
+      FROM event_ids
+      WHERE kind='approved' AND fee IS NOT NULL
+    ) a
+    LEFT JOIN create_keys_in_range k
+      ON (k.from_id,k.escrow_id,k.nai)=(a.from_id,a.escrow_id,a.nai)
+    WHERE k.from_id IS NULL
+    GROUP BY a.from_id, a.escrow_id, a.nai
+  ),
+
+  -- compute new remaining for pre-existing rows and capture last contributing op_id (releases + approvals)
   pre_calc AS MATERIALIZED (
     SELECT s.from_id,
            s.escrow_id,
            s.nai,
            s.remaining,
-           pr.sum_release,
-           GREATEST(s.remaining - pr.sum_release, 0)::bigint AS new_remaining,
-           (
-             SELECT MAX(ev.op_id)
-             FROM event_ids ev
-             WHERE ev.kind = 'release'
-               AND (ev.from_id, ev.escrow_id, ev.nai) = (s.from_id, s.escrow_id, s.nai)
+           COALESCE(pr.sum_release,0)     AS sum_release,
+           COALESCE(pa.sum_approve_fee,0) AS sum_approve_fee,
+           GREATEST(
+             s.remaining - COALESCE(pr.sum_release,0) - COALESCE(pa.sum_approve_fee,0),
+             0
+           )::bigint AS new_remaining,
+           GREATEST(
+             COALESCE((
+               SELECT MAX(ev.op_id)
+               FROM event_ids ev
+               WHERE ev.kind='release'
+                 AND (ev.from_id,ev.escrow_id,ev.nai)=(s.from_id,s.escrow_id,s.nai)
+             ), 0),
+             COALESCE(pa.last_approve_op, 0)
            ) AS pre_last_op_id
     FROM escrow_state s
-    JOIN pre_releases pr
-      ON (s.from_id, s.escrow_id, s.nai) = (pr.from_id, pr.escrow_id, pr.nai)
-    WHERE pr.sum_release <> 0
-      AND s.remaining <> GREATEST(s.remaining - pr.sum_release, 0)::bigint
+    LEFT JOIN pre_releases  pr ON (s.from_id,s.escrow_id,s.nai)=(pr.from_id,pr.escrow_id,pr.nai)
+    LEFT JOIN pre_approvals pa ON (s.from_id,s.escrow_id,s.nai)=(pa.from_id,pa.escrow_id,pa.nai)
+    WHERE COALESCE(pr.sum_release,0) <> 0
+       OR COALESCE(pa.sum_approve_fee,0) <> 0
   ),
 
   -- latest transfer per key in this range
@@ -287,7 +310,7 @@ BEGIN
     RETURNING 1
   ),
 
-  -- apply pre-range releases to pre-existing rows, and stamp exact last contributing op_id
+  -- apply cross-batch releases/approvals to pre-existing rows, and stamp exact last contributing op_id
   upd_pre AS (
     UPDATE escrow_state s
        SET remaining = pc.new_remaining,
@@ -304,7 +327,7 @@ BEGIN
     COALESCE((SELECT COUNT(*) FROM del_any), 0),
     COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
 
-    -- approvals that actually subtracted fee (i.e., not rejected after transfer)
+    -- approvals that actually subtracted fee (i.e., not rejected after transfer) in the in-range (latest-transfer) path
     COALESCE((
       SELECT COUNT(*)
       FROM remaining_calc rc
