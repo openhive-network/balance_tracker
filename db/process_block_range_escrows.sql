@@ -25,12 +25,12 @@ DECLARE
   __del_any  INT := 0;
   __upd_pre  INT := 0;
 
-  -- single-notice metrics focused on approvals and “did agent fee matter”
-  __appr_applied_keys           INT    := 0;     -- approvals that actually subtracted fee (not rejected)
-  __appr_applied_sum            BIGINT := 0;     -- total approval fee subtracted (raw NAI)
-  __appr_with_agent_keys        INT    := 0;     -- among those, how many had a prior agent fee
-  __appr_with_agent_agent_sum   BIGINT := 0;     -- total agent fees (raw NAI) for those same escrows
-  __appr_with_agent_net_delta   BIGINT := 0;     -- agent_sum - approval_sum for those escrows
+  -- approval debug/notice metrics (sum raw NAI)
+  __appr_applied_keys INT    := 0;
+  __appr_applied_sum  BIGINT := 0;
+  __appr_with_agent_keys      INT    := 0;
+  __appr_with_agent_agent_sum BIGINT := 0;
+  __appr_with_agent_net_delta BIGINT := 0;
 BEGIN
   SELECT id INTO _op_transfer    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
   SELECT id INTO _op_release     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
@@ -60,7 +60,7 @@ BEGIN
       av_from.id  AS from_id,
       av_to.id    AS to_id,
       e.escrow_id,
-      e.nai,           -- may be NULL for approvals; use fee_nai for approval currency
+      e.nai,           -- (may be NULL on approvals; use fee_nai there)
       e.amount,
       e.kind,
       e.fee,
@@ -72,7 +72,7 @@ BEGIN
     LEFT JOIN hive.accounts_view av_to   ON av_to.name   = e.to_name
   ),
 
-  -- fee at transfer time (if any) — keep the latest transfer per key (in this batch)
+  /* ---------- FEES AT TRANSFER (agent) ---------- */
   transfer_rows AS (
     SELECT from_id, escrow_id, fee_nai AS nai,
            COALESCE(fee,0)::bigint AS fee_amount,
@@ -87,14 +87,14 @@ BEGIN
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
 
-  -- keys created (transferred) within the processed range
+  /* ---------- CREATE KEYS IN-RANGE ---------- */
   create_keys_in_range AS (
     SELECT DISTINCT from_id, escrow_id, nai
     FROM event_ids
     WHERE kind = 'transfer'
   ),
 
-  -- releases in range that apply to a state created earlier than this range
+  /* ---------- PRE-RANGE RELEASES & APPROVALS (to existing rows) ---------- */
   pre_releases AS (
     SELECT r.from_id, r.escrow_id, r.nai, SUM(r.amount)::bigint AS sum_release
     FROM event_ids r
@@ -103,8 +103,6 @@ BEGIN
     WHERE r.kind = 'release' AND k.from_id IS NULL
     GROUP BY r.from_id, r.escrow_id, r.nai
   ),
-
-  -- approvals in range whose creating transfer is NOT in this batch (cross-batch approvals)
   pre_approvals AS (
     SELECT a.from_id, a.escrow_id, a.nai,
            SUM(a.fee_amount)::bigint AS sum_approve_fee,
@@ -112,7 +110,7 @@ BEGIN
     FROM (
       SELECT from_id,
              escrow_id,
-             fee_nai AS nai,                -- approval currency = fee_nai
+             fee_nai AS nai,
              op_id,
              COALESCE(fee,0)::bigint AS fee_amount
       FROM event_ids
@@ -120,11 +118,9 @@ BEGIN
     ) a
     LEFT JOIN create_keys_in_range k
       ON (k.from_id,k.escrow_id,k.nai)=(a.from_id,a.escrow_id,a.nai)
-    WHERE k.from_id IS NULL              -- transfer NOT in this block: cross-batch approval
+    WHERE k.from_id IS NULL
     GROUP BY a.from_id,a.escrow_id,a.nai
   ),
-
-  -- compute new remaining for pre-existing rows and capture last contributing op_id (releases + approvals)
   pre_calc AS MATERIALIZED (
     SELECT s.from_id,
            s.escrow_id,
@@ -152,7 +148,7 @@ BEGIN
        OR COALESCE(pa.sum_approve_fee,0) <> 0
   ),
 
-  -- latest transfer per key in this range (for main in-range path)
+  /* ---------- IN-RANGE TRANSFERS & AFTER-EVENTS ---------- */
   latest_transfers AS MATERIALIZED (
     SELECT DISTINCT ON (from_id, escrow_id, nai)
            from_id, escrow_id, nai,
@@ -163,8 +159,6 @@ BEGIN
     WHERE kind = 'transfer'
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
-
-  -- releases after latest transfer; also compute last contributing release op_id
   releases_after_latest AS MATERIALIZED (
     WITH rel AS (
       SELECT r.from_id, r.escrow_id, r.nai, r.amount, r.op_id, r.block_num
@@ -187,8 +181,6 @@ BEGIN
       ON (rel.from_id, rel.escrow_id, rel.nai) = (t.from_id, t.escrow_id, t.nai)
     GROUP BY t.from_id, t.escrow_id, t.nai
   ),
-
-  -- if rejected after transfer -> remaining becomes 0
   rejections_after_latest AS MATERIALIZED (
     SELECT t.from_id, t.escrow_id,
            MAX(ev.op_id) AS reject_op_id
@@ -200,8 +192,22 @@ BEGIN
      AND ev.kind      = 'rejected'
     GROUP BY t.from_id, t.escrow_id
   ),
-
-  -- approvals after the last known source_op from escrow_state (fallback when transfer not in-range)
+  /* missing in your paste; restore it */
+  approval_fees_after_latest AS MATERIALIZED (
+    SELECT DISTINCT ON (t.from_id, t.escrow_id, t.nai)
+           t.from_id, t.escrow_id, t.nai,
+           COALESCE(ev.fee,0)::bigint AS fee_amount,
+           ev.op_id                   AS approve_op_id
+    FROM latest_transfers t
+    JOIN event_ids ev
+      ON ev.from_id   = t.from_id
+     AND ev.escrow_id = t.escrow_id
+     AND ev.op_id     > t.create_op_id
+     AND ev.kind      = 'approved'
+     AND ev.fee IS NOT NULL
+     AND ev.fee_nai   = t.nai
+    ORDER BY t.from_id, t.escrow_id, t.nai, ev.op_id DESC
+  ),
   approval_fees_after_state AS MATERIALIZED (
     SELECT s.from_id, s.escrow_id, s.nai,
            COALESCE(ev.fee,0)::bigint AS fee_amount,
@@ -213,10 +219,8 @@ BEGIN
      AND ev.fee_nai = s.nai
      AND ev.from_id = s.from_id
      AND ev.escrow_id = s.escrow_id
-     AND ev.op_id > s.source_op            -- only approvals after what we already applied
+     AND ev.op_id > s.source_op            -- keep your guard
   ),
-
-  -- unify approvals: prefer in-range transfer path, else fallback to state-based
   approval_fees_after AS MATERIALIZED (
     SELECT * FROM approval_fees_after_latest
     UNION ALL
@@ -228,7 +232,6 @@ BEGIN
     )
   ),
 
-  -- compute remaining and the exact last operation that determined it
   remaining_calc AS MATERIALIZED (
     SELECT
       t.from_id,
@@ -236,9 +239,9 @@ BEGIN
       t.nai,
       CASE WHEN rj.reject_op_id IS NOT NULL THEN 0
            ELSE ( t.create_amount
-                + COALESCE(tf.fee_amount, 0)        -- agent fee added at transfer (unchanged)
+                + COALESCE(tf.fee_amount, 0)        -- agent fee added
                 - ral.sum_release_after              -- releases subtract
-                - COALESCE(af.fee_amount, 0) )       -- approvals subtract (unified path)
+                - COALESCE(af.fee_amount, 0) )       -- approvals subtract
       END AS remaining,
       GREATEST(
         t.create_op_id,
@@ -264,7 +267,6 @@ BEGIN
     WHERE kind = 'transfer'
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
-
   survivors AS (
     SELECT rc.from_id, rc.escrow_id, rc.nai,
            tt.to_id,
@@ -275,7 +277,6 @@ BEGIN
       ON (tt.from_id, tt.escrow_id, tt.nai) = (rc.from_id, rc.escrow_id, rc.nai)
     WHERE rc.remaining > 0
   ),
-
   ins_new AS (
     INSERT INTO escrow_state (from_id, escrow_id, nai, to_id, remaining, source_op)
     SELECT from_id, escrow_id, nai, to_id, remaining, source_op
@@ -287,7 +288,7 @@ BEGIN
     RETURNING 1
   ),
 
-  -- any state that is now zero/closed (by pre-calc or main calc) or explicitly rejected (and not resurfaced as survivor)
+  /* ---------- CLOSE/DELETE & PRE-APPLY ---------- */
   pre_rejected AS (
     SELECT s.from_id, s.escrow_id
     FROM escrow_state s
@@ -299,7 +300,6 @@ BEGIN
         AND ev.from_id   = s.from_id
     )
   ),
-
   del_keys AS (
     SELECT from_id, escrow_id FROM (
       SELECT from_id, escrow_id FROM pre_calc       WHERE new_remaining <= 0
@@ -309,22 +309,18 @@ BEGIN
       SELECT from_id, escrow_id FROM pre_rejected
     ) u
   ),
-
   to_delete AS (
     SELECT DISTINCT d.from_id, d.escrow_id
     FROM del_keys d
     LEFT JOIN survivors s USING (from_id, escrow_id)
     WHERE s.from_id IS NULL
   ),
-
   del_any AS (
     DELETE FROM escrow_state s
     USING to_delete d
     WHERE (s.from_id, s.escrow_id) = (d.from_id, d.escrow_id)
     RETURNING 1
   ),
-
-  -- apply cross-batch releases/approvals to pre-existing rows, and stamp exact last contributing op_id
   upd_pre AS (
     UPDATE escrow_state s
        SET remaining = pc.new_remaining,
@@ -334,6 +330,41 @@ BEGIN
        AND pc.new_remaining > 0
        AND s.remaining <> pc.new_remaining
     RETURNING 1
+  ),
+
+  /* ---------- WHAT ACTUALLY APPLIED THIS RUN (for the NOTICE) ---------- */
+  -- approvals that applied via in-range main path (skip rejected keys)
+  applied_approvals_inrange AS (
+    SELECT rc.from_id, rc.escrow_id, rc.nai, af.fee_amount::bigint AS amount
+    FROM remaining_calc rc
+    JOIN approval_fees_after af
+      ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+    LEFT JOIN rejections_after_latest rj
+      ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
+    WHERE COALESCE(af.fee_amount,0) > 0
+      AND rj.reject_op_id IS NULL
+  ),
+  -- pre-range approvals considered "new" vs state (guard: last_approve_op > source_op)
+  pre_approvals_new AS (
+    SELECT pa.from_id, pa.escrow_id, pa.nai, pa.sum_approve_fee::bigint AS amount
+    FROM pre_approvals pa
+    JOIN escrow_state s
+      ON (s.from_id,s.escrow_id,s.nai)=(pa.from_id,pa.escrow_id,pa.nai)
+    WHERE pa.last_approve_op > s.source_op
+      AND pa.sum_approve_fee > 0
+  ),
+  applied_approvals AS (
+    SELECT * FROM applied_approvals_inrange
+    UNION ALL
+    SELECT * FROM pre_approvals_new
+  ),
+
+  -- subset with prior agent fee (NOTE: only detects agent fees seen in-range)
+  applied_with_agent AS (
+    SELECT a.from_id, a.escrow_id, a.nai, a.amount, tf.fee_amount AS agent_fee
+    FROM applied_approvals a
+    JOIN latest_transfer_fees tf
+      ON (tf.from_id, tf.escrow_id, tf.nai)=(a.from_id, a.escrow_id, a.nai)
   )
 
   SELECT
@@ -341,72 +372,18 @@ BEGIN
     COALESCE((SELECT COUNT(*) FROM del_any), 0),
     COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
 
-    -- approvals that actually subtracted fee (i.e., not rejected after transfer) in the unified path
-    COALESCE((
-      SELECT COUNT(*)
-      FROM remaining_calc rc
-      JOIN approval_fees_after af
-        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      LEFT JOIN rejections_after_latest rj
-        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
-      WHERE COALESCE(af.fee_amount,0) > 0
-        AND rj.reject_op_id IS NULL
-    ), 0),
-    COALESCE((
-      SELECT SUM(af.fee_amount)
-      FROM remaining_calc rc
-      JOIN approval_fees_after af
-        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      LEFT JOIN rejections_after_latest rj
-        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
-      WHERE COALESCE(af.fee_amount,0) > 0
-        AND rj.reject_op_id IS NULL
-    ), 0),
+    COALESCE((SELECT COUNT(*)    FROM applied_approvals), 0),
+    COALESCE((SELECT SUM(amount) FROM applied_approvals), 0),
 
-    -- among those approvals, how many had a prior agent fee and its sum
-    COALESCE((
-      SELECT COUNT(*)
-      FROM remaining_calc rc
-      JOIN approval_fees_after af
-        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      JOIN latest_transfer_fees tf
-        ON (tf.from_id, tf.escrow_id, tf.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      LEFT JOIN rejections_after_latest rj
-        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
-      WHERE COALESCE(af.fee_amount,0) > 0
-        AND COALESCE(tf.fee_amount,0) > 0
-        AND rj.reject_op_id IS NULL
-    ), 0),
-    COALESCE((
-      SELECT SUM(tf.fee_amount)
-      FROM remaining_calc rc
-      JOIN approval_fees_after af
-        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      JOIN latest_transfer_fees tf
-        ON (tf.from_id, tf.escrow_id, tf.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-      LEFT JOIN rejections_after_latest rj
-        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
-      WHERE COALESCE(af.fee_amount,0) > 0
-        AND COALESCE(tf.fee_amount,0) > 0
-        AND rj.reject_op_id IS NULL
-    ), 0)
+    COALESCE((SELECT COUNT(*)           FROM applied_with_agent), 0),
+    COALESCE((SELECT SUM(agent_fee)     FROM applied_with_agent), 0)
   INTO __ins_new, __del_any, __upd_pre,
        __appr_applied_keys, __appr_applied_sum,
        __appr_with_agent_keys, __appr_with_agent_agent_sum;
 
-  -- compute net delta = agent_sum - approval_sum for those escrows (NULL-safe)
   __appr_with_agent_net_delta := COALESCE(__appr_with_agent_agent_sum,0) - COALESCE(__appr_applied_sum,0);
 
-  -- Optional DEBUG (safe to remove after validation)
-  RAISE NOTICE 'pre_approvals (cross-batch): rows=%, sum=%',
-    (SELECT COUNT(*) FROM pre_approvals),
-    (SELECT COALESCE(SUM(sum_approve_fee),0) FROM pre_approvals);
-
-  RAISE NOTICE 'approval_fees_after (unified): rows=%, sum=%',
-    (SELECT COUNT(*) FROM approval_fees_after),
-    (SELECT COALESCE(SUM(fee_amount),0) FROM approval_fees_after);
-
-  -- Single concise notice: only when there are approvals that actually subtracted fees
+  -- concise notice
   IF __appr_applied_sum > 0 THEN
     RAISE NOTICE
       'escrow: approvals applied: % keys, approval_fee_subtracted=%; among these: prior agent-fee on % keys, agent_fee_sum=%; net(agent - approval)=% (raw NAI).',
