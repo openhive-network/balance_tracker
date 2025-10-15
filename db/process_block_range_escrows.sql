@@ -24,6 +24,13 @@ DECLARE
   __ins_new  INT := 0;
   __del_any  INT := 0;
   __upd_pre  INT := 0;
+
+  -- single-notice metrics focused on approvals and “did agent fee matter”
+  __appr_applied_keys           INT    := 0;     -- approvals that actually subtracted fee (not rejected)
+  __appr_applied_sum            BIGINT := 0;     -- total approval fee subtracted (raw NAI)
+  __appr_with_agent_keys        INT    := 0;     -- among those, how many had a prior agent fee
+  __appr_with_agent_agent_sum   BIGINT := 0;     -- total agent fees (raw NAI) for those same escrows
+  __appr_with_agent_net_delta   BIGINT := 0;     -- agent_sum - approval_sum for those escrows
 BEGIN
   SELECT id INTO _op_transfer    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
   SELECT id INTO _op_release     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
@@ -295,8 +302,74 @@ BEGIN
   SELECT
     COALESCE((SELECT COUNT(*) FROM ins_new), 0),
     COALESCE((SELECT COUNT(*) FROM del_any), 0),
-    COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
-  INTO __ins_new, __del_any, __upd_pre;
+    COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
+
+    -- approvals that actually subtracted fee (i.e., not rejected after transfer)
+    COALESCE((
+      SELECT COUNT(*)
+      FROM remaining_calc rc
+      JOIN approval_fees_after_latest af
+        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      LEFT JOIN rejections_after_latest rj
+        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
+      WHERE COALESCE(af.fee_amount,0) > 0
+        AND rj.reject_op_id IS NULL
+    ), 0),
+    COALESCE((
+      SELECT SUM(af.fee_amount)
+      FROM remaining_calc rc
+      JOIN approval_fees_after_latest af
+        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      LEFT JOIN rejections_after_latest rj
+        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
+      WHERE COALESCE(af.fee_amount,0) > 0
+        AND rj.reject_op_id IS NULL
+    ), 0),
+
+    -- among those approvals, how many had a prior agent fee and its sum
+    COALESCE((
+      SELECT COUNT(*)
+      FROM remaining_calc rc
+      JOIN approval_fees_after_latest af
+        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      JOIN latest_transfer_fees tf
+        ON (tf.from_id, tf.escrow_id, tf.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      LEFT JOIN rejections_after_latest rj
+        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
+      WHERE COALESCE(af.fee_amount,0) > 0
+        AND COALESCE(tf.fee_amount,0) > 0
+        AND rj.reject_op_id IS NULL
+    ), 0),
+    COALESCE((
+      SELECT SUM(tf.fee_amount)
+      FROM remaining_calc rc
+      JOIN approval_fees_after_latest af
+        ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      JOIN latest_transfer_fees tf
+        ON (tf.from_id, tf.escrow_id, tf.nai)=(rc.from_id, rc.escrow_id, rc.nai)
+      LEFT JOIN rejections_after_latest rj
+        ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
+      WHERE COALESCE(af.fee_amount,0) > 0
+        AND COALESCE(tf.fee_amount,0) > 0
+        AND rj.reject_op_id IS NULL
+    ), 0)
+  INTO __ins_new, __del_any, __upd_pre,
+       __appr_applied_keys, __appr_applied_sum,
+       __appr_with_agent_keys, __appr_with_agent_agent_sum;
+
+  -- compute net delta = agent_sum - approval_sum for those escrows (NULL-safe)
+  __appr_with_agent_net_delta := COALESCE(__appr_with_agent_agent_sum,0) - COALESCE(__appr_applied_sum,0);
+
+  -- Single concise notice: only when there are approvals that actually subtracted fees
+  IF __appr_applied_sum > 0 THEN
+    RAISE NOTICE
+      'escrow: approvals applied: % keys, approval_fee_subtracted=%; among these: prior agent-fee on % keys, agent_fee_sum=%; net(agent - approval)=% (raw NAI).',
+      __appr_applied_keys,
+      __appr_applied_sum,
+      __appr_with_agent_keys,
+      __appr_with_agent_agent_sum,
+      __appr_with_agent_net_delta;
+  END IF;
 
 END;
 $func$;
