@@ -2,5 +2,5 @@
   "code": "P0001",
   "details": null,
   "hint": null,
-  "message": "from-block <= 0: from-block of 0 is lesser or equal 0"
+  "message": "the starting Block-num must be a positive integer or a valid timestamp, found: 0d"
 }
