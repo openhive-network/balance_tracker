@@ -20,17 +20,6 @@ DECLARE
   _op_rejected    INT;  
   _op_approve_req INT;  
   _op_dispute     INT;
-
-  __ins_new  INT := 0;
-  __del_any  INT := 0;
-  __upd_pre  INT := 0;
-
-  -- approval debug/notice metrics (sum raw NAI)
-  __appr_applied_keys INT    := 0;
-  __appr_applied_sum  BIGINT := 0;
-  __appr_with_agent_keys      INT    := 0;
-  __appr_with_agent_agent_sum BIGINT := 0;
-  __appr_with_agent_net_delta BIGINT := 0;
 BEGIN
   SELECT id INTO _op_transfer    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
   SELECT id INTO _op_release     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
@@ -60,7 +49,7 @@ BEGIN
       av_from.id  AS from_id,
       av_to.id    AS to_id,
       e.escrow_id,
-      e.nai,           -- (may be NULL on approvals; use fee_nai there)
+      e.nai,
       e.amount,
       e.kind,
       e.fee,
@@ -192,7 +181,6 @@ BEGIN
      AND ev.kind      = 'rejected'
     GROUP BY t.from_id, t.escrow_id
   ),
-  /* missing in your paste; restore it */
   approval_fees_after_latest AS MATERIALIZED (
     SELECT DISTINCT ON (t.from_id, t.escrow_id, t.nai)
            t.from_id, t.escrow_id, t.nai,
@@ -219,7 +207,7 @@ BEGIN
      AND ev.fee_nai = s.nai
      AND ev.from_id = s.from_id
      AND ev.escrow_id = s.escrow_id
-     AND ev.op_id > s.source_op            -- keep your guard
+     AND ev.op_id > s.source_op
   ),
   approval_fees_after AS MATERIALIZED (
     SELECT * FROM approval_fees_after_latest
@@ -239,9 +227,9 @@ BEGIN
       t.nai,
       CASE WHEN rj.reject_op_id IS NOT NULL THEN 0
            ELSE ( t.create_amount
-                + COALESCE(tf.fee_amount, 0)        -- agent fee added
-                - ral.sum_release_after              -- releases subtract
-                - COALESCE(af.fee_amount, 0) )       -- approvals subtract
+                + COALESCE(tf.fee_amount, 0)
+                - ral.sum_release_after
+                - COALESCE(af.fee_amount, 0) )
       END AS remaining,
       GREATEST(
         t.create_op_id,
@@ -330,69 +318,13 @@ BEGIN
        AND pc.new_remaining > 0
        AND s.remaining <> pc.new_remaining
     RETURNING 1
-  ),
-
-  /* ---------- WHAT ACTUALLY APPLIED THIS RUN (for the NOTICE) ---------- */
-  -- approvals that applied via in-range main path (skip rejected keys)
-  applied_approvals_inrange AS (
-    SELECT rc.from_id, rc.escrow_id, rc.nai, af.fee_amount::bigint AS amount
-    FROM remaining_calc rc
-    JOIN approval_fees_after af
-      ON (af.from_id, af.escrow_id, af.nai)=(rc.from_id, rc.escrow_id, rc.nai)
-    LEFT JOIN rejections_after_latest rj
-      ON (rj.from_id, rj.escrow_id)=(rc.from_id, rc.escrow_id)
-    WHERE COALESCE(af.fee_amount,0) > 0
-      AND rj.reject_op_id IS NULL
-  ),
-  -- pre-range approvals considered "new" vs state (guard: last_approve_op > source_op)
-  pre_approvals_new AS (
-    SELECT pa.from_id, pa.escrow_id, pa.nai, pa.sum_approve_fee::bigint AS amount
-    FROM pre_approvals pa
-    JOIN escrow_state s
-      ON (s.from_id,s.escrow_id,s.nai)=(pa.from_id,pa.escrow_id,pa.nai)
-    WHERE pa.last_approve_op > s.source_op
-      AND pa.sum_approve_fee > 0
-  ),
-  applied_approvals AS (
-    SELECT * FROM applied_approvals_inrange
-    UNION ALL
-    SELECT * FROM pre_approvals_new
-  ),
-
-  -- subset with prior agent fee (NOTE: only detects agent fees seen in-range)
-  applied_with_agent AS (
-    SELECT a.from_id, a.escrow_id, a.nai, a.amount, tf.fee_amount AS agent_fee
-    FROM applied_approvals a
-    JOIN latest_transfer_fees tf
-      ON (tf.from_id, tf.escrow_id, tf.nai)=(a.from_id, a.escrow_id, a.nai)
   )
 
+  /* Force execution of DML CTEs without emitting notices/metrics */
   SELECT
-    COALESCE((SELECT COUNT(*) FROM ins_new), 0),
-    COALESCE((SELECT COUNT(*) FROM del_any), 0),
-    COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
-
-    COALESCE((SELECT COUNT(*)    FROM applied_approvals), 0),
-    COALESCE((SELECT SUM(amount) FROM applied_approvals), 0),
-
-    COALESCE((SELECT COUNT(*)           FROM applied_with_agent), 0),
-    COALESCE((SELECT SUM(agent_fee)     FROM applied_with_agent), 0)
-  INTO __ins_new, __del_any, __upd_pre,
-       __appr_applied_keys, __appr_applied_sum,
-       __appr_with_agent_keys, __appr_with_agent_agent_sum;
-
-  __appr_with_agent_net_delta := COALESCE(__appr_with_agent_agent_sum,0) - COALESCE(__appr_applied_sum,0);
-
-  -- concise notice
-  IF __appr_applied_sum > 0 THEN
-    RAISE NOTICE
-      'escrow: approvals applied: % keys, approval_fee_subtracted=%; among these: prior agent-fee on % keys, agent_fee_sum=%; net(agent - approval)=% (raw NAI).',
-      __appr_applied_keys,
-      __appr_applied_sum,
-      __appr_with_agent_keys,
-      __appr_with_agent_agent_sum,
-      __appr_with_agent_net_delta;
-  END IF;
+    COALESCE((SELECT COUNT(*) FROM ins_new), 0) +
+    COALESCE((SELECT COUNT(*) FROM del_any), 0) +
+    COALESCE((SELECT COUNT(*) FROM upd_pre), 0);
 
 END;
 $func$;
