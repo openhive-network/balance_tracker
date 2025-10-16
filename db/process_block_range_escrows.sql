@@ -20,6 +20,10 @@ DECLARE
   _op_rejected    INT;  
   _op_approve_req INT;  
   _op_dispute     INT;
+
+  __ins_new  INT := 0;
+  __del_any  INT := 0;
+  __upd_pre  INT := 0;
 BEGIN
   SELECT id INTO _op_transfer    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
   SELECT id INTO _op_release     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
@@ -319,10 +323,13 @@ BEGIN
        AND s.remaining <> pc.new_remaining
     RETURNING 1
   )
-  PERFORM
-    COALESCE((SELECT COUNT(*) FROM ins_new), 0) +
-    COALESCE((SELECT COUNT(*) FROM del_any), 0) +
-    COALESCE((SELECT COUNT(*) FROM upd_pre), 0);
+
+  -- Force execution of DML CTEs and store counts
+  SELECT
+      COALESCE((SELECT COUNT(*) FROM ins_new), 0),
+      COALESCE((SELECT COUNT(*) FROM del_any), 0),
+      COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
+  INTO __ins_new, __del_any, __upd_pre;
 
 END;
 $func$;
