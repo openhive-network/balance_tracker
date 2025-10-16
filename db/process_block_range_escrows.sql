@@ -319,9 +319,7 @@ BEGIN
        AND s.remaining <> pc.new_remaining
     RETURNING 1
   )
-
-  /* Force execution of DML CTEs without emitting notices/metrics */
-  SELECT
+  PERFORM
     COALESCE((SELECT COUNT(*) FROM ins_new), 0) +
     COALESCE((SELECT COUNT(*) FROM del_any), 0) +
     COALESCE((SELECT COUNT(*) FROM upd_pre), 0);
