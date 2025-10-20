@@ -14,23 +14,19 @@ SET jit = OFF
 AS
 $func$
 DECLARE
-  _op_transfer    INT;
-  _op_release     INT;
-  _op_approved    INT;  
-  _op_rejected    INT;  
-  _op_approve_req INT;  
-  _op_dispute     INT;
+  _op_transfer  INT;
+  _op_release   INT;
+  _op_approved  INT;
+  _op_rejected  INT;
 
   __ins_new  INT := 0;
   __del_any  INT := 0;
   __upd_pre  INT := 0;
 BEGIN
-  SELECT id INTO _op_transfer    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
-  SELECT id INTO _op_release     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
-  SELECT id INTO _op_approved    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_approved_operation';
-  SELECT id INTO _op_rejected    FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_rejected_operation';
-  SELECT id INTO _op_approve_req FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_approve_operation';
-  SELECT id INTO _op_dispute     FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_dispute_operation';
+  SELECT id INTO _op_transfer FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_transfer_operation';
+  SELECT id INTO _op_release  FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_release_operation';
+  SELECT id INTO _op_approved FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_approved_operation';
+  SELECT id INTO _op_rejected FROM hafd.operation_types WHERE name = 'hive::protocol::escrow_rejected_operation';
 
   WITH
   ops_in_range AS (
@@ -38,14 +34,61 @@ BEGIN
     FROM hive.operations_view ov
     JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
     WHERE ov.block_num BETWEEN _from AND _to
-      AND ov.op_type_id IN (_op_transfer, _op_release, _op_approved, _op_rejected, _op_approve_req, _op_dispute)
+      AND ov.op_type_id IN (_op_transfer, _op_release, _op_approved, _op_rejected)
   ),
 
-  events AS MATERIALIZED (
-    SELECT e.*, o.op_id, o.block_num
+  -- one aggregated row per operation
+  events_agg AS MATERIALIZED (
+    SELECT
+      (btracker_backend.get_escrow_event_agg(o.body, o.op_name)).*,
+      o.op_id,
+      o.block_num
     FROM ops_in_range o
-    CROSS JOIN LATERAL btracker_backend.get_escrow_events(o.body, o.op_name) AS e
-    WHERE e.kind IN ('transfer','release','approved','rejected')
+  ),
+
+    SELECT
+      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
+      CASE
+        WHEN COALESCE(ea.hbd_amount, 0)  > 0 THEN 13::smallint
+        WHEN COALESCE(ea.hive_amount, 0) > 0 THEN 21::smallint
+        ELSE NULL::smallint
+      END AS nai,
+      COALESCE(ea.hbd_amount, ea.hive_amount)::bigint AS amount,
+      ea.kind,
+      ea.fee_amount::bigint  AS fee,      -- includes agent fee if kind='transfer'; NULL otherwise
+      ea.fee_nai::smallint   AS fee_nai,  -- matches fee (transfer/approved)
+      ea.op_id, ea.block_num
+    FROM events_agg ea
+    WHERE ea.kind IN ('transfer','release')
+      AND (COALESCE(ea.hbd_amount,0) > 0 OR COALESCE(ea.hive_amount,0) > 0)
+
+    UNION ALL
+
+    /* approved (virtual) → fee with its NAI */
+    SELECT
+      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
+      ea.fee_nai,
+      NULL::bigint AS amount,
+      'approved'::text AS kind,
+      ea.fee_amount::bigint AS fee,
+      ea.fee_nai,
+      ea.op_id, ea.block_num
+    FROM events_agg ea
+    WHERE ea.kind = 'approved' AND ea.fee_amount IS NOT NULL
+
+    UNION ALL
+
+    /* rejected → non-amount passthrough (nai/amount NULL) */
+    SELECT
+      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
+      NULL::smallint AS nai,
+      NULL::bigint   AS amount,
+      'rejected'::text AS kind,
+      NULL::bigint   AS fee,
+      NULL::smallint AS fee_nai,
+      ea.op_id, ea.block_num
+    FROM events_agg ea
+    WHERE ea.kind = 'rejected'
   ),
 
   event_ids AS MATERIALIZED (
@@ -60,7 +103,7 @@ BEGIN
       e.fee_nai,
       e.op_id,
       e.block_num
-    FROM events e
+    FROM events_per_nai e
     JOIN hive.accounts_view av_from ON av_from.name = e.from_name
     LEFT JOIN hive.accounts_view av_to   ON av_to.name   = e.to_name
   ),
@@ -231,9 +274,9 @@ BEGIN
       t.nai,
       CASE WHEN rj.reject_op_id IS NOT NULL THEN 0
            ELSE ( t.create_amount
-                + COALESCE(tf.fee_amount, 0)
-                - ral.sum_release_after
-                - COALESCE(af.fee_amount, 0) )
+                + COALESCE(tf.fee_amount, 0)        -- agent fee added
+                - ral.sum_release_after              -- releases subtract
+                - COALESCE(af.fee_amount, 0) )       -- approvals subtract
       END AS remaining,
       GREATEST(
         t.create_op_id,
