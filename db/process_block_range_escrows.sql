@@ -14,10 +14,10 @@ SET jit = OFF
 AS
 $func$
 DECLARE
-  _op_transfer  INT;
-  _op_release   INT;
-  _op_approved  INT;
-  _op_rejected  INT;
+  _op_transfer INT;
+  _op_release  INT;
+  _op_approved INT;
+  _op_rejected INT;
 
   __ins_new  INT := 0;
   __del_any  INT := 0;
@@ -37,58 +37,11 @@ BEGIN
       AND ov.op_type_id IN (_op_transfer, _op_release, _op_approved, _op_rejected)
   ),
 
-  -- one aggregated row per operation
-  events_agg AS MATERIALIZED (
-    SELECT
-      (btracker_backend.get_escrow_event_agg(o.body, o.op_name)).*,
-      o.op_id,
-      o.block_num
+  events AS MATERIALIZED (
+    SELECT e.*, o.op_id, o.block_num
     FROM ops_in_range o
-  ),
-
-    SELECT
-      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
-      CASE
-        WHEN COALESCE(ea.hbd_amount, 0)  > 0 THEN 13::smallint
-        WHEN COALESCE(ea.hive_amount, 0) > 0 THEN 21::smallint
-        ELSE NULL::smallint
-      END AS nai,
-      COALESCE(ea.hbd_amount, ea.hive_amount)::bigint AS amount,
-      ea.kind,
-      ea.fee_amount::bigint  AS fee,      -- includes agent fee if kind='transfer'; NULL otherwise
-      ea.fee_nai::smallint   AS fee_nai,  -- matches fee (transfer/approved)
-      ea.op_id, ea.block_num
-    FROM events_agg ea
-    WHERE ea.kind IN ('transfer','release')
-      AND (COALESCE(ea.hbd_amount,0) > 0 OR COALESCE(ea.hive_amount,0) > 0)
-
-    UNION ALL
-
-    /* approved (virtual) → fee with its NAI */
-    SELECT
-      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
-      ea.fee_nai,
-      NULL::bigint AS amount,
-      'approved'::text AS kind,
-      ea.fee_amount::bigint AS fee,
-      ea.fee_nai,
-      ea.op_id, ea.block_num
-    FROM events_agg ea
-    WHERE ea.kind = 'approved' AND ea.fee_amount IS NOT NULL
-
-    UNION ALL
-
-    /* rejected → non-amount passthrough (nai/amount NULL) */
-    SELECT
-      ea.from_name, ea.to_name, ea.agent_name, ea.escrow_id,
-      NULL::smallint AS nai,
-      NULL::bigint   AS amount,
-      'rejected'::text AS kind,
-      NULL::bigint   AS fee,
-      NULL::smallint AS fee_nai,
-      ea.op_id, ea.block_num
-    FROM events_agg ea
-    WHERE ea.kind = 'rejected'
+    CROSS JOIN LATERAL btracker_backend.get_escrow_events(o.body, o.op_name) AS e
+    WHERE e.kind IN ('transfer','release','approved','rejected')
   ),
 
   event_ids AS MATERIALIZED (
@@ -103,7 +56,7 @@ BEGIN
       e.fee_nai,
       e.op_id,
       e.block_num
-    FROM events_per_nai e
+    FROM events e
     JOIN hive.accounts_view av_from ON av_from.name = e.from_name
     LEFT JOIN hive.accounts_view av_to   ON av_to.name   = e.to_name
   ),
@@ -123,14 +76,14 @@ BEGIN
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
 
-  /* ---------- CREATE KEYS IN-RANGE ---------- */
+  /* ---------- KEYS CREATED IN-RANGE ---------- */
   create_keys_in_range AS (
     SELECT DISTINCT from_id, escrow_id, nai
     FROM event_ids
     WHERE kind = 'transfer'
   ),
 
-  /* ---------- PRE-RANGE RELEASES & APPROVALS (to existing rows) ---------- */
+  /* ---------- PRE-RANGE RELEASES ---------- */
   pre_releases AS (
     SELECT r.from_id, r.escrow_id, r.nai, SUM(r.amount)::bigint AS sum_release
     FROM event_ids r
@@ -139,6 +92,8 @@ BEGIN
     WHERE r.kind = 'release' AND k.from_id IS NULL
     GROUP BY r.from_id, r.escrow_id, r.nai
   ),
+
+  /* ---------- PRE-RANGE APPROVAL FEES (RICHER BEHAVIOR) ---------- */
   pre_approvals AS (
     SELECT a.from_id, a.escrow_id, a.nai,
            SUM(a.fee_amount)::bigint AS sum_approve_fee,
@@ -157,6 +112,8 @@ BEGIN
     WHERE k.from_id IS NULL
     GROUP BY a.from_id,a.escrow_id,a.nai
   ),
+
+  /* ---------- APPLY PRE-RANGE RELEASES + APPROVAL FEES TO EXISTING STATE ---------- */
   pre_calc AS MATERIALIZED (
     SELECT s.from_id,
            s.escrow_id,
@@ -195,6 +152,7 @@ BEGIN
     WHERE kind = 'transfer'
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
+
   releases_after_latest AS MATERIALIZED (
     WITH rel AS (
       SELECT r.from_id, r.escrow_id, r.nai, r.amount, r.op_id, r.block_num
@@ -217,6 +175,7 @@ BEGIN
       ON (rel.from_id, rel.escrow_id, rel.nai) = (t.from_id, t.escrow_id, t.nai)
     GROUP BY t.from_id, t.escrow_id, t.nai
   ),
+
   rejections_after_latest AS MATERIALIZED (
     SELECT t.from_id, t.escrow_id,
            MAX(ev.op_id) AS reject_op_id
@@ -228,6 +187,8 @@ BEGIN
      AND ev.kind      = 'rejected'
     GROUP BY t.from_id, t.escrow_id
   ),
+
+  /* ---------- APPROVAL FEES AFTER (RICHER BEHAVIOR) ---------- */
   approval_fees_after_latest AS MATERIALIZED (
     SELECT DISTINCT ON (t.from_id, t.escrow_id, t.nai)
            t.from_id, t.escrow_id, t.nai,
@@ -243,6 +204,7 @@ BEGIN
      AND ev.fee_nai   = t.nai
     ORDER BY t.from_id, t.escrow_id, t.nai, ev.op_id DESC
   ),
+
   approval_fees_after_state AS MATERIALIZED (
     SELECT s.from_id, s.escrow_id, s.nai,
            COALESCE(ev.fee,0)::bigint AS fee_amount,
@@ -256,6 +218,7 @@ BEGIN
      AND ev.escrow_id = s.escrow_id
      AND ev.op_id > s.source_op
   ),
+
   approval_fees_after AS MATERIALIZED (
     SELECT * FROM approval_fees_after_latest
     UNION ALL
@@ -267,6 +230,7 @@ BEGIN
     )
   ),
 
+  /* ---------- REMAINING + LAST OP (USES RICHER APPROVAL COVERAGE) ---------- */
   remaining_calc AS MATERIALIZED (
     SELECT
       t.from_id,
@@ -274,9 +238,9 @@ BEGIN
       t.nai,
       CASE WHEN rj.reject_op_id IS NOT NULL THEN 0
            ELSE ( t.create_amount
-                + COALESCE(tf.fee_amount, 0)        -- agent fee added
-                - ral.sum_release_after              -- releases subtract
-                - COALESCE(af.fee_amount, 0) )       -- approvals subtract
+                + COALESCE(tf.fee_amount, 0)          -- transfer-time fee
+                - ral.sum_release_after                -- releases after
+                - COALESCE(af.fee_amount, 0) )         -- approval fee after (latest OR state)
       END AS remaining,
       GREATEST(
         t.create_op_id,
@@ -302,6 +266,7 @@ BEGIN
     WHERE kind = 'transfer'
     ORDER BY from_id, escrow_id, nai, op_id DESC
   ),
+
   survivors AS (
     SELECT rc.from_id, rc.escrow_id, rc.nai,
            tt.to_id,
@@ -312,6 +277,7 @@ BEGIN
       ON (tt.from_id, tt.escrow_id, tt.nai) = (rc.from_id, rc.escrow_id, rc.nai)
     WHERE rc.remaining > 0
   ),
+
   ins_new AS (
     INSERT INTO escrow_state (from_id, escrow_id, nai, to_id, remaining, source_op)
     SELECT from_id, escrow_id, nai, to_id, remaining, source_op
@@ -323,7 +289,6 @@ BEGIN
     RETURNING 1
   ),
 
-  /* ---------- CLOSE/DELETE & PRE-APPLY ---------- */
   pre_rejected AS (
     SELECT s.from_id, s.escrow_id
     FROM escrow_state s
@@ -335,6 +300,7 @@ BEGIN
         AND ev.from_id   = s.from_id
     )
   ),
+
   del_keys AS (
     SELECT from_id, escrow_id FROM (
       SELECT from_id, escrow_id FROM pre_calc       WHERE new_remaining <= 0
@@ -344,18 +310,21 @@ BEGIN
       SELECT from_id, escrow_id FROM pre_rejected
     ) u
   ),
+
   to_delete AS (
     SELECT DISTINCT d.from_id, d.escrow_id
     FROM del_keys d
     LEFT JOIN survivors s USING (from_id, escrow_id)
     WHERE s.from_id IS NULL
   ),
+
   del_any AS (
     DELETE FROM escrow_state s
     USING to_delete d
     WHERE (s.from_id, s.escrow_id) = (d.from_id, d.escrow_id)
     RETURNING 1
   ),
+
   upd_pre AS (
     UPDATE escrow_state s
        SET remaining = pc.new_remaining,
@@ -367,11 +336,10 @@ BEGIN
     RETURNING 1
   )
 
-  -- Force execution of DML CTEs and store counts
   SELECT
-      COALESCE((SELECT COUNT(*) FROM ins_new), 0),
-      COALESCE((SELECT COUNT(*) FROM del_any), 0),
-      COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
+    COALESCE((SELECT COUNT(*) FROM ins_new), 0),
+    COALESCE((SELECT COUNT(*) FROM del_any), 0),
+    COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
   INTO __ins_new, __del_any, __upd_pre;
 
 END;
