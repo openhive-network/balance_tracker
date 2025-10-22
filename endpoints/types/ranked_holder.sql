@@ -45,4 +45,3 @@ CREATE TYPE btracker_backend.top_holders AS (
     "holders_result" btracker_backend.ranked_holder[]
 );
 -- openapi-generated-code-end
-
