@@ -8,7 +8,7 @@ BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
   __context_table:=__context_table || __schema_name;
 
-  synchronization_stages := ARRAY[( 'MASSIVE_PROCESSING', 101, 10000 ), hive.live_stage()]::hive.application_stages;
+  synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
 
   RAISE NOTICE 'balance_tracker will be installed in schema % with context %', __schema_name, __schema_name;
 
