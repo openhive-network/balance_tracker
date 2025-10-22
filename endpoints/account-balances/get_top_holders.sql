@@ -5,9 +5,9 @@ SET ROLE btracker_owner;
   get:
     tags:
       - Accounts
-    summary: Top asset holders (with totals)
+    summary: Top asset holders with total number of account and pages.
     description: |
-      Lists top holders for a given coin with totals to support pagination.
+      Lists top holders for a given coin with Top asset holders with total number of account and pages to support pagination.
 
       SQL example:
       * `SELECT * FROM btracker_endpoints.get_top_holders("HIVE","balance",1,100);`
@@ -61,7 +61,7 @@ SET ROLE btracker_owner;
 
     responses:
       '200':
-        description: Ranked holders with totals (typed envelope)
+        description: Ranked holders with totals number of pages and acounts.
         content:
           application/json:
             schema:
