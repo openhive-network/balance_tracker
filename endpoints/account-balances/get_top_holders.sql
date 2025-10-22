@@ -10,11 +10,10 @@ SET ROLE btracker_owner;
       Lists top holders for a given coin with totals to support pagination.
 
       SQL example:
-      * `SELECT * FROM btracker_endpoints.get_top_holders('HIVE','balance',1,100);`
+      * `SELECT * FROM btracker_endpoints.get_top_holders("HIVE","balance",1,100);`
 
       REST call example:
-      * `GET 'https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1&page-size=100'`
-
+      * `GET "https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1&page-size=100"
     operationId: btracker_endpoints.get_top_holders
 
     x-response-headers:
