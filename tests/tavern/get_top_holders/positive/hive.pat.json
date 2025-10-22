@@ -1,5 +1,5 @@
 {
-  "total_accounts": 3071,
+  "total_accounts": 3070,
   "total_pages": 31,
   "holders_result": [
     { "rank": 1, "account": "steemit", "value": "4778859891" },
@@ -11,7 +11,7 @@
     { "rank": 7, "account": "openledger", "value": "52275479" },
     { "rank": 8, "account": "ben", "value": "50968139" },
     { "rank": 9, "account": "blocktrades", "value": "29594875" },
-    { "rank": 10, "account": "steem", "value": "29325210" },
+    { "rank": 10, "account": "steem", "value": "29315310" },
     { "rank": 11, "account": "imadev", "value": "23787999" },
     { "rank": 12, "account": "smooth", "value": "20998219" },
     { "rank": 13, "account": "steemit60", "value": "20000000" },
