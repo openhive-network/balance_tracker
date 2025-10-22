@@ -70,17 +70,17 @@ SET ROLE btracker_owner;
       '400':
         description: Unsupported parameter combination
 */
-
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_top_holders;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
-    "coin-type"    btracker_backend.nai_type,
+    "coin-type" btracker_backend.nai_type,
     "balance-type" btracker_backend.balance_type = 'balance',
-    "page"         INT = 1,
-    "page-size"    INT = 100
+    "page" INT = 1,
+    "page-size" INT = 100
 )
-RETURNS btracker_backend.top_holders
+RETURNS btracker_backend.top_holders 
 -- openapi-generated-code-end
+
 LANGUAGE plpgsql
 STABLE
 SET from_collapse_limit = 16
@@ -100,12 +100,12 @@ BEGIN
   -- Current balances are volatile → short cache
   PERFORM set_config('response.headers', '[{"Cache-Control":"public, max-age=2"}]', true);
 
-  -- Delegate to backend envelope (computes totals, pages, and rows)
-  RETURN btracker_backend.top_holders_envelope(
+  -- Delegate to unified backend function (returns totals + pages + rows[])
+  RETURN btracker_backend.get_top_holders(
     _coin_type_id,
     "balance-type",
-    "page",
-    "page-size"
+    COALESCE("page", 1),
+    COALESCE("page-size", 100)
   );
 END
 $$;

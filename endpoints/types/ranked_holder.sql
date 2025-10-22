@@ -41,7 +41,7 @@ btracker_backend.top_holders:
 DROP TYPE IF EXISTS btracker_backend.top_holders CASCADE;
 CREATE TYPE btracker_backend.top_holders AS (
     "total_accounts" INT,
-    "total_pages"    INT,
+    "total_pages" INT,
     "holders_result" btracker_backend.ranked_holder[]
 );
 -- openapi-generated-code-end
