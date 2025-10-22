@@ -1038,8 +1038,8 @@ declare
         "tags": [
           "Accounts"
         ],
-        "summary": "Top asset holders (with totals)",
-        "description": "Lists top holders for a given coin with totals to support pagination.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(\"HIVE\",\"balance\",1,100);`\n\nREST call example:\n* `GET \"https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1&page-size=100\"\n",
+        "summary": "Top asset holders with total number of account and pages.",
+        "description": "Lists top holders for a given coin with Top asset holders with total number of account and pages to support pagination.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(\"HIVE\",\"balance\",1,100);`\n\nREST call example:\n* `GET \"https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1&page-size=100\"\n",
         "operationId": "btracker_endpoints.get_top_holders",
         "x-response-headers": [
           {
@@ -1092,7 +1092,7 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Ranked holders with totals (typed envelope)",
+            "description": "Ranked holders with totals number of pages and acounts.",
             "content": {
               "application/json": {
                 "schema": {
