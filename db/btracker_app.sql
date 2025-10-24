@@ -645,9 +645,6 @@ BEGIN
   CREATE INDEX IF NOT EXISTS convert_state_owner_nai_idx ON convert_state (owner_id, request_id, nai);
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai,balance DESC);
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
-  CREATE INDEX IF NOT EXISTS idx_transfer_stats_by_hour_nai_updatedat ON transfer_stats_by_hour (nai, updated_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_transfer_stats_by_day_nai_updatedat ON transfer_stats_by_day (nai, updated_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_transfer_stats_by_month_nai_updatedat ON transfer_stats_by_month (nai, updated_at DESC);
 END
 $$;
 
