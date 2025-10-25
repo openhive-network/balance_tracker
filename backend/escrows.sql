@@ -1,5 +1,6 @@
 SET ROLE btracker_owner;
 
+DROP TYPE IF EXISTS btracker_backend.escrow_event CASCADE;
 CREATE TYPE btracker_backend.escrow_event AS
 (
     from_name   TEXT,
