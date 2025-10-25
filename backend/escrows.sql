@@ -1,19 +1,17 @@
 SET ROLE btracker_owner;
 
--- 1) Aggregate record type (single row per op)
-DROP TYPE IF EXISTS btracker_backend.escrow_event_agg CASCADE;
-CREATE TYPE btracker_backend.escrow_event_agg AS (
-    from_name   text,
-    to_name     text,
-    agent_name  text,
-    escrow_id   bigint,
-    kind        text,        -- 'transfer' | 'release' | 'approved' | 'rejected'
-    hbd_amount  bigint,      -- millis (transfer/release)
-    hive_amount bigint,      -- millis (transfer/release)
-    fee_amount  bigint,      -- millis (transfer: agent fee, approved: approval fee)
-    fee_nai     smallint     -- 13 or 21 for the fee (if present; shim ignores for nai)
-);
-SET ROLE btracker_owner;
+CREATE TYPE btracker_backend.escrow_event AS
+(
+    from_name   TEXT,
+    to_name     TEXT,
+    agent_name  TEXT,
+    escrow_id   BIGINT,
+    nai         SMALLINT,   -- 13=HBD, 21=HIVE (NULL for non-amount events like 'approved'/'rejected')
+    amount      BIGINT,     -- millis; NULL for non-amount events
+    kind        TEXT,       -- 'transfer' | 'release' | 'approved' | 'rejected'
+    fee         BIGINT,     -- transfer-time agent fee OR approval fee (millis)
+    fee_nai     SMALLINT    -- 13 or 21 for fee (if present); informative
+); 
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_escrow_events(
     _body    jsonb,
