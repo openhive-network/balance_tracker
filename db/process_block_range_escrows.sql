@@ -40,9 +40,13 @@ BEGIN
   events AS MATERIALIZED (
     SELECT e.*, o.op_id, o.block_num
     FROM ops_in_range o
-    CROSS JOIN LATERAL btracker_backend.get_escrow_events(o.body, o.op_name) AS e
+    -- get_escrow_events now returns a SINGLE composite row → expand it with ( ... ).*
+    CROSS JOIN LATERAL (
+      SELECT (btracker_backend.get_escrow_events(o.body, o.op_name)).*
+    ) AS e
     WHERE e.kind IN ('transfer','release','approved','rejected')
   ),
+
 
   event_ids AS MATERIALIZED (
     SELECT
