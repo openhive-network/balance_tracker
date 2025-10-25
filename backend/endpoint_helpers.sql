@@ -199,7 +199,6 @@ savings_pivot AS (
 
 END;
 $BODY$;
-
 CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
     _coin_type    INT,
     _balance_type btracker_backend.balance_type,
@@ -209,116 +208,99 @@ CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
 RETURNS btracker_backend.top_holders
 LANGUAGE plpgsql
 STABLE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+SET plan_cache_mode = 'force_custom_plan'
 AS $$
 DECLARE
-  _safe_page    INT := GREATEST(COALESCE(_page, 1), 1);
-  _safe_ps      INT := GREATEST(COALESCE(_limit, 100), 1);
-  _ofs          INT := (_safe_page - 1) * _safe_ps;
+  -- page/limit are already validated by the endpoint helpers
+  _ofs          INT := (_page - 1) * _limit;
 
   _total        INT := 0;
   _total_pages  INT := 0;
   _rows         btracker_backend.ranked_holder[];
-  _sql_tot      TEXT;
-  _sql_rows     TEXT;
 BEGIN
   IF _balance_type = 'balance' THEN
-    -- totals (balance)
-    _sql_tot := format(
-      'SELECT COUNT(*) FROM %I.%I WHERE nai = $1 AND balance > 0',
-      'btracker_backend','current_account_balances_view'
-    );
-    EXECUTE _sql_tot INTO _total USING _coin_type;
+    /* totals */
+    SELECT COUNT(*)
+      INTO _total
+    FROM btracker_backend.current_account_balances_view
+    WHERE nai = _coin_type AND balance > 0;
 
-    -- pages
     IF _total = 0 THEN
       _total_pages := 0;
-      _safe_page := 1;
-      _ofs := 0;
       _rows := ARRAY[]::btracker_backend.ranked_holder[];
     ELSE
-      _total_pages := CEIL(_total::numeric / _safe_ps)::INT;
-      _safe_page   := LEAST(_safe_page, _total_pages);
-      _ofs         := (_safe_page - 1) * _safe_ps;
+      _total_pages := CEIL(_total::numeric / _limit)::INT;
 
-      -- rows (balance)
-      _sql_rows := format($q$
-        WITH ordered_holders AS MATERIALIZED (
-          SELECT av.name, src.balance
-          FROM %I.%I AS src
-          JOIN hive.accounts_view av ON av.id = src.account
-          WHERE src.nai = $1
-          ORDER BY src.balance DESC, av.name ASC
-          OFFSET $2
-          LIMIT $3
-        ),
-        ranked AS (
-          SELECT
-            (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + $2)::INT AS rank,
-            o.name::TEXT    AS account,
-            o.balance::NUMERIC(38,0) AS value
-          FROM ordered_holders o
-        )
-        SELECT COALESCE(
-                 array_agg(
-                   (ROW(r.rank, r.account, r.value::text))::btracker_backend.ranked_holder
-                   ORDER BY r.rank
-                 ),
-                 ARRAY[]::btracker_backend.ranked_holder[]
-               )
-        FROM ranked r
-      $q$, 'btracker_backend','current_account_balances_view');
-
-      EXECUTE _sql_rows INTO _rows USING _coin_type, _ofs, _safe_ps;
+      /* rows → ranked_holder[] */
+      WITH ordered_holders AS MATERIALIZED (
+        SELECT av.name, src.balance
+        FROM btracker_backend.current_account_balances_view AS src
+        JOIN hive.accounts_view av ON av.id = src.account
+        WHERE src.nai = _coin_type
+        ORDER BY src.balance DESC, av.name ASC
+        OFFSET _ofs
+        LIMIT _limit
+      ),
+      ranked AS (
+        SELECT
+          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs)::INT AS rank,
+          o.name::TEXT    AS account,
+          o.balance::NUMERIC(38,0) AS value
+        FROM ordered_holders o
+      )
+      SELECT COALESCE(
+               array_agg(
+                 (ROW(r.rank, r.account, r.value::TEXT))::btracker_backend.ranked_holder
+                 ORDER BY r.rank
+               ),
+               ARRAY[]::btracker_backend.ranked_holder[]
+             )
+        INTO _rows
+      FROM ranked r;
     END IF;
 
   ELSIF _balance_type = 'savings_balance' THEN
-    -- totals (savings)
-    _sql_tot := format(
-      'SELECT COUNT(*) FROM %I.%I WHERE nai = $1 AND balance > 0',
-      'btracker_backend','account_savings_view'
-    );
-    EXECUTE _sql_tot INTO _total USING _coin_type;
+    /* totals */
+    SELECT COUNT(*)
+      INTO _total
+    FROM btracker_backend.account_savings_view
+    WHERE nai = _coin_type AND balance > 0;
 
-    -- pages
     IF _total = 0 THEN
       _total_pages := 0;
-      _safe_page := 1;
-      _ofs := 0;
       _rows := ARRAY[]::btracker_backend.ranked_holder[];
     ELSE
-      _total_pages := CEIL(_total::numeric / _safe_ps)::INT;
-      _safe_page   := LEAST(_safe_page, _total_pages);
-      _ofs         := (_safe_page - 1) * _safe_ps;
+      _total_pages := CEIL(_total::numeric / _limit)::INT;
 
-      -- rows (savings)
-      _sql_rows := format($q$
-        WITH ordered_holders AS MATERIALIZED (
-          SELECT av.name, src.balance
-          FROM %I.%I AS src
-          JOIN hive.accounts_view av ON av.id = src.account
-          WHERE src.nai = $1
-          ORDER BY src.balance DESC, av.name ASC
-          OFFSET $2
-          LIMIT $3
-        ),
-        ranked AS (
-          SELECT
-            (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + $2)::INT AS rank,
-            o.name::TEXT    AS account,
-            o.balance::NUMERIC(38,0) AS value
-          FROM ordered_holders o
-        )
-        SELECT COALESCE(
-                 array_agg(
-                   (ROW(r.rank, r.account, r.value::text))::btracker_backend.ranked_holder
-                   ORDER BY r.rank
-                 ),
-                 ARRAY[]::btracker_backend.ranked_holder[]
-               )
-        FROM ranked r
-      $q$, 'btracker_backend','account_savings_view');
-
-      EXECUTE _sql_rows INTO _rows USING _coin_type, _ofs, _safe_ps;
+      /* rows → ranked_holder[] */
+      WITH ordered_holders AS MATERIALIZED (
+        SELECT av.name, src.balance
+        FROM btracker_backend.account_savings_view AS src
+        JOIN hive.accounts_view av ON av.id = src.account
+        WHERE src.nai = _coin_type
+        ORDER BY src.balance DESC, av.name ASC
+        OFFSET _ofs
+        LIMIT _limit
+      ),
+      ranked AS (
+        SELECT
+          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs)::INT AS rank,
+          o.name::TEXT    AS account,
+          o.balance::NUMERIC(38,0) AS value
+        FROM ordered_holders o
+      )
+      SELECT COALESCE(
+               array_agg(
+                 (ROW(r.rank, r.account, r.value::TEXT))::btracker_backend.ranked_holder
+                 ORDER BY r.rank
+               ),
+               ARRAY[]::btracker_backend.ranked_holder[]
+             )
+        INTO _rows
+      FROM ranked r;
     END IF;
 
   ELSE
@@ -328,7 +310,6 @@ BEGIN
   RETURN (_total, _total_pages, _rows)::btracker_backend.top_holders;
 END;
 $$;
-
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations
