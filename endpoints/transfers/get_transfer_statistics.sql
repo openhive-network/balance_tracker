@@ -13,7 +13,7 @@ SET ROLE btracker_owner;
       * `SELECT * FROM btracker_endpoints.get_transfer_statistics(''HBD'');`
 
       REST call example
-      * `GET ''https://%1$s/balance-api/transfer-statistics''`
+      * `GET ''https://%1$s/balance-api/transfer-statistics?coin-type=HBD''`
     operationId: btracker_endpoints.get_transfer_statistics
     parameters:
       - in: query
@@ -111,7 +111,7 @@ SET ROLE btracker_owner;
               }
             ]            
       '404':
-        description: No such account in the database
+        description: No transfer statistics found for the given parameters
  */
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_transfer_statistics;
@@ -164,6 +164,15 @@ BEGIN
   ) ah;
 
 END
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_endpoints.get_transfer_statistics()
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Missing required parameter: "coin-type"';
+END;
 $$;
 
 RESET ROLE;
