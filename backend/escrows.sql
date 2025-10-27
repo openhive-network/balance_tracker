@@ -7,84 +7,78 @@ CREATE TYPE btracker_backend.escrow_event AS
     to_name     TEXT,
     agent_name  TEXT,
     escrow_id   BIGINT,
-    nai         SMALLINT,   -- 13=HBD, 21=HIVE (NULL for non-amount events)
+    nai         SMALLINT,   -- 13=HBD, 21=HIVE (NULL for non-amount events like 'approved'/'rejected')
     amount      BIGINT,     -- millis; NULL for non-amount events
-    kind        TEXT,       -- 'transfer' | 'release' | 'approved' | 'rejected' | 'dispute' | 'approve_intent'
-    fee         BIGINT,     -- only used for 'approved' if virtual op carries it
-    fee_nai     SMALLINT    -- 13 or 21 for fee (if present)
-);
+    kind        TEXT,       -- 'transfer' | 'release' | 'approved' | 'rejected'
+    fee         BIGINT,     -- transfer-time agent fee OR approval fee (millis)
+    fee_nai     SMALLINT    -- 13 or 21 for fee (if present); informative
+); 
 
 CREATE OR REPLACE FUNCTION btracker_backend.get_escrow_events(
-    IN _body jsonb,
-    IN _op_name text
-) RETURNS SETOF btracker_backend.escrow_event
-LANGUAGE plpgsql STABLE AS
-$$
+    _body    jsonb,
+    _op_name text
+) RETURNS btracker_backend.escrow_event
+LANGUAGE plpgsql
+STABLE
+AS $$
 DECLARE
-    _from   text;
-    _to     text;
-    _agent  text;
-    _id     bigint;
+    -- Common fields
+    _from   text    := (_body->'value'->>'from');
+    _to     text    := (_body->'value'->>'to');
+    _agent  text    := (_body->'value'->>'agent');
+    _id     bigint  := NULLIF((_body->'value'->>'escrow_id'), '')::bigint;
 
-    _hbd_amt  bigint; _hbd_nai  smallint;
-    _hive_amt bigint; _hive_nai smallint;
+    -- Amounts / fee
+    _hbd_amt   bigint    := NULLIF((_body->'value'->'hbd_amount' ->>'amount'), '')::bigint;
+    _hive_amt  bigint    := NULLIF((_body->'value'->'hive_amount'->>'amount'), '')::bigint;
+    _fee_amt   bigint    := NULLIF((_body->'value'->'fee'->>'amount'), '')::bigint;
+    _fee_nai   smallint  := NULLIF(substring((_body->'value'->'fee'->>'nai') FROM 3), '')::smallint;
 
-    _fee_amt bigint; _fee_nai smallint;
+    _kind   text;
+    _nai    smallint;
+    _amt    bigint;
+
+    r       btracker_backend.escrow_event;
 BEGIN
-  -- Common keys (ignore 'who'/'receiver')
-    _from  := (_body->'value'->>'from')::text;
-    _to    := (_body->'value'->>'to')::text;
-    _agent := (_body->'value'->>'agent')::text;
-    _id    := (_body->'value'->>'escrow_id')::bigint;
+    IF _op_name = 'hive::protocol::escrow_transfer_operation' THEN
+        _kind := 'transfer';
+        IF COALESCE(_hbd_amt,0) > 0 THEN
+            _nai := 13; _amt := _hbd_amt;
+        ELSIF COALESCE(_hive_amt,0) > 0 THEN
+            _nai := 21; _amt := _hive_amt;
+        ELSE
+            _nai := NULL; _amt := NULL;
+        END IF;
 
-  IF _op_name = 'hive::protocol::escrow_transfer_operation' THEN
-    _hbd_amt  := NULLIF((_body->'value'->'hbd_amount' ->>'amount'), '')::bigint;
-    _hbd_nai  := NULLIF(substring((_body->'value'->'hbd_amount' ->>'nai') FROM 3),'')::smallint;
-    _hive_amt := NULLIF((_body->'value'->'hive_amount'->>'amount'), '')::bigint;
-    _hive_nai := NULLIF(substring((_body->'value'->'hive_amount'->>'nai') FROM 3),'')::smallint;
+    ELSIF _op_name = 'hive::protocol::escrow_release_operation' THEN
+        _kind := 'release';
+        _fee_amt := NULL; _fee_nai := NULL;  -- no fee on release
+        IF COALESCE(_hbd_amt,0) > 0 THEN
+            _nai := 13; _amt := _hbd_amt;
+        ELSIF COALESCE(_hive_amt,0) > 0 THEN
+            _nai := 21; _amt := _hive_amt;
+        ELSE
+            _nai := NULL; _amt := NULL;
+        END IF;
 
-    _fee_amt  := NULLIF((_body->'value'->'fee'->>'amount'), '')::bigint;
-    _fee_nai  := NULLIF(substring((_body->'value'->'fee'->>'nai') FROM 3),'')::smallint;
+    ELSIF _op_name = 'hive::protocol::escrow_approved_operation' THEN
+        _kind := 'approved';
+        -- only fee applies on approved
+        _nai := NULL; _amt := NULL;
 
-    IF COALESCE(_hbd_amt,0) > 0 THEN
-      RETURN QUERY SELECT _from, _to, _agent, _id, _hbd_nai,  _hbd_amt,  'transfer', _fee_amt, _fee_nai;
+    ELSIF _op_name = 'hive::protocol::escrow_rejected_operation' THEN
+        _kind := 'rejected';
+        _nai := NULL; _amt := NULL;
+        _fee_amt := NULL; _fee_nai := NULL;
+
+    ELSE
+        -- ignored kinds (approve_intent / dispute / etc.)
+        RETURN NULL;
     END IF;
-    IF COALESCE(_hive_amt,0) > 0 THEN
-      RETURN QUERY SELECT _from, _to, _agent, _id, _hive_nai, _hive_amt, 'transfer', _fee_amt, _fee_nai;
-    END IF;
 
-  ELSIF _op_name = 'hive::protocol::escrow_release_operation' THEN
-    _hbd_amt  := NULLIF((_body->'value'->'hbd_amount' ->>'amount'), '')::bigint;
-    _hbd_nai  := NULLIF(substring((_body->'value'->'hbd_amount' ->>'nai') FROM 3),'')::smallint;
-    _hive_amt := NULLIF((_body->'value'->'hive_amount'->>'amount'), '')::bigint;
-    _hive_nai := NULLIF(substring((_body->'value'->'hive_amount'->>'nai') FROM 3),'')::smallint;
-
-    IF COALESCE(_hbd_amt,0) > 0 THEN
-      RETURN QUERY SELECT _from, _to, _agent, _id, _hbd_nai,  _hbd_amt,  'release', NULL::bigint, NULL::smallint;
-    END IF;
-    IF COALESCE(_hive_amt,0) > 0 THEN
-      RETURN QUERY SELECT _from, _to, _agent, _id, _hive_nai, _hive_amt, 'release', NULL::bigint, NULL::smallint;
-    END IF;
-
-  ELSIF _op_name = 'hive::protocol::escrow_approve_operation' THEN
-    -- Intent only, for audit
-    RETURN QUERY SELECT _from, _to, _agent, _id, NULL::smallint, NULL::bigint, 'approve_intent', NULL::bigint, NULL::smallint;
-
-  ELSIF _op_name = 'hive::protocol::escrow_approved_operation' THEN
-    -- Virtual approval; carry fee if present (regardless of 'who')
-    _fee_amt := NULLIF((_body->'value'->'fee'->>'amount'), '')::bigint;
-    _fee_nai := NULLIF(substring((_body->'value'->'fee'->>'nai') FROM 3),'')::smallint;
-    RETURN QUERY SELECT _from, _to, _agent, _id, NULL::smallint, NULL::bigint, 'approved', _fee_amt, _fee_nai;
-
-  ELSIF _op_name = 'hive::protocol::escrow_rejected_operation' THEN
-    -- Generic rejection; ignore 'who'
-    RETURN QUERY SELECT _from, _to, _agent, _id, NULL::smallint, NULL::bigint, 'rejected', NULL::bigint, NULL::smallint;
-
-  ELSIF _op_name = 'hive::protocol::escrow_dispute_operation' THEN
-    RETURN QUERY SELECT _from, _to, _agent, _id, NULL::smallint, NULL::bigint, 'dispute', NULL::bigint, NULL::smallint;
-  END IF;
-
-  RETURN;
+   
+    r := (_from, _to, _agent, _id, _nai, _amt, _kind, _fee_amt, _fee_nai);
+    RETURN r;
 END;
 $$;
 
