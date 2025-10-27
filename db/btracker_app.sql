@@ -645,7 +645,7 @@ BEGIN
   CREATE INDEX IF NOT EXISTS convert_state_owner_nai_idx ON convert_state (owner_id, request_id, nai);
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai,balance DESC);
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
-  CREATE INDEX IF NOT EXISTS idx_blocks_created_at_desc ON hive.blocks (created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_blocks_created_at_desc ON hafd.blocks (created_at DESC);
 END
 $$;
 
