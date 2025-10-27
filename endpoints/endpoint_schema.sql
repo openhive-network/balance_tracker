@@ -617,16 +617,30 @@ declare
           }
         }
       },
+      "btracker_backend.top_holders": {
+        "type": "object",
+        "properties": {
+          "total_accounts": {
+            "type": "integer",
+            "description": "Total number of accounts that match"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages (given requested page-size)"
+          },
+          "holders_result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.ranked_holder"
+            },
+            "description": "Ranked holders for the requested page"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/btracker_backend.aggregated_history"
-        }
-      },
-      "btracker_backend.array_of_ranked_holder": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/btracker_backend.ranked_holder"
         }
       }
     }
@@ -1024,8 +1038,8 @@ declare
         "tags": [
           "Accounts"
         ],
-        "summary": "Top 100 asset holders",
-        "description": "Lists the top 100 accounts holding a given coin, 100 results per page.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(''HIVE'',''balance'',1);`\n\nREST call example:\n* `GET ''https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1''`\n",
+        "summary": "Top asset holders with total number of account and pages.",
+        "description": "Lists top holders for a given coin with Top asset holders with total number of account and pages to support pagination.\n\nSQL example:\n* `SELECT * FROM btracker_endpoints.get_top_holders(\"HIVE\",\"balance\",1,100);`\n\nREST call example:\n* `GET \"https://%1$s/balance-api/top-holders?coin-type=HIVE&balance-type=balance&page=1&page-size=100\"\n",
         "operationId": "btracker_endpoints.get_top_holders",
         "x-response-headers": [
           {
@@ -1062,16 +1076,27 @@ declare
               "minimum": 1,
               "default": 1
             },
-            "description": "100 results per page (default `1`)."
+            "description": "1-based page number."
+          },
+          {
+            "in": "query",
+            "name": "page-size",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            },
+            "description": "Max results per page (capped by backend validator)."
           }
         ],
         "responses": {
           "200": {
-            "description": "Ranked list of holders",
+            "description": "Ranked holders with totals number of pages and acounts.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/btracker_backend.array_of_ranked_holder"
+                  "$ref": "#/components/schemas/btracker_backend.top_holders"
                 }
               }
             }
