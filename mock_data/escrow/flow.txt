@@ -6,7 +6,7 @@ operation_types:
   89  "hive::protocol::escrow_approved_operation"     virtual:true
   90  "hive::protocol::escrow_rejected_operation"     virtual:true
 
-# Scenario built from your cvk/fnait/kush blocks
+# Scenario built from your cvk/fnait/kush blocks (corrected)
 
 # (A) escrow_id 90003001 — transfer only (no approvals or releases in given range)
 block 90000031  [27] escrow_transfer_operation
@@ -14,7 +14,7 @@ block 90000031  [27] escrow_transfer_operation
   hbd_amount: 0, hive_amount: 1000, fee: 40
   ratification_deadline: 2025-10-01T12:00:00, escrow_expiration: 2025-10-08T12:00:00
 
-# (B) escrow_id 90003002 — approve → approve → approved (virtual) → release 300 to recipient, approved fee 20
+# (B) escrow_id 90003002 — approve → approve → approved (virtual, fee 20) → release 300 to recipient
 block 90000032  [27] escrow_transfer_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
   hbd_amount: 0, hive_amount: 2000, fee: 20
@@ -28,16 +28,12 @@ block 90000034  [31] escrow_approve_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
   who: kush, approve: true
 
-# virtual approvals emitted later as separate ops in your data:
+# virtual approval emitted later as a separate op in your data:
 block 90000041  [89] escrow_approved_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  who: fnait
+  fee: 20
 
-block 90000042  [89] escrow_approved_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  who: kush, fee: 20
-
-block 90000043  [29] escrow_release_operation
+block 90000042  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
   who: fnait, receiver: fnait
   hbd_amount: 0, hive_amount: 300
@@ -60,7 +56,7 @@ block 90000038  [28] escrow_dispute_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003003
   who: fnait
 
-block 90000044  [90] escrow_rejected_operation
+block 90000043  [90] escrow_rejected_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003003
   who: kush
 
@@ -74,16 +70,26 @@ block 90000040  [31] escrow_approve_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait, approve: true
 
-block 90000045  [28] escrow_dispute_operation
+block 90000044  [28] escrow_dispute_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait
 
-block 90000046  [29] escrow_release_operation
+block 90000045  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait, receiver: fnait
   hbd_amount: 0, hive_amount: 100
 
-block 90000047  [29] escrow_release_operation
+block 90000046  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait, receiver: fnait
   hbd_amount: 0, hive_amount: 405
+
+# Final result — per process_block_range_escrows logic
+# Calculation: (90003001: 1000 + 40) + (90003002: 2000 + 20 - 300 - 20) + (90003003: rejected→0) + (90003004: 500 + 5 - 100 - 405)
+#   A(90003001): create 1000 + transfer-fee 40 = 1040
+#   B(90003002): create 2000 + transfer-fee 20 − releases(300) − approved-fee(20) = 1700
+#   C(90003003): rejected ⇒ 0
+#   D(90003004): create 500 + transfer-fee 5 − releases(100+405) = 0
+#              = 1040 + 1700 + 0 + 0
+#              = 2740
+FINAL RESULT: 2740
