@@ -320,6 +320,49 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION btracker_backend.get_total_value_locked()
+RETURNS btracker_backend.total_value_locked
+LANGUAGE plpgsql
+STABLE
+$$
+DECLARE
+  -- NAI constants
+  _NAI_VESTS CONSTANT INT := 37;  -- VESTS
+  _NAI_HBD   CONSTANT INT := 13;  -- HBD
+  _NAI_HIVE  CONSTANT INT := 21;  -- HIVE
+
+  _synced_block      INT;
+
+  _sum_vests_txt     TEXT;
+  _sum_sav_hive_txt  TEXT;
+  _sum_sav_hbd_txt   TEXT;
+BEGIN
+ 
+  SELECT btracker_endpoints.get_btracker_last_synced_block()
+  INTO _synced_block;
+
+  SELECT COALESCE(SUM(cab.balance::NUMERIC), 0)::TEXT
+  INTO   _sum_vests_txt
+  FROM   current_account_balances cab
+  WHERE  cab.nai = _NAI_VESTS;
+
+  SELECT
+    COALESCE(SUM(CASE WHEN asv.nai = _NAI_HIVE THEN asv.balance::NUMERIC ELSE 0 END), 0)::TEXT,
+    COALESCE(SUM(CASE WHEN asv.nai = _NAI_HBD  THEN asv.balance::NUMERIC ELSE 0 END),  0)::TEXT
+  INTO
+    _sum_sav_hive_txt,
+    _sum_sav_hbd_txt
+  FROM account_savings asv;
+
+  RETURN (
+    _synced_block,
+    _sum_vests_txt,
+    _sum_sav_hive_txt,
+    _sum_sav_hbd_txt
+  )::btracker_backend.total_value_locked;
+END
+$$;
+
 
 CREATE OR REPLACE FUNCTION btracker_backend.incoming_delegations(IN _account_id INT)
 RETURNS SETOF btracker_backend.incoming_delegations
