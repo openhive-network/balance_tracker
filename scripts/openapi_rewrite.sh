@@ -31,7 +31,8 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/account-balances/get_top_holders.sql
 ../$endpoints/transfers/get_transfer_statistics.sql
 ../$endpoints/other/get_btracker_version.sql
-../$endpoints/other/get_btracker_last_synced_block.sql"
+../$endpoints/other/get_btracker_last_synced_block.sql
+../$endpoints/other/get_total_value_locked.sql"
 
 
 # Function to reverse the lines
