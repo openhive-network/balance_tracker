@@ -324,7 +324,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.get_total_value_locked()
 RETURNS btracker_backend.total_value_locked
 LANGUAGE plpgsql
 STABLE
-$$
+AS $$
 DECLARE
   -- NAI constants
   _NAI_VESTS CONSTANT INT := 37;  -- VESTS

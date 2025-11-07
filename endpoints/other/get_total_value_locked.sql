@@ -7,30 +7,37 @@ SET ROLE btracker_owner;
       - Other
     summary: Returns Total Value Locked (VESTS + HIVE savings + HBD savings)
     description: |
-      Computes the current chain totals of VESTS, HIVE savings, and HBD savings at the head block.
-    operationId: hafbe_endpoints.get_total_value_locked
+      Computes the chain totals of VESTS, HIVE savings, and HBD savings at the last-synced block.
+
+      SQL example
+      * `SELECT * FROM btracker_endpoints.get_total_value_locked();`
+
+      REST call example
+      * `GET "https://%1$s/balance-api/total-value-locked"`
+    operationId: btracker_endpoints.get_total_value_locked
     responses:
       '200':
-        description: TVL snapshot
+        description: TVL snapshot (block height is the app’s last-synced block)
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/hafbe_types.total_value_locked'
+              $ref: '#/components/schemas/btracker_backend.total_value_locked'
             example:
               {
-                "block_num": 5000000,
+                "block_num": 50000000,
                 "total_vests": "448144916705468383",
                 "savings_hive": "0",
                 "savings_hbd": "0"
               }
       '404':
-        description: No blocks in the database
+        description: App last-synced block is undefined (TVL cannot be computed)
 */
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_total_value_locked;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_total_value_locked()
-RETURNS hafbe_types.total_value_locked
+RETURNS btracker_backend.total_value_locked 
 -- openapi-generated-code-end
+
 LANGUAGE plpgsql STABLE
 SET JIT = OFF
 SET join_collapse_limit = 16

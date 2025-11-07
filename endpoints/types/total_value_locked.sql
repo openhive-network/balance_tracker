@@ -9,17 +9,17 @@ btracker_backend.total_value_locked:
       description: Head block number at which the snapshot was computed
     total_vests:
       type: string
-      description: Global sum of VESTS from hafbe_bal.current_account_balances (nai=37)
+      description: Global sum of VESTS 
     savings_hive:
       type: string
-      description: Total number of HIVE in savings from hafbe_bal.account_savings (nai=21)
+      description: Total number of HIVE in savings 
     savings_hbd:
       type: string
-      description: Total number of HIVE backed dollars the chain has in savings (hafbe_bal.account_savings nai=13)
+      description: Total number of HIVE backed dollars the chain has in savings
 */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.total_value_locked CASCADE;
-CREATE TYPE hafbe_types.total_value_locked AS (
+CREATE TYPE btracker_backend.total_value_locked AS (
     "block_num" INT,
     "total_vests" TEXT,
     "savings_hive" TEXT,

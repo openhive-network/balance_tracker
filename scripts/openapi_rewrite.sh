@@ -23,6 +23,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/types/recurrent_transfers.sql
 ../$endpoints/types/transfer_stats.sql
 ../$endpoints/types/ranked_holder.sql
+../$endpoints/types/total_value_locked.sql
 ../$endpoints/account-balances/get_account_balances.sql
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
