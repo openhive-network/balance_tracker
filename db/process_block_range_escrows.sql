@@ -31,7 +31,7 @@ BEGIN
   WITH
   ops_in_range AS (
     SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ot.name AS op_name, ov.body::jsonb AS body
-    FROM hive.operations_view ov
+    FROM operations_view ov
     JOIN hafd.operation_types ot ON ot.id = ov.op_type_id
     WHERE ov.block_num BETWEEN _from AND _to
       AND ov.op_type_id IN (_op_transfer, _op_release, _op_approved, _op_rejected)
@@ -49,8 +49,8 @@ BEGIN
 
   event_ids AS MATERIALIZED (
     SELECT
-      av_from.id  AS from_id,
-      av_to.id    AS to_id,
+      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      (SELECT av.id FROM accounts_view av WHERE av.name = e.to_name) AS to_id,
       e.escrow_id,
       e.nai,
       e.amount,
@@ -60,8 +60,6 @@ BEGIN
       e.op_id,
       e.block_num
     FROM events e
-    JOIN hive.accounts_view av_from ON av_from.name = e.from_name
-    LEFT JOIN hive.accounts_view av_to   ON av_to.name   = e.to_name
   ),
 
   /* ---------- FEES AT TRANSFER (agent) ---------- */
