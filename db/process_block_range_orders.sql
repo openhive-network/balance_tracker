@@ -45,13 +45,13 @@ BEGIN
     WITH
     ops_in_range AS (
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, (ov.body)::jsonb AS body
-        FROM hive.operations_view ov
+        FROM operations_view ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
     ),
     events AS MATERIALIZED (
         SELECT
-            av.id AS owner_id,
+            (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
             e.order_id,
             e.nai,
@@ -63,7 +63,6 @@ BEGIN
             o.op_type_id
         FROM ops_in_range o
         CROSS JOIN LATERAL btracker_backend.get_limit_order_events(o.body, o.op_type_id) AS e
-        JOIN accounts_view av ON av.name = e.owner
     ),
     creates AS (
         SELECT

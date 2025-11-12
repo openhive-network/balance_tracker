@@ -30,13 +30,13 @@ BEGIN
     WITH
     ops_in_range AS (
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body
-        FROM hive.operations_view ov
+        FROM operations_view ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_convert, _op_fillconv)
     ),
     events AS MATERIALIZED (
         SELECT
-            av.id AS owner_id,
+            (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
             e.request_id,
             e.nai,
@@ -47,14 +47,13 @@ BEGIN
             o.body
         FROM ops_in_range o
         CROSS JOIN LATERAL btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
-        JOIN accounts_view av ON av.name = e.owner
     ),
     creates AS (
         SELECT
             owner_id,
             request_id,
             nai,
-            e.amount_in AS create_amount,         
+            e.amount_in AS create_amount,
             op_id AS create_op_id,
             block_num AS create_block
         FROM events e
@@ -65,7 +64,7 @@ BEGIN
             owner_id,
             request_id,
             nai,
-            e.amount_in AS fill_amount,           
+            e.amount_in AS fill_amount,
             op_id AS fill_op_id,
             block_num AS fill_block
         FROM events e
