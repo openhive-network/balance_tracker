@@ -68,11 +68,39 @@ done
 
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_block_processing"}
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Get the project root (parent of scripts directory)
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
 process_blocks() {
     local n_blocks="${1:-null}"
     log_file="btracker_sync.log"
     date -uIseconds > /tmp/block_processing_startup_time.txt
-    psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);" 2>&1 | tee -i $log_file
+    
+    # Build arguments for Python script
+    PYTHON_ARGS=(
+        "--context=${BTRACKER_SCHEMA}"
+        "--schema=${BTRACKER_SCHEMA}"
+        "--host=${POSTGRES_HOST}"
+        "--port=${POSTGRES_PORT}"
+        "--user=${POSTGRES_USER}"
+    )
+    
+    # Add stop-at-block if specified and not null
+    if [ "$n_blocks" != "null" ] && [ -n "$n_blocks" ]; then
+        PYTHON_ARGS+=("--stop-at-block=${n_blocks}")
+    fi
+    
+    # Add URL if specified, otherwise individual connection params are already added
+    if [ -n "$POSTGRES_URL" ]; then
+        PYTHON_ARGS=("--url=${POSTGRES_URL}" "--context=${BTRACKER_SCHEMA}" "--schema=${BTRACKER_SCHEMA}")
+        if [ "$n_blocks" != "null" ] && [ -n "$n_blocks" ]; then
+            PYTHON_ARGS+=("--stop-at-block=${n_blocks}")
+        fi
+    fi
+    
+    python3 "$PROJECT_ROOT/process_blocks.py" "${PYTHON_ARGS[@]}" 2>&1 | tee -i $log_file
 }
 
 process_blocks "$PROCESS_BLOCK_LIMIT"

@@ -578,6 +578,16 @@ $$;
     To stop it call `stopProcessing();`
     from another session and commit its trasaction.
 */
+END
+$$;
+
+/**
+ * DEPRECATED: This procedure is no longer used and kept only for backward compatibility.
+ * The main processing loop has been moved to Python (process_blocks.py) to avoid
+ * long-running SQL queries that would violate statement timeout settings.
+ * 
+ * Use the Python script instead: python3 process_blocks.py --help
+ */
 CREATE OR REPLACE PROCEDURE main(
     IN _appContext hive.context_name,
     IN _maxBlockLimit INT = null
@@ -588,6 +598,9 @@ $$
 DECLARE
   _blocks_range hive.blocks_range := (0,0);
 BEGIN
+  RAISE WARNING 'The SQL main() procedure is deprecated. Please use process_blocks.py Python script instead.';
+  RAISE WARNING 'This procedure will be removed in a future version.';
+  
   IF _maxBlockLimit != NULL THEN
     RAISE NOTICE 'Max block limit is specified as: %', _maxBlockLimit;
   END IF;
