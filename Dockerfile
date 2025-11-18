@@ -37,6 +37,9 @@ RUN <<EOF
   set -e
   mkdir /app
   chown haf_admin /app
+  apt-get update
+  apt-get install -y python3 python3-psycopg2
+  rm -rf /var/lib/apt/lists/*
 EOF
 
 USER haf_admin
@@ -45,6 +48,7 @@ COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
 COPY scripts/add_mocks_to_db.sh /app/scripts/add_mocks_to_db.sh
+COPY process_blocks.py /app/process_blocks.py
 COPY db /app/db
 COPY backend /app/backend
 COPY endpoints /app/endpoints
