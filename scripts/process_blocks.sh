@@ -23,6 +23,7 @@ POSTGRES_USER=${POSTGRES_USER:-"btracker_owner"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
+POSTGRES_DATABASE=${POSTGRES_DATABASE:-"haf_block_log"}
 PROCESS_BLOCK_LIMIT=${PROCESS_BLOCK_LIMIT:-null}
 BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
 
@@ -66,7 +67,8 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_block_processing"}
+# POSTGRES_ACCESS is no longer used - Python script uses individual connection parameters
+# POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_block_processing"}
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -85,6 +87,7 @@ process_blocks() {
         "--host=${POSTGRES_HOST}"
         "--port=${POSTGRES_PORT}"
         "--user=${POSTGRES_USER}"
+        "--database=${POSTGRES_DATABASE}"
     )
     
     # Add stop-at-block if specified and not null
