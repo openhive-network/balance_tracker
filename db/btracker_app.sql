@@ -578,8 +578,6 @@ $$;
     To stop it call `stopProcessing();`
     from another session and commit its trasaction.
 */
-END
-$$;
 
 /**
  * DEPRECATED: This procedure is no longer used and kept only for backward compatibility.
