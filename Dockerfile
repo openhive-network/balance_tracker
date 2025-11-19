@@ -43,6 +43,9 @@ COPY --from=python-base /usr/local /usr/local
 COPY --from=python-base /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
 COPY --from=python-base /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 
+# Debug: Check what was copied and set paths
+RUN ls -la /usr/local/bin/ && echo "Python files:" && find /usr/local -name "*python*" -type f 2>/dev/null | head -20
+
 # Set paths for Python and install psycopg2-binary
 ENV PATH=/usr/local/bin:$PATH \
     LD_LIBRARY_PATH=/usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
