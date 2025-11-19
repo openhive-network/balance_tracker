@@ -2,8 +2,8 @@
 ARG PSQL_CLIENT_VERSION=14-1
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
-# Get Python from official Alpine image
-FROM python:3.11-alpine AS python-base
+# Get Python from official Debian slim image (compatible with glibc-based systems)
+FROM python:3.11-slim AS python-base
 
 FROM psql as version-calculcation
 
