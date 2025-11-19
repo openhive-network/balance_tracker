@@ -97,28 +97,15 @@ $$
 DECLARE 
   _pair_id INT;
   _amount BIGINT := ((_operation_body)->'value'->'amount'->>'amount')::BIGINT;
-  _extension_data JSONB;
-  _first_elem JSONB;
 BEGIN
-  _extension_data := (_operation_body)->'value'->'extensions';
-  
-  -- Handle both pre-HF28 (nested arrays) and post-HF28 (direct objects) formats
-  IF jsonb_array_length(_extension_data) > 0 THEN
-    _first_elem := _extension_data->0;
-    
-    -- Check if we have the old nested array format or new direct object format
-    IF jsonb_typeof(_first_elem) = 'array' THEN
-      -- Old format: array of arrays
-      SELECT (inner_elem->>'pair_id')::INT INTO _pair_id
-      FROM jsonb_array_elements(_extension_data) AS outer_elem,
-      LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-      WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id'
-      LIMIT 1;
-    ELSIF jsonb_typeof(_first_elem) = 'object' AND _first_elem ? 'pair_id' THEN
-      -- New format: array of objects directly
-      _pair_id := (_first_elem->>'pair_id')::INT;
-    END IF;
-  END IF;
+  WITH json_data AS (
+    SELECT (_operation_body)->'value'->'extensions' AS extension_data
+  )
+  SELECT (inner_elem->>'pair_id')::INT INTO _pair_id
+  FROM json_data,
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
+  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
+  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
 
   RETURN (
     ((_operation_body)->'value'->>'from')::TEXT,
@@ -159,28 +146,15 @@ AS
 $$
 DECLARE 
   _pair_id INT;
-  _extension_data JSONB;
-  _first_elem JSONB;
 BEGIN
-  _extension_data := (_operation_body)->'value'->'extensions';
-  
-  -- Handle both pre-HF28 (nested arrays) and post-HF28 (direct objects) formats
-  IF jsonb_array_length(_extension_data) > 0 THEN
-    _first_elem := _extension_data->0;
-    
-    -- Check if we have the old nested array format or new direct object format
-    IF jsonb_typeof(_first_elem) = 'array' THEN
-      -- Old format: array of arrays
-      SELECT inner_elem->>'pair_id' INTO _pair_id
-      FROM jsonb_array_elements(_extension_data) AS outer_elem,
-      LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-      WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id'
-      LIMIT 1;
-    ELSIF jsonb_typeof(_first_elem) = 'object' AND _first_elem ? 'pair_id' THEN
-      -- New format: array of objects directly
-      _pair_id := (_first_elem->>'pair_id')::INT;
-    END IF;
-  END IF;
+  WITH json_data AS (
+    SELECT (_operation_body)->'value'->'extensions' AS extension_data
+  )
+  SELECT inner_elem->>'pair_id' INTO _pair_id
+  FROM json_data,
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
+  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
+  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
 
   RETURN (
     ((_operation_body)->'value'->>'from')::TEXT,
@@ -243,28 +217,15 @@ $$
 DECLARE 
   _pair_id INT;
   _delete BOOLEAN;
-  _extension_data JSONB;
-  _first_elem JSONB;
 BEGIN
-  _extension_data := (_operation_body)->'value'->'extensions';
-  
-  -- Handle both pre-HF28 (nested arrays) and post-HF28 (direct objects) formats
-  IF jsonb_array_length(_extension_data) > 0 THEN
-    _first_elem := _extension_data->0;
-    
-    -- Check if we have the old nested array format or new direct object format
-    IF jsonb_typeof(_first_elem) = 'array' THEN
-      -- Old format: array of arrays
-      SELECT inner_elem->>'pair_id' INTO _pair_id
-      FROM jsonb_array_elements(_extension_data) AS outer_elem,
-      LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-      WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id'
-      LIMIT 1;
-    ELSIF jsonb_typeof(_first_elem) = 'object' AND _first_elem ? 'pair_id' THEN
-      -- New format: array of objects directly
-      _pair_id := (_first_elem->>'pair_id')::INT;
-    END IF;
-  END IF;
+  WITH json_data AS (
+    SELECT (_operation_body)->'value'->'extensions' AS extension_data
+  )
+  SELECT inner_elem->>'pair_id' INTO _pair_id
+  FROM json_data,
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
+  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
+  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
 
   -- FIX for a bug in failed_recurrent_transfer_operation - delete is not set when remaining_executions = 0
   _delete := (
