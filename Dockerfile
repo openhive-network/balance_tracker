@@ -2,6 +2,9 @@
 ARG PSQL_CLIENT_VERSION=14-1
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
+# Get Python from official Alpine image
+FROM python:3.11-alpine AS python-base
+
 FROM psql as version-calculcation
 
 COPY --chown=haf_admin:users . /home/haf_admin/src
@@ -33,11 +36,14 @@ LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
 
 USER root
 
+# Copy Python from python-base stage
+COPY --from=python-base /usr/local /usr/local
+
 RUN <<EOF
   set -e
   mkdir /app
   chown haf_admin /app
-  apk add --no-cache python3 py3-psycopg2
+  python3 -m pip install --no-cache-dir psycopg2-binary
 EOF
 
 USER haf_admin
