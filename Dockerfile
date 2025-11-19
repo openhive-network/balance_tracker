@@ -37,9 +37,7 @@ RUN <<EOF
   set -e
   mkdir /app
   chown haf_admin /app
-  apt-get update
-  apt-get install -y python3 python3-psycopg2
-  rm -rf /var/lib/apt/lists/*
+  apk add --no-cache python3 py3-psycopg2
 EOF
 
 USER haf_admin
