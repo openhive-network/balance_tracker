@@ -43,10 +43,11 @@ COPY --from=python-base /usr/local /usr/local
 COPY --from=python-base /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
 COPY --from=python-base /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 
-# Set paths for Python
-ENV PATH=/usr/local/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
-RUN python3 -m pip install --no-cache-dir psycopg2-binary
+# Set paths for Python and install psycopg2-binary
+ENV PATH=/usr/local/bin:$PATH \
+    LD_LIBRARY_PATH=/usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
+    
+RUN /usr/local/bin/python3 -m pip install --no-cache-dir psycopg2-binary
 
 USER haf_admin
 
