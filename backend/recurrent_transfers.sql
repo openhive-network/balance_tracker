@@ -101,11 +101,9 @@ BEGIN
   WITH json_data AS (
     SELECT (_operation_body)->'value'->'extensions' AS extension_data
   )
-  SELECT (inner_elem->>'pair_id')::INT INTO _pair_id
+  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
   FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
-  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
 
   RETURN (
     ((_operation_body)->'value'->>'from')::TEXT,
@@ -150,11 +148,9 @@ BEGIN
   WITH json_data AS (
     SELECT (_operation_body)->'value'->'extensions' AS extension_data
   )
-  SELECT inner_elem->>'pair_id' INTO _pair_id
+  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
   FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
-  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
 
   RETURN (
     ((_operation_body)->'value'->>'from')::TEXT,
@@ -221,11 +217,9 @@ BEGIN
   WITH json_data AS (
     SELECT (_operation_body)->'value'->'extensions' AS extension_data
   )
-  SELECT inner_elem->>'pair_id' INTO _pair_id
+  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
   FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem,
-  LATERAL jsonb_array_elements(outer_elem) AS inner_elem
-  WHERE jsonb_typeof(inner_elem) = 'object' AND inner_elem ? 'pair_id';
+  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
 
   -- FIX for a bug in failed_recurrent_transfer_operation - delete is not set when remaining_executions = 0
   _delete := (
