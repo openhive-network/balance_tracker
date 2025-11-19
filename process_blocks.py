@@ -79,42 +79,54 @@ class BlockProcessor:
         """
         Call hive.app_next_iteration and return the blocks range.
         Returns tuple (first_block, last_block) or None if no blocks available.
+        
+        Note: app_next_iteration commits internally, so we create a wrapper
+        function that can handle the OUT parameter and commit the transaction.
         """
-        query = """
-            DO $$
+        # Create a wrapper function to handle the OUT parameter from app_next_iteration
+        create_wrapper_query = """
+            CREATE OR REPLACE FUNCTION btracker_app.get_next_iteration_wrapper(
+                _context_name hive.context_name,
+                _limit INT
+            )
+            RETURNS hive.blocks_range
+            LANGUAGE plpgsql
+            AS $_wrapper$
             DECLARE
                 _blocks_range hive.blocks_range;
             BEGIN
+                -- Call app_next_iteration which will commit internally
                 CALL hive.app_next_iteration(
-                    %s::hive.context_name,
+                    _context_name,
                     _blocks_range,
                     _override_max_batch => NULL,
-                    _limit => %s
+                    _limit => _limit
                 );
-                
-                -- Store result in a temporary table for retrieval
-                CREATE TEMPORARY TABLE IF NOT EXISTS temp_blocks_range (
-                    first_block INT,
-                    last_block INT
-                );
-                DELETE FROM temp_blocks_range;
-                
-                IF _blocks_range IS NOT NULL THEN
-                    INSERT INTO temp_blocks_range VALUES (_blocks_range.first_block, _blocks_range.last_block);
-                END IF;
-            END $$;
+                RETURN _blocks_range;
+            END;
+            $_wrapper$;
         """
         
-        # Execute the procedure
-        self.execute_query(query, (context_name, max_block_limit))
+        # Create the wrapper function (idempotent with CREATE OR REPLACE)
+        cursor = self.connection.cursor()
+        cursor.execute(create_wrapper_query)
+        cursor.close()
+        self.connection.commit()
         
-        # Fetch the result
-        fetch_query = "SELECT first_block, last_block FROM temp_blocks_range"
-        result = self.execute_query(fetch_query, fetch=True)
+        # Call the wrapper function
+        # Note: This must be called with autocommit=True to allow the internal commits
+        old_autocommit = self.connection.autocommit
+        self.connection.autocommit = True
         
-        if result and result[0] is not None:
-            return {'first_block': result[0], 'last_block': result[1]}
-        return None
+        try:
+            query = "SELECT * FROM btracker_app.get_next_iteration_wrapper(%s::hive.context_name, %s)"
+            result = self.execute_query(query, (context_name, max_block_limit), fetch=True)
+            
+            if result and result[0] is not None:
+                return {'first_block': result[0], 'last_block': result[1]}
+            return None
+        finally:
+            self.connection.autocommit = old_autocommit
     
     def process_blocks(self, context_name, blocks_range):
         """Process a range of blocks."""
