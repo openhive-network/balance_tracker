@@ -2,9 +2,6 @@
 ARG PSQL_CLIENT_VERSION=14-1
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
-# Get Python from official Debian slim image (compatible with glibc-based systems)
-FROM python:3.11-slim AS python-base
-
 FROM psql as version-calculcation
 
 COPY --chown=haf_admin:users . /home/haf_admin/src
@@ -38,17 +35,14 @@ USER root
 
 RUN mkdir /app && chown haf_admin /app
 
-# Copy Python installation from python-base stage
-COPY --from=python-base /usr/local /usr/local
-COPY --from=python-base /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
-COPY --from=python-base /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
+# Install Python 3 and pip using apt (psql image is Debian-based)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set paths for Python and install psycopg2-binary
-ENV PATH=/usr/local/bin:$PATH \
-    LD_LIBRARY_PATH=/usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
-    
-# Use python3.11 directly instead of symlink
-RUN /usr/local/bin/python3.11 -m pip install --no-cache-dir psycopg2-binary
+# Install psycopg2-binary for database connectivity
+RUN python3 -m pip install --no-cache-dir psycopg2-binary
 
 USER haf_admin
 
