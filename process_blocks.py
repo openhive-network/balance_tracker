@@ -60,23 +60,6 @@ class BlockProcessor:
                 cursor.close()
             raise e
     
-    def allow_processing(self):
-        """Enable processing flag."""
-        query = sql.SQL("SELECT {schema}.allowProcessing()").format(
-            schema=sql.Identifier(self.schema)
-        )
-        self.execute_query(query)
-        self.connection.commit()
-        logger.info("Processing enabled")
-    
-    def continue_processing(self):
-        """Check if processing should continue."""
-        query = sql.SQL("SELECT {schema}.continueProcessing()").format(
-            schema=sql.Identifier(self.schema)
-        )
-        result = self.execute_query(query, fetch=True)
-        return result[0] if result else False
-    
     def get_current_block_num(self, context_name):
         """Get the current block number for the context."""
         query = "SELECT hive.app_get_current_block_num(%s)"
@@ -143,8 +126,6 @@ class BlockProcessor:
         self.connect()
         
         try:
-            self.allow_processing()
-            
             current_block = self.get_current_block_num(context_name)
             logger.info(f"Last block processed by application: {current_block}")
             
@@ -154,13 +135,6 @@ class BlockProcessor:
             logger.info("Entering application main loop...")
             
             while True:
-                # Check if we should continue processing
-                if not self.continue_processing():
-                    self.connection.rollback()
-                    current_block = self.get_current_block_num(context_name)
-                    logger.info(f"Exiting application main loop at processed block: {current_block}")
-                    break
-                
                 # Get next iteration
                 # Note: app_next_iteration commits internally, so no commit needed here
                 blocks_range = self.get_next_iteration(context_name, max_block_limit)
