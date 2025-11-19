@@ -33,6 +33,15 @@ class BlockProcessor:
         try:
             self.connection = psycopg2.connect(self.connection_string)
             self.connection.autocommit = False
+            
+            # Set search_path to ensure procedures/functions are found
+            cursor = self.connection.cursor()
+            cursor.execute(
+                sql.SQL("SET SEARCH_PATH TO {}").format(sql.Identifier(self.schema))
+            )
+            cursor.close()
+            self.connection.commit()
+            
             logger.info("Connected to database")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
