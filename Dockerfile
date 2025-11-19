@@ -36,23 +36,16 @@ LABEL io.hive.image.commit.date="$GIT_LAST_COMMIT_DATE"
 
 USER root
 
-# Copy Python and its dependencies from python-base stage
-COPY --from=python-base /usr/local/bin/python3 /usr/local/bin/python3
-COPY --from=python-base /usr/local/bin/python3.11 /usr/local/bin/python3.11
-COPY --from=python-base /usr/local/bin/pip3 /usr/local/bin/pip3
-COPY --from=python-base /usr/local/lib/python3.11 /usr/local/lib/python3.11
-COPY --from=python-base /usr/local/lib/libpython3.11.so.1.0 /usr/local/lib/libpython3.11.so.1.0
+RUN mkdir /app && chown haf_admin /app
+
+# Copy Python installation from python-base stage
+COPY --from=python-base /usr/local /usr/local
 COPY --from=python-base /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
 COPY --from=python-base /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 
-RUN <<EOF
-  set -e
-  mkdir /app
-  chown haf_admin /app
-  ln -sf /usr/local/lib/libpython3.11.so.1.0 /usr/local/lib/libpython3.11.so
-  ldconfig
-  python3 -m pip install --no-cache-dir psycopg2-binary
-EOF
+# Set library path and install psycopg2-binary
+ENV LD_LIBRARY_PATH=/usr/local/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
+RUN python3 -m pip install --no-cache-dir psycopg2-binary
 
 USER haf_admin
 
