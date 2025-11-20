@@ -2,7 +2,7 @@
   "curation_rewards": "19888",
   "delayed_vests": "0",
   "delegated_vests": "10000",
-  "hbd_balance": 22464,
+  "hbd_balance": 22454,
   "hbd_rewards": 0,
   "hbd_savings": 0,
   "hive_balance": 0,
@@ -33,6 +33,4 @@
   "escrow_pending_amount_hbd": 0,
   "escrow_pending_amount_hive": 0,
   "escrow_pending_count": 0
-
-
 }

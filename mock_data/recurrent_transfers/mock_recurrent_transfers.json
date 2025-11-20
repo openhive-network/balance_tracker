@@ -413,6 +413,63 @@
                     "remaining_executions": 0
                 }
             }
+        },
+        {
+            "block_num":90000047,
+            "op_type_id":49,
+            "op_pos":1,
+            "trx_in_block":-1,
+            "body": {
+                "type": "recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10",
+                        "precision": 3
+                    },
+                    "executions": 10,
+                    "extensions": [
+                        {
+                            "type": "recurrent_transfer_pair_id",
+                            "value": {
+                                "pair_id": 1
+                            }
+                        }
+                    ],
+                    "recurrence": 24
+                }
+            }
+        },
+        {
+            "block_num":90000048,
+            "op_type_id":83,
+            "op_pos":1,
+            "trx_in_block":-1,
+            "body": {
+                "type": "fill_recurrent_transfer_operation",
+                "value": {
+                    "to": "blocktrades",
+                    "from": "gtg",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "10",
+                        "precision": 3
+                    },
+                    "extensions": [
+                        {
+                            "type": "recurrent_transfer_pair_id",
+                            "value": {
+                                "pair_id": 1
+                            }
+                        }
+                    ],
+                    "remaining_executions": 9
+                }
+            }
         }
     ]
 }

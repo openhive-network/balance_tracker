@@ -31,6 +31,22 @@
       "recurrence": 24,
       "remaining_executions": 10,
       "trigger_date": "2016-09-16T19:48:21"
+    },
+    {
+      "amount": {
+        "amount": "10",
+        "nai": "@@000000013",
+        "precision": 3
+      },
+      "block_num": 90000048,
+      "consecutive_failures": 0,
+      "from": "gtg",
+      "memo": "",
+      "operation_id": "386547262798430547",
+      "pair_id": 1,
+      "recurrence": 24,
+      "remaining_executions": 9,
+      "trigger_date": "2016-09-16T19:49:51"
     }
   ],
   "outgoing_recurrent_transfers": [
