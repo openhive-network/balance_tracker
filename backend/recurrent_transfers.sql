@@ -3,38 +3,57 @@ SET ROLE btracker_owner;
 DROP TYPE IF EXISTS btracker_backend.recurrent_transfer_return CASCADE;
 CREATE TYPE btracker_backend.recurrent_transfer_return AS
 (
-    from_account TEXT,
-    to_account TEXT,
-    transfer_id INT,
-    nai INT,
-    amount BIGINT,
+    from_account         TEXT,
+    to_account           TEXT,
+    transfer_id          INT,
+    nai                  INT,
+    amount               BIGINT,
     consecutive_failures INT,
     remaining_executions INT,
-    recurrence INT,
-    memo TEXT,
-    delete_transfer BOOLEAN
+    recurrence           INT,
+    memo                 TEXT,
+    delete_transfer      BOOLEAN
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_recurrent_transfer_operations(IN _operation_body JSONB, IN _op_type_id INT)
+CREATE OR REPLACE FUNCTION btracker_backend.get_recurrent_transfer_operations(IN __operation_body JSONB, IN _op_type_id INT)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE plpgsql
-STABLE
+IMMUTABLE
 AS
 $BODY$
 BEGIN
   RETURN (
-    CASE 
+    CASE
       WHEN _op_type_id = 49 THEN
-        btracker_backend.process_recurrent_transfer_operations(_operation_body)
+        btracker_backend.process_recurrent_transfer_operations(__operation_body)
 
       WHEN _op_type_id = 83 THEN
-        btracker_backend.process_fill_recurrent_transfer_operations(_operation_body)
+        btracker_backend.process_fill_recurrent_transfer_operations(__operation_body)
 
       WHEN _op_type_id = 84 THEN
-        btracker_backend.process_fail_recurrent_transfer_operations(_operation_body) 
+        btracker_backend.process_fail_recurrent_transfer_operations(__operation_body)
     END
   );
 
+END;
+$BODY$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.extract_pair_id(IN __extensions JSONB)
+RETURNS INT
+LANGUAGE plpgsql
+IMMUTABLE
+AS
+$BODY$
+DECLARE
+  __pair_id INT;
+BEGIN
+  __pair_id := (
+    SELECT (outer_elem->'value'->>'pair_id')::INT
+    FROM jsonb_array_elements(__extensions) AS outer_elem
+    LIMIT 1
+  );
+
+  RETURN COALESCE(__pair_id, 0);
 END;
 $BODY$;
 
@@ -89,34 +108,39 @@ $BODY$;
 
 */
 
-CREATE OR REPLACE FUNCTION btracker_backend.process_recurrent_transfer_operations(IN _operation_body JSONB)
+CREATE OR REPLACE FUNCTION btracker_backend.process_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
-DECLARE 
-  _pair_id INT;
-  _amount BIGINT := ((_operation_body)->'value'->'amount'->>'amount')::BIGINT;
-BEGIN
-  WITH json_data AS (
-    SELECT (_operation_body)->'value'->'extensions' AS extension_data
-  )
-  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
-  FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
+DECLARE
+  __amount       BIGINT  := ((__operation_body)->'value'->'amount'->>'amount')::BIGINT;
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
+  __nai          INT     := substring((__operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT;
+  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if amount s is 0
+  __con_failures INT     := 0;     -- first transfer, always 0
 
-  RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,
-    ((_operation_body)->'value'->>'to')::TEXT,
-    COALESCE(_pair_id, 0),
-    substring((_operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT,
-    _amount,
-    0,
-    ((_operation_body)->'value'->>'executions')::INT,
-    ((_operation_body)->'value'->>'recurrence')::INT,
-    ((_operation_body)->'value'->>'memo')::TEXT,
-    (CASE WHEN _amount = 0 THEN TRUE ELSE FALSE END)
-  )::btracker_backend.recurrent_transfer_return;
+  __return btracker_backend.recurrent_transfer_return;
+BEGIN
+  -- if amount is 0, mark transfer for deletion
+  IF __amount = 0 THEN
+    __del_transfer := TRUE;
+  END IF;
+
+  __return := (
+    __operation_body -> 'value' ->> 'from',       -- from_account
+    __operation_body -> 'value' ->> 'to',         -- to_account
+    __pair_id,                                    -- transfer_id
+    __nai,                                        -- nai
+    __amount,                                     -- amount
+    __con_failures,                               -- consecutive_failures
+    __operation_body -> 'value' ->> 'executions', -- remaining_executions
+    __operation_body -> 'value' ->> 'recurrence', -- recurrence
+    __operation_body -> 'value' ->> 'memo',       -- memo
+    __del_transfer                                -- delete_transfer
+  );
+
+  RETURN __return;
 END
 $$;
 
@@ -137,33 +161,38 @@ $$;
 }
 */
 
-CREATE OR REPLACE FUNCTION btracker_backend.process_fill_recurrent_transfer_operations(IN _operation_body JSONB)
+CREATE OR REPLACE FUNCTION btracker_backend.process_fill_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
-DECLARE 
-  _pair_id INT;
-BEGIN
-  WITH json_data AS (
-    SELECT (_operation_body)->'value'->'extensions' AS extension_data
-  )
-  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
-  FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
+DECLARE
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
+  __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
+  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if remaining executions is 0
+  __con_failures INT     := 0;     -- resets consecutive failures on fill is always 0
 
-  RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,
-    ((_operation_body)->'value'->>'to')::TEXT,
-    COALESCE(_pair_id, 0),
-    NULL,
-    NULL,
-    0,
-    ((_operation_body)->'value'->>'remaining_executions')::INT,
-    NULL,
-    NULL,
-    (CASE WHEN ((_operation_body)->'value'->>'remaining_executions')::INT = 0 THEN TRUE ELSE FALSE END)
-  )::btracker_backend.recurrent_transfer_return;
+  __return btracker_backend.recurrent_transfer_return;
+BEGIN
+  -- if remaining executions is 0, mark transfer for deletion
+  IF __rem_exec = 0 THEN
+    __del_transfer := TRUE;
+  END IF;
+
+  __return := (
+    __operation_body -> 'value' ->> 'from', -- from_account
+    __operation_body -> 'value' ->> 'to',   -- to_account
+    __pair_id,                              -- transfer_id
+    NULL,                                   -- nai         not included in fill operation
+    NULL,                                   -- amount      not included in fill operation
+    __con_failures,                         -- consecutive_failures
+    __rem_exec,                             -- remaining_executions
+    NULL,                                   -- recurrence  not included in fill operation
+    NULL,                                   -- memo        not included in fill operation
+    __del_transfer                          -- delete_transfer
+  );
+
+  RETURN __return;
 END
 $$;
 
@@ -205,72 +234,40 @@ $$;
 
 */
 
-CREATE OR REPLACE FUNCTION btracker_backend.process_fail_recurrent_transfer_operations(IN _operation_body JSONB)
+CREATE OR REPLACE FUNCTION btracker_backend.process_fail_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
-DECLARE 
-  _pair_id INT;
-  _delete BOOLEAN;
+DECLARE
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
+  __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
+  __deleted      BOOLEAN := (__operation_body->'value'->>'deleted')::BOOLEAN;
+  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if remaining executions is 0 or deleted is true
+  __con_failures INT     := (__operation_body->'value'->>'consecutive_failures')::INT;
+
+  __return btracker_backend.recurrent_transfer_return;
 BEGIN
-  WITH json_data AS (
-    SELECT (_operation_body)->'value'->'extensions' AS extension_data
-  )
-  SELECT  (outer_elem->'value'->>'pair_id')::INT INTO _pair_id
-  FROM json_data,
-  LATERAL jsonb_array_elements(extension_data) AS outer_elem;
-
-  -- FIX for a bug in failed_recurrent_transfer_operation - delete is not set when remaining_executions = 0
-  _delete := (
-    CASE
-      WHEN ((_operation_body)->'value'->>'deleted')::BOOLEAN = TRUE OR ((_operation_body)->'value'->>'remaining_executions')::INT = 0 THEN
-        TRUE
-      ELSE
-        FALSE
-    END
-  );
-
-  RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,
-    ((_operation_body)->'value'->>'to')::TEXT,
-    COALESCE(_pair_id, 0),
-    NULL,
-    NULL,
-    ((_operation_body)->'value'->>'consecutive_failures')::INT,
-    ((_operation_body)->'value'->>'remaining_executions')::INT,
-    NULL,
-    NULL,
-    _delete
-  )::btracker_backend.recurrent_transfer_return;
-END
-$$;
-
-CREATE OR REPLACE FUNCTION btracker_backend.amount_object(IN _nai INT, IN _amount BIGINT)
-RETURNS btracker_backend.amount
-LANGUAGE 'plpgsql' STABLE
-AS
-$$
-DECLARE 
-  __precision INT;
-  __nai TEXT := '@@0000000' || _nai;
-BEGIN
-  IF _nai = 13 THEN
-    __precision := 3;
-  ELSIF _nai = 21 THEN
-    __precision := 3;
-  ELSIF _nai = 37 THEN
-    __precision := 6;
+  -- if remaining executions is 0, mark transfer for deletion
+  IF __rem_exec = 0 OR __deleted THEN
+    __del_transfer := TRUE;
   END IF;
 
-  RETURN (
-    __nai,
-    _amount::TEXT,
-    __precision
-  )::btracker_backend.amount;
+  __return := (
+    __operation_body -> 'value' ->> 'from',       -- from_account
+    __operation_body -> 'value' ->> 'to',         -- to_account
+    __pair_id,                                    -- transfer_id
+    NULL,                                         -- nai         not included in fail operation
+    NULL,                                         -- amount      not included in fail operation
+    __con_failures,                               -- consecutive_failures
+    __rem_exec,                                   -- remaining_executions
+    NULL,                                         -- recurrence  not included in fail operation
+    NULL,                                         -- memo        not included in fail operation
+    __del_transfer                                -- delete_transfer
+  );
+
+  RETURN __return;
 END
 $$;
-
-
 
 RESET ROLE;
