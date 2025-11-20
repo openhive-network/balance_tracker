@@ -4,7 +4,7 @@
 
 ***balance***
 blocktrades: {
-    "hbd_balance": 77255982
+    "hbd_balance": 77255992
     "hive_balance": 29594875
     "vesting_shares": "8172549681957451",
     "delayed_vests": "0"
@@ -30,7 +30,7 @@ fill_vesting_withdraw_operation(to_account:`blocktrades`, deposited:`9000`, with
 
 ***balance***
 blocktrades: {
-    "hbd_balance": 77255982
+    "hbd_balance": 77255992
     "hive_balance": 29593875
     "vesting_shares": "8182549681957451",
     "delayed_vests": "10000000000000"

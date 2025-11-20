@@ -75,14 +75,21 @@ recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`, nai:`13`, a
 ***block 90000024***
 fill_recurrent_transfer_operation(from_account:`gtg`, to_account:`steem`)
 
+8.Create second recurrent transfer on the same receiver (pair_id = 1) ------------------------------------------------------------------------
+***block 90000047***
+recurrent_transfer_operation(from_account:`gtg`, to_account:`blocktrades`, nai:`13`, amount:`10`, recurrence:`24`, executions:`10`, pair_id = `1`)
+
+***block 90000048***
+fill_recurrent_transfer_operation(from_account:`gtg`, to_account:`blocktrades`, pair_id = `1`)
+
 ***balance***
 blocktrades: {
-    "hbd_balance": 77255982
+    "hbd_balance": 77255992
     "hive_balance": 29594875
     "vesting_shares": "8172549681957451"
 }
 gtg: {
-    "hbd_balance": 22464
+    "hbd_balance": 22454
     "hive_balance": 0,
     "vesting_shares": "17579100476774"
 }
