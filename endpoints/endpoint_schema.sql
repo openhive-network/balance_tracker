@@ -637,6 +637,27 @@ declare
           }
         }
       },
+      "btracker_backend.total_value_locked": {
+        "type": "object",
+        "properties": {
+          "block_num": {
+            "type": "integer",
+            "description": "Head block number at which the snapshot was computed"
+          },
+          "total_vests": {
+            "type": "string",
+            "description": "Global sum of VESTS"
+          },
+          "savings_hive": {
+            "type": "string",
+            "description": "Total number of HIVE in savings"
+          },
+          "savings_hbd": {
+            "type": "string",
+            "description": "Total number of HIVE backed dollars the chain has in savings"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
@@ -1113,7 +1134,7 @@ declare
           "Transfers"
         ],
         "summary": "Aggregated transfer statistics",
-        "description": "History of amount of transfers per hour, day, month or year.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_transfer_statistics(''HBD'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/transfer-statistics''`\n",
+        "description": "History of amount of transfers per hour, day, month or year.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_transfer_statistics(''HBD'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/transfer-statistics?coin-type=HBD''`\n",
         "operationId": "btracker_endpoints.get_transfer_statistics",
         "parameters": [
           {
@@ -1189,7 +1210,7 @@ declare
             }
           },
           "404": {
-            "description": "No such account in the database"
+            "description": "No transfer statistics found for the given parameters"
           }
         }
       }
@@ -1242,6 +1263,37 @@ declare
           },
           "404": {
             "description": "No blocks synced"
+          }
+        }
+      }
+    },
+    "/total-value-locked": {
+      "get": {
+        "tags": [
+          "Other"
+        ],
+        "summary": "Returns Total Value Locked (VESTS + HIVE savings + HBD savings)",
+        "description": "Computes the chain totals of VESTS, HIVE savings, and HBD savings at the last-synced block.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_total_value_locked();`\n\nREST call example\n* `GET \"https://%1$s/balance-api/total-value-locked\"`\n",
+        "operationId": "btracker_endpoints.get_total_value_locked",
+        "responses": {
+          "200": {
+            "description": "TVL snapshot (block height is the app\u2019s last-synced block)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.total_value_locked"
+                },
+                "example": {
+                  "block_num": 50000000,
+                  "total_vests": "448144916705468383",
+                  "savings_hive": "0",
+                  "savings_hbd": "0"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App last-synced block is undefined (TVL cannot be computed)"
           }
         }
       }

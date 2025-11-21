@@ -23,6 +23,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/types/recurrent_transfers.sql
 ../$endpoints/types/transfer_stats.sql
 ../$endpoints/types/ranked_holder.sql
+../$endpoints/types/total_value_locked.sql
 ../$endpoints/account-balances/get_account_balances.sql
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
@@ -31,7 +32,8 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/account-balances/get_top_holders.sql
 ../$endpoints/transfers/get_transfer_statistics.sql
 ../$endpoints/other/get_btracker_version.sql
-../$endpoints/other/get_btracker_last_synced_block.sql"
+../$endpoints/other/get_btracker_last_synced_block.sql
+../$endpoints/other/get_total_value_locked.sql"
 
 
 # Function to reverse the lines
