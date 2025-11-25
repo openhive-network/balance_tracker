@@ -35,8 +35,6 @@ BEGIN
             e.order_id,
             e.nai,
             e.amount,
-            e.kind,
-            e.side,
             o.op_id,
             o.block_num,
             o.op_type_id
