@@ -46,7 +46,7 @@ BEGIN
             o.block_num,
             o.body
         FROM ops_in_range o
-        CROSS JOIN LATERAL btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
+        CROSS JOIN btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
     ),
     creates AS (
         SELECT
