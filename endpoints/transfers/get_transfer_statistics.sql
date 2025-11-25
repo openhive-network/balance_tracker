@@ -130,7 +130,7 @@ AS
 $$
 DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
-  _coin_type INT                 := btracker_backend.get_nai_type("coin-type"::btracker_backend.liquid_nai_type);
+  _coin_type INT                 := btracker_backend.get_nai_type("coin-type"::btracker_backend.nai_type);
 BEGIN
   IF _block_range.first_block IS NOT NULL THEN
     PERFORM btracker_backend.validate_negative_limit(_block_range.first_block, 'from-block');
