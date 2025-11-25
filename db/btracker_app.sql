@@ -24,10 +24,7 @@ BEGIN
      _stages => synchronization_stages
   );
 
-
-
 RAISE NOTICE 'Attempting to create an application schema tables...';
-
 -- Indicates whether the application should continue processing blocks
 -- stopped using stopProcessing() function
 CREATE TABLE IF NOT EXISTS btracker_app_status (continue_processing BOOLEAN NOT NULL);
@@ -36,8 +33,24 @@ INSERT INTO btracker_app_status (continue_processing) VALUES (True);
 -- version table
 CREATE TABLE IF NOT EXISTS version(git_hash TEXT);
 INSERT INTO version VALUES('unspecified (generate and apply set_version_in_sql.pgsql)');
---ACCOUNT BALANCES
 
+-- table of supported assets (HIVE, HBD, VESTS)
+CREATE TABLE IF NOT EXISTS asset_table
+(
+  asset_symbol_nai SMALLINT NOT NULL, -- Type of asset symbol used in the operation
+  asset_precision  INT      NOT NULL, -- Precision of assets
+  nai_string       TEXT     NOT NULL, -- NAI string representation
+  asset_name       TEXT     NOT NULL, -- readable asset name (e.g., HIVE, HBD)
+
+  CONSTRAINT pk_asset_table PRIMARY KEY (asset_symbol_nai),
+  CONSTRAINT uq_asset_table_nai_string UNIQUE (nai_string),
+  CONSTRAINT uq_asset_table_asset_name UNIQUE (asset_name)
+);
+--- Prepopulate asset table with HIVE, HBD and VESTS
+INSERT INTO asset_table(asset_symbol_nai, asset_precision, nai_string, asset_name)
+VALUES (13,3,'@@000000013','HBD'),(21,3,'@@000000021','HIVE'),(37,6,'@@000000037','VESTS');
+
+--ACCOUNT BALANCES
 CREATE TABLE IF NOT EXISTS current_account_balances
 (
   account INT NOT NULL, -- Balance owner account
