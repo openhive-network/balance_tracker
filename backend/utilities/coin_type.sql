@@ -10,14 +10,4 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_liquid_nai_type(_nai btracker_backend.liquid_nai_type)
-RETURNS INT IMMUTABLE
-LANGUAGE 'plpgsql'
-AS
-$$
-BEGIN
-  RETURN (CASE WHEN _nai = 'HBD' THEN 13 ELSE 21 END);
-END
-$$;
-
 RESET ROLE;
