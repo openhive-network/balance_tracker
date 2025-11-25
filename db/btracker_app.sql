@@ -646,9 +646,6 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
-
-  CREATE INDEX IF NOT EXISTS order_state_owner_nai_idx ON order_state(owner_id, order_id);
-  CREATE INDEX IF NOT EXISTS convert_state_owner_nai_idx ON convert_state(owner_id, request_id, nai);
 END
 $$;
 
