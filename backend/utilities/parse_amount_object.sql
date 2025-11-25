@@ -17,17 +17,17 @@ DECLARE
   __nai        hafd.asset_symbol;
   __asset_info hive.asset_symbol_info;
 
-  __result     hive.asset;
+  __result     btracker_backend.asset;
 BEGIN
   __nai := hive.asset_symbol_from_nai_string(
-    __amount_object ->> 'nai',
-    __amount_object ->> 'precision'
+    (__amount_object ->> 'nai'),
+    (__amount_object ->> 'precision')::SMALLINT
   );
 
   __asset_info := hive.decode_asset_symbol(__nai);
 
   __result := (
-    __amount_object->>'amount'::BIGINT,
+    __amount_object->>'amount',
     __asset_info.precision,
     __asset_info.nai
   );
