@@ -28,22 +28,13 @@ BEGIN
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 
-CREATE TABLE IF NOT EXISTS btracker_app_status
-(
-  continue_processing BOOLEAN NOT NULL,
-  is_indexes_created BOOLEAN NOT NULL
-);
+-- Indicates whether the application should continue processing blocks
+-- stopped using stopProcessing() function
+CREATE TABLE IF NOT EXISTS btracker_app_status (continue_processing BOOLEAN NOT NULL);
+INSERT INTO btracker_app_status (continue_processing) VALUES (True);
 
-INSERT INTO btracker_app_status
-(continue_processing, is_indexes_created)
-VALUES
-(True, False)
-;
-
-CREATE TABLE IF NOT EXISTS version(
-  git_hash TEXT
-);
-
+-- version table
+CREATE TABLE IF NOT EXISTS version(git_hash TEXT);
 INSERT INTO version VALUES('unspecified (generate and apply set_version_in_sql.pgsql)');
 --ACCOUNT BALANCES
 
