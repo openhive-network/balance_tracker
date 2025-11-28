@@ -3,9 +3,9 @@ SET ROLE btracker_owner;
 DROP TYPE IF EXISTS btracker_backend.asset CASCADE;
 CREATE TYPE btracker_backend.asset AS
 (
-  amount           BIGINT, -- Amount of asset
-  asset_precision  INT,    -- Precision of assets
-  asset_symbol_nai INT     -- Type of asset symbol used in the operation
+    amount           BIGINT, -- Amount of asset
+    asset_precision  INT,    -- Precision of assets
+    asset_symbol_nai INT     -- Type of asset symbol used in the operation
 );
 
 CREATE OR REPLACE FUNCTION btracker_backend.parse_amount_object(__amount_object JSONB)
