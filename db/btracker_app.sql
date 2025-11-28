@@ -356,14 +356,27 @@ BEGIN
   (
     from_id        INT      NOT NULL, -- hive.accounts_view.id
     escrow_id      BIGINT   NOT NULL, -- unique per "from"
-    to_id          INT      NOT NULL, -- hive.accounts_view.id
-    nai            SMALLINT NOT NULL, -- 13=HBD, 21=HIVE
-    remaining      BIGINT   NOT NULL, -- satoshis (×1000)
+    hive_nai       SMALLINT NOT NULL, -- 13=HBD, 21=HIVE
+    hive_amount    BIGINT   NOT NULL, -- satoshis (×1000)
+    hbd_nai        SMALLINT NOT NULL, -- 13=HBD, 21=HIVE
+    hbd_amount     BIGINT   NOT NULL, -- satoshis (×1000
     source_op      BIGINT   NOT NULL, -- last operation affecting escrow
 
-    CONSTRAINT pk_escrow_state PRIMARY KEY (from_id, escrow_id, nai)
+    CONSTRAINT pk_escrow_state PRIMARY KEY (from_id, escrow_id)
   );
   PERFORM hive.app_register_table(__schema_name, 'escrow_state', __schema_name);
+
+  CREATE TABLE IF NOT EXISTS escrow_fees
+  (
+    from_id        INT      NOT NULL, -- hive.accounts_view.id
+    escrow_id      BIGINT   NOT NULL, -- unique per "from"
+    nai            SMALLINT NOT NULL, -- 13=HBD, 21=HIVE
+    fee_amount     BIGINT   NOT NULL, -- satoshis (×1000)
+
+    CONSTRAINT pk_escrow_fee PRIMARY KEY (from_id, escrow_id)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'escrow_fees', __schema_name);
+
 
 END
 $$;

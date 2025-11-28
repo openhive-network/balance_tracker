@@ -132,14 +132,14 @@ savings_pivot AS (
   WHERE tsi.account = _account_id
 ),
 
-    -- 13) Escrows (INCOMING: you are the beneficiary)
-  escrow_pivot AS (
-    SELECT
-      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 13), 0)::BIGINT AS escrow_pending_amount_hbd,
-      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 21), 0)::BIGINT AS escrow_pending_amount_hive,
-      COUNT(*)::INT AS escrow_pending_count
-    FROM escrow_state es
-    WHERE es.from_id = _account_id
+-- 13) Escrows (INCOMING: you are the beneficiary)
+escrow_pivot AS (
+  SELECT
+    COALESCE(SUM(es.hbd_amount ), 0)::BIGINT AS escrow_pending_amount_hbd,
+    COALESCE(SUM(es.hive_amount), 0)::BIGINT AS escrow_pending_amount_hive,
+    COUNT(*)::INT AS escrow_pending_count
+  FROM escrow_state es
+  WHERE es.from_id = _account_id
 )
 
 
@@ -176,9 +176,9 @@ savings_pivot AS (
     oo.open_orders_hbd_amount,
     sp.savings_pending_amount_hbd,
     sp.savings_pending_amount_hive,
-    ep.escrow_pending_amount_hbd,      
-    ep.escrow_pending_amount_hive,     
-    ep.escrow_pending_count           
+    ep.escrow_pending_amount_hbd,
+    ep.escrow_pending_amount_hive,
+    ep.escrow_pending_count
 
   INTO result_row
   FROM get_balances     gb
