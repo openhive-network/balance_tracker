@@ -388,7 +388,9 @@ BEGIN
     INSERT INTO escrow_state (
       from_id,
       escrow_id,
+      hive_nai,
       hive_amount,
+      hbd_nai,
       hbd_amount,
       source_op
     )
