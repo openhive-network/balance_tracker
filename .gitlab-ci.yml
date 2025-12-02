@@ -78,6 +78,7 @@ prepare_haf_image:
   tags:
   - public-runner-docker
   - hived-for-tests
+  - hived
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
