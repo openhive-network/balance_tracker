@@ -15,6 +15,11 @@ variables:
   GIT_SUBMODULE_UPDATE_FLAGS: --jobs 4
   # HAF configuration
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
+  # NFS cache configuration for sync data sharing across builders
+  CACHE_NFS_PATH: "/nfs/ci-cache"
+  SYNC_CACHE_KEY: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
+  SYNC_CACHE_KEY_MOCK: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}_mock"
+  SYNC_CACHE_TYPE: "haf_sync"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
   # uses registry.gitlab.syncad.com/hive/haf/ci-base-image:ubuntu24.04-10
@@ -270,19 +275,30 @@ sync:
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log" "${DATADIR}/blockchain/block_log"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts" "${DATADIR}/blockchain/block_log.artifacts"
 
-    mkdir -p "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
-    sudo cp -a "${DATADIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
-    sudo cp -a "${SHM_DIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
+    # Save sync data to local cache with commit-based key (not pipeline ID)
+    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    mkdir -p "${LOCAL_SYNC_CACHE}"
+    sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE}"
+    sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE}"
 
     ls -lah "${DATADIR}"
     ls -lah "${DATADIR}/blockchain"
 
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/datadir"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/datadir/blockchain"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}/shm_dir"
+    ls -lah "${LOCAL_SYNC_CACHE}"
+    ls -lah "${LOCAL_SYNC_CACHE}/datadir" || true
+    ls -lah "${LOCAL_SYNC_CACHE}/datadir/blockchain" || true
+    ls -lah "${LOCAL_SYNC_CACHE}/shm_dir" || true
 
-    # Manually remove the copy of the repaly data to preserve disk space on the replay server
+    # Push sync data to NFS cache for sharing across builders
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    if [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Pushing sync data to NFS cache: ${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
+      "$CACHE_MANAGER" put "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}" || echo "Warning: Failed to push to NFS cache"
+    else
+      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+    fi
+
+    # Manually remove the copy of the replay data to preserve disk space on the replay server
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
 
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
@@ -309,7 +325,7 @@ sync_with_mock_data:
   - job: docker-ci-runner-build
     artifacts: true
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
@@ -328,6 +344,34 @@ sync_with_mock_data:
     git config --global --add safe.directory "$CI_PROJECT_DIR"
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
+
+    # Ensure sync data is available locally (fetch from NFS if needed)
+    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
+      echo "Local sync cache found at ${LOCAL_SYNC_CACHE}"
+    else
+      echo "Local sync cache not found, checking NFS..."
+      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+      NFS_CACHE_PATH="${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
+      if [[ -x "$CACHE_MANAGER" ]]; then
+        if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
+          echo "Fetched sync data from NFS cache via cache-manager"
+        else
+          echo "ERROR: Failed to fetch sync data from NFS cache"
+          exit 1
+        fi
+      elif [[ -d "$NFS_CACHE_PATH" ]]; then
+        echo "Using direct NFS copy (cache-manager not available)"
+        mkdir -p "${LOCAL_SYNC_CACHE}"
+        cp -a "${NFS_CACHE_PATH}"/* "${LOCAL_SYNC_CACHE}/" || rsync -a "${NFS_CACHE_PATH}/" "${LOCAL_SYNC_CACHE}/"
+        echo "Fetched sync data from NFS cache via direct copy"
+      else
+        echo "ERROR: No sync data available locally or on NFS"
+        echo "  Local path checked: ${LOCAL_SYNC_CACHE}"
+        echo "  NFS path checked: ${NFS_CACHE_PATH}"
+        exit 1
+      fi
+    fi
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
@@ -363,19 +407,30 @@ sync_with_mock_data:
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log" "${DATADIR}/blockchain/block_log"
     cp -a "${CI_PROJECT_DIR}/docker/blockchain/block_log.artifacts" "${DATADIR}/blockchain/block_log.artifacts"
 
-    mkdir -p "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
-    sudo cp -a "${DATADIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
-    sudo cp -a "${SHM_DIR}" "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
+    # Save mock sync data to local cache with commit-based key
+    LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
+    mkdir -p "${LOCAL_SYNC_CACHE_MOCK}"
+    sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE_MOCK}"
+    sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE_MOCK}"
 
     ls -lah "${DATADIR}"
     ls -lah "${DATADIR}/blockchain"
 
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/datadir"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/datadir/blockchain"
-    ls -lah "${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock/shm_dir"
+    ls -lah "${LOCAL_SYNC_CACHE_MOCK}"
+    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/datadir" || true
+    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/datadir/blockchain" || true
+    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/shm_dir" || true
 
-    # Manually remove the copy of the repaly data to preserve disk space on the replay server
+    # Push mock sync data to NFS cache for sharing across builders
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    if [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Pushing mock sync data to NFS cache: ${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}"
+      "$CACHE_MANAGER" put "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY_MOCK}" "${LOCAL_SYNC_CACHE_MOCK}" || echo "Warning: Failed to push to NFS cache"
+    else
+      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+    fi
+
+    # Manually remove the copy of the replay data to preserve disk space on the replay server
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
 
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
@@ -387,6 +442,58 @@ sync_with_mock_data:
   tags:
   - data-cache-storage
   - fast
+
+# Ensure sync data is available locally (fetch from NFS if needed)
+.ensure-sync-data: &ensure-sync-data
+- |
+  LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+  if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
+    echo "Local sync cache found at ${LOCAL_SYNC_CACHE}"
+  else
+    echo "Local sync cache not found, checking NFS..."
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    if [[ -x "$CACHE_MANAGER" ]]; then
+      if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
+        echo "Fetched sync data from NFS cache"
+      else
+        echo "ERROR: Failed to fetch sync data from NFS cache"
+        exit 1
+      fi
+    else
+      echo "ERROR: cache-manager.sh not found and local cache missing"
+      exit 1
+    fi
+  fi
+
+# Ensure mock sync data is available locally (fetch from NFS if needed)
+.ensure-sync-data-mock: &ensure-sync-data-mock
+- |
+  LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
+  if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
+    echo "Local mock sync cache found at ${LOCAL_SYNC_CACHE}"
+  else
+    echo "Local mock sync cache not found, checking NFS..."
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    NFS_CACHE_PATH="${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}"
+    if [[ -x "$CACHE_MANAGER" ]]; then
+      if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY_MOCK}" "${LOCAL_SYNC_CACHE}"; then
+        echo "Fetched mock sync data from NFS cache via cache-manager"
+      else
+        echo "ERROR: Failed to fetch mock sync data from NFS cache"
+        exit 1
+      fi
+    elif [[ -d "$NFS_CACHE_PATH" ]]; then
+      echo "Using direct NFS copy (cache-manager not available)"
+      mkdir -p "${LOCAL_SYNC_CACHE}"
+      cp -a "${NFS_CACHE_PATH}"/* "${LOCAL_SYNC_CACHE}/" || rsync -a "${NFS_CACHE_PATH}/" "${LOCAL_SYNC_CACHE}/"
+      echo "Fetched mock sync data from NFS cache via direct copy"
+    else
+      echo "ERROR: No mock sync data available locally or on NFS"
+      echo "  Local path checked: ${LOCAL_SYNC_CACHE}"
+      echo "  NFS path checked: ${NFS_CACHE_PATH}"
+      exit 1
+    fi
+  fi
 
 .hfm-only-service: &hfm-only-service
   name: $HAF_IMAGE_NAME
@@ -429,7 +536,8 @@ regression-test:
   services:
   - *hfm-only-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+  before_script: *ensure-sync-data
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -459,7 +567,8 @@ setup-scripts-test:
   services:
   - *hfm-only-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+  before_script: *ensure-sync-data
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -486,7 +595,8 @@ performance-test:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+  before_script: *ensure-sync-data
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -523,13 +633,14 @@ pattern-test:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
     BTRACKER_ADDRESS: postgrest-server
     BTRACKER_PORT: 3000
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
+  before_script: *ensure-sync-data
   script:
   - |
     cd $CI_PROJECT_DIR/tests/tavern
@@ -555,13 +666,14 @@ pattern-test-with-mock-data:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}_${CI_PIPELINE_ID}_mock
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
     BTRACKER_ADDRESS: postgrest-server
     BTRACKER_PORT: 3000
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern_mocks
+  before_script: *ensure-sync-data-mock
   script:
   - |
     cd $CI_PROJECT_DIR/tests/tavern_mocks
