@@ -536,8 +536,8 @@ regression-test:
   services:
   - *hfm-only-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
-  before_script: *ensure-sync-data
+    # Use NFS path directly - services start before script, so data must already exist
+    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -567,8 +567,8 @@ setup-scripts-test:
   services:
   - *hfm-only-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
-  before_script: *ensure-sync-data
+    # Use NFS path directly - services start before script, so data must already exist
+    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -595,8 +595,8 @@ performance-test:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
-  before_script: *ensure-sync-data
+    # Use NFS path directly - services start before script, so data must already exist
+    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -633,7 +633,8 @@ pattern-test:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+    # Use NFS path directly - services start before script, so data must already exist
+    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
@@ -642,7 +643,6 @@ pattern-test:
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
   # Note: Don't override before_script - template's poetry install runs pytest setup
   script:
-  - *ensure-sync-data
   - |
     cd $CI_PROJECT_DIR/tests/tavern
     pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
@@ -667,7 +667,8 @@ pattern-test-with-mock-data:
   - *hfm-only-service
   - *postgrest-service
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}
+    # Use NFS path directly - services start before script, so data must already exist
+    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
@@ -676,7 +677,6 @@ pattern-test-with-mock-data:
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern_mocks
   # Note: Don't override before_script - template's poetry install runs pytest setup
   script:
-  - *ensure-sync-data-mock
   - |
     cd $CI_PROJECT_DIR/tests/tavern_mocks
     pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
