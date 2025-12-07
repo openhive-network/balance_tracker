@@ -24,7 +24,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 68a06608fe308afc05c994b8e1c16564d34e8fac   # feature/nfs-cache-manager (pending merge to develop)
+  ref: e46ca9526605b452c24558a4180792634e52255d   # develop (with NFS cache-manager)
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
