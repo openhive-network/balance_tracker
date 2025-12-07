@@ -16,7 +16,7 @@ variables:
   # HAF configuration
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   # NFS cache configuration for sync data sharing across builders
-  CACHE_NFS_PATH: "/nfs/ci-cache"
+  DATA_CACHE_NFS_PREFIX: "/nfs/ci-cache"
   SYNC_CACHE_KEY: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
   SYNC_CACHE_KEY_MOCK: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}_mock"
   SYNC_CACHE_TYPE: "haf_sync"
@@ -25,11 +25,14 @@ variables:
   # uses registry.gitlab.syncad.com/hive/haf/ci-base-image:ubuntu24.04-10
   BUILDER_IMAGE_TAG: "$TEST_HAF_IMAGE_TAG"
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
+  # HAF submodule commit - must match the 'ref:' in the include section below
+  # This is needed for service containers which can't access dotenv artifacts
+  HAF_COMMIT: "e46ca9526605b452c24558a4180792634e52255d"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 8e6a5b9804f218159598a5684ba0d7350d291e1c   # Use 1G shared-file-size for 5M block replays
+  ref: e46ca9526605b452c24558a4180792634e52255d   # Must match HAF_COMMIT variable above
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -70,6 +73,40 @@ lint_sql_scripts:
   artifacts:
     paths:
     - sql-lint.yaml
+
+validate_haf_commit:
+  stage: build
+  image: alpine:latest
+  script:
+  - |
+    # Validate that HAF_COMMIT variable matches both the submodule and include ref
+    # This prevents cache misses due to mismatched commits
+    SUBMODULE_COMMIT=$(cat .git/modules/haf/HEAD 2>/dev/null || git -C haf rev-parse HEAD)
+    INCLUDE_REF=$(grep -A2 "project:.*hive/haf" .gitlab-ci.yml | grep "ref:" | head -1 | sed 's/.*ref: *\([a-f0-9]*\).*/\1/')
+
+    echo "HAF_COMMIT variable: $HAF_COMMIT"
+    echo "HAF submodule HEAD:  $SUBMODULE_COMMIT"
+    echo "Include ref:         $INCLUDE_REF"
+
+    ERRORS=0
+    if [ "$HAF_COMMIT" != "$SUBMODULE_COMMIT" ]; then
+      echo "ERROR: HAF_COMMIT variable does not match submodule commit!"
+      echo "       Update HAF_COMMIT in .gitlab-ci.yml to: $SUBMODULE_COMMIT"
+      ERRORS=1
+    fi
+    if [ "$HAF_COMMIT" != "$INCLUDE_REF" ]; then
+      echo "ERROR: HAF_COMMIT variable does not match include ref!"
+      echo "       Both should be: $HAF_COMMIT"
+      ERRORS=1
+    fi
+    if [ $ERRORS -eq 1 ]; then
+      echo ""
+      echo "To fix: ensure HAF_COMMIT, include ref, and submodule all use the same commit"
+      exit 1
+    fi
+    echo "All HAF commit references are consistent"
+  tags:
+  - public-runner-docker
 
 prepare_haf_image:
   stage: build
@@ -372,7 +409,7 @@ sync_with_mock_data:
     else
       echo "Local sync cache not found, checking NFS..."
       CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-      NFS_CACHE_PATH="${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
+      NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
       if [[ -x "$CACHE_MANAGER" ]]; then
         if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
           echo "Fetched sync data from NFS cache via cache-manager"
@@ -463,69 +500,103 @@ sync_with_mock_data:
   - data-cache-storage
   - fast
 
-# Ensure sync data is available locally (fetch from NFS if needed)
-.ensure-sync-data: &ensure-sync-data
-- |
-  LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
-  if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
-    echo "Local sync cache found at ${LOCAL_SYNC_CACHE}"
-  else
-    echo "Local sync cache not found, checking NFS..."
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
-        echo "Fetched sync data from NFS cache"
-      else
-        echo "ERROR: Failed to fetch sync data from NFS cache"
-        exit 1
-      fi
-    else
-      echo "ERROR: cache-manager.sh not found and local cache missing"
-      exit 1
-    fi
-  fi
-
-# Ensure mock sync data is available locally (fetch from NFS if needed)
-.ensure-sync-data-mock: &ensure-sync-data-mock
-- |
-  LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
-  if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
-    echo "Local mock sync cache found at ${LOCAL_SYNC_CACHE}"
-  else
-    echo "Local mock sync cache not found, checking NFS..."
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    NFS_CACHE_PATH="${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY_MOCK}" "${LOCAL_SYNC_CACHE}"; then
-        echo "Fetched mock sync data from NFS cache via cache-manager"
-      else
-        echo "ERROR: Failed to fetch mock sync data from NFS cache"
-        exit 1
-      fi
-    elif [[ -d "$NFS_CACHE_PATH" ]]; then
-      echo "Using direct NFS copy (cache-manager not available)"
-      mkdir -p "${LOCAL_SYNC_CACHE}"
-      cp -a "${NFS_CACHE_PATH}"/* "${LOCAL_SYNC_CACHE}/" || rsync -a "${NFS_CACHE_PATH}/" "${LOCAL_SYNC_CACHE}/"
-      echo "Fetched mock sync data from NFS cache via direct copy"
-    else
-      echo "ERROR: No mock sync data available locally or on NFS"
-      echo "  Local path checked: ${LOCAL_SYNC_CACHE}"
-      echo "  NFS path checked: ${NFS_CACHE_PATH}"
-      exit 1
-    fi
-  fi
-
-.hfm-only-service: &hfm-only-service
-  name: $HAF_IMAGE_NAME
-  alias: hfm-only-instance
+# HAF instance with NFS fallback for sync data
+# Services start before before_script, so we need fallback logic in the entrypoint
+.haf-instance-with-nfs-fallback: &haf-instance-with-nfs-fallback
+  name: ${HAF_IMAGE_NAME}
+  alias: haf-instance
   variables:
-    PGCTLTIMEOUT: 600 # give PostgreSQL more time to start if GitLab shut it down improperly after the sync job
+    PGCTLTIMEOUT: 600
     PG_ACCESS: |
       "host    all              haf_admin        0.0.0.0/0    trust"
       "host    all              hived            0.0.0.0/0    trust"
       "host    all              btracker_user       0.0.0.0/0    trust"
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
+    DATA_SOURCE: "${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
+    DATA_SOURCE_NFS_TYPE: "${SYNC_CACHE_TYPE}"
+    DATA_SOURCE_NFS_KEY: "${SYNC_CACHE_KEY}"
+  entrypoint:
+    - '/bin/bash'
+    - '-c'
+    - |
+      set -xeuo pipefail
+      echo "Checking data source availability..."
+      ORIGINAL_SOURCE="${DATA_SOURCE}"
+      NFS_PREFIX="${DATA_SOURCE_NFS_PREFIX:-/nfs/ci-cache}"
+      NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
+      NFS_KEY="${DATA_SOURCE_NFS_KEY}"
+
+      # If original path doesn't exist, try NFS fallback
+      if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
+        echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
+        NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
+
+        if [[ -d "${NFS_PATH}/datadir" ]]; then
+          echo "Found data on NFS: $NFS_PATH"
+          export DATA_SOURCE="$NFS_PATH"
+        else
+          echo "WARNING: Data not found in local or NFS cache"
+          echo "Checked: ${ORIGINAL_SOURCE}/datadir"
+          echo "Checked: ${NFS_PATH}/datadir"
+        fi
+      else
+        echo "Using local cache: ${ORIGINAL_SOURCE}"
+      fi
+
+      # Run original entrypoint
+      exec /home/haf_admin/docker_entrypoint.sh "$@"
+    - '/bin/bash'
+  command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
+
+# HAF instance with NFS fallback for mock sync data
+.haf-instance-with-nfs-fallback-mock: &haf-instance-with-nfs-fallback-mock
+  name: ${HAF_IMAGE_NAME}
+  alias: haf-instance
+  variables:
+    PGCTLTIMEOUT: 600
+    PG_ACCESS: |
+      "host    all              haf_admin        0.0.0.0/0    trust"
+      "host    all              hived            0.0.0.0/0    trust"
+      "host    all              btracker_user       0.0.0.0/0    trust"
+      "host    all              btracker_owner      0.0.0.0/0    trust"
+      "host    all              all              0.0.0.0/0    scram-sha-256"
+    DATA_SOURCE: "${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
+    DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
+    DATA_SOURCE_NFS_TYPE: "${SYNC_CACHE_TYPE}"
+    DATA_SOURCE_NFS_KEY: "${SYNC_CACHE_KEY_MOCK}"
+  entrypoint:
+    - '/bin/bash'
+    - '-c'
+    - |
+      set -xeuo pipefail
+      echo "Checking data source availability..."
+      ORIGINAL_SOURCE="${DATA_SOURCE}"
+      NFS_PREFIX="${DATA_SOURCE_NFS_PREFIX:-/nfs/ci-cache}"
+      NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
+      NFS_KEY="${DATA_SOURCE_NFS_KEY}"
+
+      # If original path doesn't exist, try NFS fallback
+      if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
+        echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
+        NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
+
+        if [[ -d "${NFS_PATH}/datadir" ]]; then
+          echo "Found data on NFS: $NFS_PATH"
+          export DATA_SOURCE="$NFS_PATH"
+        else
+          echo "WARNING: Data not found in local or NFS cache"
+          echo "Checked: ${ORIGINAL_SOURCE}/datadir"
+          echo "Checked: ${NFS_PATH}/datadir"
+        fi
+      else
+        echo "Using local cache: ${ORIGINAL_SOURCE}"
+      fi
+
+      # Run original entrypoint
+      exec /home/haf_admin/docker_entrypoint.sh "$@"
+    - '/bin/bash'
   command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
 
 .postgrest-service: &postgrest-service
@@ -534,8 +605,8 @@ sync_with_mock_data:
   variables:
     PGRST_ADMIN_SERVER_PORT: 3001
     PGRST_SERVER_PORT: 3000
-    # Pointing to the PostgreSQL service running in hfm-only-instance
-    PGRST_DB_URI: postgresql://haf_admin@hfm-only-instance:5432/haf_block_log
+    # Pointing to the PostgreSQL service running in haf-instance
+    PGRST_DB_URI: postgresql://haf_admin@haf-instance:5432/haf_block_log
     PGRST_DB_SCHEMA: btracker_endpoints
     PGRST_DB_ANON_ROLE: btracker_user
     PGRST_DB_POOL: 20
@@ -554,16 +625,13 @@ regression-test:
   - job: prepare_haf_image
     artifacts: true
   services:
-  - *hfm-only-service
-  variables:
-    # Use NFS path directly - services start before script, so data must already exist
-    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
+  - *haf-instance-with-nfs-fallback
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
     cd tests/account_balances
-    ./accounts_dump_test.sh --host=hfm-only-instance
+    ./accounts_dump_test.sh --host=haf-instance
 
     echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
@@ -585,16 +653,13 @@ setup-scripts-test:
   - job: prepare_haf_image
     artifacts: true
   services:
-  - *hfm-only-service
-  variables:
-    # Use NFS path directly - services start before script, so data must already exist
-    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
+  - *haf-instance-with-nfs-fallback
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
     cd tests/functional
-    ./test_scripts.sh --host=hfm-only-instance
+    ./test_scripts.sh --host=haf-instance
 
     echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   tags:
@@ -612,16 +677,13 @@ performance-test:
   - job: prepare_haf_image
     artifacts: true
   services:
-  - *hfm-only-service
+  - *haf-instance-with-nfs-fallback
   - *postgrest-service
-  variables:
-    # Use NFS path directly - services start before script, so data must already exist
-    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
-    timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=postgrest-server --postgres-host=hfm-only-instance
+    timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=postgrest-server --postgres-host=haf-instance
     tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
     cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
     m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
@@ -650,18 +712,15 @@ pattern-test:
   - job: prepare_haf_image
     artifacts: true
   services:
-  - *hfm-only-service
+  - *haf-instance-with-nfs-fallback
   - *postgrest-service
   variables:
-    # Use NFS path directly - services start before script, so data must already exist
-    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
     BTRACKER_ADDRESS: postgrest-server
     BTRACKER_PORT: 3000
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
-  # Note: Don't override before_script - template's poetry install runs pytest setup
   script:
   - |
     cd $CI_PROJECT_DIR/tests/tavern
@@ -684,18 +743,15 @@ pattern-test-with-mock-data:
   - job: prepare_haf_image
     artifacts: true
   services:
-  - *hfm-only-service
+  - *haf-instance-with-nfs-fallback-mock
   - *postgrest-service
   variables:
-    # Use NFS path directly - services start before script, so data must already exist
-    DATA_SOURCE: ${CACHE_NFS_PATH}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
     POETRY_INSTALL_ROOT_DIR: $CI_PROJECT_DIR/haf/hive/tests/python/hive-local-tools
     BTRACKER_ADDRESS: postgrest-server
     BTRACKER_PORT: 3000
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern_mocks
-  # Note: Don't override before_script - template's poetry install runs pytest setup
   script:
   - |
     cd $CI_PROJECT_DIR/tests/tavern_mocks
