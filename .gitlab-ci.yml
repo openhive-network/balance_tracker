@@ -29,7 +29,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 1e8fe7b1f587bac68f3184fc82afcefcf03834df   # fix/cache-manager-busybox-flock (MR #718)
+  ref: 8e6a5b9804f218159598a5684ba0d7350d291e1c   # Use 1G shared-file-size for 5M block replays
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -239,6 +239,26 @@ sync:
     git config --global --add safe.directory "$CI_PROJECT_DIR"
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
+  - |
+    # Ensure HAF replay data is available locally (fetch from NFS if needed)
+    LOCAL_HAF_CACHE="${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}"
+    if [[ -d "${LOCAL_HAF_CACHE}/datadir" ]]; then
+      echo "Local HAF cache found at ${LOCAL_HAF_CACHE}"
+    else
+      echo "Local HAF cache not found, checking NFS..."
+      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+      if [[ -x "$CACHE_MANAGER" ]]; then
+        if "$CACHE_MANAGER" get haf "${HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
+          echo "Fetched HAF replay data from NFS cache"
+        else
+          echo "ERROR: Failed to fetch HAF replay data from NFS cache"
+          exit 1
+        fi
+      else
+        echo "ERROR: cache-manager.sh not found and local cache missing"
+        exit 1
+      fi
+    fi
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
