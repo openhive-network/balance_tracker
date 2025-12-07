@@ -29,7 +29,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: e46ca9526605b452c24558a4180792634e52255d   # develop (with NFS cache-manager)
+  ref: 1e8fe7b1f587bac68f3184fc82afcefcf03834df   # fix/cache-manager-busybox-flock (MR #718)
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
