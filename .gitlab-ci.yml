@@ -264,7 +264,7 @@ sync:
     HAF_SHM_DIRECTORY: ${SHM_DIR}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
-    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/dev.yml
+    COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/ci.yml
       --ansi never
   timeout: 1 hours
   before_script:
@@ -384,7 +384,7 @@ sync_with_mock_data:
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
-      overrides/dev.yml --ansi never
+      overrides/ci.yml --ansi never
   timeout: 1 hours
   before_script:
   - |

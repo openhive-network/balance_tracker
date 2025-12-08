@@ -1,0 +1,29 @@
+services:
+  haf:
+    environment:
+      PGCTLTIMEOUT: 600
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+    ports:
+      - 5432:5432
+    # Override base docker-compose.yml volumes to remove ./blockchain bind mount
+    # In CI, block_log is already in the datadir from cache, don't override it
+    volumes:
+      - haf_datadir:/home/hived/datadir
+      - haf_shmdir:/home/hived/shm_dir
+      - ./scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
+
+volumes:
+  haf_datadir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_DATA_DIRECTORY}/
+  haf_shmdir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_SHM_DIRECTORY}/
