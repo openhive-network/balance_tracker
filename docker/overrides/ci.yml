@@ -5,9 +5,10 @@ services:
       PG_ACCESS: "
         host    all    all    all    trust\n
         "
-      # Don't replay - use cached HAF database from prepare_haf_data
-      # But still need --stop-at-block to prevent syncing beyond cached data
-      HAF_COMMAND: "--shared-file-size=1G --plugin database_api --stop-at-block=5000000"
+      # HAF must replay from blockchain since prepare_haf_data only caches
+      # Hive data (blockchain, shared_memory.bin), not PostgreSQL database.
+      # Same as reputation_tracker - replay every time in sync job.
+      HAF_COMMAND: "--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000"
     ports:
       - 5432:5432
     # Override base docker-compose.yml volumes to remove ./blockchain bind mount
