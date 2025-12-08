@@ -300,10 +300,7 @@ sync:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
-    # Copy split block_log files (block_log_part.*)
-    cp "${BLOCK_LOG_SOURCE_DIR_5M}"/block_log_part.* "${CI_PROJECT_DIR}/docker/blockchain/"
-    chmod a+w docker/blockchain/block_log_part.*
-
+    # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
@@ -328,9 +325,6 @@ sync:
     popd
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
-
-    # Copy split block_log files to datadir
-    cp -a "${CI_PROJECT_DIR}"/docker/blockchain/block_log_part.* "${DATADIR}/blockchain/"
 
     # Save sync data to local cache with commit-based key (not pipeline ID)
     LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
@@ -433,10 +427,7 @@ sync_with_mock_data:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
-    # Copy split block_log files (block_log_part.*)
-    cp "${BLOCK_LOG_SOURCE_DIR_5M}"/block_log_part.* "${CI_PROJECT_DIR}/docker/blockchain/"
-    chmod a+w docker/blockchain/block_log_part.*
-
+    # Block log is already in sync cache from sync job, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
@@ -460,9 +451,6 @@ sync_with_mock_data:
     popd
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
-
-    # Copy split block_log files to datadir
-    cp -a "${CI_PROJECT_DIR}"/docker/blockchain/block_log_part.* "${DATADIR}/blockchain/"
 
     # Save mock sync data to local cache with commit-based key
     LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
