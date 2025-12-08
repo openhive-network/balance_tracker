@@ -310,8 +310,17 @@ sync:
     PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
     if [[ -d "$PGDATA_PATH" ]]; then
       echo "Restoring pgdata permissions to mode 700"
+      # pgdata directory itself must be 700
       sudo chmod 700 "$PGDATA_PATH"
-      sudo chown -R 105:105 "$PGDATA_PATH"
+      # Set ownership to postgres user (UID 105 in HAF container)
+      sudo chown -R 105:105 "${DATADIR}/haf_db_store"
+      # Debug: show permissions
+      ls -la "${DATADIR}/haf_db_store/"
+      ls -la "${PGDATA_PATH}/" | head -10
+    else
+      echo "WARNING: pgdata directory not found at $PGDATA_PATH"
+      ls -la "${DATADIR}/" || true
+      ls -la "${DATADIR}/haf_db_store/" || true
     fi
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
@@ -451,8 +460,17 @@ sync_with_mock_data:
     PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
     if [[ -d "$PGDATA_PATH" ]]; then
       echo "Restoring pgdata permissions to mode 700"
+      # pgdata directory itself must be 700
       sudo chmod 700 "$PGDATA_PATH"
-      sudo chown -R 105:105 "$PGDATA_PATH"
+      # Set ownership to postgres user (UID 105 in HAF container)
+      sudo chown -R 105:105 "${DATADIR}/haf_db_store"
+      # Debug: show permissions
+      ls -la "${DATADIR}/haf_db_store/"
+      ls -la "${PGDATA_PATH}/" | head -10
+    else
+      echo "WARNING: pgdata directory not found at $PGDATA_PATH"
+      ls -la "${DATADIR}/" || true
+      ls -la "${DATADIR}/haf_db_store/" || true
     fi
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
