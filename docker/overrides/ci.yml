@@ -5,6 +5,8 @@ services:
       PG_ACCESS: "
         host    all    all    all    trust\n
         "
+      # Don't replay - use cached HAF database from prepare_haf_data
+      HAF_COMMAND: "--shared-file-size=1G --plugin database_api"
     ports:
       - 5432:5432
     # Override base docker-compose.yml volumes to remove ./blockchain bind mount
