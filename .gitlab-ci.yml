@@ -79,10 +79,12 @@ validate_haf_commit:
   image: alpine:latest
   script:
   - |
+    set -e
+    apk add --no-cache git
     # Validate that HAF_COMMIT variable matches both the submodule and include ref
     # This prevents cache misses due to mismatched commits
     SUBMODULE_COMMIT=$(cat .git/modules/haf/HEAD 2>/dev/null || git -C haf rev-parse HEAD)
-    INCLUDE_REF=$(grep -A2 "project:.*hive/haf" .gitlab-ci.yml | grep "ref:" | head -1 | sed 's/.*ref: *\([a-f0-9]*\).*/\1/')
+    INCLUDE_REF=$(grep -A2 "project:.*hive/haf" .gitlab-ci.yml | grep "ref:" | head -1 | sed 's/.*ref: *\([a-f0-9]*\).*/\1/' || true)
 
     echo "HAF_COMMIT variable: $HAF_COMMIT"
     echo "HAF submodule HEAD:  $SUBMODULE_COMMIT"
