@@ -305,6 +305,15 @@ sync:
     # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
+    # Restore PostgreSQL pgdata permissions after copy from cache
+    # The cache has relaxed permissions (a+rX) for copying, but PostgreSQL requires mode 700
+    PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
+    if [[ -d "$PGDATA_PATH" ]]; then
+      echo "Restoring pgdata permissions to mode 700"
+      sudo chmod 700 "$PGDATA_PATH"
+      sudo chown -R 105:105 "$PGDATA_PATH"
+    fi
+
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
@@ -436,6 +445,15 @@ sync_with_mock_data:
 
     # Block log is already in sync cache from sync job, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
+
+    # Restore PostgreSQL pgdata permissions after copy from cache
+    # The cache has relaxed permissions (a+rX) for copying, but PostgreSQL requires mode 700
+    PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
+    if [[ -d "$PGDATA_PATH" ]]; then
+      echo "Restoring pgdata permissions to mode 700"
+      sudo chmod 700 "$PGDATA_PATH"
+      sudo chown -R 105:105 "$PGDATA_PATH"
+    fi
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
