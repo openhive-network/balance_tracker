@@ -6,7 +6,8 @@ services:
         host    all    all    all    trust\n
         "
       # Don't replay - use cached HAF database from prepare_haf_data
-      HAF_COMMAND: "--shared-file-size=1G --plugin database_api"
+      # But still need --stop-at-block to prevent syncing beyond cached data
+      HAF_COMMAND: "--shared-file-size=1G --plugin database_api --stop-at-block=5000000"
     ports:
       - 5432:5432
     # Override base docker-compose.yml volumes to remove ./blockchain bind mount
