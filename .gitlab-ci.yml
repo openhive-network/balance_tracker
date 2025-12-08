@@ -305,6 +305,11 @@ sync:
     # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
+    # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
+    # Copy blockchain files there so HAF can see them.
+    rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
+    cp -a "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
     echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
@@ -431,6 +436,11 @@ sync_with_mock_data:
 
     # Block log is already in sync cache from sync job, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
+
+    # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
+    # Copy blockchain files there so HAF can see them.
+    rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
+    cp -a "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
