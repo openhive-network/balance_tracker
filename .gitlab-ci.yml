@@ -27,12 +27,12 @@ variables:
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "e50db662040edc47eefdb103ca2f48414fe75046"
+  HAF_COMMIT: "85fbba5957a9fcfd91a06165b1f4de11321bbbb5"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: e50db662040edc47eefdb103ca2f48414fe75046   # Must match HAF_COMMIT variable above
+  ref: 85fbba5957a9fcfd91a06165b1f4de11321bbbb5   # Must match HAF_COMMIT variable above
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -314,9 +314,8 @@ sync:
       sudo chmod 700 "$PGDATA_PATH"
       # Set ownership to postgres user (UID 105 in HAF container)
       sudo chown -R 105:105 "${DATADIR}/haf_db_store"
-      # Debug: show permissions
+      # Debug: show permissions (don't list inside pgdata - only postgres can read it after chmod 700)
       ls -la "${DATADIR}/haf_db_store/"
-      ls -la "${PGDATA_PATH}/" | head -10
     else
       echo "WARNING: pgdata directory not found at $PGDATA_PATH"
       ls -la "${DATADIR}/" || true
@@ -464,9 +463,8 @@ sync_with_mock_data:
       sudo chmod 700 "$PGDATA_PATH"
       # Set ownership to postgres user (UID 105 in HAF container)
       sudo chown -R 105:105 "${DATADIR}/haf_db_store"
-      # Debug: show permissions
+      # Debug: show permissions (don't list inside pgdata - only postgres can read it after chmod 700)
       ls -la "${DATADIR}/haf_db_store/"
-      ls -la "${PGDATA_PATH}/" | head -10
     else
       echo "WARNING: pgdata directory not found at $PGDATA_PATH"
       ls -la "${DATADIR}/" || true
