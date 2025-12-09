@@ -327,8 +327,13 @@ sync:
     # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
     # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
     # which isn't accessible inside the Docker Compose containers (DinD environment)
+    echo "Copying blockchain files to docker/blockchain..."
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
     cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    echo "Contents of docker/blockchain after copy:"
+    ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
+    echo "Total size:"
+    du -sh "${CI_PROJECT_DIR}/docker/blockchain/"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
@@ -526,8 +531,13 @@ sync_with_mock_data:
     # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
     # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
     # which isn't accessible inside the Docker Compose containers (DinD environment)
+    echo "Copying blockchain files to docker/blockchain..."
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
     cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    echo "Contents of docker/blockchain after copy:"
+    ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
+    echo "Total size:"
+    du -sh "${CI_PROJECT_DIR}/docker/blockchain/"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
