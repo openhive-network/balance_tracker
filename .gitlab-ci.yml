@@ -722,13 +722,17 @@ sync_with_mock_data:
   - |
     LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
     NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
+    echo "DEBUG: NFS_TAR=${NFS_TAR}"
+    echo "DEBUG: Local cache exists: $([[ -d "${LOCAL_CACHE}/datadir" ]] && echo yes || echo no)"
+    echo "DEBUG: NFS tar exists: $([[ -f "$NFS_TAR" ]] && echo yes || echo no)"
     if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
       echo "Extracting NFS cache for service container..."
       mkdir -p "${LOCAL_CACHE}"
       tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
       echo "Extraction complete: ${LOCAL_CACHE}"
     else
-      echo "Local cache exists or NFS tar not found, skipping extraction"
+      echo "Skipping extraction (local cache exists or NFS tar not found)"
     fi
   - |
     # Wait for haf-instance PostgreSQL to be ready
@@ -752,13 +756,17 @@ sync_with_mock_data:
   - |
     LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
     NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
+    echo "DEBUG: NFS_TAR=${NFS_TAR}"
+    echo "DEBUG: Local cache exists: $([[ -d "${LOCAL_CACHE}/datadir" ]] && echo yes || echo no)"
+    echo "DEBUG: NFS tar exists: $([[ -f "$NFS_TAR" ]] && echo yes || echo no)"
     if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
       echo "Extracting NFS cache for service container..."
       mkdir -p "${LOCAL_CACHE}"
       tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
       echo "Extraction complete: ${LOCAL_CACHE}"
     else
-      echo "Local cache exists or NFS tar not found, skipping extraction"
+      echo "Skipping extraction (local cache exists or NFS tar not found)"
     fi
   - |
     # Wait for haf-instance PostgreSQL to be ready
@@ -787,13 +795,17 @@ sync_with_mock_data:
   - |
     LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
     NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
+    echo "DEBUG: NFS_TAR=${NFS_TAR}"
+    echo "DEBUG: Local cache exists: $([[ -d "${LOCAL_CACHE}/datadir" ]] && echo yes || echo no)"
+    echo "DEBUG: NFS tar exists: $([[ -f "$NFS_TAR" ]] && echo yes || echo no)"
     if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
       echo "Extracting NFS cache for service container (mock)..."
       mkdir -p "${LOCAL_CACHE}"
       tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
       echo "Extraction complete: ${LOCAL_CACHE}"
     else
-      echo "Local cache exists or NFS tar not found, skipping extraction"
+      echo "Skipping extraction (local cache exists or NFS tar not found)"
     fi
   - |
     # Wait for haf-instance PostgreSQL to be ready
@@ -817,13 +829,17 @@ sync_with_mock_data:
   - |
     LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
     NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
+    echo "DEBUG: NFS_TAR=${NFS_TAR}"
+    echo "DEBUG: Local cache exists: $([[ -d "${LOCAL_CACHE}/datadir" ]] && echo yes || echo no)"
+    echo "DEBUG: NFS tar exists: $([[ -f "$NFS_TAR" ]] && echo yes || echo no)"
     if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
       echo "Extracting NFS cache for service container (mock)..."
       mkdir -p "${LOCAL_CACHE}"
       tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
       echo "Extraction complete: ${LOCAL_CACHE}"
     else
-      echo "Local cache exists or NFS tar not found, skipping extraction"
+      echo "Skipping extraction (local cache exists or NFS tar not found)"
     fi
   - |
     # Wait for haf-instance PostgreSQL to be ready
