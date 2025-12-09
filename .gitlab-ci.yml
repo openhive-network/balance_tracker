@@ -730,6 +730,22 @@ sync_with_mock_data:
     else
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
+  - |
+    # Wait for haf-instance PostgreSQL to be ready
+    echo "Waiting for haf-instance PostgreSQL service..."
+    WAIT_TIMEOUT=120
+    WAIT_INTERVAL=2
+    WAITED=0
+    while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
+      if [[ $WAITED -ge $WAIT_TIMEOUT ]]; then
+        echo "ERROR: Timed out waiting for haf-instance after ${WAIT_TIMEOUT}s"
+        exit 1
+      fi
+      sleep $WAIT_INTERVAL
+      WAITED=$((WAITED + WAIT_INTERVAL))
+      echo "  Waiting for PostgreSQL... ($WAITED/${WAIT_TIMEOUT}s)"
+    done
+    echo "PostgreSQL is ready!"
 
 # Combined before script for pytest jobs: NFS extraction + pytest setup
 .extract-nfs-cache-pytest-before-script: &extract-nfs-cache-pytest-before-script
@@ -744,6 +760,22 @@ sync_with_mock_data:
     else
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
+  - |
+    # Wait for haf-instance PostgreSQL to be ready
+    echo "Waiting for haf-instance PostgreSQL service..."
+    WAIT_TIMEOUT=120
+    WAIT_INTERVAL=2
+    WAITED=0
+    while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
+      if [[ $WAITED -ge $WAIT_TIMEOUT ]]; then
+        echo "ERROR: Timed out waiting for haf-instance after ${WAIT_TIMEOUT}s"
+        exit 1
+      fi
+      sleep $WAIT_INTERVAL
+      WAITED=$((WAITED + WAIT_INTERVAL))
+      echo "  Waiting for PostgreSQL... ($WAITED/${WAIT_TIMEOUT}s)"
+    done
+    echo "PostgreSQL is ready!"
   - python3 -m venv venv/
   - . venv/bin/activate
   - echo "Entering ${POETRY_INSTALL_ROOT_DIR}"
@@ -763,6 +795,22 @@ sync_with_mock_data:
     else
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
+  - |
+    # Wait for haf-instance PostgreSQL to be ready
+    echo "Waiting for haf-instance PostgreSQL service..."
+    WAIT_TIMEOUT=120
+    WAIT_INTERVAL=2
+    WAITED=0
+    while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
+      if [[ $WAITED -ge $WAIT_TIMEOUT ]]; then
+        echo "ERROR: Timed out waiting for haf-instance after ${WAIT_TIMEOUT}s"
+        exit 1
+      fi
+      sleep $WAIT_INTERVAL
+      WAITED=$((WAITED + WAIT_INTERVAL))
+      echo "  Waiting for PostgreSQL... ($WAITED/${WAIT_TIMEOUT}s)"
+    done
+    echo "PostgreSQL is ready!"
 
 # Combined before script for pytest jobs with mock data: NFS extraction + pytest setup
 .extract-nfs-cache-mock-pytest-before-script: &extract-nfs-cache-mock-pytest-before-script
@@ -777,6 +825,22 @@ sync_with_mock_data:
     else
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
+  - |
+    # Wait for haf-instance PostgreSQL to be ready
+    echo "Waiting for haf-instance PostgreSQL service..."
+    WAIT_TIMEOUT=120
+    WAIT_INTERVAL=2
+    WAITED=0
+    while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
+      if [[ $WAITED -ge $WAIT_TIMEOUT ]]; then
+        echo "ERROR: Timed out waiting for haf-instance after ${WAIT_TIMEOUT}s"
+        exit 1
+      fi
+      sleep $WAIT_INTERVAL
+      WAITED=$((WAITED + WAIT_INTERVAL))
+      echo "  Waiting for PostgreSQL... ($WAITED/${WAIT_TIMEOUT}s)"
+    done
+    echo "PostgreSQL is ready!"
   - python3 -m venv venv/
   - . venv/bin/activate
   - echo "Entering ${POETRY_INSTALL_ROOT_DIR}"
