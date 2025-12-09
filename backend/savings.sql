@@ -45,11 +45,13 @@ RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'to')::TEXT,
-    ((_operation_body)->'value'->'amount'->>'amount')::BIGINT,
-    substring((_operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT,
+    (_operation_body -> 'value' ->> 'to')::TEXT,
+    __amount.amount,
+    __amount.asset_symbol_nai,
     0,
     NULL
   )::btracker_backend.impacted_savings_return;
@@ -62,13 +64,15 @@ RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,
-    - ((_operation_body)->'value'->'amount'->>'amount')::BIGINT,
-    substring((_operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT,
+    (_operation_body -> 'value' ->> 'from')::TEXT,
+    - __amount.amount,
+    __amount.asset_symbol_nai,
     1,
-    ((_operation_body)->'value'->>'request_id')::BIGINT
+    (_operation_body -> 'value' ->> 'request_id')::BIGINT
   )::btracker_backend.impacted_savings_return;
 
 END
@@ -79,13 +83,15 @@ RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,
+    (_operation_body -> 'value' ->> 'from')::TEXT,
     0,
-    substring((_operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT,
+    __amount.asset_symbol_nai,
     -1,
-    ((_operation_body)->'value'->>'request_id')::BIGINT
+    (_operation_body -> 'value' ->> 'request_id')::BIGINT
   )::btracker_backend.impacted_savings_return;
 
 END
@@ -96,11 +102,13 @@ RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'interest');
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'owner')::TEXT,
-    ((_operation_body)->'value'->'interest'->>'amount')::BIGINT,
-    substring((_operation_body)->'value'->'interest'->>'nai', '[0-9]+')::INT,
+    (_operation_body -> 'value' ->> 'owner')::TEXT,
+    __amount.amount,
+    __amount.asset_symbol_nai,
     0,
     NULL
   )::btracker_backend.impacted_savings_return;

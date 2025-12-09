@@ -114,16 +114,15 @@ LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
 DECLARE
-  __amount       BIGINT  := ((__operation_body)->'value'->'amount'->>'amount')::BIGINT;
+  __amount       btracker_backend.asset := btracker_backend.parse_amount_object(__operation_body -> 'value' -> 'amount');
   __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
-  __nai          INT     := substring((__operation_body)->'value'->'amount'->>'nai', '[0-9]+')::INT;
-  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if amount s is 0
+  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if amount is 0
   __con_failures INT     := 0;     -- first transfer, always 0
 
   __return btracker_backend.recurrent_transfer_return;
 BEGIN
   -- if amount is 0, mark transfer for deletion
-  IF __amount = 0 THEN
+  IF __amount.amount = 0 THEN
     __del_transfer := TRUE;
   END IF;
 
@@ -131,8 +130,8 @@ BEGIN
     __operation_body -> 'value' ->> 'from',       -- from_account
     __operation_body -> 'value' ->> 'to',         -- to_account
     __pair_id,                                    -- transfer_id
-    __nai,                                        -- nai
-    __amount,                                     -- amount
+    __amount.asset_symbol_nai,                    -- nai
+    __amount.amount,                              -- amount
     __con_failures,                               -- consecutive_failures
     __operation_body -> 'value' ->> 'executions', -- remaining_executions
     __operation_body -> 'value' ->> 'recurrence', -- recurrence

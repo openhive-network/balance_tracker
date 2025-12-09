@@ -27,11 +27,13 @@ RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
 BEGIN
   RETURN QUERY (
     SELECT 
-      substring((_operation_body) -> 'value' -> 'amount' ->> 'nai', '[0-9]+')::INT AS nai,
-      (_operation_body -> 'value' -> 'amount' ->> 'amount')::BIGINT AS transfer_amount
+      __amount.asset_symbol_nai AS nai,
+      __amount.amount AS transfer_amount
   );
   
 END
@@ -42,17 +44,20 @@ RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
+DECLARE
+  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'hive_amount');
+  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'hbd_amount');
 BEGIN
   RETURN QUERY (
     SELECT
-      substring((_operation_body) -> 'value' -> 'hive_amount' ->> 'nai', '[0-9]+')::INT AS nai,
-      ((_operation_body) -> 'value' -> 'hive_amount' ->> 'amount')::BIGINT AS transfer_amount
+      __hive_amt.asset_symbol_nai AS nai,
+      __hive_amt.amount AS transfer_amount
 
     UNION ALL
 
     SELECT
-      substring((_operation_body) -> 'value' -> 'hbd_amount' ->> 'nai', '[0-9]+')::INT AS nai,
-      ((_operation_body) -> 'value' -> 'hbd_amount' ->> 'amount')::BIGINT AS transfer_amount
+      __hbd_amt.asset_symbol_nai AS nai,
+      __hbd_amt.amount AS transfer_amount
   );
   
 END
