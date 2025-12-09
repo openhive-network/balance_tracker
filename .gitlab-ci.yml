@@ -650,6 +650,13 @@ sync_with_mock_data:
         echo "Using local cache: ${ORIGINAL_SOURCE}"
       fi
 
+      # Restore pgdata permissions (PostgreSQL requires 700 or 750)
+      PGDATA="${DATA_SOURCE}/datadir/haf_db_store/pgdata"
+      if [[ -d "$PGDATA" ]]; then
+        echo "Restoring pgdata permissions to mode 700"
+        chmod 700 "$PGDATA" 2>/dev/null || sudo chmod 700 "$PGDATA" || true
+      fi
+
       # Run original entrypoint
       exec /home/haf_admin/docker_entrypoint.sh "$@"
     - '/bin/bash'
@@ -721,6 +728,13 @@ sync_with_mock_data:
         fi
       else
         echo "Using local cache: ${ORIGINAL_SOURCE}"
+      fi
+
+      # Restore pgdata permissions (PostgreSQL requires 700 or 750)
+      PGDATA="${DATA_SOURCE}/datadir/haf_db_store/pgdata"
+      if [[ -d "$PGDATA" ]]; then
+        echo "Restoring pgdata permissions to mode 700"
+        chmod 700 "$PGDATA" 2>/dev/null || sudo chmod 700 "$PGDATA" || true
       fi
 
       # Run original entrypoint
