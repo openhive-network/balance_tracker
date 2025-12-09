@@ -562,6 +562,15 @@ sync_with_mock_data:
       NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
       NFS_KEY="${DATA_SOURCE_NFS_KEY}"
 
+      # Debug: show available paths
+      echo "DEBUG: Checking paths..."
+      echo "  ORIGINAL_SOURCE=${ORIGINAL_SOURCE}"
+      echo "  NFS_PREFIX=${NFS_PREFIX}"
+      echo "  NFS_TYPE=${NFS_TYPE}"
+      echo "  NFS_KEY=${NFS_KEY}"
+      ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
+      ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
+
       # If original path doesn't exist, try NFS fallback
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
@@ -579,10 +588,13 @@ sync_with_mock_data:
           echo "Extraction complete"
           export DATA_SOURCE="${ORIGINAL_SOURCE}"
         else
-          echo "WARNING: Data not found in local or NFS cache"
+          echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
           echo "Checked: ${NFS_PATH}/datadir"
           echo "Checked: ${NFS_TAR}"
+          ls -la "${NFS_PREFIX}/${NFS_TYPE}/" 2>/dev/null || echo "Cannot list ${NFS_PREFIX}/${NFS_TYPE}/"
+          echo "Service container cannot start without sync data"
+          exit 1
         fi
       else
         echo "Using local cache: ${ORIGINAL_SOURCE}"
@@ -620,6 +632,15 @@ sync_with_mock_data:
       NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
       NFS_KEY="${DATA_SOURCE_NFS_KEY}"
 
+      # Debug: show available paths
+      echo "DEBUG: Checking paths..."
+      echo "  ORIGINAL_SOURCE=${ORIGINAL_SOURCE}"
+      echo "  NFS_PREFIX=${NFS_PREFIX}"
+      echo "  NFS_TYPE=${NFS_TYPE}"
+      echo "  NFS_KEY=${NFS_KEY}"
+      ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
+      ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
+
       # If original path doesn't exist, try NFS fallback
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
@@ -637,10 +658,13 @@ sync_with_mock_data:
           echo "Extraction complete"
           export DATA_SOURCE="${ORIGINAL_SOURCE}"
         else
-          echo "WARNING: Data not found in local or NFS cache"
+          echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
           echo "Checked: ${NFS_PATH}/datadir"
           echo "Checked: ${NFS_TAR}"
+          ls -la "${NFS_PREFIX}/${NFS_TYPE}/" 2>/dev/null || echo "Cannot list ${NFS_PREFIX}/${NFS_TYPE}/"
+          echo "Service container cannot start without sync data"
+          exit 1
         fi
       else
         echo "Using local cache: ${ORIGINAL_SOURCE}"
