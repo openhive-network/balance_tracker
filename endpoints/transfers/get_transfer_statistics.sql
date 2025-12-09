@@ -130,7 +130,7 @@ AS
 $$
 DECLARE
   _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
-  _coin_type INT                 := btracker_backend.get_liquid_nai_type("coin-type");
+  _coin_type INT                 := btracker_backend.get_nai_type("coin-type"::TEXT::btracker_backend.nai_type);
 BEGIN
   IF _block_range.first_block IS NOT NULL THEN
     PERFORM btracker_backend.validate_negative_limit(_block_range.first_block, 'from-block');
@@ -139,7 +139,7 @@ BEGIN
   IF _block_range.last_block IS NOT NULL THEN
     PERFORM btracker_backend.validate_negative_limit(_block_range.last_block, 'to-block');
   END IF;
-  
+
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
@@ -147,7 +147,7 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT 
+  SELECT
     ah.updated_at,
     ah.sum_transfer_amount::TEXT,
     ah.avg_transfer_amount::TEXT,
