@@ -1,18 +1,5 @@
 SET ROLE btracker_owner;
 
-CREATE OR REPLACE FUNCTION btracker_backend.create_amount_object(IN __nai INT, IN __amount BIGINT)
-RETURNS btracker_backend.amount
-LANGUAGE 'plpgsql' IMMUTABLE
-AS
-$$
-DECLARE
-  __precision  INT  := (CASE WHEN __nai = 37 THEN 6 ELSE 3 END);
-  __nai_string TEXT := '@@0000000' || __nai;
-BEGIN
-  RETURN (__nai_string, __amount::TEXT, __precision)::btracker_backend.amount;
-END
-$$;
-
 CREATE OR REPLACE FUNCTION btracker_backend.get_account_balances(
     _account_id INT
 )
@@ -145,14 +132,14 @@ savings_pivot AS (
   WHERE tsi.account = _account_id
 ),
 
-    -- 13) Escrows (INCOMING: you are the beneficiary)
-  escrow_pivot AS (
-    SELECT
-      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 13), 0)::BIGINT AS escrow_pending_amount_hbd,
-      COALESCE(SUM(es.remaining) FILTER (WHERE es.nai = 21), 0)::BIGINT AS escrow_pending_amount_hive,
-      COUNT(*)::INT AS escrow_pending_count
-    FROM escrow_state es
-    WHERE es.from_id = _account_id
+-- 13) Escrows (INCOMING: you are the beneficiary)
+escrow_pivot AS (
+  SELECT
+    COALESCE(SUM(es.hbd_amount ), 0)::BIGINT AS escrow_pending_amount_hbd,
+    COALESCE(SUM(es.hive_amount), 0)::BIGINT AS escrow_pending_amount_hive,
+    COUNT(*)::INT AS escrow_pending_count
+  FROM escrow_state es
+  WHERE es.from_id = _account_id
 )
 
 
@@ -189,9 +176,9 @@ savings_pivot AS (
     oo.open_orders_hbd_amount,
     sp.savings_pending_amount_hbd,
     sp.savings_pending_amount_hive,
-    ep.escrow_pending_amount_hbd,      
-    ep.escrow_pending_amount_hive,     
-    ep.escrow_pending_count           
+    ep.escrow_pending_amount_hbd,
+    ep.escrow_pending_amount_hive,
+    ep.escrow_pending_count
 
   INTO result_row
   FROM get_balances     gb
