@@ -2,94 +2,122 @@ operation_types:
   27  "hive::protocol::escrow_transfer_operation"     virtual:false
   28  "hive::protocol::escrow_dispute_operation"      virtual:false
   29  "hive::protocol::escrow_release_operation"      virtual:false
-  31  "hive::protocol::escrow_approve_operation"      virtual:false
   89  "hive::protocol::escrow_approved_operation"     virtual:true
   90  "hive::protocol::escrow_rejected_operation"     virtual:true
 
-# Scenario built from your cvk/fnait/kush blocks (corrected)
+Note: escrow_approve_operation (31) is NOT tracked - only the virtual escrow_approved_operation (89) matters
 
-# (A) escrow_id 90003001 — transfer only (no approvals or releases in given range)
+# Scenario built for cvk/fnait/kush escrow mock data
+
+# (A) escrow_id 90003001 — transfer only (no approvals or releases)
+#     State: to_approved=FALSE, disputed=FALSE
 block 90000031  [27] escrow_transfer_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003001
-  hbd_amount: 0, hive_amount: 1000, fee: 40
+  hbd_amount: 0, hive_amount: 1000, fee: 40 HIVE
   ratification_deadline: 2025-10-01T12:00:00, escrow_expiration: 2025-10-08T12:00:00
 
-# (B) escrow_id 90003002 — approve → approve → approved (virtual, fee 20) → release 300 to recipient
+# (B) escrow_id 90003002 — transfer → approved → dispute → release 300
+#     State: to_approved=TRUE, disputed=TRUE
 block 90000032  [27] escrow_transfer_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  hbd_amount: 0, hive_amount: 2000, fee: 20
+  hbd_amount: 0, hive_amount: 2000, fee: 20 HIVE
   ratification_deadline: 2025-10-01T13:00:00, escrow_expiration: 2025-10-08T13:00:00
 
-block 90000033  [31] escrow_approve_operation
+block 90000038  [89] escrow_approved_operation (virtual)
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  who: fnait, approve: true
+  fee: 20 HIVE (fee is deleted from escrow_fees table)
 
-block 90000034  [31] escrow_approve_operation
+block 90000039  [28] escrow_dispute_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  who: kush, approve: true
+  who: fnait
 
-# virtual approval emitted later as a separate op in your data:
-block 90000041  [89] escrow_approved_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003002
-  fee: 20
-
-block 90000042  [29] escrow_release_operation
+block 90000040  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003002
   who: fnait, receiver: fnait
   hbd_amount: 0, hive_amount: 300
+  Remaining: 2000 - 300 = 1700 HIVE
 
-# (C) escrow_id 90003003 — approve → approve → dispute → rejected (virtual)
-block 90000035  [27] escrow_transfer_operation
+# (C) escrow_id 90003003 — transfer → dispute → rejected
+#     State: DELETED (rejected escrows are removed entirely)
+block 90000033  [27] escrow_transfer_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003003
-  hbd_amount: 0, hive_amount: 1500, fee: 10
+  hbd_amount: 0, hive_amount: 1500, fee: 10 HIVE
   ratification_deadline: 2025-10-01T14:00:00, escrow_expiration: 2025-10-08T14:00:00
 
-block 90000036  [31] escrow_approve_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
-  who: fnait, approve: true
-
-block 90000037  [31] escrow_approve_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003003
-  who: kush, approve: true
-
-block 90000038  [28] escrow_dispute_operation
+block 90000041  [28] escrow_dispute_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003003
   who: fnait
 
-block 90000043  [90] escrow_rejected_operation
+block 90000042  [90] escrow_rejected_operation (virtual)
   from: cvk, to: fnait, agent: kush, escrow_id: 90003003
-  who: kush
+  Result: escrow and fee are deleted
 
-# (D) escrow_id 90003004 — transfer → approve → dispute → two releases (100 + 405) to recipient
-block 90000039  [27] escrow_transfer_operation
+# (D) escrow_id 90003004 — transfer → release 100 → release 400 (fully released)
+#     State: DELETED (fully released escrows are removed)
+block 90000034  [27] escrow_transfer_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
-  hbd_amount: 0, hive_amount: 500, fee: 5
+  hbd_amount: 0, hive_amount: 500, fee: 5 HIVE
   ratification_deadline: 2025-10-01T15:00:00, escrow_expiration: 2025-10-08T15:00:00
 
-block 90000040  [31] escrow_approve_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
-  who: fnait, approve: true
-
-block 90000044  [28] escrow_dispute_operation
-  from: cvk, to: fnait, agent: kush, escrow_id: 90003004
-  who: fnait
-
-block 90000045  [29] escrow_release_operation
+block 90000043  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait, receiver: fnait
   hbd_amount: 0, hive_amount: 100
 
-block 90000046  [29] escrow_release_operation
+block 90000044  [29] escrow_release_operation
   from: cvk, to: fnait, agent: kush, escrow_id: 90003004
   who: fnait, receiver: fnait
-  hbd_amount: 0, hive_amount: 405
+  hbd_amount: 0, hive_amount: 400
+  Result: 500 - 100 - 400 = 0 → escrow deleted (fee remains if not approved)
 
-# Final result — per process_block_range_escrows logic
-# Calculation: (90003001: 1000 + 40) + (90003002: 2000 + 20 - 300 - 20) + (90003003: rejected→0) + (90003004: 500 + 5 - 100 - 405)
-#   A(90003001): create 1000 + transfer-fee 40 = 1040
-#   B(90003002): create 2000 + transfer-fee 20 − releases(300) − approved-fee(20) = 1700
-#   C(90003003): rejected ⇒ 0
-#   D(90003004): create 500 + transfer-fee 5 − releases(100+405) = 0
-#              = 1040 + 1700 + 0 + 0
-#              = 2740
-FINAL RESULT: 2740
+# (E) escrow_id 90003005 — transfer (mixed HIVE+HBD) → approved
+#     State: to_approved=TRUE, disputed=FALSE
+#     Tests: both hive_amount and hbd_amount tracked correctly
+block 90000035  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003005
+  hbd_amount: 500, hive_amount: 1000, fee: 30 HIVE
+  ratification_deadline: 2025-10-01T16:00:00, escrow_expiration: 2025-10-08T16:00:00
+
+block 90000036  [89] escrow_approved_operation (virtual)
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003005
+  fee: 30 HIVE (fee is deleted from escrow_fees table)
+
+block 90000046  [29] escrow_release_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003005
+  who: fnait, receiver: fnait
+  hbd_amount: 200, hive_amount: 500
+  Result: 1000-500=500 HIVE + 500-200=300 HBD remains in escrow
+
+# (F) escrow_id 90003006 — transfer → dispute (never approved)
+#     State: to_approved=FALSE, disputed=TRUE
+#     Tests: dispute without approval scenario
+block 90000037  [27] escrow_transfer_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003006
+  hbd_amount: 0, hive_amount: 800, fee: 15 HIVE
+  ratification_deadline: 2025-10-01T17:00:00, escrow_expiration: 2025-10-08T17:00:00
+
+block 90000045  [28] escrow_dispute_operation
+  from: cvk, to: fnait, agent: kush, escrow_id: 90003006
+  who: fnait
+  Result: 800 HIVE in escrow, disputed=TRUE, fee still pending
+
+# ==================== FINAL RESULTS ====================
+#
+# escrow_state table (4 active escrows):
+#   A(90003001): 1000 HIVE, 0 HBD   | to_approved=FALSE, disputed=FALSE
+#   B(90003002): 1700 HIVE, 0 HBD   | to_approved=TRUE,  disputed=TRUE
+#   E(90003005):  500 HIVE, 300 HBD | to_approved=TRUE,  disputed=FALSE
+#   F(90003006):  800 HIVE, 0 HBD   | to_approved=FALSE, disputed=TRUE
+#
+# escrow_fees table (3 pending fees - A, D, F):
+#   A(90003001): fee = 40 HIVE  (not approved)
+#   D(90003004): fee = 5 HIVE   (never approved, escrow fully released)
+#   F(90003006): fee = 15 HIVE  (not approved, disputed)
+#
+# Totals for account cvk:
+#   escrow_pending_amount_hive = 1000 + 1700 + 500 + 800 = 4000
+#   escrow_pending_amount_hbd  = 300
+#   escrow_pending_count       = 4
+#
+# Fee totals (stored separately, not in escrow amounts):
+#   pending_fees_hive = 40 + 5 + 15 = 60
