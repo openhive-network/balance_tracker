@@ -535,7 +535,7 @@ sync_with_mock_data:
   - fast
 
 # HAF instance with NFS fallback for sync data
-# Services start before before_script, so we need fallback logic in the entrypoint
+# Services start before before_script, so we wait for job to extract data if needed
 .haf-instance-with-nfs-fallback: &haf-instance-with-nfs-fallback
   name: ${HAF_IMAGE_NAME}
   alias: haf-instance
@@ -571,7 +571,7 @@ sync_with_mock_data:
       ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
       ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
 
-      # If original path doesn't exist, try NFS fallback
+      # If original path doesn't exist, try NFS fallback or wait for job to extract
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
         NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
@@ -581,12 +581,25 @@ sync_with_mock_data:
           echo "Found data on NFS (directory): $NFS_PATH"
           export DATA_SOURCE="$NFS_PATH"
         elif [[ -f "$NFS_TAR" ]]; then
-          echo "Found data on NFS (tar archive): $NFS_TAR"
-          echo "Extracting to ${ORIGINAL_SOURCE}..."
-          mkdir -p "${ORIGINAL_SOURCE}"
-          tar xf "$NFS_TAR" -C "${ORIGINAL_SOURCE}"
-          echo "Extraction complete"
-          export DATA_SOURCE="${ORIGINAL_SOURCE}"
+          # NFS tar exists - wait for job's before_script to extract it
+          # This avoids blocking health check while extracting large tar
+          echo "NFS tar archive found: $NFS_TAR"
+          echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
+          WAIT_TIMEOUT=300
+          WAIT_INTERVAL=5
+          WAITED=0
+          while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
+            sleep $WAIT_INTERVAL
+            WAITED=$((WAITED + WAIT_INTERVAL))
+            echo "  Waiting... ($WAITED/${WAIT_TIMEOUT}s)"
+          done
+          if [[ -d "${ORIGINAL_SOURCE}/datadir" ]]; then
+            echo "Data extracted successfully after ${WAITED}s"
+            export DATA_SOURCE="${ORIGINAL_SOURCE}"
+          else
+            echo "ERROR: Timeout waiting for data extraction"
+            exit 1
+          fi
         else
           echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
@@ -641,7 +654,7 @@ sync_with_mock_data:
       ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
       ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
 
-      # If original path doesn't exist, try NFS fallback
+      # If original path doesn't exist, try NFS fallback or wait for job to extract
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
         NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
@@ -651,12 +664,25 @@ sync_with_mock_data:
           echo "Found data on NFS (directory): $NFS_PATH"
           export DATA_SOURCE="$NFS_PATH"
         elif [[ -f "$NFS_TAR" ]]; then
-          echo "Found data on NFS (tar archive): $NFS_TAR"
-          echo "Extracting to ${ORIGINAL_SOURCE}..."
-          mkdir -p "${ORIGINAL_SOURCE}"
-          tar xf "$NFS_TAR" -C "${ORIGINAL_SOURCE}"
-          echo "Extraction complete"
-          export DATA_SOURCE="${ORIGINAL_SOURCE}"
+          # NFS tar exists - wait for job's before_script to extract it
+          # This avoids blocking health check while extracting large tar
+          echo "NFS tar archive found: $NFS_TAR"
+          echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
+          WAIT_TIMEOUT=300
+          WAIT_INTERVAL=5
+          WAITED=0
+          while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
+            sleep $WAIT_INTERVAL
+            WAITED=$((WAITED + WAIT_INTERVAL))
+            echo "  Waiting... ($WAITED/${WAIT_TIMEOUT}s)"
+          done
+          if [[ -d "${ORIGINAL_SOURCE}/datadir" ]]; then
+            echo "Data extracted successfully after ${WAITED}s"
+            export DATA_SOURCE="${ORIGINAL_SOURCE}"
+          else
+            echo "ERROR: Timeout waiting for data extraction"
+            exit 1
+          fi
         else
           echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
@@ -690,6 +716,35 @@ sync_with_mock_data:
     PGRST_DB_EXTRA_SEARCH_PATH: btracker_app
     HEALTHCHECK_TCP_PORT: 3000
 
+# Before script to extract NFS cache for service containers
+# Service containers wait for this extraction to complete
+.extract-nfs-cache-before-script: &extract-nfs-cache-before-script
+  - |
+    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
+      echo "Extracting NFS cache for service container..."
+      mkdir -p "${LOCAL_CACHE}"
+      tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
+      echo "Extraction complete: ${LOCAL_CACHE}"
+    else
+      echo "Local cache exists or NFS tar not found, skipping extraction"
+    fi
+
+# Before script for mock data extraction
+.extract-nfs-cache-mock-before-script: &extract-nfs-cache-mock-before-script
+  - |
+    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
+      echo "Extracting NFS cache for service container (mock)..."
+      mkdir -p "${LOCAL_CACHE}"
+      tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
+      echo "Extraction complete: ${LOCAL_CACHE}"
+    else
+      echo "Local cache exists or NFS tar not found, skipping extraction"
+    fi
+
 regression-test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-11
   stage: test
@@ -702,6 +757,7 @@ regression-test:
     artifacts: true
   services:
   - *haf-instance-with-nfs-fallback
+  before_script: *extract-nfs-cache-before-script
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -730,6 +786,7 @@ setup-scripts-test:
     artifacts: true
   services:
   - *haf-instance-with-nfs-fallback
+  before_script: *extract-nfs-cache-before-script
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -755,6 +812,7 @@ performance-test:
   services:
   - *haf-instance-with-nfs-fallback
   - *postgrest-service
+  before_script: *extract-nfs-cache-before-script
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -790,6 +848,7 @@ pattern-test:
   services:
   - *haf-instance-with-nfs-fallback
   - *postgrest-service
+  before_script: *extract-nfs-cache-before-script
   variables:
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
@@ -821,6 +880,7 @@ pattern-test-with-mock-data:
   services:
   - *haf-instance-with-nfs-fallback-mock
   - *postgrest-service
+  before_script: *extract-nfs-cache-mock-before-script
   variables:
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
