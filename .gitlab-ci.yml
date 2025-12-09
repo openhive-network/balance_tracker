@@ -421,19 +421,33 @@ sync_with_mock_data:
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
 
     # Ensure sync data is available locally (fetch from NFS if needed)
+    echo "DEBUG: Setting up cache paths..."
     LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
     CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
     NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
     NFS_TAR="${NFS_CACHE_PATH}.tar"
+    echo "DEBUG: LOCAL_SYNC_CACHE=${LOCAL_SYNC_CACHE}"
+    echo "DEBUG: NFS_TAR=${NFS_TAR}"
 
     # Check if local cache exists and is usable
     # Service container extractions may have broken symlinks, so validate pg_tblspc
     LOCAL_CACHE_VALID=false
+    echo "DEBUG: Checking local cache..."
     if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
+      echo "DEBUG: Local cache datadir exists"
       # Check for broken symlinks in pg_tblspc
       TBLSPC="${LOCAL_SYNC_CACHE}/datadir/haf_db_store/pgdata/pg_tblspc"
       if [[ -d "$TBLSPC" ]]; then
-        BROKEN_LINKS=$(find "$TBLSPC" -xtype l 2>/dev/null | wc -l)
+        echo "DEBUG: Checking tablespace symlinks in $TBLSPC"
+        # Find broken symlinks portably (find -xtype not available in all find versions)
+        BROKEN_LINKS=0
+        shopt -s nullglob  # Handle empty directories gracefully
+        for link in "$TBLSPC"/*; do
+          if [[ -L "$link" ]] && [[ ! -e "$link" ]]; then
+            BROKEN_LINKS=$((BROKEN_LINKS + 1))
+          fi
+        done
+        shopt -u nullglob
         if [[ "$BROKEN_LINKS" -gt 0 ]]; then
           echo "Local cache has $BROKEN_LINKS broken symlinks in pg_tblspc, will re-extract"
           sudo rm -rf "${LOCAL_SYNC_CACHE}" || rm -rf "${LOCAL_SYNC_CACHE}" || true
@@ -441,8 +455,11 @@ sync_with_mock_data:
           LOCAL_CACHE_VALID=true
         fi
       else
+        echo "DEBUG: No pg_tblspc directory, cache is valid"
         LOCAL_CACHE_VALID=true
       fi
+    else
+      echo "DEBUG: Local cache datadir does not exist"
     fi
 
     if [[ "$LOCAL_CACHE_VALID" == "true" ]]; then
