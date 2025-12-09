@@ -27,12 +27,12 @@ variables:
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "267c1abd75398fe8903f1e6eb3f5c2e596b9c28f"
+  HAF_COMMIT: "df653a09a8f16c8f96a852c40443635f4c93887d"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 267c1abd75398fe8903f1e6eb3f5c2e596b9c28f   # feature/nfs-cache-manager
+  ref: df653a09a8f16c8f96a852c40443635f4c93887d   # feature/nfs-cache-manager
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -121,8 +121,7 @@ prepare_haf_image:
   - git config --global --add safe.directory $CI_PROJECT_DIR/haf
   tags:
   - public-runner-docker
-  - hived-for-tests
-  - hived
+  - build-mainnet
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
@@ -230,7 +229,7 @@ prepare_haf_data:
     echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
   - public-runner-docker
-  - hived-for-tests
+  - build-mainnet
 
 docker-ci-runner-build:
   extends: .docker-build-template
@@ -825,7 +824,7 @@ build_and_publish_image:
     fi
   tags:
   - public-runner-docker
-  - hived-for-tests
+  - build-mainnet
 
 deploy_python_api_packages_to_gitlab:
   stage: publish
