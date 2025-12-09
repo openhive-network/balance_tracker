@@ -305,33 +305,22 @@ sync:
     # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
-    # Remove shared_memory.bin and comments-rocksdb-storage to force HAF to replay from block 1
-    # The replay_data_haf cache includes shared_memory.bin at 5M blocks, but no PostgreSQL data.
-    # If we keep shared_memory.bin, hived thinks it's at 5M blocks and skips replay,
-    # leaving PostgreSQL empty. By removing it, hived will replay all blocks into PostgreSQL.
-    # The comments-rocksdb-storage must also be removed to avoid "Inconsistency in last irreversible block" error
+    # Remove shared_memory.bin, comments-rocksdb-storage, AND pgdata to force HAF to replay from block 1
+    # The replay_data_haf cache includes shared_memory.bin and pgdata at 5M blocks.
+    # If we keep shared_memory.bin, hived thinks it's at 5M blocks and skips replay.
+    # If we remove only shared_memory.bin but keep pgdata, hived replays and inserts duplicates
+    # into the existing PostgreSQL database, causing unique constraint violations.
+    # By removing all three, hived will initialize a fresh database and replay all blocks.
     if [[ -f "${SHM_DIR}/shared_memory.bin" ]]; then
-      echo "Removing shared_memory.bin and comments-rocksdb-storage to force HAF replay into PostgreSQL"
+      echo "Removing shared_memory.bin, comments-rocksdb-storage, and pgdata to force HAF replay into PostgreSQL"
       rm -f "${SHM_DIR}/shared_memory.bin"
       rm -rf "${SHM_DIR}/comments-rocksdb-storage"
+      rm -rf "${DATADIR}/haf_db_store/pgdata"
+      rm -rf "${DATADIR}/haf_db_store/tablespace"
     fi
 
-    # Restore PostgreSQL pgdata permissions after copy from cache
-    # The cache has relaxed permissions (a+rX) for copying, but PostgreSQL requires mode 700
-    PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
-    if [[ -d "$PGDATA_PATH" ]]; then
-      echo "Restoring pgdata permissions to mode 700"
-      # pgdata directory itself must be 700
-      sudo chmod 700 "$PGDATA_PATH"
-      # Set ownership to postgres user (UID 105 in HAF container)
-      sudo chown -R 105:105 "${DATADIR}/haf_db_store"
-      # Debug: show permissions (don't list inside pgdata - only postgres can read it after chmod 700)
-      ls -la "${DATADIR}/haf_db_store/"
-    else
-      echo "WARNING: pgdata directory not found at $PGDATA_PATH"
-      ls -la "${DATADIR}/" || true
-      ls -la "${DATADIR}/haf_db_store/" || true
-    fi
+    # Note: pgdata and tablespace were removed above to force fresh database initialization.
+    # HAF entrypoint will run initdb to create a new database.
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
