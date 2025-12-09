@@ -764,7 +764,7 @@ sync_with_mock_data:
   - |
     # Wait for haf-instance PostgreSQL to be ready
     echo "Waiting for haf-instance PostgreSQL service..."
-    WAIT_TIMEOUT=120
+    WAIT_TIMEOUT=300
     WAIT_INTERVAL=2
     WAITED=0
     while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
@@ -798,7 +798,7 @@ sync_with_mock_data:
   - |
     # Wait for haf-instance PostgreSQL to be ready
     echo "Waiting for haf-instance PostgreSQL service..."
-    WAIT_TIMEOUT=120
+    WAIT_TIMEOUT=300
     WAIT_INTERVAL=2
     WAITED=0
     while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
@@ -837,7 +837,7 @@ sync_with_mock_data:
   - |
     # Wait for haf-instance PostgreSQL to be ready
     echo "Waiting for haf-instance PostgreSQL service..."
-    WAIT_TIMEOUT=120
+    WAIT_TIMEOUT=300
     WAIT_INTERVAL=2
     WAITED=0
     while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
@@ -871,7 +871,7 @@ sync_with_mock_data:
   - |
     # Wait for haf-instance PostgreSQL to be ready
     echo "Waiting for haf-instance PostgreSQL service..."
-    WAIT_TIMEOUT=120
+    WAIT_TIMEOUT=300
     WAIT_INTERVAL=2
     WAITED=0
     while ! pg_isready -h haf-instance -p 5432 -q 2>/dev/null; do
