@@ -324,8 +324,11 @@ sync:
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
+    # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
+    # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
+    # which isn't accessible inside the Docker Compose containers (DinD environment)
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
-    cp -a "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
@@ -520,8 +523,11 @@ sync_with_mock_data:
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
+    # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
+    # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
+    # which isn't accessible inside the Docker Compose containers (DinD environment)
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
-    cp -a "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 

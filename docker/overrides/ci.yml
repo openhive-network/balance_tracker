@@ -11,14 +11,15 @@ services:
       HAF_COMMAND: "--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000"
     ports:
       - 5432:5432
-    # Override base docker-compose.yml volumes to remove ./blockchain bind mount
-    # In CI, block_log is already in the datadir from cache, don't override it
+    # Override base docker-compose.yml volumes
+    # Keep ./blockchain bind mount to provide blockchain files (copied with cp -aL to dereference symlinks)
+    # This is needed because datadir/blockchain contains symlinks to /cache/blockchain/block_log_5m/
+    # which isn't accessible inside Docker Compose containers in DinD environment
     volumes:
       - haf_datadir:/home/hived/datadir
       - haf_shmdir:/home/hived/shm_dir
       - ./scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
-      # Mount shared block_log so symlinks in datadir/blockchain work
-      - /cache/blockchain/block_log_5m:/cache/blockchain/block_log_5m:ro
+      - ./blockchain:/home/hived/datadir/blockchain
 
 volumes:
   haf_datadir:
