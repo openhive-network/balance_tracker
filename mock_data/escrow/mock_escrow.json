@@ -1,5 +1,4 @@
 {
-  
   "operations": [
     {
       "block_num": 90000031,
@@ -44,43 +43,9 @@
         }
       }
     },
-    {
-      "block_num": 90000033,
-      "op_type_id": 31,
-      "op_pos": 1,
-      "trx_in_block": -1,
-      "body": {
-        "type": "escrow_approve_operation",
-        "value": {
-          "from": "cvk",
-          "to": "fnait",
-          "agent": "kush",
-          "escrow_id": 90003002,
-          "who": "fnait",
-          "approve": true
-        }
-      }
-    },
-    {
-      "block_num": 90000034,
-      "op_type_id": 31,
-      "op_pos": 1,
-      "trx_in_block": -1,
-      "body": {
-        "type": "escrow_approve_operation",
-        "value": {
-          "from": "cvk",
-          "to": "fnait",
-          "agent": "kush",
-          "escrow_id": 90003002,
-          "who": "kush",
-          "approve": true
-        }
-      }
-    },
 
     {
-      "block_num": 90000035,
+      "block_num": 90000033,
       "op_type_id": 27,
       "op_pos": 1,
       "trx_in_block": -1,
@@ -100,59 +65,9 @@
         }
       }
     },
-    {
-      "block_num": 90000036,
-      "op_type_id": 31,
-      "op_pos": 1,
-      "trx_in_block": -1,
-      "body": {
-        "type": "escrow_approve_operation",
-        "value": {
-          "from": "cvk",
-          "to": "fnait",
-          "agent": "kush",
-          "escrow_id": 90003003,
-          "who": "fnait",
-          "approve": true
-        }
-      }
-    },
-    {
-      "block_num": 90000037,
-      "op_type_id": 31,
-      "op_pos": 1,
-      "trx_in_block": -1,
-      "body": {
-        "type": "escrow_approve_operation",
-        "value": {
-          "from": "cvk",
-          "to": "fnait",
-          "agent": "kush",
-          "escrow_id": 90003003,
-          "who": "kush",
-          "approve": true
-        }
-      }
-    },
-    {
-      "block_num": 90000038,
-      "op_type_id": 28,
-      "op_pos": 1,
-      "trx_in_block": -1,
-      "body": {
-        "type": "escrow_dispute_operation",
-        "value": {
-          "from": "cvk",
-          "to": "fnait",
-          "agent": "kush",
-          "escrow_id": 90003003,
-          "who": "fnait"
-        }
-      }
-    },
 
     {
-      "block_num": 90000039,
+      "block_num": 90000034,
       "op_type_id": 27,
       "op_pos": 1,
       "trx_in_block": -1,
@@ -172,131 +87,230 @@
         }
       }
     },
+
     {
-      "block_num": 90000040,
-      "op_type_id": 31,
+      "block_num": 90000035,
+      "op_type_id": 27,
       "op_pos": 1,
       "trx_in_block": -1,
       "body": {
-        "type": "escrow_approve_operation",
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003005,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003005\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "500",  "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "1000", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "30",   "precision": 3 },
+          "ratification_deadline": "2025-10-01T16:00:00",
+          "escrow_expiration":     "2025-10-08T16:00:00"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000036,
+      "op_type_id": 89,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approved_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003005,
+          "fee": { "nai": "@@000000021", "amount": "30", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000037,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003006,
+          "json_meta": "{\"type\":\"trade_escrow\",\"tradeId\":\"escrow-demo-90003006\"}",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "800", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "15",  "precision": 3 },
+          "ratification_deadline": "2025-10-01T17:00:00",
+          "escrow_expiration":     "2025-10-08T17:00:00"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000038,
+      "op_type_id": 89,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_approved_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "fee": { "nai": "@@000000021", "amount": "20", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000039,
+      "op_type_id": 28,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_dispute_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "who": "fnait"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000040,
+      "op_type_id": 29,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_release_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003002,
+          "who": "fnait",
+          "receiver": "fnait",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "300", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000041,
+      "op_type_id": 28,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_dispute_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003,
+          "who": "fnait"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000042,
+      "op_type_id": 90,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_rejected_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003003
+        }
+      }
+    },
+
+    {
+      "block_num": 90000043,
+      "op_type_id": 29,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_release_operation",
         "value": {
           "from": "cvk",
           "to": "fnait",
           "agent": "kush",
           "escrow_id": 90003004,
           "who": "fnait",
-          "approve": true
+          "receiver": "fnait",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "100", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000044,
+      "op_type_id": 29,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_release_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003004,
+          "who": "fnait",
+          "receiver": "fnait",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "400", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000045,
+      "op_type_id": 28,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_dispute_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003006,
+          "who": "fnait"
+        }
+      }
+    },
+
+    {
+      "block_num": 90000046,
+      "op_type_id": 29,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_release_operation",
+        "value": {
+          "from": "cvk",
+          "to": "fnait",
+          "agent": "kush",
+          "escrow_id": 90003005,
+          "who": "fnait",
+          "receiver": "fnait",
+          "hbd_amount":  { "nai": "@@000000013", "amount": "200", "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "500", "precision": 3 }
         }
       }
     }
-  ,
-  {
-    "block_num": 90000041,
-    "op_type_id": 89,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_approved_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "escrow_id": 90003002,
-        "fee": { "nai": "@@000000021", "amount": "20", "precision": 3 }
-      }
-    }
-  },
-  {
-    "block_num": 90000042,
-    "op_type_id": 29,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_release_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "escrow_id": 90003002,
-        "who": "fnait",                 
-        "receiver": "fnait", 
-        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
-        "hive_amount": { "nai": "@@000000021", "amount": "300", "precision": 3 }
-      }
-    }
-  },
-
-  {
-    "block_num": 90000043,
-    "op_type_id": 90,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_rejected_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "escrow_id": 90003003,
-        "who": "kush"
-      }
-    }
-  },
-
-  {
-    "block_num": 90000044,
-    "op_type_id": 28,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_dispute_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "escrow_id": 90003004,
-        "who": "fnait"
-      }
-    }
-  },
-  {
-    "block_num": 90000045,
-    "op_type_id": 29,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_release_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "who": "fnait",                 
-        "receiver": "fnait", 
-        "escrow_id": 90003004,
-        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
-        "hive_amount": { "nai": "@@000000021", "amount": "100", "precision": 3 }
-      }
-    }
-  },
-  {
-    "block_num": 90000046,
-    "op_type_id": 29,
-    "op_pos": 1,
-    "trx_in_block": -1,
-    "body": {
-      "type": "escrow_release_operation",
-      "value": {
-        "from": "cvk",
-        "to": "fnait",
-        "agent": "kush",
-        "escrow_id": 90003004,
-        "who": "fnait",
-        "receiver": "fnait",
-        "hbd_amount":  { "nai": "@@000000013", "amount": "0",   "precision": 3 },
-        "hive_amount": { "nai": "@@000000021", "amount": "405", "precision": 3 }
-      }
-    }
-  }
-  
-]
+  ]
 }
