@@ -422,13 +422,41 @@ sync_with_mock_data:
 
     # Ensure sync data is available locally (fetch from NFS if needed)
     LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
+    NFS_TAR="${NFS_CACHE_PATH}.tar"
+
+    # Check if local cache exists and is usable
+    # Service container extractions may have broken symlinks, so validate pg_tblspc
+    LOCAL_CACHE_VALID=false
     if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
+      # Check for broken symlinks in pg_tblspc
+      TBLSPC="${LOCAL_SYNC_CACHE}/datadir/haf_db_store/pgdata/pg_tblspc"
+      if [[ -d "$TBLSPC" ]]; then
+        BROKEN_LINKS=$(find "$TBLSPC" -xtype l 2>/dev/null | wc -l)
+        if [[ "$BROKEN_LINKS" -gt 0 ]]; then
+          echo "Local cache has $BROKEN_LINKS broken symlinks in pg_tblspc, will re-extract"
+          sudo rm -rf "${LOCAL_SYNC_CACHE}" || rm -rf "${LOCAL_SYNC_CACHE}" || true
+        else
+          LOCAL_CACHE_VALID=true
+        fi
+      else
+        LOCAL_CACHE_VALID=true
+      fi
+    fi
+
+    if [[ "$LOCAL_CACHE_VALID" == "true" ]]; then
       echo "Local sync cache found at ${LOCAL_SYNC_CACHE}"
     else
-      echo "Local sync cache not found, checking NFS..."
-      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-      NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
-      if [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Local sync cache not found or invalid, checking NFS..."
+      # Prefer NFS tar extraction over cache-manager for haf_sync type
+      # (cache-manager cp -rL breaks on tablespace symlinks)
+      if [[ -f "$NFS_TAR" ]]; then
+        echo "Extracting from NFS tar: $NFS_TAR"
+        mkdir -p "${LOCAL_SYNC_CACHE}"
+        tar xf "$NFS_TAR" -C "${LOCAL_SYNC_CACHE}"
+        echo "Extracted sync data from NFS tar archive"
+      elif [[ -x "$CACHE_MANAGER" ]]; then
         if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
           echo "Fetched sync data from NFS cache via cache-manager"
         else
@@ -438,11 +466,13 @@ sync_with_mock_data:
       elif [[ -d "$NFS_CACHE_PATH" ]]; then
         echo "Using direct NFS copy (cache-manager not available)"
         mkdir -p "${LOCAL_SYNC_CACHE}"
-        cp -a "${NFS_CACHE_PATH}"/* "${LOCAL_SYNC_CACHE}/" || rsync -a "${NFS_CACHE_PATH}/" "${LOCAL_SYNC_CACHE}/"
-        echo "Fetched sync data from NFS cache via direct copy"
+        # Use tar pipe to preserve symlinks correctly
+        (cd "$NFS_CACHE_PATH" && tar cf - .) | (cd "${LOCAL_SYNC_CACHE}" && tar xf -)
+        echo "Fetched sync data from NFS cache via tar pipe"
       else
         echo "ERROR: No sync data available locally or on NFS"
         echo "  Local path checked: ${LOCAL_SYNC_CACHE}"
+        echo "  NFS tar checked: ${NFS_TAR}"
         echo "  NFS path checked: ${NFS_CACHE_PATH}"
         exit 1
       fi
