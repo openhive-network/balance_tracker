@@ -585,7 +585,7 @@ sync_with_mock_data:
           # This avoids blocking health check while extracting large tar
           echo "NFS tar archive found: $NFS_TAR"
           echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
-          WAIT_TIMEOUT=300
+          WAIT_TIMEOUT=600
           WAIT_INTERVAL=5
           WAITED=0
           while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
@@ -668,7 +668,7 @@ sync_with_mock_data:
           # This avoids blocking health check while extracting large tar
           echo "NFS tar archive found: $NFS_TAR"
           echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
-          WAIT_TIMEOUT=300
+          WAIT_TIMEOUT=600
           WAIT_INTERVAL=5
           WAITED=0
           while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
