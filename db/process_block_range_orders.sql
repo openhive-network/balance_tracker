@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION process_block_range_orders(
     IN _from INT,
     IN _to INT,
     IN _report_step INT DEFAULT 1000
-) 
+)
 RETURNS VOID
 LANGUAGE plpgsql
 VOLATILE
@@ -13,56 +13,33 @@ SET join_collapse_limit = 16
 SET jit = OFF
 AS $func$
 DECLARE
-    _op_create1 INT;
-    _op_create2 INT;
-    _op_fill INT;
-    _op_cancel INT;
-    _op_cancelled INT;
-    __ins_new INT := 0;
-    __del_any INT := 0;
-    __upd_pre INT := 0;
+    _op_create1   INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::limit_order_create_operation'   )::INT;
+    _op_create2   INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::limit_order_create2_operation'  )::INT;
+    _op_fill      INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::fill_order_operation'           )::INT;
+    _op_cancel    INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::limit_order_cancel_operation'   )::INT;
+    _op_cancelled INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::limit_order_cancelled_operation')::INT;
+    __ins_new     INT := 0;
+    __del_any     INT := 0;
+    __upd_pre     INT := 0;
 BEGIN
-    SELECT id INTO _op_create1
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::limit_order_create_operation';
-
-    SELECT id INTO _op_create2
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::limit_order_create2_operation';
-
-    SELECT id INTO _op_fill
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::fill_order_operation';
-
-    SELECT id INTO _op_cancel
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::limit_order_cancel_operation';
-
-    SELECT id INTO _op_cancelled
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::limit_order_cancelled_operation';
-
-    WITH
-    ops_in_range AS (
+    WITH ops_in_range AS (
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, (ov.body)::jsonb AS body
         FROM operations_view ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
     ),
-    events AS MATERIALIZED (
+    events AS ( -- MATERIALIZED (test performance difference without it)
         SELECT
             (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
             e.order_id,
             e.nai,
             e.amount,
-            e.kind,
-            e.side,
             o.op_id,
             o.block_num,
             o.op_type_id
         FROM ops_in_range o
-        CROSS JOIN LATERAL btracker_backend.get_limit_order_events(o.body, o.op_type_id) AS e
+        CROSS JOIN btracker_backend.get_limit_order_events(o.body, o.op_type_id) AS e
     ),
     creates AS (
         SELECT
@@ -73,7 +50,7 @@ BEGIN
             op_id AS create_op_id,
             block_num AS create_block
         FROM events
-        WHERE kind = 'create'
+        WHERE op_type_id IN (_op_create1, _op_create2)
     ),
     fills AS (
         SELECT
@@ -84,7 +61,7 @@ BEGIN
             op_id AS fill_op_id,
             block_num AS fill_block
         FROM events
-        WHERE kind = 'fill'
+        WHERE op_type_id = _op_fill
     ),
     cancels AS (
         SELECT
@@ -93,7 +70,7 @@ BEGIN
             op_id AS cancel_op_id,
             block_num AS cancel_block
         FROM events
-        WHERE kind IN ('cancel', 'cancelled')
+        WHERE op_type_id IN (_op_cancel, _op_cancelled)
     ),
     create_keys AS (
         SELECT DISTINCT owner_id, order_id
