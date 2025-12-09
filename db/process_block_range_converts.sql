@@ -13,28 +13,19 @@ SET join_collapse_limit = 16
 SET jit = OFF
 AS $func$
 DECLARE
-    _op_convert  INT;
-    _op_fillconv INT;
+    _op_convert  INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::convert_operation')::INT;
+    _op_fillconv INT := (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::fill_convert_request_operation')::INT;
     __upd_pre    INT := 0;
     __ins_new    INT := 0;
     __del_any    INT := 0;
 BEGIN
-    SELECT id INTO _op_convert
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::convert_operation';
-
-    SELECT id INTO _op_fillconv
-    FROM hafd.operation_types
-    WHERE name = 'hive::protocol::fill_convert_request_operation';
-
-    WITH
-    ops_in_range AS (
+    WITH ops_in_range AS (
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body
         FROM operations_view ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_convert, _op_fillconv)
     ),
-    events AS MATERIALIZED (
+    events AS ( -- MATERIALIZED (test performance difference without it)
         SELECT
             (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
@@ -46,7 +37,7 @@ BEGIN
             o.block_num,
             o.body
         FROM ops_in_range o
-        CROSS JOIN LATERAL btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
+        CROSS JOIN btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
     ),
     creates AS (
         SELECT
