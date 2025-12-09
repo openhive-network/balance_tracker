@@ -571,7 +571,7 @@ sync_with_mock_data:
       ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
       ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
 
-      # If original path doesn't exist, try NFS fallback or wait for job to extract
+      # If original path doesn't exist, try NFS fallback
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
         NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
@@ -581,25 +581,15 @@ sync_with_mock_data:
           echo "Found data on NFS (directory): $NFS_PATH"
           export DATA_SOURCE="$NFS_PATH"
         elif [[ -f "$NFS_TAR" ]]; then
-          # NFS tar exists - wait for job's before_script to extract it
-          # This avoids blocking health check while extracting large tar
+          # Extract NFS tar to local cache
+          # Note: Job and service containers have separate /cache/ mounts,
+          # so service must extract its own copy
           echo "NFS tar archive found: $NFS_TAR"
-          echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
-          WAIT_TIMEOUT=600
-          WAIT_INTERVAL=5
-          WAITED=0
-          while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
-            sleep $WAIT_INTERVAL
-            WAITED=$((WAITED + WAIT_INTERVAL))
-            echo "  Waiting... ($WAITED/${WAIT_TIMEOUT}s)"
-          done
-          if [[ -d "${ORIGINAL_SOURCE}/datadir" ]]; then
-            echo "Data extracted successfully after ${WAITED}s"
-            export DATA_SOURCE="${ORIGINAL_SOURCE}"
-          else
-            echo "ERROR: Timeout waiting for data extraction"
-            exit 1
-          fi
+          echo "Extracting to ${ORIGINAL_SOURCE}..."
+          mkdir -p "${ORIGINAL_SOURCE}"
+          tar xf "$NFS_TAR" -C "${ORIGINAL_SOURCE}"
+          echo "Extraction complete"
+          export DATA_SOURCE="${ORIGINAL_SOURCE}"
         else
           echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
@@ -654,7 +644,7 @@ sync_with_mock_data:
       ls -la /cache/ 2>/dev/null | head -5 || echo "  /cache/ not accessible"
       ls -la /nfs/ci-cache/ 2>/dev/null | head -5 || echo "  /nfs/ci-cache/ not accessible"
 
-      # If original path doesn't exist, try NFS fallback or wait for job to extract
+      # If original path doesn't exist, try NFS fallback
       if [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]]; then
         echo "Local cache not found: ${ORIGINAL_SOURCE}/datadir"
         NFS_PATH="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}"
@@ -664,25 +654,15 @@ sync_with_mock_data:
           echo "Found data on NFS (directory): $NFS_PATH"
           export DATA_SOURCE="$NFS_PATH"
         elif [[ -f "$NFS_TAR" ]]; then
-          # NFS tar exists - wait for job's before_script to extract it
-          # This avoids blocking health check while extracting large tar
+          # Extract NFS tar to local cache
+          # Note: Job and service containers have separate /cache/ mounts,
+          # so service must extract its own copy
           echo "NFS tar archive found: $NFS_TAR"
-          echo "Waiting for job to extract data to ${ORIGINAL_SOURCE}..."
-          WAIT_TIMEOUT=600
-          WAIT_INTERVAL=5
-          WAITED=0
-          while [[ ! -d "${ORIGINAL_SOURCE}/datadir" ]] && [[ $WAITED -lt $WAIT_TIMEOUT ]]; do
-            sleep $WAIT_INTERVAL
-            WAITED=$((WAITED + WAIT_INTERVAL))
-            echo "  Waiting... ($WAITED/${WAIT_TIMEOUT}s)"
-          done
-          if [[ -d "${ORIGINAL_SOURCE}/datadir" ]]; then
-            echo "Data extracted successfully after ${WAITED}s"
-            export DATA_SOURCE="${ORIGINAL_SOURCE}"
-          else
-            echo "ERROR: Timeout waiting for data extraction"
-            exit 1
-          fi
+          echo "Extracting to ${ORIGINAL_SOURCE}..."
+          mkdir -p "${ORIGINAL_SOURCE}"
+          tar xf "$NFS_TAR" -C "${ORIGINAL_SOURCE}"
+          echo "Extraction complete"
+          export DATA_SOURCE="${ORIGINAL_SOURCE}"
         else
           echo "ERROR: Data not found in local or NFS cache"
           echo "Checked: ${ORIGINAL_SOURCE}/datadir"
