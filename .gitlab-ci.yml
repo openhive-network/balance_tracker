@@ -731,6 +731,25 @@ sync_with_mock_data:
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
 
+# Combined before script for pytest jobs: NFS extraction + pytest setup
+.extract-nfs-cache-pytest-before-script: &extract-nfs-cache-pytest-before-script
+  - |
+    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
+      echo "Extracting NFS cache for service container..."
+      mkdir -p "${LOCAL_CACHE}"
+      tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
+      echo "Extraction complete: ${LOCAL_CACHE}"
+    else
+      echo "Local cache exists or NFS tar not found, skipping extraction"
+    fi
+  - python3 -m venv venv/
+  - . venv/bin/activate
+  - echo "Entering ${POETRY_INSTALL_ROOT_DIR}"
+  - cd "${POETRY_INSTALL_ROOT_DIR}"
+  - poetry install
+
 # Before script for mock data extraction
 .extract-nfs-cache-mock-before-script: &extract-nfs-cache-mock-before-script
   - |
@@ -744,6 +763,25 @@ sync_with_mock_data:
     else
       echo "Local cache exists or NFS tar not found, skipping extraction"
     fi
+
+# Combined before script for pytest jobs with mock data: NFS extraction + pytest setup
+.extract-nfs-cache-mock-pytest-before-script: &extract-nfs-cache-mock-pytest-before-script
+  - |
+    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    if [[ ! -d "${LOCAL_CACHE}/datadir" ]] && [[ -f "$NFS_TAR" ]]; then
+      echo "Extracting NFS cache for service container (mock)..."
+      mkdir -p "${LOCAL_CACHE}"
+      tar xf "$NFS_TAR" -C "${LOCAL_CACHE}"
+      echo "Extraction complete: ${LOCAL_CACHE}"
+    else
+      echo "Local cache exists or NFS tar not found, skipping extraction"
+    fi
+  - python3 -m venv venv/
+  - . venv/bin/activate
+  - echo "Entering ${POETRY_INSTALL_ROOT_DIR}"
+  - cd "${POETRY_INSTALL_ROOT_DIR}"
+  - poetry install
 
 regression-test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-11
@@ -848,7 +886,7 @@ pattern-test:
   services:
   - *haf-instance-with-nfs-fallback
   - *postgrest-service
-  before_script: *extract-nfs-cache-before-script
+  before_script: *extract-nfs-cache-pytest-before-script
   variables:
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
@@ -880,7 +918,7 @@ pattern-test-with-mock-data:
   services:
   - *haf-instance-with-nfs-fallback-mock
   - *postgrest-service
-  before_script: *extract-nfs-cache-mock-before-script
+  before_script: *extract-nfs-cache-mock-pytest-before-script
   variables:
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
     PYTEST_BASED_IMAGE_NAME: $BUILDER_IMAGE_PATH
