@@ -17,6 +17,8 @@ services:
       - haf_datadir:/home/hived/datadir
       - haf_shmdir:/home/hived/shm_dir
       - ./scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
+      # Mount shared block_log so symlinks in datadir/blockchain work
+      - /cache/blockchain/block_log_5m:/cache/blockchain/block_log_5m:ro
 
 volumes:
   haf_datadir:
