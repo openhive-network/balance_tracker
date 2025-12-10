@@ -1,0 +1,36 @@
+services:
+  haf:
+    environment:
+      PGCTLTIMEOUT: 600
+      PG_ACCESS: "
+        host    all    all    all    trust\n
+        "
+      # HAF must replay from blockchain since prepare_haf_data only caches
+      # Hive data (blockchain, shared_memory.bin), not PostgreSQL database.
+      # Same as reputation_tracker - replay every time in sync job.
+      HAF_COMMAND: "--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000"
+    ports:
+      - 5432:5432
+    # Override base docker-compose.yml volumes
+    # Keep ./blockchain bind mount to provide blockchain files (copied with cp -aL to dereference symlinks)
+    # This is needed because datadir/blockchain contains symlinks to /cache/blockchain/block_log_5m/
+    # which isn't accessible inside Docker Compose containers in DinD environment
+    volumes:
+      - haf_datadir:/home/hived/datadir
+      - haf_shmdir:/home/hived/shm_dir
+      - ./scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
+      - ./blockchain:/home/hived/datadir/blockchain
+
+volumes:
+  haf_datadir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_DATA_DIRECTORY}/
+  haf_shmdir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_SHM_DIRECTORY}/
