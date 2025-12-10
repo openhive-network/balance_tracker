@@ -315,8 +315,8 @@ sync:
       echo "Removing shared_memory.bin, comments-rocksdb-storage, and pgdata to force HAF replay into PostgreSQL"
       rm -f "${SHM_DIR}/shared_memory.bin"
       rm -rf "${SHM_DIR}/comments-rocksdb-storage"
-      rm -rf "${DATADIR}/haf_db_store/pgdata"
-      rm -rf "${DATADIR}/haf_db_store/tablespace"
+      sudo rm -rf "${DATADIR}/haf_db_store/pgdata"
+      sudo rm -rf "${DATADIR}/haf_db_store/tablespace"
     fi
 
     # Note: pgdata and tablespace were removed above to force fresh database initialization.
