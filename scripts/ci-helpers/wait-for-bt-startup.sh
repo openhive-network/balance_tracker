@@ -60,6 +60,8 @@ export POSTGRES_ACCESS
 export COMMAND
 export MESSAGE
 
-timeout -k 1m 10m bash -c wait-for-bt-startup
+# HAF replay of 5M blocks takes ~50 minutes, plus Balance Tracker sync time
+# Total timeout: 90 minutes (60m replay + 30m sync buffer)
+timeout -k 1m 90m bash -c wait-for-bt-startup
       
 echo "Block processing is finished."
