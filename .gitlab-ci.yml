@@ -264,6 +264,7 @@ sync:
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
     HAF_SHM_DIRECTORY: ${SHM_DIR}
+    SHARED_BLOCK_LOG_DIR: ${BLOCK_LOG_SOURCE_DIR_5M}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/ci.yml
