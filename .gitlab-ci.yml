@@ -366,8 +366,9 @@ sync:
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
     # Save sync data to local cache with commit-based key (not pipeline ID)
+    # Use /cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY} to match what test jobs expect
     # Remove old cache first to ensure clean copy (cp -a merges, doesn't replace)
-    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    LOCAL_SYNC_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
     sudo rm -rf "${LOCAL_SYNC_CACHE}"
     mkdir -p "${LOCAL_SYNC_CACHE}"
     sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE}"
@@ -439,7 +440,7 @@ sync_with_mock_data:
 
     # Ensure sync data is available locally (fetch from NFS if needed)
     echo "DEBUG: Setting up cache paths..."
-    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    LOCAL_SYNC_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
     CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
     NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
     NFS_TAR="${NFS_CACHE_PATH}.tar"
@@ -575,8 +576,9 @@ sync_with_mock_data:
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
     # Save mock sync data to local cache with commit-based key
+    # Use /cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK} to match what test jobs expect
     # Remove old cache first to ensure clean copy (cp -a merges, doesn't replace)
-    LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
+    LOCAL_SYNC_CACHE_MOCK="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
     sudo rm -rf "${LOCAL_SYNC_CACHE_MOCK}"
     mkdir -p "${LOCAL_SYNC_CACHE_MOCK}"
     sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE_MOCK}"
