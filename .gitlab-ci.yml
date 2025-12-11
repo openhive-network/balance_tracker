@@ -420,7 +420,8 @@ sync_with_mock_data:
   - job: docker-ci-runner-build
     artifacts: true
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+    # DATA_SOURCE must match LOCAL_SYNC_CACHE in before_script where NFS tar is extracted
+    DATA_SOURCE: /cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
