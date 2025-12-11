@@ -340,7 +340,7 @@ sync:
 
     # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
     # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
-    rm -rf "${DATADIR}/blockchain"
+    sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
@@ -551,7 +551,7 @@ sync_with_mock_data:
 
     # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
     # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
-    rm -rf "${DATADIR}/blockchain"
+    sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
