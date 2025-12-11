@@ -362,6 +362,13 @@ sync:
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
+
+    # Force PostgreSQL checkpoint before stopping for clean cache
+    # This ensures pg_controldata reports the correct checkpoint WAL for cache-manager
+    echo "Running PostgreSQL CHECKPOINT before shutdown..."
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" 2>/dev/null || true
+
+    # Stop containers - PostgreSQL will do a clean shutdown after checkpoint
     docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
     popd
 
@@ -575,6 +582,13 @@ sync_with_mock_data:
     docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs fill-db-with-mock-data > fill-db-with-mock-data.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
+
+    # Force PostgreSQL checkpoint before stopping for clean cache
+    # This ensures pg_controldata reports the correct checkpoint WAL for cache-manager
+    echo "Running PostgreSQL CHECKPOINT before shutdown..."
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" 2>/dev/null || true
+
+    # Stop containers - PostgreSQL will do a clean shutdown after checkpoint
     docker compose "${COMPOSE_OPTIONS[@]}" down --volumes
     popd
 
