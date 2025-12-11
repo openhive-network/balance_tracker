@@ -317,6 +317,8 @@ sync:
       rm -rf "${SHM_DIR}/comments-rocksdb-storage"
       sudo rm -rf "${DATADIR}/haf_db_store/pgdata"
       sudo rm -rf "${DATADIR}/haf_db_store/tablespace"
+      # Fix permissions so container can create pgdata (runs as hived user)
+      sudo chmod 777 "${DATADIR}/haf_db_store"
     fi
 
     # Note: pgdata and tablespace were removed above to force fresh database initialization.
