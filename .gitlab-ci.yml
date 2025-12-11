@@ -620,7 +620,7 @@ sync_with_mock_data:
   - fast
 
 # HAF instance with NFS fallback for sync data via copy_datadir.sh
-# Uses entrypoint wrapper to wait for DATA_SOURCE before HAF starts (extracted by job's before_script)
+# copy_datadir.sh has resolve_data_source() which extracts from NFS if local cache not found
 .haf-instance-with-nfs-fallback: &haf-instance-with-nfs-fallback
   name: ${HAF_IMAGE_NAME}
   alias: haf-instance
@@ -634,11 +634,10 @@ sync_with_mock_data:
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
     SHARED_BLOCK_LOG_DIR: "/blockchain/block_log_5m"
-  entrypoint: ["/bin/bash", "-c", "echo 'Waiting for DATA_SOURCE...'; waited=0; while [ ! -d \"${DATA_SOURCE}/datadir\" ] && [ $waited -lt 120 ]; do sleep 2; waited=$((waited+2)); echo \"  Waiting... ($waited/120s)\"; done; if [ -d \"${DATA_SOURCE}/datadir\" ]; then echo 'DATA_SOURCE ready'; exec /home/haf_admin/docker_entrypoint.sh \"$@\"; else echo 'ERROR: DATA_SOURCE not available'; exit 1; fi", "--"]
   command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
 
 # HAF instance with NFS fallback for mock sync data via copy_datadir.sh
-# Uses entrypoint wrapper to wait for DATA_SOURCE before HAF starts (extracted by job's before_script)
+# copy_datadir.sh has resolve_data_source() which extracts from NFS if local cache not found
 .haf-instance-with-nfs-fallback-mock: &haf-instance-with-nfs-fallback-mock
   name: ${HAF_IMAGE_NAME}
   alias: haf-instance
@@ -652,7 +651,6 @@ sync_with_mock_data:
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
     SHARED_BLOCK_LOG_DIR: "/blockchain/block_log_5m"
-  entrypoint: ["/bin/bash", "-c", "echo 'Waiting for DATA_SOURCE...'; waited=0; while [ ! -d \"${DATA_SOURCE}/datadir\" ] && [ $waited -lt 120 ]; do sleep 2; waited=$((waited+2)); echo \"  Waiting... ($waited/120s)\"; done; if [ -d \"${DATA_SOURCE}/datadir\" ]; then echo 'DATA_SOURCE ready'; exec /home/haf_admin/docker_entrypoint.sh \"$@\"; else echo 'ERROR: DATA_SOURCE not available'; exit 1; fi", "--"]
   command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
 
 .postgrest-service: &postgrest-service
