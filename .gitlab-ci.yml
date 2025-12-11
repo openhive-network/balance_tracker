@@ -366,7 +366,9 @@ sync:
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
     # Save sync data to local cache with commit-based key (not pipeline ID)
+    # Remove old cache first to ensure clean copy (cp -a merges, doesn't replace)
     LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+    sudo rm -rf "${LOCAL_SYNC_CACHE}"
     mkdir -p "${LOCAL_SYNC_CACHE}"
     sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE}"
     sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE}"
@@ -573,7 +575,9 @@ sync_with_mock_data:
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
     # Save mock sync data to local cache with commit-based key
+    # Remove old cache first to ensure clean copy (cp -a merges, doesn't replace)
     LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
+    sudo rm -rf "${LOCAL_SYNC_CACHE_MOCK}"
     mkdir -p "${LOCAL_SYNC_CACHE_MOCK}"
     sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE_MOCK}"
     sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE_MOCK}"
@@ -621,6 +625,7 @@ sync_with_mock_data:
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
+    SHARED_BLOCK_LOG_DIR: "/blockchain/block_log_5m"
   command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
 
 # HAF instance with NFS fallback for mock sync data via copy_datadir.sh
@@ -636,6 +641,7 @@ sync_with_mock_data:
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
+    SHARED_BLOCK_LOG_DIR: "/blockchain/block_log_5m"
   command: ["--execute-maintenance-script=${HAF_SOURCE_DIR}/scripts/maintenance-scripts/sleep_infinity.sh"]
 
 .postgrest-service: &postgrest-service
