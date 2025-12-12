@@ -6,7 +6,7 @@ services:
     command: $${HAF_COMMAND}
     environment:
       HIVED_UID:
-      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
+      HAF_COMMAND: --skip-hived
       DATADIR: /home/hived/datadir
       SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "
