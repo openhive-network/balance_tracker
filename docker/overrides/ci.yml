@@ -5,8 +5,6 @@ services:
       PG_ACCESS: "
         host    all    all    all    trust\n
         "
-      # Use pre-replayed HAF data from NFS cache - just run PostgreSQL without hived
-      HAF_COMMAND: "--skip-hived"
     ports:
       - 5432:5432
     # Override base docker-compose.yml volumes

@@ -64,7 +64,6 @@ pushd "${CI_PROJECT_DIR}/docker"
 
 cat <<-EOF | tee ci.env
     BACKEND_VERSION=${BACKEND_VERSION:-latest}
-    HAF_COMMAND=--skip-hived
     HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY:-/srv/haf/data}
     HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY:-/srv/haf/shm}
     HAF_REGISTRY=${HAF_REGISTRY_PATH:-registry.gitlab.syncad.com/hive/haf/instance}
