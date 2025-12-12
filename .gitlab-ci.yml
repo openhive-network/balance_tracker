@@ -313,10 +313,10 @@ sync:
     # By removing all three, hived will initialize a fresh database and replay all blocks.
     if [[ -f "${SHM_DIR}/shared_memory.bin" ]]; then
       echo "Removing shared_memory.bin, comments-rocksdb-storage, and pgdata to force HAF replay into PostgreSQL"
-      rm -f "${SHM_DIR}/shared_memory.bin"
-      rm -rf "${SHM_DIR}/comments-rocksdb-storage"
-      rm -rf "${DATADIR}/haf_db_store/pgdata"
-      rm -rf "${DATADIR}/haf_db_store/tablespace"
+      sudo rm -f "${SHM_DIR}/shared_memory.bin"
+      sudo rm -rf "${SHM_DIR}/comments-rocksdb-storage"
+      sudo rm -rf "${DATADIR}/haf_db_store/pgdata"
+      sudo rm -rf "${DATADIR}/haf_db_store/tablespace"
     fi
 
     # Note: pgdata and tablespace were removed above to force fresh database initialization.
@@ -337,7 +337,7 @@ sync:
 
     # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
     # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
-    rm -rf "${DATADIR}/blockchain"
+    sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
@@ -545,7 +545,7 @@ sync_with_mock_data:
 
     # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
     # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
-    rm -rf "${DATADIR}/blockchain"
+    sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
