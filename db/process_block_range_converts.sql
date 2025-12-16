@@ -25,9 +25,8 @@ BEGIN
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_convert, _op_fillconv)
     ),
-    events AS ( -- MATERIALIZED (test performance difference without it)
+    events_raw AS MATERIALIZED (
         SELECT
-            (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
             e.request_id,
             e.nai,
@@ -38,6 +37,28 @@ BEGIN
             o.body
         FROM ops_in_range o
         CROSS JOIN btracker_backend.get_convert_events(o.body, o.op_type_id) AS e
+    ),
+    account_names AS (
+        SELECT DISTINCT owner FROM events_raw
+    ),
+    account_ids AS MATERIALIZED (
+        SELECT av.name AS account_name, av.id AS account_id
+        FROM accounts_view av
+        WHERE av.name IN (SELECT owner FROM account_names)
+    ),
+    events AS MATERIALIZED (
+        SELECT
+            ai.account_id AS owner_id,
+            er.owner,
+            er.request_id,
+            er.nai,
+            er.amount_in,
+            er.op_type_id,
+            er.op_id,
+            er.block_num,
+            er.body
+        FROM events_raw er
+        JOIN account_ids ai ON ai.account_name = er.owner
     ),
     creates AS (
         SELECT

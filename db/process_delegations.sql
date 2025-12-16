@@ -150,16 +150,20 @@ add_prev_delegation AS (
   1       5        5 - 1
   0       1          1
 */
-
+-- Combine LAG and ROW_NUMBER in same pass using WINDOW clause
 delegation_delta AS MATERIALIZED (
-  SELECT 
+  SELECT
     delegator,
     delegatee,
     balance,
-    balance - LAG(balance, 1, 0) OVER (PARTITION BY delegator, delegatee ORDER BY source_op) AS balance_delta,
+    balance - LAG(balance, 1, 0) OVER w_asc AS balance_delta,
     source_op,
-    source_op_block
-  FROM add_prev_delegation 
+    source_op_block,
+    ROW_NUMBER() OVER w_desc AS rn
+  FROM add_prev_delegation
+  WINDOW
+    w_asc AS (PARTITION BY delegator, delegatee ORDER BY source_op),
+    w_desc AS (PARTITION BY delegator, delegatee ORDER BY source_op DESC)
 ),
 ---------------------------------------------------------------------------------------
 -- sum received and delegated vests
@@ -205,15 +209,16 @@ sum_delegations AS (
   FROM union_delegations ud
   GROUP BY ud.account_id
 ),
+-- Use rn = 1 filter instead of JOIN to get newest delegation pairs
 prepare_newest_delegation_pairs AS MATERIALIZED (
-  SELECT 
+  SELECT
     dd.delegator,
     dd.delegatee,
     dd.balance,
     dd.source_op,
     dd.source_op_block
-  FROM delegation_delta dd 
-  JOIN group_by_delegator_delegatee gb ON gb.delegator = dd.delegator AND gb.delegatee = dd.delegatee AND gb.source_op = dd.source_op
+  FROM delegation_delta dd
+  WHERE dd.rn = 1 AND dd.source_op > 0
 ),
 ---------------------------------------------------------------------------------------
 insert_current_delegations AS (

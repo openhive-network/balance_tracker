@@ -39,11 +39,21 @@ BEGIN
       ov.block_num BETWEEN _from AND _to AND
       ov.op_type_id IN (__op_transfer, __op_release, __op_approved, __op_rejected, __op_dispute)
   ),
+  --------------------- BATCH ACCOUNT LOOKUPS ---------------------
+  all_account_names AS (
+    SELECT DISTINCT (o.body->'value'->>'from')::TEXT AS account_name
+    FROM ops_in_range o
+  ),
+  account_ids AS MATERIALIZED (
+    SELECT av.name AS account_name, av.id AS account_id
+    FROM accounts_view av
+    WHERE av.name IN (SELECT account_name FROM all_account_names)
+  ),
   --------------------- GET ESCROW EVENTS ---------------------
-  escrow_transfers AS (
+  escrow_transfers AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      ai.account_id AS from_id,
       e.escrow_id,
       e.hive_nai,
       e.hive_amount,
@@ -51,12 +61,13 @@ BEGIN
       e.hbd_amount
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_transfers(o.body) AS e
+    JOIN account_ids ai ON ai.account_name = e.from_name
     WHERE o.op_type_id = __op_transfer
   ),
-  escrow_releases AS (
+  escrow_releases AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      ai.account_id AS from_id,
       e.escrow_id,
       e.hive_nai,
       e.hive_amount,
@@ -64,43 +75,48 @@ BEGIN
       e.hbd_amount
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_release(o.body) AS e
+    JOIN account_ids ai ON ai.account_name = e.from_name
     WHERE o.op_type_id = __op_release
   ),
-  escrow_fees AS (
+  escrow_fees AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      ai.account_id AS from_id,
       e.escrow_id,
       e.nai,
       e.amount
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_fees(o.body) AS e
+    JOIN account_ids ai ON ai.account_name = e.from_name
     WHERE o.op_type_id = __op_transfer
   ),
-  escrow_rejects AS (
+  escrow_rejects AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      ai.account_id AS from_id,
       e.escrow_id
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_rejects (o.body) AS e
+    JOIN account_ids ai ON ai.account_name = e.from_name
     WHERE o.op_type_id = __op_rejected
   ),
-  escrow_approved AS (
+  escrow_approved AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = e.from_name) AS from_id,
+      ai.account_id AS from_id,
       e.escrow_id
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_approves(o.body) AS e
+    JOIN account_ids ai ON ai.account_name = e.from_name
     WHERE o.op_type_id = __op_approved
   ),
-  escrow_disputes AS (
+  escrow_disputes AS MATERIALIZED (
     SELECT
       o.op_id,
-      (SELECT av.id FROM accounts_view av WHERE av.name = (o.body->'value'->>'from')::TEXT) AS from_id,
+      ai.account_id AS from_id,
       (o.body->'value'->>'escrow_id')::BIGINT AS escrow_id
     FROM ops_in_range o
+    JOIN account_ids ai ON ai.account_name = (o.body->'value'->>'from')::TEXT
     WHERE o.op_type_id = __op_dispute
   ),
   --------------------- UNIQUE DISPUTES ---------------------
@@ -162,14 +178,11 @@ BEGIN
     SELECT
       ct.*
     FROM create_transfers_in_range ct
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM unique_escrow_rejects er
-      WHERE
-        er.from_id = ct.from_id AND
-        er.escrow_id = ct.escrow_id AND
-        er.op_id > ct.op_id
-    )
+    LEFT JOIN unique_escrow_rejects er ON
+      er.from_id = ct.from_id AND
+      er.escrow_id = ct.escrow_id AND
+      er.op_id > ct.op_id
+    WHERE er.from_id IS NULL
   ),
   releases_related_to_in_range_transfers AS (
     SELECT
@@ -239,45 +252,37 @@ BEGIN
       er.op_id
     FROM unique_escrow_rejects er
     -- exclude rejections that relate to transfers created in the range
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM create_transfers_in_range frt
-      WHERE
-        frt.from_id = er.from_id AND
-        frt.escrow_id = er.escrow_id AND
-        frt.op_id > er.op_id
-    )
+    LEFT JOIN create_transfers_in_range frt ON
+      frt.from_id = er.from_id AND
+      frt.escrow_id = er.escrow_id AND
+      frt.op_id > er.op_id
+    WHERE frt.from_id IS NULL
   ),
   --------------------- RELEASES PRE-RANGE CREATED TRANSFERS---------------------
   releases_to_pre_range_transfers AS (
     SELECT
-      from_id,
-      escrow_id,
-      hive_nai,
-      hive_amount,
-      hbd_nai,
-      hbd_amount,
-      op_id
+      er.from_id,
+      er.escrow_id,
+      er.hive_nai,
+      er.hive_amount,
+      er.hbd_nai,
+      er.hbd_amount,
+      er.op_id
     FROM escrow_releases er
     -- only those releases that relate to transfers created before the range (not in create_transfers_in_range)
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM create_transfers_in_range frt
-      WHERE frt.from_id = er.from_id AND frt.escrow_id = er.escrow_id
-    )
+    LEFT JOIN create_transfers_in_range frt ON
+      frt.from_id = er.from_id AND frt.escrow_id = er.escrow_id
+    WHERE frt.from_id IS NULL
   ),
   filter_out_rejected_releases AS (
     SELECT
       rt.*
     FROM releases_to_pre_range_transfers rt
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM unique_escrow_rejects er
-      WHERE
-        er.from_id = rt.from_id AND
-        er.escrow_id = rt.escrow_id AND
-        er.op_id > rt.op_id
-    )
+    LEFT JOIN unique_escrow_rejects er ON
+      er.from_id = rt.from_id AND
+      er.escrow_id = rt.escrow_id AND
+      er.op_id > rt.op_id
+    WHERE er.from_id IS NULL
   ),
   aggregate_releases_to_pre_range_transfers AS (
     SELECT
@@ -348,26 +353,20 @@ BEGIN
       ef.nai,
       ef.amount
     FROM unique_escrow_fees ef
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM unique_escrow_approves ea
-      WHERE
-        ea.from_id = ef.from_id AND
-        ea.escrow_id = ef.escrow_id AND
-        ea.op_id > ef.op_id
-    )
+    LEFT JOIN unique_escrow_approves ea ON
+      ea.from_id = ef.from_id AND
+      ea.escrow_id = ef.escrow_id AND
+      ea.op_id > ef.op_id
+    WHERE ea.from_id IS NULL
   ),
   filter_out_deleted_fees AS (
     SELECT
       uf.*
     FROM not_approved_fees uf
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM union_deletions ud
-      WHERE
-        ud.from_id = uf.from_id AND
-        ud.escrow_id = uf.escrow_id
-    )
+    LEFT JOIN union_deletions ud ON
+      ud.from_id = uf.from_id AND
+      ud.escrow_id = uf.escrow_id
+    WHERE ud.from_id IS NULL
   ),
   --------------------- PREPARE FEE DELETIONS  ---------------------
   fee_approved_pre_range AS (
@@ -375,14 +374,11 @@ BEGIN
       ea.from_id,
       ea.escrow_id
     FROM unique_escrow_approves ea
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM unique_escrow_fees ef
-      WHERE
-        ef.from_id = ea.from_id AND
-        ef.escrow_id = ea.escrow_id AND
-        ef.op_id > ea.op_id
-    )
+    LEFT JOIN unique_escrow_fees ef ON
+      ef.from_id = ea.from_id AND
+      ef.escrow_id = ea.escrow_id AND
+      ef.op_id > ea.op_id
+    WHERE ef.from_id IS NULL
   ),
   union_fee_deletions AS (
     SELECT
