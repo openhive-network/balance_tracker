@@ -28,9 +28,8 @@ BEGIN
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
     ),
-    events AS ( -- MATERIALIZED (test performance difference without it)
+    events_raw AS MATERIALIZED (
         SELECT
-            (SELECT av.id FROM accounts_view av WHERE av.name = e.owner) AS owner_id,
             e.owner,
             e.order_id,
             e.nai,
@@ -41,7 +40,28 @@ BEGIN
         FROM ops_in_range o
         CROSS JOIN btracker_backend.get_limit_order_events(o.body, o.op_type_id) AS e
     ),
-    creates AS (
+    account_names AS (
+        SELECT DISTINCT owner FROM events_raw
+    ),
+    account_ids AS MATERIALIZED (
+        SELECT av.name AS account_name, av.id AS account_id
+        FROM accounts_view av
+        WHERE av.name IN (SELECT owner FROM account_names)
+    ),
+    events AS MATERIALIZED (
+        SELECT
+            ai.account_id AS owner_id,
+            er.owner,
+            er.order_id,
+            er.nai,
+            er.amount,
+            er.op_id,
+            er.block_num,
+            er.op_type_id
+        FROM events_raw er
+        JOIN account_ids ai ON ai.account_name = er.owner
+    ),
+    creates AS MATERIALIZED (
         SELECT
             owner_id,
             order_id,
@@ -52,7 +72,7 @@ BEGIN
         FROM events
         WHERE op_type_id IN (_op_create1, _op_create2)
     ),
-    fills AS (
+    fills AS MATERIALIZED (
         SELECT
             owner_id,
             order_id,
@@ -63,7 +83,7 @@ BEGIN
         FROM events
         WHERE op_type_id = _op_fill
     ),
-    cancels AS (
+    cancels AS MATERIALIZED (
         SELECT
             owner_id,
             order_id,
@@ -154,20 +174,16 @@ BEGIN
           ON (fal.owner_id, fal.order_id, fal.nai) = (c.owner_id, c.order_id, c.nai)
     ),
     survivors AS (
-        SELECT DISTINCT ON (owner_id, order_id)
-               owner_id,
-               order_id,
-               nai,
-               remaining,
-               block_created
+        SELECT DISTINCT ON (rc.owner_id, rc.order_id)
+               rc.owner_id,
+               rc.order_id,
+               rc.nai,
+               rc.remaining,
+               rc.block_created
         FROM remaining_calc rc
-        WHERE rc.remaining > 0
-          AND NOT EXISTS (
-              SELECT 1
-              FROM canceled_after_latest x
-              WHERE (x.owner_id, x.order_id) = (rc.owner_id, rc.order_id)
-          )
-        ORDER BY owner_id, order_id, block_created DESC, nai DESC
+        LEFT JOIN canceled_after_latest cal ON (cal.owner_id, cal.order_id) = (rc.owner_id, rc.order_id)
+        WHERE rc.remaining > 0 AND cal.owner_id IS NULL
+        ORDER BY rc.owner_id, rc.order_id, rc.block_created DESC, rc.nai DESC
     ),
     ins_new AS (
         INSERT INTO order_state (owner_id, order_id, nai, remaining, block_created)

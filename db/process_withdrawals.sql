@@ -20,7 +20,7 @@ BEGIN
 -----------------------------------------WITHDRAWALS---------------------------------------------
 WITH process_block_range_data_b AS MATERIALIZED
 (
-  SELECT 
+  SELECT
     impacted_withdraws.account_name,
     impacted_withdraws.withdrawn,
     impacted_withdraws.vesting_withdraw_rate,
@@ -28,33 +28,43 @@ WITH process_block_range_data_b AS MATERIALIZED
     ov.id AS source_op
   FROM operations_view ov
   CROSS JOIN btracker_backend.get_impacted_withdraws(ov.body, ov.op_type_id, ov.block_num) AS impacted_withdraws
-  WHERE 
-    ov.op_type_id IN (4,68) AND 
+  WHERE
+    ov.op_type_id IN (4,68) AND
     ov.block_num BETWEEN _from AND _to
 ),
-group_by_account AS (
-  SELECT 
+group_by_account AS MATERIALIZED (
+  SELECT
     account_name,
     withdrawn,
     vesting_withdraw_rate,
     to_withdraw,
     source_op,
-    ROW_NUMBER() OVER (PARTITION BY account_name ORDER BY source_op DESC) AS row_num
+    ROW_NUMBER() OVER w_account_desc AS row_num
   FROM process_block_range_data_b
+  WINDOW w_account_desc AS (PARTITION BY account_name ORDER BY source_op DESC)
+),
+account_names_withdrawal AS (
+  SELECT DISTINCT account_name FROM group_by_account WHERE row_num = 1
+),
+account_ids_withdrawal AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM account_names_withdrawal)
 ),
 join_latest_withdraw AS (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = account_name) AS account_id,
-    withdrawn,
-    vesting_withdraw_rate,
-    to_withdraw,
-    source_op
-  FROM group_by_account
-  WHERE row_num = 1
+  SELECT
+    ai.account_id,
+    gba.withdrawn,
+    gba.vesting_withdraw_rate,
+    gba.to_withdraw,
+    gba.source_op
+  FROM group_by_account gba
+  JOIN account_ids_withdrawal ai ON ai.account_name = gba.account_name
+  WHERE gba.row_num = 1
 )
 INSERT INTO account_withdraws
   (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
-SELECT 
+SELECT
   jlw.account_id,
   jlw.vesting_withdraw_rate,
   jlw.to_withdraw,
@@ -70,37 +80,50 @@ DO UPDATE SET
 
 -----------------------------------------WITHDRAWAL ROUTES---------------------------------------------
 WITH process_block_range_data_b AS (
-  SELECT 
+  SELECT
     withdraw_vesting_route.from_account,
     withdraw_vesting_route.to_account,
     withdraw_vesting_route.percent,
     ov.id AS source_op
   FROM operations_view ov
   CROSS JOIN btracker_backend.process_set_withdraw_vesting_route_operation(ov.body) AS withdraw_vesting_route
-  WHERE 
-    ov.op_type_id = 20 AND 
+  WHERE
+    ov.op_type_id = 20 AND
     ov.block_num BETWEEN _from AND _to
 ),
-group_by_account AS (
-  SELECT 
+group_by_account AS MATERIALIZED (
+  SELECT
     from_account,
     to_account,
     percent,
     source_op,
-    ROW_NUMBER() OVER (PARTITION BY from_account, to_account ORDER BY source_op DESC) AS row_num
+    ROW_NUMBER() OVER w_accounts_desc AS row_num
   FROM process_block_range_data_b
+  WINDOW w_accounts_desc AS (PARTITION BY from_account, to_account ORDER BY source_op DESC)
+),
+account_names_routes AS (
+  SELECT DISTINCT from_account AS account_name FROM group_by_account WHERE row_num = 1
+  UNION
+  SELECT DISTINCT to_account AS account_name FROM group_by_account WHERE row_num = 1
+),
+account_ids_routes AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM account_names_routes)
 ),
 join_latest_withdraw_routes AS (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = from_account) AS from_account,
-    (SELECT av.id FROM accounts_view av WHERE av.name = to_account) AS to_account,
-    percent,
-    source_op
-  FROM group_by_account 
-  WHERE row_num = 1
+  SELECT
+    ai_from.account_id AS from_account,
+    ai_to.account_id AS to_account,
+    gba.percent,
+    gba.source_op
+  FROM group_by_account gba
+  JOIN account_ids_routes ai_from ON ai_from.account_name = gba.from_account
+  JOIN account_ids_routes ai_to ON ai_to.account_name = gba.to_account
+  WHERE gba.row_num = 1
 ),
 join_prev_route AS (
-  SELECT 
+  SELECT
     cp.from_account,
     cp.to_account,
     cp.percent,
@@ -110,19 +133,19 @@ join_prev_route AS (
   LEFT JOIN account_routes cr ON cr.account = cp.from_account AND cr.to_account = cp.to_account
 ),
 add_routes AS MATERIALIZED (
-  SELECT 
+  SELECT
     from_account,
     to_account,
     percent,
     (
-      CASE 
-        WHEN prev_percent IS NULL AND percent != 0 THEN 
+      CASE
+        WHEN prev_percent IS NULL AND percent != 0 THEN
           1
         WHEN prev_percent IS NOT NULL AND percent != 0 THEN
           0
-        WHEN prev_percent IS NOT NULL AND percent = 0 THEN 
+        WHEN prev_percent IS NOT NULL AND percent = 0 THEN
           -1
-        ELSE 
+        ELSE
           0
       END
     ) AS withdraw_routes,
@@ -130,7 +153,7 @@ add_routes AS MATERIALIZED (
   FROM join_prev_route
 ),
 sum_routes AS (
-  SELECT 
+  SELECT
     from_account,
     SUM(withdraw_routes) AS withdraw_routes
   FROM add_routes
@@ -139,7 +162,7 @@ sum_routes AS (
 insert_routes AS (
   INSERT INTO account_routes
     (account, to_account, percent, source_op)
-  SELECT 
+  SELECT
     ar.from_account,
     ar.to_account,
     ar.percent,
@@ -155,16 +178,16 @@ insert_routes AS (
 delete_routes AS (
   DELETE FROM account_routes ar
   USING add_routes ar2
-  WHERE 
-    ar.account = ar2.from_account AND 
-    ar.to_account = ar2.to_account AND 
+  WHERE
+    ar.account = ar2.from_account AND
+    ar.to_account = ar2.to_account AND
     ar2.percent = 0
   RETURNING ar.account
 ),
 insert_sum_of_routes AS (
   INSERT INTO account_withdraws
     (account, withdraw_routes)
-  SELECT 
+  SELECT
     sr.from_account,
     sr.withdraw_routes
   FROM sum_routes sr
@@ -182,20 +205,35 @@ INTO __insert_routes, __delete_routes, __insert_sum_of_routes;
 
 -- delete routes for hf23 accounts (it will be triggered only once - in hf23 block range)
 WITH process_block_range_data_b AS (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = (ov.body->'value'->>'account')) AS account_id,
+  SELECT
+    (ov.body->'value'->>'account') AS account_name,
     ov.id AS source_op
   FROM operations_view ov
-  WHERE 
-    ov.op_type_id = 68 AND 
+  WHERE
+    ov.op_type_id = 68 AND
     ov.block_num BETWEEN _from AND _to
 ),
+account_names_hf23 AS (
+  SELECT DISTINCT account_name FROM process_block_range_data_b
+),
+account_ids_hf23 AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM account_names_hf23)
+),
+process_block_range_data_with_ids AS (
+  SELECT
+    ai.account_id,
+    pb.source_op
+  FROM process_block_range_data_b pb
+  JOIN account_ids_hf23 ai ON ai.account_name = pb.account_name
+),
 join_current_routes_for_hf23_accounts AS MATERIALIZED (
-  SELECT 
+  SELECT
     ar.account,
     ar.to_account
   FROM account_routes ar
-  JOIN process_block_range_data_b gi ON ar.account = gi.account_id
+  JOIN process_block_range_data_with_ids gi ON ar.account = gi.account_id
   WHERE gi.source_op > ar.source_op
 ),
 count_deleted_routes AS (
@@ -208,7 +246,7 @@ count_deleted_routes AS (
 delete_hf23_routes_count AS (
   INSERT INTO account_withdraws
     (account, withdraw_routes)
-  SELECT 
+  SELECT
     cd.account,
     cd.count
   FROM count_deleted_routes cd
@@ -220,8 +258,8 @@ delete_hf23_routes_count AS (
 delete_hf23_routes AS (
   DELETE FROM account_routes ar
   USING join_current_routes_for_hf23_accounts jcr
-  WHERE 
-    ar.account = jcr.account AND 
+  WHERE
+    ar.account = jcr.account AND
     ar.to_account = jcr.to_account
   RETURNING ar.account
 )
@@ -232,26 +270,42 @@ INTO __delete_hf23_routes_count, __delete_hf23_routes;
 
 -----------------------------------------FILL WITHDRAWS---------------------------------------------
 
-WITH process_block_range_data_b AS MATERIALIZED
+WITH process_block_range_data_raw AS MATERIALIZED
 (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = fill_vesting_withdraw_operation.account_name) AS account_id,
+  SELECT
+    fill_vesting_withdraw_operation.account_name,
     fill_vesting_withdraw_operation.withdrawn,
     ov.id AS source_op
   FROM operations_view ov
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
   CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation(ov.body, ov.block_num > ah.block_num) AS fill_vesting_withdraw_operation
-  WHERE 
-    ov.op_type_id IN (56) AND 
+  WHERE
+    ov.op_type_id IN (56) AND
     ov.block_num BETWEEN _from AND _to
 ),
+account_names_fill AS (
+  SELECT DISTINCT account_name FROM process_block_range_data_raw
+),
+account_ids_fill AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM account_names_fill)
+),
+process_block_range_data_b AS (
+  SELECT
+    ai.account_id,
+    pr.withdrawn,
+    pr.source_op
+  FROM process_block_range_data_raw pr
+  JOIN account_ids_fill ai ON ai.account_name = pr.account_name
+),
 --------------------------------------------------------------------------------------
-group_by_account AS (
+group_by_account AS MATERIALIZED (
   SELECT DISTINCT account_id
   FROM process_block_range_data_b
 ),
 join_current_withdraw AS (
-  SELECT 
+  SELECT
     aw.account,
     aw.withdrawn,
     aw.to_withdraw,
@@ -261,7 +315,7 @@ join_current_withdraw AS (
 ),
 --------------------------------------------------------------------------------------
 get_fills_conserning_current_withdrawal AS MATERIALIZED (
-  SELECT 
+  SELECT
     cp.account_id,
     SUM(cp.withdrawn) + aw.withdrawn AS withdrawn,
     MAX(aw.to_withdraw) AS to_withdraw
@@ -273,7 +327,7 @@ get_fills_conserning_current_withdrawal AS MATERIALIZED (
 insert_not_yet_filled_withdrawals AS (
   INSERT INTO account_withdraws
     (account, withdrawn)
-  SELECT 
+  SELECT
     gf.account_id,
     gf.withdrawn
   FROM get_fills_conserning_current_withdrawal gf
@@ -286,7 +340,7 @@ insert_not_yet_filled_withdrawals AS (
 reset_filled_withdrawals AS (
   INSERT INTO account_withdraws
     (account, vesting_withdraw_rate, to_withdraw, withdrawn)
-  SELECT 
+  SELECT
     gf.account_id,
     0,
     0,
@@ -307,11 +361,11 @@ INTO __insert_not_yet_filled_withdrawals, __reset_filled_withdrawals;
 
 -----------------------------------------DELAYS---------------------------------------------
 
-WITH process_block_range_data_b AS MATERIALIZED
+WITH process_block_range_data_raw AS MATERIALIZED
 (
-  SELECT 
-    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delayed_balances.from_account) AS from_account,
-    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_delayed_balances.to_account) AS to_account,
+  SELECT
+    get_impacted_delayed_balances.from_account AS from_account_name,
+    get_impacted_delayed_balances.to_account AS to_account_name,
     get_impacted_delayed_balances.withdrawn,
     get_impacted_delayed_balances.deposited,
     ov.id AS source_op
@@ -319,14 +373,35 @@ WITH process_block_range_data_b AS MATERIALIZED
   -- start calculations from the first block after the 24 hardfork
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 24 AND ah.block_num < ov.block_num
   CROSS JOIN btracker_backend.get_impacted_delayed_balances(ov.body, ov.op_type_id) AS get_impacted_delayed_balances
-  WHERE 
-    ov.op_type_id IN (56,77,70) AND 
+  WHERE
+    ov.op_type_id IN (56,77,70) AND
     ov.block_num BETWEEN _from AND _to
+),
+account_names_delays AS (
+  SELECT DISTINCT from_account_name AS account_name FROM process_block_range_data_raw
+  UNION
+  SELECT DISTINCT to_account_name AS account_name FROM process_block_range_data_raw WHERE to_account_name IS NOT NULL
+),
+account_ids_delays AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM account_names_delays)
+),
+process_block_range_data_b AS (
+  SELECT
+    ai_from.account_id AS from_account,
+    ai_to.account_id AS to_account,
+    pr.withdrawn,
+    pr.deposited,
+    pr.source_op
+  FROM process_block_range_data_raw pr
+  JOIN account_ids_delays ai_from ON ai_from.account_name = pr.from_account_name
+  LEFT JOIN account_ids_delays ai_to ON ai_to.account_name = pr.to_account_name
 ),
 --------------------------------------------------------------------------------------
 -- prepare and sum all delayed vests
 union_delays AS MATERIALIZED (
-  SELECT 
+  SELECT
     from_account AS account_id,
     withdrawn AS balance,
     source_op
@@ -334,19 +409,19 @@ union_delays AS MATERIALIZED (
 
   UNION ALL
 
-  SELECT 
+  SELECT
     to_account AS account_id,
     deposited AS balance,
     source_op
   FROM process_block_range_data_b
   WHERE to_account IS NOT NULL
 ),
-group_by_account AS (
-  SELECT DISTINCT account_id 
+group_by_account AS MATERIALIZED (
+  SELECT DISTINCT account_id
   FROM union_delays
 ),
 join_prev_delays AS (
-  SELECT 
+  SELECT
     gb.account_id,
     COALESCE(aw.delayed_vests,0) AS balance,
     0 AS source_op
@@ -354,7 +429,7 @@ join_prev_delays AS (
   LEFT JOIN account_withdraws aw ON aw.account = gb.account_id
 ),
 union_prev_delays AS (
-  SELECT 
+  SELECT
     account_id,
     balance,
     source_op
@@ -362,23 +437,24 @@ union_prev_delays AS (
 
   UNION ALL
 
-  SELECT 
+  SELECT
     account_id,
     balance,
     source_op
   FROM union_delays
 ),
 add_row_number AS (
-  SELECT 
+  SELECT
     account_id,
     balance,
     source_op,
-    ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY source_op) AS row_num
+    ROW_NUMBER() OVER w_account_asc AS row_num
   FROM union_prev_delays
+  WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
 ),
 recursive_delays AS MATERIALIZED (
   WITH RECURSIVE calculated_delays AS (
-    SELECT 
+    SELECT
       cp.account_id,
       cp.balance,
       cp.source_op,
@@ -388,7 +464,7 @@ recursive_delays AS MATERIALIZED (
 
     UNION ALL
 
-    SELECT 
+    SELECT
       next_cp.account_id,
       GREATEST(next_cp.balance + prev.balance, 0) AS balance,
       next_cp.source_op,
@@ -402,14 +478,15 @@ latest_rows AS (
   SELECT
     account_id,
     balance,
-    ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY source_op DESC) AS rn
+    ROW_NUMBER() OVER w_account_desc AS rn
   FROM
     recursive_delays
+  WINDOW w_account_desc AS (PARTITION BY account_id ORDER BY source_op DESC)
 )
 --------------------------------------------------------------------------------------
 INSERT INTO account_withdraws
   (account, delayed_vests)
-SELECT 
+SELECT
   account_id,
   balance
 FROM latest_rows

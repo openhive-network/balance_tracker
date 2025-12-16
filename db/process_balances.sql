@@ -100,35 +100,23 @@ whole table is inserted into history (without id = 0) and the newest record is u
 
 */
 
-sum_balances AS (
+-- Combine both window function calculations in a single pass to avoid redundant sorting.
+-- The row number must be calculated after the sum since operations like escrow_rejected_operation
+-- can trigger multiple balance changes for the same asset, leading to multiple rows with the
+-- same source_op and balance.
+prepare_balance_history AS MATERIALIZED (
   SELECT
     ulb.account_id,
     ulb.nai,
-    SUM(ulb.balance) OVER (
-      PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    ) AS balance,
-    SUM(ulb.balance_seq_no) OVER (
-      PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    ) AS balance_seq_no,
+    SUM(ulb.balance) OVER w_asc AS balance,
+    SUM(ulb.balance_seq_no) OVER w_asc AS balance_seq_no,
     ulb.source_op,
-    ulb.source_op_block
-    --ROW_NUMBER() OVER (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC) AS rn
+    ulb.source_op_block,
+    ROW_NUMBER() OVER w_desc AS rn
   FROM union_latest_balance_with_impacted_balances ulb
-),
-
--- the row number must be calculated after the sum,
--- some operations like escrow_rejected_operation can trigger multiple balance changes
--- for the same asset, which can lead to multiple rows with the same source_op and the same balance
-prepare_balance_history AS MATERIALIZED (
-  SELECT
-    sb.account_id,
-    sb.nai,
-    sb.balance,
-    sb.balance_seq_no,
-    sb.source_op,
-    sb.source_op_block,
-    ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
-  FROM sum_balances sb
+  WINDOW
+    w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
+    w_desc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC)
 ),
 
 insert_current_account_balances AS (
@@ -177,6 +165,7 @@ insert_account_balance_history AS (
 ),
 
 -- aggregated balance history by day and month
+-- Join block timestamps once and compute all aggregations in a single pass
 join_created_at_to_balance_history AS MATERIALIZED (
   SELECT
     rls.account_id,
@@ -189,62 +178,47 @@ join_created_at_to_balance_history AS MATERIALIZED (
   FROM remove_latest_stored_balance_record rls
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
 ),
-get_latest_updates AS (
-  SELECT 
+-- Combine all window functions and aggregations into single pass using WINDOW clause
+-- This avoids multiple scans of join_created_at_to_balance_history
+aggregated_balance_history AS MATERIALIZED (
+  SELECT
     account_id,
     nai,
     source_op,
-    source_op_block,
     balance,
     by_day,
     by_month,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
-  FROM join_created_at_to_balance_history 
-),
-
--- calculate min and max balances for each day and month
-get_min_max_balances_by_day AS (
-  SELECT 
-    account_id,
-    nai,
-    by_day,
-    MAX(balance) AS max_balance,
-    MIN(balance) AS min_balance
+    ROW_NUMBER() OVER w_day_desc AS rn_by_day,
+    ROW_NUMBER() OVER w_month_desc AS rn_by_month,
+    MIN(balance) OVER w_day_all AS min_balance_day,
+    MAX(balance) OVER w_day_all AS max_balance_day,
+    MIN(balance) OVER w_month_all AS min_balance_month,
+    MAX(balance) OVER w_month_all AS max_balance_month
   FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_day
-),
-get_min_max_balances_by_month AS (
-  SELECT 
-    account_id,
-    nai,
-    by_month,
-    MAX(balance) AS max_balance,
-    MIN(balance) AS min_balance
-  FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_month
+  WINDOW
+    w_day_desc AS (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC),
+    w_month_desc AS (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC),
+    w_day_all AS (PARTITION BY account_id, nai, by_day),
+    w_month_all AS (PARTITION BY account_id, nai, by_month)
 ),
 
 -- insert aggregated balance history
+-- Now using the combined aggregated_balance_history CTE which has all data in one scan
 insert_account_balance_history_by_day AS (
   INSERT INTO balance_history_by_day AS acc_history
     (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
-    gl.account_id,
-    gl.nai,
-    gl.source_op,
-    gl.by_day,
-    gl.balance,
-    gm.min_balance,
-    gm.max_balance
-  FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_day gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_day = gl.by_day
-  WHERE gl.rn_by_day = 1
-  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO 
-  UPDATE SET 
+  SELECT
+    abh.account_id,
+    abh.nai,
+    abh.source_op,
+    abh.by_day,
+    abh.balance,
+    abh.min_balance_day,
+    abh.max_balance_day
+  FROM aggregated_balance_history abh
+  WHERE abh.rn_by_day = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO
+  UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
@@ -254,21 +228,17 @@ insert_account_balance_history_by_day AS (
 insert_account_balance_history_by_month AS (
   INSERT INTO balance_history_by_month AS acc_history
     (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
-    gl.account_id,
-    gl.nai,
-    gl.source_op,
-    gl.by_month,
-    gl.balance,
-    gm.min_balance,
-    gm.max_balance
-  FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_month gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_month = gl.by_month
-  WHERE rn_by_month = 1
-  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO 
+  SELECT
+    abh.account_id,
+    abh.nai,
+    abh.source_op,
+    abh.by_month,
+    abh.balance,
+    abh.min_balance_month,
+    abh.max_balance_month
+  FROM aggregated_balance_history abh
+  WHERE abh.rn_by_month = 1
+  ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,

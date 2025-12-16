@@ -309,32 +309,21 @@ union_operations_with_latest_balance AS (
   FROM union_operations
 ---------------------------------------------------------------------------------------
 ),
+-- Use WINDOW clause to avoid repeating identical partition/ordering definitions
 prepare_savings_history AS (
-  SELECT 
+  SELECT
     uo.account_id,
     uo.nai,
-    SUM(uo.balance) OVER 
-      (
-        PARTITION BY uo.account_id, uo.nai 
-        ORDER BY uo.source_op, uo.balance 
-        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-      ) AS balance,
-    SUM(uo.savings_withdraw_request) OVER 
-      ( 
-        PARTITION BY uo.account_id, uo.nai 
-        ORDER BY uo.source_op, uo.balance 
-        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-      ) AS savings_withdraw_request,
-    SUM(uo.balance_seq_no) OVER 
-      (
-        PARTITION BY uo.account_id, uo.nai 
-        ORDER BY uo.source_op, uo.balance 
-        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-      ) AS balance_seq_no,
+    SUM(uo.balance) OVER w_asc AS balance,
+    SUM(uo.savings_withdraw_request) OVER w_asc AS savings_withdraw_request,
+    SUM(uo.balance_seq_no) OVER w_asc AS balance_seq_no,
     uo.source_op,
     uo.source_op_block,
-    ROW_NUMBER() OVER (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC) AS rn
+    ROW_NUMBER() OVER w_desc AS rn
   FROM union_operations_with_latest_balance uo
+  WINDOW
+    w_asc AS (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op, uo.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
+    w_desc AS (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC)
 ),
 ---------------------------------------------------------------------------------------
 delete_all_canceled_or_filled_transfers AS (
@@ -405,8 +394,9 @@ insert_saving_balance_history AS (
   FROM remove_latest_stored_balance_record pbh
   RETURNING acc_history.account
 ),
-join_created_at_to_balance_history AS (
-  SELECT 
+-- Join block timestamps once and compute all aggregations in a single pass
+join_created_at_to_balance_history AS MATERIALIZED (
+  SELECT
     rls.account_id,
     rls.nai,
     rls.source_op,
@@ -417,58 +407,45 @@ join_created_at_to_balance_history AS (
   FROM remove_latest_stored_balance_record rls
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
 ),
-get_latest_updates AS (
-  SELECT 
+-- Combine all window functions and aggregations into single pass using WINDOW clause
+-- This avoids multiple scans of join_created_at_to_balance_history
+aggregated_savings_history AS MATERIALIZED (
+  SELECT
     account_id,
     nai,
     source_op,
-    source_op_block,
     balance,
     by_day,
     by_month,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC) AS rn_by_day,
-    ROW_NUMBER() OVER (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC) AS rn_by_month
-  FROM join_created_at_to_balance_history 
-),
-get_min_max_balances_by_day AS (
-  SELECT 
-    account_id,
-    nai,
-    by_day,
-    MAX(balance) AS max_balance,
-    MIN(balance) AS min_balance
+    ROW_NUMBER() OVER w_day_desc AS rn_by_day,
+    ROW_NUMBER() OVER w_month_desc AS rn_by_month,
+    MIN(balance) OVER w_day_all AS min_balance_day,
+    MAX(balance) OVER w_day_all AS max_balance_day,
+    MIN(balance) OVER w_month_all AS min_balance_month,
+    MAX(balance) OVER w_month_all AS max_balance_month
   FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_day
+  WINDOW
+    w_day_desc AS (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC),
+    w_month_desc AS (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC),
+    w_day_all AS (PARTITION BY account_id, nai, by_day),
+    w_month_all AS (PARTITION BY account_id, nai, by_month)
 ),
-get_min_max_balances_by_month AS (
-  SELECT 
-    account_id,
-    nai,
-    by_month,
-    MAX(balance) AS max_balance,
-    MIN(balance) AS min_balance
-  FROM join_created_at_to_balance_history
-  GROUP BY account_id, nai, by_month
-),
+-- Now using the combined aggregated_savings_history CTE which has all data in one scan
 insert_saving_balance_history_by_day AS (
   INSERT INTO saving_history_by_day AS acc_history
     (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
-    gl.account_id,
-    gl.nai,
-    gl.source_op,
-    gl.by_day,
-    gl.balance,
-    gm.min_balance,
-    gm.max_balance
-  FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_day gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_day = gl.by_day
-  WHERE gl.rn_by_day = 1
-  ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO 
-  UPDATE SET 
+  SELECT
+    ash.account_id,
+    ash.nai,
+    ash.source_op,
+    ash.by_day,
+    ash.balance,
+    ash.min_balance_day,
+    ash.max_balance_day
+  FROM aggregated_savings_history ash
+  WHERE ash.rn_by_day = 1
+  ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO
+  UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
@@ -478,21 +455,17 @@ insert_saving_balance_history_by_day AS (
 insert_saving_balance_history_by_month AS (
   INSERT INTO saving_history_by_month AS acc_history
     (account, nai, source_op, updated_at, balance, min_balance, max_balance)
-  SELECT 
-    gl.account_id,
-    gl.nai,
-    gl.source_op,
-    gl.by_month,
-    gl.balance,
-    gm.min_balance,
-    gm.max_balance
-  FROM get_latest_updates gl
-  JOIN get_min_max_balances_by_month gm ON 
-    gm.account_id = gl.account_id AND 
-    gm.nai = gl.nai AND 
-    gm.by_month = gl.by_month
-  WHERE rn_by_month = 1
-  ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO 
+  SELECT
+    ash.account_id,
+    ash.nai,
+    ash.source_op,
+    ash.by_month,
+    ash.balance,
+    ash.min_balance_month,
+    ash.max_balance_month
+  FROM aggregated_savings_history ash
+  WHERE ash.rn_by_month = 1
+  ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
     balance = EXCLUDED.balance,
