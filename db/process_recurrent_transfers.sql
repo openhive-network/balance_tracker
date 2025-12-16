@@ -14,7 +14,7 @@ DECLARE
   __delete_canceled_transfers INT;
 BEGIN
   WITH process_block_range_data_b AS (
-    SELECT 
+    SELECT
       rto.from_account AS from_account,
       rto.to_account AS to_account,
       rto.transfer_id AS transfer_id,
@@ -26,16 +26,17 @@ BEGIN
       rto.memo AS memo,
       rto.delete_transfer AS delete_transfer,
       ov.id AS source_op,
-      ov.op_type_id 
+      ov.op_type_id
     FROM operations_view ov
     CROSS JOIN btracker_backend.get_recurrent_transfer_operations(ov.body, ov.op_type_id) AS rto
-    WHERE 
-      ov.op_type_id IN (49,83,84) AND 
+    WHERE
+      ov.op_type_id IN (49,83,84) AND
       ov.block_num BETWEEN _from AND _to
   ),
   ---------------------------------------------------------------------------------------
-  latest_rec_transfers AS (
-    SELECT 
+  -- Optimization 1: WINDOW clause for combined ROW_NUMBER - compute both in single pass
+  latest_rec_transfers AS MATERIALIZED (
+    SELECT
       ar.from_account,
       ar.to_account,
       ar.transfer_id,
@@ -48,26 +49,47 @@ BEGIN
       ar.delete_transfer,
       ar.source_op,
       ar.op_type_id,
-      ROW_NUMBER() OVER (PARTITION BY ar.from_account, ar.to_account, ar.transfer_id ORDER BY ar.source_op DESC) AS rn_per_transfer_desc
+      ROW_NUMBER() OVER w_desc AS rn_per_transfer_desc,
+      ROW_NUMBER() OVER w_asc AS rn_per_transfer_asc
     FROM process_block_range_data_b ar
+    WINDOW
+      w_desc AS (PARTITION BY ar.from_account, ar.to_account, ar.transfer_id ORDER BY ar.source_op DESC),
+      w_asc AS (PARTITION BY ar.from_account, ar.to_account, ar.transfer_id ORDER BY ar.source_op)
   ),
+  ---------------------------------------------------------------------------------------
+  -- Optimization 2: Batch account ID lookups instead of correlated subqueries
+  all_account_names AS (
+    SELECT DISTINCT from_account AS account_name FROM latest_rec_transfers
+    UNION
+    SELECT DISTINCT to_account AS account_name FROM latest_rec_transfers
+  ),
+  account_ids AS MATERIALIZED (
+    SELECT av.name AS account_name, av.id AS account_id
+    FROM hive.accounts_view av
+    WHERE av.name IN (SELECT account_name FROM all_account_names)
+  ),
+  ---------------------------------------------------------------------------------------
   delete_transfer AS MATERIALIZED (
-    SELECT 
+    SELECT
       lrt.from_account,
       lrt.to_account,
-      (SELECT av.id FROM hive.accounts_view av WHERE av.name = lrt.from_account) AS from_account_id,
-      (SELECT av.id FROM hive.accounts_view av WHERE av.name = lrt.to_account) AS to_account_id,
+      from_acc.account_id AS from_account_id,
+      to_acc.account_id AS to_account_id,
       lrt.transfer_id
     FROM latest_rec_transfers lrt
+    JOIN account_ids from_acc ON from_acc.account_name = lrt.from_account
+    JOIN account_ids to_acc ON to_acc.account_name = lrt.to_account
     WHERE lrt.delete_transfer = TRUE AND lrt.rn_per_transfer_desc = 1
   ),
   -- exclude records related to deleted transfers
+  -- Optimization 3: LEFT JOIN anti-pattern instead of NOT EXISTS
+  -- Optimization 5: Use pre-computed rn_per_transfer_asc from latest_rec_transfers
   excluded_deleted_transfers AS MATERIALIZED (
-    SELECT 
+    SELECT
       lrt.from_account,
       lrt.to_account,
-      (SELECT av.id FROM hive.accounts_view av WHERE av.name = lrt.from_account) AS from_account_id,
-      (SELECT av.id FROM hive.accounts_view av WHERE av.name = lrt.to_account) AS to_account_id,
+      from_acc.account_id AS from_account_id,
+      to_acc.account_id AS to_account_id,
       lrt.transfer_id,
       lrt.nai,
       lrt.amount,
@@ -79,16 +101,15 @@ BEGIN
       lrt.source_op,
       lrt.op_type_id,
       lrt.rn_per_transfer_desc,
-      ROW_NUMBER() OVER (PARTITION BY lrt.from_account, lrt.to_account, lrt.transfer_id ORDER BY lrt.source_op) AS rn_per_transfer_asc
+      lrt.rn_per_transfer_asc
     FROM latest_rec_transfers lrt
-    WHERE NOT EXISTS (
-      SELECT 1 
-      FROM delete_transfer dt 
-      WHERE 
-        dt.from_account = lrt.from_account AND 
-        dt.to_account   = lrt.to_account AND 
-        dt.transfer_id  = lrt.transfer_id
-    )
+    JOIN account_ids from_acc ON from_acc.account_name = lrt.from_account
+    JOIN account_ids to_acc ON to_acc.account_name = lrt.to_account
+    LEFT JOIN delete_transfer dt ON
+      dt.from_account = lrt.from_account AND
+      dt.to_account = lrt.to_account AND
+      dt.transfer_id = lrt.transfer_id
+    WHERE dt.from_account IS NULL
   ),
   latest_transfers_in_table AS (
     SELECT 

@@ -14,73 +14,82 @@ DECLARE
 BEGIN
 WITH process_block_range_data_b AS MATERIALIZED
 (
-  SELECT 
+  SELECT
     ov.body,
     ov.id AS source_op,
     ov.block_num as source_op_block,
-    ov.op_type_id 
+    ov.op_type_id
   FROM operations_view ov
-  WHERE 
-  ov.op_type_id = ANY(ARRAY[39,51,52,63,53]) AND 
+  WHERE
+  ov.op_type_id = ANY(ARRAY[39,51,52,63,53]) AND
   ov.block_num BETWEEN _from AND _to
 ),
-get_impacted_bal AS (
-  SELECT 
+------------------------------------------------------------------------------
+-- Optimization #3: Single blocks_view fetch for all needed block data
+blocks_data AS MATERIALIZED (
+  SELECT DISTINCT bv.num, bv.total_vesting_fund_hive, bv.total_vesting_shares
+  FROM hive.blocks_view bv
+  WHERE bv.num IN (SELECT DISTINCT source_op_block FROM process_block_range_data_b)
+),
+------------------------------------------------------------------------------
+-- Optimization #4: Add MATERIALIZED to get_impacted_bal
+get_impacted_bal AS MATERIALIZED (
+  SELECT
     get_impacted_reward_balances.account_name,
     get_impacted_reward_balances.hbd_payout AS reward_hbd,
-    get_impacted_reward_balances.hive_payout AS reward_hive,  
-    get_impacted_reward_balances.vesting_payout AS reward_vests,    
+    get_impacted_reward_balances.hive_payout AS reward_hive,
+    get_impacted_reward_balances.vesting_payout AS reward_vests,
     fio.op_type_id,
     fio.source_op,
-    fio.source_op_block 
+    fio.source_op_block
   FROM process_block_range_data_b fio
   CROSS JOIN btracker_backend.get_impacted_reward_balances(fio.body, fio.source_op_block, fio.op_type_id) AS get_impacted_reward_balances
-  WHERE 
+  WHERE
     fio.op_type_id = 39 OR
     (fio.op_type_id IN (51,63) AND (fio.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true)
 ),
 ------------------------------------------------------------------------------
 --prepare info rewards data
 get_impacted_posting AS (
-  SELECT 
+  SELECT
     get_posting.account_name,
     get_posting.reward AS posting_reward,
     fio.op_type_id,
     fio.source_op,
-    fio.source_op_block 
+    fio.source_op_block
   FROM process_block_range_data_b fio
   CROSS JOIN btracker_backend.process_posting_rewards(fio.body) AS get_posting
   WHERE fio.op_type_id = 53
 ),
 get_impacted_curation AS (
-  SELECT 
+  SELECT
     get_curation.account_name,
     get_curation.reward,
     get_curation.payout_must_be_claimed,
     fio.op_type_id,
     fio.source_op,
-    fio.source_op_block 
+    fio.source_op_block
   FROM process_block_range_data_b fio
   CROSS JOIN btracker_backend.process_curation_rewards(fio.body) AS get_curation
   WHERE fio.op_type_id = 52
 ),
 ------------------------------------------------------------------------------
--- calculate curation_reward into hive
+-- calculate curation_reward into hive (using blocks_data instead of hive.blocks_view)
 calculate_vests_from_curation AS MATERIALIZED (
-  SELECT 
+  SELECT
     pc.account_name,
     pc.reward,
-    (pc.reward * bv.total_vesting_fund_hive::NUMERIC / NULLIF(bv.total_vesting_shares, 0)::NUMERIC)::BIGINT AS curation_reward,
+    (pc.reward * bd.total_vesting_fund_hive::NUMERIC / NULLIF(bd.total_vesting_shares, 0)::NUMERIC)::BIGINT AS curation_reward,
     pc.payout_must_be_claimed,
     pc.op_type_id,
     pc.source_op,
-    pc.source_op_block 
+    pc.source_op_block
   FROM get_impacted_curation pc
-  JOIN hive.blocks_view bv ON bv.num = pc.source_op_block
+  JOIN blocks_data bd ON bd.num = pc.source_op_block
 ),
 ------------------------------------------------------------------------------
 get_impacted_info_rewards AS (
-  SELECT 
+  SELECT
     account_name,
     posting_reward,
     0 AS curation_reward
@@ -88,52 +97,45 @@ get_impacted_info_rewards AS (
 
   UNION ALL
 
-  SELECT 
+  SELECT
     account_name,
     0 AS posting_reward,
     curation_reward
-  FROM calculate_vests_from_curation 
+  FROM calculate_vests_from_curation
 ),
 -- prepare info rewards data
 group_by_account_info AS (
-  SELECT 
+  SELECT
     account_name,
     SUM(posting_reward) AS posting,
     SUM(curation_reward) AS curation
   FROM get_impacted_info_rewards
   GROUP BY account_name
 ),
-posting_and_curations_account_id AS (
-  SELECT 
-	  (SELECT av.id FROM accounts_view av WHERE av.name = account_name) AS account_id,
-    posting,
-    curation
-  FROM group_by_account_info 
-),
 ------------------------------------------------------------------------------
 --vesting balance must be calculated for all operations except claim operation (can't be aggregated)
+-- Using blocks_data instead of hive.blocks_view
 calculate_vesting_balance AS (
-  SELECT 
+  SELECT
     account_name,
     reward_hbd,
-    reward_hive,  
-    reward_vests,  
-    (reward_vests * bv.total_vesting_fund_hive::NUMERIC / NULLIF(bv.total_vesting_shares, 0)::NUMERIC)::BIGINT AS reward_vest_balance,
+    reward_hive,
+    reward_vests,
+    (reward_vests * bd.total_vesting_fund_hive::NUMERIC / NULLIF(bd.total_vesting_shares, 0)::NUMERIC)::BIGINT AS reward_vest_balance,
     op_type_id,
     source_op,
     source_op_block
   FROM get_impacted_bal
-  -- we use hive view because of performance issues during live sync  
-  JOIN hive.blocks_view bv ON bv.num = source_op_block
+  JOIN blocks_data bd ON bd.num = source_op_block
   WHERE op_type_id != 39
 ),
 
 union_operations_with_vesting_balance AS (
-  SELECT 
+  SELECT
     account_name,
     reward_hbd,
-    reward_hive,  
-    reward_vests,  
+    reward_hive,
+    reward_vests,
     reward_vest_balance,
     op_type_id,
     source_op,
@@ -142,11 +144,11 @@ union_operations_with_vesting_balance AS (
 
   UNION ALL
 
-  SELECT 
+  SELECT
     account_name,
     reward_hbd,
-    reward_hive,  
-    reward_vests,  
+    reward_hive,
+    reward_vests,
     0 AS reward_vest_balance,
     op_type_id,
     source_op,
@@ -156,11 +158,11 @@ union_operations_with_vesting_balance AS (
 
   UNION ALL
 
-  SELECT 
+  SELECT
     account_name,
     0 AS reward_hbd,
-    0 AS reward_hive,  
-    reward AS reward_vests,  
+    0 AS reward_hive,
+    reward AS reward_vests,
     curation_reward AS reward_vest_balance,
     op_type_id,
     source_op,
@@ -173,14 +175,14 @@ union_operations_with_vesting_balance AS (
 -- aggregate rewards for each account (CLAIMS WITH reward_vests = 0 INCLUDED)
 -- Identify segments between op_type_id = 39
 segmented_rows AS (
-  SELECT 
+  SELECT
     *,
     SUM(CASE WHEN op_type_id = 39 AND reward_vests != 0 THEN 1 ELSE 0 END) OVER (PARTITION BY account_name ORDER BY source_op) AS segment
   FROM union_operations_with_vesting_balance
 ),
 -- Aggregate balances for segments ending with op_type_id = 39
 aggregated_rows AS (
-  SELECT 
+  SELECT
     account_name,
     SUM(CASE WHEN op_type_id = 39 AND reward_vests != 0 THEN 0 ELSE reward_hbd END) AS reward_hbd,
     SUM(CASE WHEN op_type_id = 39 AND reward_vests != 0 THEN 0 ELSE reward_hive END) AS reward_hive,
@@ -192,8 +194,9 @@ aggregated_rows AS (
   GROUP BY account_name, segment
 ),
 -- Select the results including the op_type_id = 39 records
-union_aggregated_and_segmented_rows AS (
-  SELECT 
+-- Optimization #4: Add MATERIALIZED hint
+union_aggregated_and_segmented_rows AS MATERIALIZED (
+  SELECT
     account_name,
     reward_hbd,
     reward_hive,
@@ -202,12 +205,12 @@ union_aggregated_and_segmented_rows AS (
     source_op,
     source_op_block,
     FALSE AS is_claim
-  FROM aggregated_rows 
+  FROM aggregated_rows
   WHERE NOT (reward_hbd = 0 AND reward_hive = 0 AND reward_vests = 0 AND reward_vest_balance = 0)
   -- Include 39 operations in the results
   UNION ALL
 
-  SELECT 
+  SELECT
     account_name,
     reward_hbd,
     reward_hive,
@@ -221,14 +224,41 @@ union_aggregated_and_segmented_rows AS (
   ORDER BY source_op
 ),
 ------------------------------------------------------------------------------
--- prepare previous balances for each account
-find_accounts_using_claim AS (
-  SELECT 
-    account_name,
-    (SELECT av.id FROM accounts_view av WHERE av.name = account_name) AS account_id
-  FROM union_aggregated_and_segmented_rows 
+-- Optimization #1: Separate claim/non-claim processing paths
+-- Identify accounts that have claims in this block range
+accounts_with_claims AS (
+  SELECT DISTINCT account_name
+  FROM union_aggregated_and_segmented_rows
   WHERE is_claim
+),
+-- Non-claim accounts can be aggregated directly without recursive CTE
+non_claim_accounts_sum AS (
+  SELECT
+    account_name,
+    SUM(reward_hbd)::BIGINT AS reward_hbd,
+    SUM(reward_hive)::BIGINT AS reward_hive,
+    SUM(reward_vests)::BIGINT AS reward_vests,
+    SUM(reward_vest_balance)::BIGINT AS reward_vest_balance,
+    MAX(source_op_block)::INT AS source_op_block,
+    MAX(source_op)::BIGINT AS source_op
+  FROM union_aggregated_and_segmented_rows
+  WHERE account_name NOT IN (SELECT account_name FROM accounts_with_claims)
   GROUP BY account_name
+),
+------------------------------------------------------------------------------
+-- Accounts WITH claims need the recursive CTE for correct vest-to-hive conversion
+-- Filter to only process accounts with claims
+claim_accounts_data AS (
+  SELECT *
+  FROM union_aggregated_and_segmented_rows
+  WHERE account_name IN (SELECT account_name FROM accounts_with_claims)
+),
+-- prepare previous balances for each account (only for accounts with claims)
+find_accounts_using_claim AS (
+  SELECT DISTINCT
+    account_name
+  FROM claim_accounts_data
+  WHERE is_claim
 ),
 prepare_prev_balances AS (
   SELECT
@@ -237,32 +267,33 @@ prepare_prev_balances AS (
     ar.nai,
     ar.balance
   FROM account_rewards ar
-  JOIN find_accounts_using_claim fa ON fa.account_id = ar.account
+  JOIN accounts_view av ON av.id = ar.account
+  JOIN find_accounts_using_claim fa ON fa.account_name = av.name
   WHERE nai IN (38,37)
 ),
 join_prev_balances AS  (
-  SELECT 
+  SELECT
     cp.account_name,
     cp.reward_hbd,
-    cp.reward_hive,  
-    cp.reward_vests,  
+    cp.reward_hive,
+    cp.reward_vests,
     cp.reward_vest_balance,
 	  COALESCE(ppb.balance, 0) AS prev_vests,
 	  COALESCE(ppbs.balance, 0)::NUMERIC AS prev_hive_vests,
     cp.source_op,
     cp.source_op_block,
     cp.is_claim
-  FROM union_aggregated_and_segmented_rows cp
+  FROM claim_accounts_data cp
   LEFT JOIN prepare_prev_balances ppb ON ppb.account_name = cp.account_name AND cp.is_claim AND ppb.nai = 37
-  LEFT JOIN prepare_prev_balances ppbs ON ppbs.account_name = cp.account_name AND ppbs.nai = 38 
+  LEFT JOIN prepare_prev_balances ppbs ON ppbs.account_name = cp.account_name AND ppbs.nai = 38
 ),
 ------------------------------------------------------------------------------
 sum_prev_vests_without_current_row AS (
-  SELECT 
+  SELECT
     cp.account_name,
     cp.reward_hbd,
-    cp.reward_hive,  
-    cp.reward_vests,  
+    cp.reward_hive,
+    cp.reward_vests,
     cp.reward_vest_balance,
 	  SUM(cp.reward_vests) OVER (PARTITION BY cp.account_name ORDER BY cp.source_op ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS sum_prev_vests,
     cp.prev_vests,
@@ -273,11 +304,11 @@ sum_prev_vests_without_current_row AS (
   FROM join_prev_balances cp
 ),
 sum_vests_add_row_number AS MATERIALIZED (
-  SELECT 
+  SELECT
     cp.account_name,
     cp.reward_hbd,
-    cp.reward_hive,  
-    cp.reward_vests,  
+    cp.reward_hive,
+    cp.reward_vests,
     cp.reward_vest_balance,
     COALESCE(cp.sum_prev_vests,0) + cp.prev_vests AS prev_vests,
 	  cp.prev_hive_vests,
@@ -290,15 +321,15 @@ sum_vests_add_row_number AS MATERIALIZED (
 ------------------------------------------------------------------------------
 recursive_vests AS (
   WITH RECURSIVE calculated_vests AS (
-    SELECT 
+    SELECT
       cp.account_name,
       cp.reward_hbd,
       cp.reward_hive,
       cp.reward_vests,
-      CASE 
+      CASE
           WHEN cp.is_claim THEN
               - ROUND((cp.prev_hive_vests) * (- cp.reward_vests) / cp.prev_vests, 3)
-          ELSE 
+          ELSE
               cp.reward_vest_balance
       END AS reward_vest_balance,
       cp.prev_vests,
@@ -312,15 +343,15 @@ recursive_vests AS (
 
     UNION ALL
 
-    SELECT 
+    SELECT
       next_cp.account_name,
       next_cp.reward_hbd,
       next_cp.reward_hive,
       next_cp.reward_vests,
-      CASE 
+      CASE
           WHEN next_cp.is_claim THEN
               - ROUND((prev.reward_vest_balance + prev.prev_hive_vests) * (- next_cp.reward_vests) / next_cp.prev_vests, 3)
-          ELSE 
+          ELSE
               next_cp.reward_vest_balance
       END AS reward_vest_balance,
       next_cp.prev_vests,
@@ -335,21 +366,67 @@ recursive_vests AS (
   SELECT * FROM calculated_vests
 ),
 ------------------------------------------------------------------------------
-sum_operations AS (
-	SELECT 
-	  (SELECT av.id FROM accounts_view av WHERE av.name = account_name) AS account_id,
-	  SUM(reward_hbd)::BIGINT AS reward_hbd,
-	  SUM(reward_hive)::BIGINT AS reward_hive,
-	  SUM(reward_vests)::BIGINT AS reward_vests,
-	  SUM(reward_vest_balance)::BIGINT AS reward_vest_balance,
-	  MAX(source_op_block)::INT AS source_op_block,
-	  MAX(source_op)::BIGINT AS source_op
-	FROM recursive_vests
-	GROUP BY account_name
+-- Sum operations for accounts WITH claims (from recursive CTE)
+claim_accounts_sum AS (
+  SELECT
+    account_name,
+    SUM(reward_hbd)::BIGINT AS reward_hbd,
+    SUM(reward_hive)::BIGINT AS reward_hive,
+    SUM(reward_vests)::BIGINT AS reward_vests,
+    SUM(reward_vest_balance)::BIGINT AS reward_vest_balance,
+    MAX(source_op_block)::INT AS source_op_block,
+    MAX(source_op)::BIGINT AS source_op
+  FROM recursive_vests
+  GROUP BY account_name
 ),
+------------------------------------------------------------------------------
+-- Combine results from both paths
+all_accounts_sum AS (
+  SELECT * FROM non_claim_accounts_sum
+  UNION ALL
+  SELECT * FROM claim_accounts_sum
+),
+------------------------------------------------------------------------------
+-- Optimization #2: Batch account ID lookups
+-- Collect all unique account names from both reward paths and info rewards
+all_account_names AS (
+  SELECT DISTINCT account_name FROM all_accounts_sum
+  UNION
+  SELECT DISTINCT account_name FROM group_by_account_info
+),
+-- Single batch lookup for all account IDs
+account_ids AS (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (SELECT account_name FROM all_account_names)
+),
+------------------------------------------------------------------------------
+-- Use batch account IDs for sum_operations
+sum_operations AS (
+  SELECT
+    ai.account_id,
+    a.reward_hbd,
+    a.reward_hive,
+    a.reward_vests,
+    a.reward_vest_balance,
+    a.source_op_block,
+    a.source_op
+  FROM all_accounts_sum a
+  JOIN account_ids ai ON ai.account_name = a.account_name
+),
+-- Use batch account IDs for posting_and_curations
+posting_and_curations_account_id AS (
+  SELECT
+    ai.account_id,
+    gb.posting,
+    gb.curation
+  FROM group_by_account_info gb
+  JOIN account_ids ai ON ai.account_name = gb.account_name
+),
+------------------------------------------------------------------------------
 convert_rewards AS (
-  SELECT 
-    account_id, 
+  SELECT
+    account_id,
     unnest(ARRAY[13, 21, 37, 38]) AS nai,
     unnest(ARRAY[reward_hbd, reward_hive, reward_vests, reward_vest_balance]) AS balance,
     source_op,
@@ -357,7 +434,7 @@ convert_rewards AS (
   FROM sum_operations
 ),
 prepare_ops_before_insert AS (
-  SELECT 
+  SELECT
     account_id,
     nai,
     balance,
@@ -369,7 +446,7 @@ prepare_ops_before_insert AS (
 ------------------------------------------------------------------------------
 insert_sum_of_rewards AS (
   INSERT INTO account_rewards
-    (account, nai, balance, source_op) 
+    (account, nai, balance, source_op)
   SELECT
     po.account_id,
     po.nai,

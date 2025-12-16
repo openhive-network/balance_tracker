@@ -36,42 +36,28 @@ BEGIN
     FROM gather_transfers gt 
     JOIN hive.blocks_view bv ON gt.block_num = bv.num
   ),
-  group_by_hour AS (
-    SELECT 
+  -- Use GROUPING SETS to compute all three aggregation levels in a single scan
+  -- grp_level values: 4 = by_hour (only by_hour is non-null), 2 = by_day, 1 = by_month
+  aggregated_stats AS MATERIALIZED (
+    SELECT
+      nai,
+      by_hour,
+      by_day,
+      by_month,
       sum(transfer_amount)::BIGINT AS sum_transfer_amount,
       max(transfer_amount)::BIGINT AS max_transfer_amount,
       min(transfer_amount)::BIGINT AS min_transfer_amount,
       count(*)::INT AS transfer_count,
       max(block_num)::INT AS last_block_num,
-      nai,
-      by_hour
+      GROUPING(by_hour, by_day, by_month) AS grp_level
     FROM join_blocks_date
-    GROUP BY by_hour, nai
+    GROUP BY GROUPING SETS (
+      (nai, by_hour),
+      (nai, by_day),
+      (nai, by_month)
+    )
   ),
-  group_by_day AS (
-    SELECT 
-      sum(transfer_amount)::BIGINT AS sum_transfer_amount,
-      max(transfer_amount)::BIGINT AS max_transfer_amount,
-      min(transfer_amount)::BIGINT AS min_transfer_amount,
-      count(*)::INT AS transfer_count,
-      max(block_num)::INT AS last_block_num,
-      nai,
-      by_day
-    FROM join_blocks_date
-    GROUP BY by_day, nai
-  ),
-  group_by_month AS (
-    SELECT 
-      sum(transfer_amount)::BIGINT AS sum_transfer_amount,
-      max(transfer_amount)::BIGINT AS max_transfer_amount,
-      min(transfer_amount)::BIGINT AS min_transfer_amount,
-      count(*)::INT AS transfer_count,
-      max(block_num)::INT AS last_block_num,
-      nai,
-      by_month
-    FROM join_blocks_date
-    GROUP BY by_month, nai
-  ),
+  -- grp_level = 3 (binary 011) means by_hour is set (by_day, by_month are NULL)
   insert_trx_stats_by_hour AS (
     INSERT INTO transfer_stats_by_hour AS trx_agg
     (
@@ -83,17 +69,18 @@ BEGIN
       last_block_num,
       updated_at
     )
-    SELECT 
-      gh.sum_transfer_amount,
-      gh.max_transfer_amount,
-      gh.min_transfer_amount,
-      gh.transfer_count,
-      gh.nai,
-      gh.last_block_num,
-      gh.by_hour
-    FROM group_by_hour gh
-    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_hour DO 
-    UPDATE SET 
+    SELECT
+      agg.sum_transfer_amount,
+      agg.max_transfer_amount,
+      agg.min_transfer_amount,
+      agg.transfer_count,
+      agg.nai,
+      agg.last_block_num,
+      agg.by_hour
+    FROM aggregated_stats agg
+    WHERE agg.grp_level = 3
+    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_hour DO
+    UPDATE SET
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
@@ -101,6 +88,7 @@ BEGIN
       last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) as is_new_entry, trx_agg.updated_at
   ),
+  -- grp_level = 5 (binary 101) means by_day is set (by_hour, by_month are NULL)
   insert_trx_stats_by_day AS (
     INSERT INTO transfer_stats_by_day AS trx_agg
     (
@@ -112,17 +100,18 @@ BEGIN
       last_block_num,
       updated_at
     )
-    SELECT 
-      gh.sum_transfer_amount,
-      gh.max_transfer_amount,
-      gh.min_transfer_amount,
-      gh.transfer_count,
-      gh.nai,
-      gh.last_block_num,
-      gh.by_day
-    FROM group_by_day gh
-    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_day DO 
-    UPDATE SET 
+    SELECT
+      agg.sum_transfer_amount,
+      agg.max_transfer_amount,
+      agg.min_transfer_amount,
+      agg.transfer_count,
+      agg.nai,
+      agg.last_block_num,
+      agg.by_day
+    FROM aggregated_stats agg
+    WHERE agg.grp_level = 5
+    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_day DO
+    UPDATE SET
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
@@ -130,6 +119,7 @@ BEGIN
       last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) as is_new_entry, trx_agg.updated_at
   ),
+  -- grp_level = 6 (binary 110) means by_month is set (by_hour, by_day are NULL)
   insert_trx_stats_by_month AS (
     INSERT INTO transfer_stats_by_month AS trx_agg
     (
@@ -141,17 +131,18 @@ BEGIN
       last_block_num,
       updated_at
     )
-    SELECT 
-      gh.sum_transfer_amount,
-      gh.max_transfer_amount,
-      gh.min_transfer_amount,
-      gh.transfer_count,
-      gh.nai,
-      gh.last_block_num,
-      gh.by_month
-    FROM group_by_month gh
-    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_month DO 
-    UPDATE SET 
+    SELECT
+      agg.sum_transfer_amount,
+      agg.max_transfer_amount,
+      agg.min_transfer_amount,
+      agg.transfer_count,
+      agg.nai,
+      agg.last_block_num,
+      agg.by_month
+    FROM aggregated_stats agg
+    WHERE agg.grp_level = 6
+    ON CONFLICT ON CONSTRAINT pk_transfer_stats_by_month DO
+    UPDATE SET
       sum_transfer_amount = trx_agg.sum_transfer_amount + EXCLUDED.sum_transfer_amount,
       max_transfer_amount = GREATEST(EXCLUDED.max_transfer_amount, trx_agg.max_transfer_amount)::BIGINT,
       min_transfer_amount = LEAST(EXCLUDED.min_transfer_amount, trx_agg.min_transfer_amount)::BIGINT,
