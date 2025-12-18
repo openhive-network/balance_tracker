@@ -1,3 +1,16 @@
+/*
+Operation parsers for transfer statistics.
+Called by: db/process_transfer_stats.sql
+
+Extracts transfer amounts from operation JSONBs for:
+- transfer: Standard HIVE/HBD transfer (single amount)
+- fill_recurrent_transfer: Executed recurring transfer (single amount)
+- escrow_transfer: Escrow creation (returns both HIVE and HBD amounts)
+
+Return type is simple (nai, amount) for aggregation into hourly/daily/monthly stats.
+escrow_transfer returns SETOF with two rows (one per asset type).
+*/
+
 SET ROLE btracker_owner;
 
 DROP TYPE IF EXISTS btracker_backend.impacted_transfers CASCADE;
@@ -7,7 +20,9 @@ CREATE TYPE btracker_backend.impacted_transfers AS
     transfer_amount BIGINT
 );
 
--- Process transfer_operation and fill_recurrent_transfer_operation
+-- Extract transfer amount for statistics.
+-- Handles both regular transfer and fill_recurrent_transfer operations.
+-- Returns single row with (nai, amount) for aggregation.
 CREATE OR REPLACE FUNCTION btracker_backend.process_transfer(IN _operation_body JSONB)
 RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
@@ -25,7 +40,9 @@ BEGIN
 END
 $$;
 
--- Process escrow_transfer_operation (returns two rows: one for HIVE, one for HBD)
+-- Extract escrow_transfer amounts for statistics.
+-- Escrow can contain both HIVE and HBD, so returns two rows.
+-- Both amounts are counted toward transfer volume statistics.
 CREATE OR REPLACE FUNCTION btracker_backend.process_escrow_transfer(IN _operation_body JSONB)
 RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
