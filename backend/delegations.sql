@@ -8,32 +8,7 @@ CREATE TYPE btracker_backend.impacted_delegations_return AS
     amount BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_delegation_balances(IN _operation_body JSONB, IN _op_type_id INT)
-RETURNS btracker_backend.impacted_delegations_return
-LANGUAGE plpgsql
-STABLE
-AS
-$BODY$
-BEGIN
-  RETURN (
-    CASE 
-      WHEN _op_type_id = 40 THEN
-        btracker_backend.process_delegate_vesting_shares_operation(_operation_body)
-
-      WHEN _op_type_id = 41 THEN
-        btracker_backend.process_account_create_with_delegation_operation(_operation_body)
-
-      WHEN _op_type_id = 62 THEN
-        btracker_backend.process_return_vesting_shares_operation(_operation_body)
-
-      WHEN _op_type_id = 68 THEN
-        btracker_backend.process_hf23_acccounts(_operation_body)
-    END
-  );
-
-END;
-$BODY$;
-
+-- Process delegate_vesting_shares_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_delegate_vesting_shares_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delegations_return
 LANGUAGE 'plpgsql' STABLE
@@ -45,10 +20,11 @@ BEGIN
     ((_operation_body)->'value'->>'delegatee')::TEXT,
     ((_operation_body)->'value'->'vesting_shares'->>'amount')::BIGINT
   )::btracker_backend.impacted_delegations_return;
-  
+
 END
 $$;
 
+-- Process account_create_with_delegation_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_account_create_with_delegation_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delegations_return
 LANGUAGE 'plpgsql' STABLE
@@ -60,10 +36,11 @@ BEGIN
     ((_operation_body)->'value'->>'new_account_name')::TEXT,
     ((_operation_body)->'value'->'delegation'->>'amount')::BIGINT
   )::btracker_backend.impacted_delegations_return;
-  
+
 END
 $$;
 
+-- Process return_vesting_delegation_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_return_vesting_shares_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delegations_return
 LANGUAGE 'plpgsql' STABLE
@@ -75,10 +52,11 @@ BEGIN
     NULL,
     - ((_operation_body)->'value'->'vesting_shares'->>'amount')::BIGINT
   )::btracker_backend.impacted_delegations_return;
-  
+
 END
 $$;
 
+-- Process hardfork_hive_operation (HF23 delegation reset)
 CREATE OR REPLACE FUNCTION btracker_backend.process_hf23_acccounts(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delegations_return
 LANGUAGE 'plpgsql' STABLE
@@ -90,7 +68,7 @@ BEGIN
     NULL,
     0
   )::btracker_backend.impacted_delegations_return;
-  
+
 END
 $$;
 

@@ -10,10 +10,10 @@ AS
 $$
 BEGIN
   RETURN (
-    CASE 
-      WHEN (_ops_count % _page_size) = 0 THEN 
-        _ops_count / _page_size 
-      ELSE 
+    CASE
+      WHEN (_ops_count % _page_size) = 0 THEN
+        _ops_count / _page_size
+      ELSE
         (_ops_count / _page_size) + 1
     END
   );
@@ -41,7 +41,7 @@ LANGUAGE 'plpgsql' STABLE
 SET JIT = OFF
 AS
 $$
-DECLARE 
+DECLARE
   __rest_of_division INT;
   __total_pages INT;
   __page INT;
@@ -51,30 +51,30 @@ BEGIN
   __rest_of_division := (_count % _limit)::INT;
 
   __total_pages := (
-    CASE 
-      WHEN (__rest_of_division = 0) THEN 
-        _count / _limit 
-      ELSE 
+    CASE
+      WHEN (__rest_of_division = 0) THEN
+        _count / _limit
+      ELSE
         (_count / _limit) + 1
       END
   )::INT;
 
   __page := (
-    CASE 
-      WHEN (_page IS NULL) THEN 
+    CASE
+      WHEN (_page IS NULL) THEN
         1
-      WHEN (_page IS NOT NULL) AND _order_is = 'desc' THEN 
+      WHEN (_page IS NOT NULL) AND _order_is = 'desc' THEN
         __total_pages - _page + 1
-      ELSE 
-        _page 
+      ELSE
+        _page
       END
   );
 
   __offset := (
     CASE
-      WHEN _order_is = 'desc' AND __page != 1 AND __rest_of_division != 0 THEN 
+      WHEN _order_is = 'desc' AND __page != 1 AND __rest_of_division != 0 THEN
         ((__page - 2) * _limit) + __rest_of_division
-      WHEN __page = 1 THEN 
+      WHEN __page = 1 THEN
         0
       ELSE
         (__page - 1) * _limit
@@ -84,11 +84,11 @@ BEGIN
   __limit := (
       CASE
         WHEN _order_is = 'desc' AND __page = 1             AND __rest_of_division != 0 THEN
-          __rest_of_division 
+          __rest_of_division
         WHEN _order_is = 'asc'  AND __page = __total_pages AND __rest_of_division != 0 THEN
-          __rest_of_division 
-        ELSE 
-          _limit 
+          __rest_of_division
+        ELSE
+          _limit
         END
     );
 
@@ -110,7 +110,7 @@ CREATE OR REPLACE FUNCTION btracker_backend.balance_history_range(
     _account_id INT,
     _coin_type INT,
     _balance_type btracker_backend.balance_type,
-    _from INT, 
+    _from INT,
     _to INT
 )
 RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05
@@ -130,7 +130,7 @@ $$;
 CREATE OR REPLACE FUNCTION btracker_backend.bh_balance(
     _account_id INT,
     _coin_type INT,
-    _from INT, 
+    _from INT,
     _to INT
 )
 RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05
@@ -219,7 +219,7 @@ $$;
 CREATE OR REPLACE FUNCTION btracker_backend.bh_savings_balance(
     _account_id INT,
     _coin_type INT,
-    _from INT, 
+    _from INT,
     _to INT
 )
 RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05

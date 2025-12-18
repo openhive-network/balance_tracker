@@ -81,7 +81,6 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $$
 DECLARE
-  __op_approved INT := 89; -- hive::protocol::escrow_approved_operation
   __fee    btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'fee');
   __result btracker_backend.escrow_fee_type;
 BEGIN
