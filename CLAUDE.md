@@ -67,12 +67,17 @@ SQL files are linted with sqlfluff (PostgreSQL dialect, max line length 150).
 
 ## Specialized Agents
 
-This project uses two specialized Claude agents that work together for development. Agent names follow the pattern `{project-name}-{role}` based on the application name (Balance Tracker → `balance-tracker`):
+This project uses specialized Claude agents via the Task tool. Agent names follow patterns based on their purpose:
 
-- **Developer agent** (`-dev` suffix): For implementing features, fixing bugs, refactoring code, and performing coding tasks. Use for writing new code.
-- **Reviewer agent** (`-reviewer` suffix): For verifying code quality, ensuring existing functionality remains intact, and checking for regressions. Use after code changes to review the implementation.
+- **Developer agent** (`{project-name}-dev`): For implementing features, fixing bugs, refactoring code, and performing coding tasks. Derive the project name from the application (e.g., Balance Tracker → `balance-tracker-dev`).
+- **Reviewer agent** (`{project-name}-reviewer`): For verifying code quality, ensuring existing functionality remains intact, and checking for regressions. Use after code changes.
+- **GitLab Pipeline Engineer** (`gitlab-pipeline-engineer`): For all git operations including committing, creating/updating MRs, and pipeline analysis. **Always use this agent instead of running glab/git commands directly.**
 
-**Recommended workflow**: Use both agents in sequence - first the dev agent to write code, then the reviewer agent to identify issues, then the dev agent again to fix any issues found.
+**Recommended workflow**:
+1. Use the dev agent to write code
+2. Use the reviewer agent to identify issues
+3. Use the dev agent again to fix any issues found
+4. Use `gitlab-pipeline-engineer` to commit and create/update MRs
 
 ## Development Notes
 
