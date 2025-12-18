@@ -64,7 +64,6 @@ pushd "${CI_PROJECT_DIR}/docker"
 
 cat <<-EOF | tee ci.env
     BACKEND_VERSION=${BACKEND_VERSION:-latest}
-    HAF_COMMAND=--shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
     HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY:-/srv/haf/data}
     HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY:-/srv/haf/shm}
     HAF_REGISTRY=${HAF_REGISTRY_PATH:-registry.gitlab.syncad.com/hive/haf/instance}
