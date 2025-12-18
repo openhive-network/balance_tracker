@@ -1332,6 +1332,24 @@ performance-test:
   before_script: *extract-nfs-cache-before-script
   script:
   - |
+    # Wait for PostgREST to be ready (healthcheck on port 3000)
+    echo "Waiting for PostgREST service..."
+    WAIT_TIMEOUT=120
+    WAIT_INTERVAL=2
+    WAITED=0
+    while ! curl -sf http://postgrest-server:3000/ > /dev/null 2>&1; do
+      if [[ $WAITED -ge $WAIT_TIMEOUT ]]; then
+        echo "ERROR: Timed out waiting for PostgREST after ${WAIT_TIMEOUT}s"
+        echo "Checking if service is reachable..."
+        curl -v http://postgrest-server:3000/ || true
+        exit 1
+      fi
+      sleep $WAIT_INTERVAL
+      WAITED=$((WAITED + WAIT_INTERVAL))
+      echo "  Waiting for PostgREST... ($WAITED/${WAIT_TIMEOUT}s)"
+    done
+    echo "PostgREST is ready!"
+  - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
     timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=postgrest-server --postgres-host=haf-instance
