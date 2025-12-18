@@ -692,13 +692,14 @@ sync_with_mock_data:
       # (previous runs may have left marker files behind)
       rm -f "${MARKER_FILE}" 2>/dev/null || true
 
-      # Strategy: Wait briefly for job's extraction, then try NFS directly, then fall back to local cache
+      # Strategy: Wait for job's extraction, then try NFS directly, then fall back to local cache
       # This handles timing issues where service starts before job's before_script runs
+      # Note: Job needs ~90s for git clone + cache extraction, so we wait 120s
 
-      # Step 1: Wait up to 60s for job to extract (marker file)
+      # Step 1: Wait up to 120s for job to extract (marker file)
       WAITED=0
-      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 60 ]]; do
-        echo "Waiting for job extraction... ($WAITED/60s)"
+      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 120 ]]; do
+        echo "Waiting for job extraction... ($WAITED/120s)"
         sleep 5
         WAITED=$((WAITED + 5))
       done
@@ -786,13 +787,14 @@ sync_with_mock_data:
       # (previous runs may have left marker files behind)
       rm -f "${MARKER_FILE}" 2>/dev/null || true
 
-      # Strategy: Wait briefly for job's extraction, then try NFS directly, then fall back to local cache
+      # Strategy: Wait for job's extraction, then try NFS directly, then fall back to local cache
       # This handles timing issues where service starts before job's before_script runs
+      # Note: Job needs ~90s for git clone + cache extraction, so we wait 120s
 
-      # Step 1: Wait up to 60s for job to extract (marker file)
+      # Step 1: Wait up to 120s for job to extract (marker file)
       WAITED=0
-      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 60 ]]; do
-        echo "Waiting for job extraction... ($WAITED/60s)"
+      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 120 ]]; do
+        echo "Waiting for job extraction... ($WAITED/120s)"
         sleep 5
         WAITED=$((WAITED + 5))
       done
