@@ -24,7 +24,11 @@ BEGIN
      _stages => synchronization_stages
   );
 
-
+  -- Reset the app's block position to 0 so it processes all blocks from the beginning.
+  -- This is critical for skip-hived mode where HAF is pre-populated with data but the app
+  -- needs to process all blocks to build its tables. Without this, app_create_context
+  -- sets current_block_num to the HAF head block, causing the app to skip processing.
+  PERFORM hive.app_set_current_block_num(__schema_name, 0);
 
 RAISE NOTICE 'Attempting to create an application schema tables...';
 

@@ -29,7 +29,12 @@ function wait-for-bt-startup() {
 }
 
 #shellcheck disable=SC2089
-COMMAND="SELECT hive.is_app_in_sync('btracker_app')::INT;"
+# Check both conditions:
+# 1. btracker_app is in sync with HAF
+# 2. btracker has actually processed data (has balance records)
+# The second check is critical for skip-hived mode where the app starts at HAF head
+# and would immediately appear "in sync" without processing any blocks.
+COMMAND="SELECT (hive.is_app_in_sync('btracker_app') AND EXISTS(SELECT 1 FROM btracker_app.current_account_balances LIMIT 1))::INT;"
 MESSAGE="Waiting for Balance Tracker to finish processing blocks..."
 
 while [ $# -gt 0 ]; do
