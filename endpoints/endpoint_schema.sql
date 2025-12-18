@@ -688,7 +688,7 @@ declare
         ],
         "responses": {
           "200": {
-            "description": "Account balances \n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_backend.balance`\n",
+            "description": "Account balances\n(VEST balances are represented as string due to json limitations)\n\n* Returns `btracker_backend.balance`\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -745,7 +745,7 @@ declare
           "Accounts"
         ],
         "summary": "Historical balance change",
-        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', 37, 1 ,2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VESTS&page-size=2''`\n",
+        "description": "History of change of `coin-type` balance in given block range\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_balance_history(''blocktrades'', ''VESTS'', ''balance'', 1, 2);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balance-history?coin-type=VESTS&page-size=2''`\n",
         "operationId": "btracker_endpoints.get_balance_history",
         "parameters": [
           {
@@ -804,7 +804,7 @@ declare
               "$ref": "#/components/schemas/btracker_backend.sort_direction",
               "default": "desc"
             },
-            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
           },
           {
             "in": "query",
@@ -814,7 +814,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           },
           {
             "in": "query",
@@ -824,7 +824,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           }
         ],
         "responses": {
@@ -913,7 +913,7 @@ declare
               "$ref": "#/components/schemas/btracker_backend.sort_direction",
               "default": "desc"
             },
-            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
           },
           {
             "in": "query",
@@ -923,7 +923,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           },
           {
             "in": "query",
@@ -933,7 +933,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           }
         ],
         "responses": {
@@ -1076,7 +1076,7 @@ declare
             "schema": {
               "$ref": "#/components/schemas/btracker_backend.nai_type"
             },
-            "description": "* HBD  \n* HIVE  \n* VESTS\n"
+            "description": "* HBD\n* HIVE\n* VESTS\n"
           },
           {
             "in": "query",
@@ -1086,7 +1086,7 @@ declare
               "$ref": "#/components/schemas/btracker_backend.balance_type",
               "default": "balance"
             },
-            "description": "`balance` or `savings_balance`  \n(`savings_balance` not allowed with `VESTS`).\n"
+            "description": "`balance` or `savings_balance`\n(`savings_balance` not allowed with `VESTS`).\n"
           },
           {
             "in": "query",
@@ -1164,7 +1164,7 @@ declare
               "$ref": "#/components/schemas/btracker_backend.sort_direction",
               "default": "desc"
             },
-            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest \n\n * `desc` - Descending, from newest to oldest \n"
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
           },
           {
             "in": "query",
@@ -1174,7 +1174,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).\n\nThe function will interpret and convert the input based on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           },
           {
             "in": "query",
@@ -1184,7 +1184,7 @@ declare
               "type": "string",
               "default": null
             },
-            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). \n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block \nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
+            "description": "Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS).\n\nThe provided `timestamp` will be converted to a `block-num` by finding the first block\nwhere the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).\n\nThe function will convert the value depending on its format, example input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           }
         ],
         "responses": {
@@ -1277,7 +1277,7 @@ declare
         "operationId": "btracker_endpoints.get_total_value_locked",
         "responses": {
           "200": {
-            "description": "TVL snapshot (block height is the app\u2019s last-synced block)",
+            "description": "TVL snapshot (block height is the app''s last-synced block)",
             "content": {
               "application/json": {
                 "schema": {
