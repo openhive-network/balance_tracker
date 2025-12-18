@@ -7,21 +7,7 @@ CREATE TYPE btracker_backend.impacted_transfers AS
     transfer_amount BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_transfers(IN _operation_body JSONB, IN _op_type_id INT)
-RETURNS SETOF btracker_backend.impacted_transfers
-LANGUAGE plpgsql
-STABLE
-AS
-$BODY$
-BEGIN
-  IF _op_type_id = 2 OR _op_type_id = 83 THEN
-    RETURN QUERY SELECT * FROM btracker_backend.process_transfer(_operation_body);
-  ELSIF _op_type_id = 27 THEN
-    RETURN QUERY SELECT * FROM btracker_backend.process_escrow_transfer(_operation_body);
-  END IF;
-END;
-$BODY$;
-
+-- Process transfer_operation and fill_recurrent_transfer_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_transfer(IN _operation_body JSONB)
 RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
@@ -31,14 +17,15 @@ DECLARE
   __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
 BEGIN
   RETURN QUERY (
-    SELECT 
+    SELECT
       __amount.asset_symbol_nai AS nai,
       __amount.amount AS transfer_amount
   );
-  
+
 END
 $$;
 
+-- Process escrow_transfer_operation (returns two rows: one for HIVE, one for HBD)
 CREATE OR REPLACE FUNCTION btracker_backend.process_escrow_transfer(IN _operation_body JSONB)
 RETURNS SETOF btracker_backend.impacted_transfers
 LANGUAGE 'plpgsql' STABLE
@@ -59,7 +46,7 @@ BEGIN
       __hbd_amt.asset_symbol_nai AS nai,
       __hbd_amt.amount AS transfer_amount
   );
-  
+
 END
 $$;
 

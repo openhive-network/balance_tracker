@@ -15,29 +15,7 @@ CREATE TYPE btracker_backend.recurrent_transfer_return AS
     delete_transfer      BOOLEAN
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_recurrent_transfer_operations(IN __operation_body JSONB, IN _op_type_id INT)
-RETURNS btracker_backend.recurrent_transfer_return
-LANGUAGE plpgsql
-IMMUTABLE
-AS
-$BODY$
-BEGIN
-  RETURN (
-    CASE
-      WHEN _op_type_id = 49 THEN
-        btracker_backend.process_recurrent_transfer_operations(__operation_body)
-
-      WHEN _op_type_id = 83 THEN
-        btracker_backend.process_fill_recurrent_transfer_operations(__operation_body)
-
-      WHEN _op_type_id = 84 THEN
-        btracker_backend.process_fail_recurrent_transfer_operations(__operation_body)
-    END
-  );
-
-END;
-$BODY$;
-
+-- Helper function to extract pair_id from extensions
 CREATE OR REPLACE FUNCTION btracker_backend.extract_pair_id(IN __extensions JSONB)
 RETURNS INT
 LANGUAGE plpgsql
@@ -74,40 +52,9 @@ $BODY$;
     "recurrence": 168
   }
 }
-
-{
-  "id": 1,
-  "jsonrpc": "2.0",
-  "result": [
-    {
-      "amount": "0.001 HIVE",
-      "consecutive_failures": 0,
-      "from": "clove71",
-      "id": 2205,
-      "memo": "",
-      "pair_id": 0,
-      "recurrence": 24,
-      "remaining_executions": 60,
-      "to": "risingstar2",
-      "trigger_date": "2025-04-15T15:09:51"
-    },
-    {
-      "amount": "0.001 HIVE",
-      "consecutive_failures": 0,
-      "from": "clove71",
-      "id": 2232,
-      "memo": "",
-      "pair_id": 0,
-      "recurrence": 24,
-      "remaining_executions": 87,
-      "to": "risingstargame2",
-      "trigger_date": "2025-04-15T11:56:39"
-    }
-  ]
-}
-
 */
 
+-- Process recurrent_transfer_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -160,6 +107,7 @@ $$;
 }
 */
 
+-- Process fill_recurrent_transfer_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_fill_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -233,6 +181,7 @@ $$;
 
 */
 
+-- Process failed_recurrent_transfer_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_fail_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE

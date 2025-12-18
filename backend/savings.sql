@@ -10,36 +10,7 @@ CREATE TYPE btracker_backend.impacted_savings_return AS
     request_id BIGINT
 );
 
-
-CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_saving_balances(IN _operation_body JSONB, IN _op_type_id INT)
-RETURNS btracker_backend.impacted_savings_return
-LANGUAGE plpgsql
-STABLE
-AS
-$BODY$
-BEGIN
-  RETURN (
-    CASE 
-      WHEN _op_type_id = 32 THEN
-        btracker_backend.process_transfer_to_savings_operation(_operation_body)
-
-      WHEN _op_type_id = 33 THEN
-        btracker_backend.process_transfer_from_savings_operation(_operation_body)
-
-      WHEN _op_type_id = 34 THEN
-        btracker_backend.process_cancel_transfer_from_savings_operation(_operation_body)
-
-      WHEN _op_type_id = 59 THEN
-        btracker_backend.process_fill_transfer_from_savings_operation(_operation_body)
-
-      WHEN _op_type_id = 55 THEN
-        btracker_backend.process_interest_operation(_operation_body)
-    END
-  );
-
-END;
-$BODY$;
-
+-- Process transfer_to_savings_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_transfer_to_savings_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
@@ -55,10 +26,11 @@ BEGIN
     0,
     NULL
   )::btracker_backend.impacted_savings_return;
-  
+
 END
 $$;
 
+-- Process transfer_from_savings_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
@@ -78,6 +50,7 @@ BEGIN
 END
 $$;
 
+-- Process fill_transfer_from_savings_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_fill_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
@@ -97,6 +70,7 @@ BEGIN
 END
 $$;
 
+-- Process interest_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_interest_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
@@ -116,6 +90,7 @@ BEGIN
 END
 $$;
 
+-- Process cancel_transfer_from_savings_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_cancel_transfer_from_savings_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_savings_return
 LANGUAGE 'plpgsql' STABLE
