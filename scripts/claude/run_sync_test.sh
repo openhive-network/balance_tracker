@@ -85,6 +85,7 @@ echo ""
 echo "=== Performance Comparison ==="
 echo "  Baseline:       167.55s (2.79 minutes)"
 echo "  Best (Phase 1): 158.82s (2.65 minutes) - 5.2% improvement"
+echo "  Best (Phase 2): 155.30s (2.59 minutes) - 7.3% improvement"
 echo "  Current:        ${TOTAL_TIME}s (${TOTAL_MINUTES} minutes)"
 
 # Calculate improvement percentage
