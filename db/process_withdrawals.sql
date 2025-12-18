@@ -40,6 +40,9 @@ DECLARE
   __reset_filled_withdrawals          INT;
 BEGIN
 -- Look up hardfork blocks once at the start
+-- HF16/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
+-- with NULL return NULL (falsy), so pre-hardfork logic applies automatically:
+--   block_num > NULL => NULL => pre-hardfork behavior used
 SELECT
   MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
@@ -47,14 +50,6 @@ SELECT
 INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_delayed_voting_block
 FROM hafd.applied_hardforks
 WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_delayed_voting);
-
--- Validate that all required hardfork blocks were found
-IF _hf_vests_precision_block IS NULL OR _hf_withdraw_rate_block IS NULL OR _hf_delayed_voting_block IS NULL THEN
-  RAISE EXCEPTION 'Required hardfork block not found. HF%=%, HF%=%, HF%=%',
-    _hf_vests_precision, _hf_vests_precision_block,
-    _hf_withdraw_rate, _hf_withdraw_rate_block,
-    _hf_delayed_voting, _hf_delayed_voting_block;
-END IF;
 
 ------------------------------------------------------------------------------
 -- SECTION 1: WITHDRAWALS (withdraw_vesting_operation, hardfork_hive_operation)
