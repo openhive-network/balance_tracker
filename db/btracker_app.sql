@@ -1,3 +1,74 @@
+/**
+ * Balance Tracker Core Application Schema
+ * =======================================
+ *
+ * This file defines the core Balance Tracker HAF application, including:
+ * - HAF context registration and synchronization stages
+ * - All database tables for tracking balances and related data
+ * - Control functions for application lifecycle
+ * - Block processing dispatch functions
+ * - Index creation for API performance
+ *
+ * Table Groups:
+ * -------------
+ * 1. CONTROL TABLES
+ *    - btracker_app_status: Processing control flag
+ *    - version: Schema version tracking
+ *    - asset_table: Supported assets (HIVE, HBD, VESTS)
+ *
+ * 2. ACCOUNT BALANCES
+ *    - current_account_balances: Current liquid balances (latest state)
+ *    - account_balance_history: Complete history of all balance changes
+ *    - balance_history_by_day/month: Aggregated balance snapshots
+ *
+ * 3. REWARDS
+ *    - account_rewards: Pending unclaimed rewards
+ *    - account_info_rewards: Lifetime posting/curation rewards
+ *
+ * 4. DELEGATIONS
+ *    - current_accounts_delegations: Active delegation pairs
+ *    - account_delegations: Summary per account (total received/delegated)
+ *
+ * 5. RECURRENT TRANSFERS
+ *    - recurrent_transfers: Active scheduled recurring transfers
+ *
+ * 6. WITHDRAWALS (Power-down)
+ *    - account_withdraws: Power-down state per account
+ *    - account_routes: Vesting withdrawal routing rules
+ *
+ * 7. SAVINGS
+ *    - account_savings: Current savings balances
+ *    - account_savings_history: Complete savings history
+ *    - transfer_saving_id: Pending savings withdrawal requests
+ *    - saving_history_by_day/month: Aggregated savings snapshots
+ *
+ * 8. TRANSFER STATISTICS
+ *    - transfer_stats_by_hour/day/month: Aggregated transfer volumes
+ *
+ * 9. MARKET & CONVERSIONS
+ *    - convert_state: Pending HBD↔HIVE conversions
+ *    - order_state: Open market limit orders
+ *
+ * 10. ESCROWS
+ *    - escrow_state: Active escrow agreements
+ *    - escrow_fees: Pending escrow agent fees
+ *
+ * HAF Synchronization Stages:
+ * ---------------------------
+ * - MASSIVE_PROCESSING: Initial sync, processes blocks in batches of 10000
+ * - LIVE: Real-time sync, processes blocks one at a time
+ *
+ * Processing Flow:
+ * ----------------
+ * 1. main() starts the application loop
+ * 2. btracker_process_blocks() dispatches based on current stage
+ * 3. btracker_massive_processing() or btracker_single_processing() calls
+ *    individual process_* functions for each data type
+ *
+ * @see builtin_roles.sql for database role definitions
+ * @see process_*.sql files for individual processing logic
+ */
+
 SET ROLE btracker_owner;
 
 DO $$
@@ -383,7 +454,20 @@ BEGIN
 END
 $$;
 
---- Helper function telling application main-loop to continue execution.
+-- ============================================================================
+-- CONTROL FUNCTIONS
+-- ============================================================================
+-- These functions manage the application processing lifecycle.
+-- Used by scripts/process_blocks.sh to control block processing.
+
+/**
+ * continueProcessing()
+ * --------------------
+ * Check if the application should continue processing blocks.
+ * Called in the main loop to allow graceful shutdown.
+ *
+ * @returns TRUE if processing should continue, FALSE to stop
+ */
 CREATE OR REPLACE FUNCTION continueProcessing()
 RETURNS BOOLEAN
 LANGUAGE 'plpgsql' STABLE
@@ -394,6 +478,12 @@ BEGIN
 END
 $$;
 
+/**
+ * allowProcessing()
+ * -----------------
+ * Enable block processing. Called at application startup
+ * to reset the processing flag after a previous stop.
+ */
 CREATE OR REPLACE FUNCTION allowProcessing()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
@@ -404,9 +494,15 @@ BEGIN
 END
 $$;
 
-/** Helper function to be called from separate transaction (must be committed)
-    to safely stop execution of the application.
-**/
+/**
+ * stopProcessing()
+ * ----------------
+ * Signal the application to stop processing after the current block.
+ * Must be called from a separate session and committed to take effect.
+ * The main loop will exit gracefully on next iteration check.
+ *
+ * Usage: Call from psql or separate connection, then COMMIT.
+ */
 CREATE OR REPLACE FUNCTION stopProcessing()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
@@ -417,6 +513,15 @@ BEGIN
 END
 $$;
 
+/**
+ * isIndexesCreated()
+ * ------------------
+ * Check if performance indexes have been created.
+ * Used to determine if we're transitioning from MASSIVE to LIVE stage.
+ * Indexes are created once before entering LIVE processing.
+ *
+ * @returns TRUE if indexes exist, FALSE otherwise
+ */
 CREATE OR REPLACE FUNCTION isIndexesCreated()
 RETURNS BOOLEAN
 LANGUAGE 'plpgsql' STABLE
@@ -431,6 +536,26 @@ BEGIN
 END
 $$;
 
+-- ============================================================================
+-- BLOCK PROCESSING FUNCTIONS
+-- ============================================================================
+-- These functions handle block processing dispatch and execution.
+-- Called by the main loop for each block range to sync.
+
+/**
+ * btracker_process_blocks()
+ * -------------------------
+ * Main dispatch function for block processing.
+ * Routes to either massive or single processing based on current HAF stage.
+ *
+ * Behavior by stage:
+ * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync
+ * - LIVE: Creates indexes (once), then calls btracker_single_processing()
+ *
+ * @param _context_name  HAF context name (typically schema name)
+ * @param _block_range   Range of blocks to process (first_block, last_block)
+ * @param _logs          Enable progress logging (default: true)
+ */
 CREATE OR REPLACE FUNCTION btracker_process_blocks(
     _context_name hive.context_name,
     _block_range hive.blocks_range,
@@ -455,6 +580,33 @@ BEGIN
 END
 $$;
 
+/**
+ * btracker_massive_processing()
+ * -----------------------------
+ * Process a range of blocks during initial sync (MASSIVE_PROCESSING stage).
+ * Optimized for throughput with synchronous_commit OFF.
+ *
+ * Special handling for HF23 (block 41818752):
+ * The hardfork_hive_operation at HF23 lacks balance/rewards/savings info
+ * for affected accounts. We split processing around HF23 and manually
+ * process affected accounts via process_hf_23().
+ *
+ * Processing order per range:
+ * 1. Balances (liquid)
+ * 2. Withdrawals (power-down)
+ * 3. Savings
+ * 4. Rewards
+ * 5. Delegations
+ * 6. Recurrent transfers
+ * 7. Transfer statistics
+ * 8. Conversions
+ * 9. Market orders
+ * 10. Escrows
+ *
+ * @param _from  First block number to process
+ * @param _to    Last block number to process
+ * @param _logs  Enable progress logging
+ */
 CREATE OR REPLACE PROCEDURE btracker_massive_processing(
     IN _from INT,
     IN _to INT,
@@ -535,6 +687,18 @@ BEGIN
 END
 $$;
 
+/**
+ * btracker_single_processing()
+ * ----------------------------
+ * Process a single block during LIVE sync stage.
+ * Uses synchronous_commit ON for data safety.
+ *
+ * Called for each new block after initial sync is complete.
+ * Processes all operation types for the given block.
+ *
+ * @param _block  Block number to process
+ * @param _logs   Enable progress logging
+ */
 CREATE OR REPLACE PROCEDURE btracker_single_processing(
     IN _block INT,
     IN _logs BOOLEAN
@@ -573,6 +737,14 @@ BEGIN
 END
 $$;
 
+/**
+ * raise_exception()
+ * -----------------
+ * Utility function to raise a custom exception.
+ * Used by backend functions for input validation errors.
+ *
+ * @param TEXT  Error message to raise
+ */
 CREATE OR REPLACE FUNCTION raise_exception(TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql'
@@ -583,13 +755,27 @@ BEGIN
 END
 $$;
 
-/** Application entry point, which:
-  - defines its data schema,
-  - creates HAF application context,
-  - starts application main-loop (which iterates infinitely).
-    To stop it call `stopProcessing();`
-    from another session and commit its trasaction.
-*/
+-- ============================================================================
+-- APPLICATION ENTRY POINT
+-- ============================================================================
+
+/**
+ * main()
+ * ------
+ * Application entry point that starts the block processing loop.
+ * Called by scripts/process_blocks.sh to begin syncing.
+ *
+ * Behavior:
+ * 1. Enables processing via allowProcessing()
+ * 2. Enters infinite loop calling hive.app_next_iteration()
+ * 3. Processes each block range via btracker_process_blocks()
+ * 4. Exits when continueProcessing() returns FALSE
+ *
+ * To stop: Call stopProcessing() from another session and commit.
+ *
+ * @param _appContext    HAF context name
+ * @param _maxBlockLimit Optional maximum block to process (for testing)
+ */
 CREATE OR REPLACE PROCEDURE main(
     IN _appContext hive.context_name,
     IN _maxBlockLimit INT = null
@@ -635,31 +821,70 @@ BEGIN
 END
 $$;
 
+-- ============================================================================
+-- INDEX CREATION
+-- ============================================================================
+
+/**
+ * create_btracker_indexes()
+ * -------------------------
+ * Create performance indexes for API queries.
+ * Called once when transitioning from MASSIVE to LIVE processing.
+ *
+ * Indexes are deferred until after initial sync because:
+ * 1. Building indexes on empty/small tables is fast
+ * 2. Maintaining indexes during bulk inserts is slow
+ * 3. Better to bulk load then index
+ *
+ * Index Purposes:
+ * ---------------
+ * Balance History:
+ *   - idx_account_balance_history_account_seq_num_idx
+ *     Cursor-based pagination by sequence number
+ *   - idx_account_balance_history_account_block_num_idx
+ *     Block range filtering (uses function-based index)
+ *
+ * Savings History:
+ *   - idx_account_savings_history_account_seq_num_idx
+ *     Cursor-based pagination by sequence number
+ *   - idx_account_savings_history_account_block_num_idx
+ *     Block range filtering
+ *
+ * Top Holders:
+ *   - idx_account_balance_nai_balance_idx
+ *     Order by balance DESC for top holder queries
+ *   - idx_account_savings_nai_balance_idx
+ *     Order by savings balance DESC
+ *
+ * Delegations:
+ *   - idx_current_accounts_delegations_delegatee_idx
+ *     Filter by delegatee for incoming delegations
+ *
+ * Recurrent Transfers:
+ *   - idx_recurrent_transfers_to_account_idx
+ *     Filter by to_account for incoming transfers
+ */
 CREATE OR REPLACE FUNCTION create_btracker_indexes()
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  /*  Create necessary indexes for balance tracker application
-      Indexes used in:
-        - idx_account_balance_history_account_seq_num_idx   in balance history API (default ordering by balance_seq_no)
-        - idx_account_balance_history_account_block_num_idx in balance history API (when block_num filter is applied)
-        - idx_account_savings_history_account_seq_num_idx   in savings balance history API (default ordering by balance_seq_no)
-        - idx_account_savings_history_account_block_num_idx in savings balance history API (when block_num filter is applied)
-        - idx_account_balance_nai_balance_idx               in top holders API (ordering by balance)
-        - idx_account_savings_nai_balance_idx               in savings top holders API (ordering by balance)
-        - idx_current_accounts_delegations_delegatee_idx    in account delegations API (filter by delegatee)
-        - idx_recurrent_transfers_to_account_idx            in recurrent transfers API (filter by to_account)
-  */
-
+  -- Balance history: pagination by sequence number (default ordering)
   CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON account_balance_history(account, nai, balance_seq_no);
+  -- Savings history: pagination by sequence number (default ordering)
   CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON account_savings_history(account, nai, balance_seq_no);
+  -- Balance history: block range filtering (function-based index on source_op)
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op));
+  -- Savings history: block range filtering (function-based index on source_op)
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op));
+  -- Top holders: order by balance descending
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai, balance DESC);
+  -- Top savings holders: order by savings balance descending
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
+  -- Delegations: filter by delegatee for incoming delegation queries
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
+  -- Recurrent transfers: filter by recipient for incoming transfer queries
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
 END
 $$;
