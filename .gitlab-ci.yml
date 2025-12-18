@@ -365,6 +365,14 @@ sync:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
+    # Restore blockchain files to DATADIR before caching
+    # (they were moved to docker/blockchain for Docker Compose bind mount during script phase)
+    if [[ -d "${CI_PROJECT_DIR}/docker/blockchain" ]] && [[ -n "$(ls -A "${CI_PROJECT_DIR}/docker/blockchain" 2>/dev/null)" ]]; then
+      echo "Restoring blockchain files to datadir for caching..."
+      mkdir -p "${DATADIR}/blockchain"
+      sudo cp -a "${CI_PROJECT_DIR}/docker/blockchain"/* "${DATADIR}/blockchain/"
+    fi
+
     # Save sync data to local cache with commit-based key (not pipeline ID)
     LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
     mkdir -p "${LOCAL_SYNC_CACHE}"
@@ -582,6 +590,14 @@ sync_with_mock_data:
     popd
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+
+    # Restore blockchain files to DATADIR before caching
+    # (they were moved to docker/blockchain for Docker Compose bind mount during script phase)
+    if [[ -d "${CI_PROJECT_DIR}/docker/blockchain" ]] && [[ -n "$(ls -A "${CI_PROJECT_DIR}/docker/blockchain" 2>/dev/null)" ]]; then
+      echo "Restoring blockchain files to datadir for caching..."
+      mkdir -p "${DATADIR}/blockchain"
+      sudo cp -a "${CI_PROJECT_DIR}/docker/blockchain"/* "${DATADIR}/blockchain/"
+    fi
 
     # Save mock sync data to local cache with commit-based key
     LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
