@@ -2,6 +2,8 @@
 
 SET ROLE btracker_owner;
 
+-- Return type for transfer statistics aggregation functions.
+-- Contains summary metrics for a time period (hour/day/month/year).
 DROP TYPE IF EXISTS btracker_backend.transfer_history_return CASCADE;
 CREATE TYPE btracker_backend.transfer_history_return AS (
     updated_at TIMESTAMP,
@@ -13,6 +15,13 @@ CREATE TYPE btracker_backend.transfer_history_return AS (
     last_block_num INT
 );
 
+/*
+Aggregates monthly transfer statistics into yearly summaries.
+Called by: btracker_backend.get_transfer_stats() when _granularity_hourly = 'yearly'
+
+Pattern: Reads from transfer_stats_by_month table and re-aggregates by year.
+Note: avg_transfer_amount is NULL here; it's computed in get_transfer_aggregation().
+*/
 CREATE OR REPLACE FUNCTION btracker_backend.transfer_stats_by_year(
     _nai INT,
     _from TIMESTAMP,
@@ -25,6 +34,7 @@ AS
 $$
 BEGIN
   RETURN QUERY
+    -- get_year: Extract monthly records and truncate timestamps to year boundary
     WITH get_year AS (
         SELECT
             sum_transfer_amount,
@@ -37,6 +47,8 @@ BEGIN
         FROM transfer_stats_by_month
         WHERE DATE_TRUNC('year', updated_at) BETWEEN _from AND _to AND nai = _nai
     )
+    -- Re-aggregate monthly data into yearly summaries
+    -- NULL for avg: computed later as sum/count in get_transfer_aggregation()
     SELECT
         by_year AS updated_at,
         SUM(sum_transfer_amount)::BIGINT AS sum_transfer_amount,
@@ -50,6 +62,16 @@ BEGIN
 END
 $$;
 
+/*
+Router function that dispatches to the appropriate transfer stats table based on granularity.
+Called by: btracker_backend.get_transfer_aggregation()
+
+Routes to:
+  - hourly:  transfer_stats_by_hour table
+  - daily:   transfer_stats_by_day table
+  - monthly: transfer_stats_by_month table
+  - yearly:  btracker_backend.transfer_stats_by_year() (aggregates from monthly)
+*/
 CREATE OR REPLACE FUNCTION btracker_backend.get_transfer_stats(
     _nai INT,
     _granularity_hourly btracker_backend.granularity_hourly,
@@ -62,6 +84,7 @@ STABLE
 AS
 $$
 BEGIN
+  -- Route to appropriate data source based on requested granularity
   IF _granularity_hourly = 'hourly' THEN
     RETURN QUERY 
       SELECT 
@@ -120,8 +143,23 @@ BEGIN
 END
 $$;
 
+/*
+Main transfer aggregation function with gap-filling for continuous time series.
+Called by: btracker_endpoints.get_aggregated_transfer()
+
+This function:
+1. Converts block range to timestamp range using aggregated_history_block_range()
+2. Generates a continuous date series for the requested granularity
+3. LEFT JOINs actual transfer data from get_transfer_stats()
+4. Gap-fills missing periods with zeros (no transfers = zero values)
+5. Computes average dynamically as sum/count
+6. Fills in missing block numbers by looking up the nearest block
+
+Uses dynamic SQL (DO block with format()) to inject the HAF context schema name,
+which is required to get the current block number for range calculation.
+*/
 DO $$
-DECLARE 
+DECLARE
   __schema_name VARCHAR;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
@@ -144,12 +182,13 @@ BEGIN
     DECLARE
         __granularity TEXT;
         __one_period INTERVAL;
-        -- Get the current block number from the context
+        -- Get the current block number from the HAF context for range validation
         __btracker_current_block INT := (SELECT current_block_num FROM hafd.contexts WHERE name = '%s');
         __ah_range btracker_backend.aggregated_history_paging_return;
     BEGIN
+      -- Convert enum granularity to PostgreSQL interval unit string
       __granularity := (
-        CASE 
+        CASE
           WHEN _granularity_hourly = 'hourly' THEN 'hour'
           WHEN _granularity_hourly = 'daily' THEN 'day'
           WHEN _granularity_hourly = 'monthly' THEN 'month'
@@ -158,11 +197,15 @@ BEGIN
         END
       );
 
+      -- Convert block range to timestamp range, clamped to valid data
       __ah_range := btracker_backend.aggregated_history_block_range(_from_block, _to_block, __btracker_current_block, __granularity);
 
+      -- Build interval for generate_series step size
       __one_period := ('1 ' || __granularity )::INTERVAL;
 
       RETURN QUERY (
+        -- date_series: Generate continuous sequence of time buckets (hour/day/month/year)
+        -- This ensures every period in the range is represented, even if no transfers occurred
         WITH date_series AS (
           SELECT generate_series(
               __ah_range.from_timestamp,
@@ -170,8 +213,10 @@ BEGIN
               __one_period
           ) AS date
         ),
+        -- get_daily_aggregation: MATERIALIZED to ensure single execution
+        -- Fetches actual transfer data for the date range from appropriate granularity table
         get_daily_aggregation AS MATERIALIZED (
-          SELECT 
+          SELECT
             bh.updated_at,
             bh.sum_transfer_amount,
             bh.avg_transfer_amount,
@@ -181,8 +226,10 @@ BEGIN
             bh.last_block_num
           FROM btracker_backend.get_transfer_stats(_nai, _granularity_hourly, __ah_range.from_timestamp, __ah_range.to_timestamp) bh
         ),
+        -- transfer_records: LEFT JOIN preserves all date_series entries
+        -- COALESCE fills missing periods with zeros (gap-filling pattern)
         transfer_records AS (
-          SELECT 
+          SELECT
             ds.date,
             COALESCE(bh.sum_transfer_amount,0) AS sum_transfer_amount,
             COALESCE(bh.avg_transfer_amount,0) AS avg_transfer_amount,
@@ -193,6 +240,8 @@ BEGIN
           FROM date_series ds
           LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
         ),
+        -- join_missing_block: For periods with no transfers, find the nearest block
+        -- Uses LATERAL subquery to look up the last block before end of period
         join_missing_block AS (
           SELECT
             fb.date,
@@ -212,7 +261,9 @@ BEGIN
             LIMIT 1
           ) jl ON fb.last_block_num IS NULL
         )
-        SELECT 
+        -- Final output: compute average, adjust timestamp to period end, apply sort direction
+        -- LEAST prevents future timestamps from exceeding current time
+        SELECT
           LEAST(fb.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
           fb.sum_transfer_amount::BIGINT,
           (CASE WHEN fb.transfer_count = 0 THEN 0 ELSE (fb.sum_transfer_amount / fb.transfer_count) END)::BIGINT,

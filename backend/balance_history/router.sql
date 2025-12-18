@@ -1,5 +1,15 @@
 SET ROLE btracker_owner;
 
+/*
+Router function for paginated balance history queries.
+Called by: btracker_endpoints.get_balance_history()
+
+Dispatches to the appropriate underlying function based on balance type:
+  - 'balance':         btracker_backend.liquid_balance_history() - queries account_balance_history
+  - 'savings_balance': btracker_backend.savings_history() - queries account_savings_history
+
+Both underlying functions return paginated results with prev_balance for each operation.
+*/
 CREATE OR REPLACE FUNCTION btracker_backend.balance_history(
     _account_id INT,
     _coin_type INT,
@@ -15,6 +25,7 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
+  -- Route to liquid or savings history based on balance_type parameter
   IF _balance_type = 'balance' THEN
     RETURN btracker_backend.liquid_balance_history(_account_id, _coin_type, _page, _page_size, _order_is, _from_block, _to_block);
   END IF;

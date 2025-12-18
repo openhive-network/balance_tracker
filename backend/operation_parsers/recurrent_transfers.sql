@@ -1,3 +1,22 @@
+/*
+Operation parsers for recurring transfer operations.
+Called by: db/process_recurrent_transfers.sql
+
+Extracts data from operation JSONBs for:
+- recurrent_transfer: Create/update/cancel scheduled transfers
+- fill_recurrent_transfer: Successful execution of scheduled transfer
+- failed_recurrent_transfer: Failed execution (insufficient funds)
+
+Return type includes from/to accounts, transfer_id (pair_id from extensions),
+amount, consecutive_failures, remaining_executions, recurrence, and delete flag.
+
+Lifecycle:
+- User creates transfer with amount, recurrence (hours), and execution count
+- System fills periodically, decrementing remaining_executions
+- On fill failure, consecutive_failures increments
+- Transfer deleted when: amount=0, remaining_executions=0, or 10 consecutive failures
+*/
+
 SET ROLE btracker_owner;
 
 DROP TYPE IF EXISTS btracker_backend.recurrent_transfer_return CASCADE;
@@ -15,7 +34,9 @@ CREATE TYPE btracker_backend.recurrent_transfer_return AS
     delete_transfer      BOOLEAN
 );
 
--- Helper function to extract pair_id from extensions
+-- Extract pair_id from operation extensions.
+-- pair_id uniquely identifies a transfer between two accounts (allows multiple).
+-- Returns 0 if no pair_id specified (legacy transfers before pair_id feature).
 CREATE OR REPLACE FUNCTION btracker_backend.extract_pair_id(IN __extensions JSONB)
 RETURNS INT
 LANGUAGE plpgsql
@@ -54,7 +75,9 @@ $BODY$;
 }
 */
 
--- Process recurrent_transfer_operation
+-- Extract recurrent_transfer data.
+-- Creates/updates/cancels a scheduled recurring transfer.
+-- Amount of 0 cancels the transfer (marks for deletion).
 CREATE OR REPLACE FUNCTION btracker_backend.process_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -63,12 +86,12 @@ $$
 DECLARE
   __amount       btracker_backend.asset := btracker_backend.parse_amount_object(__operation_body -> 'value' -> 'amount');
   __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
-  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if amount is 0
-  __con_failures INT     := 0;     -- first transfer, always 0
+  __del_transfer BOOLEAN := FALSE;  -- mark transfer for deletion if amount is 0
+  __con_failures INT     := 0;      -- new/updated transfer starts with 0 failures
 
   __return btracker_backend.recurrent_transfer_return;
 BEGIN
-  -- if amount is 0, mark transfer for deletion
+  -- Amount of 0 cancels the recurring transfer
   IF __amount.amount = 0 THEN
     __del_transfer := TRUE;
   END IF;
@@ -107,7 +130,9 @@ $$;
 }
 */
 
--- Process fill_recurrent_transfer_operation
+-- Extract fill_recurrent_transfer data (virtual op).
+-- Successful execution of scheduled transfer. Decrements remaining_executions.
+-- Resets consecutive_failures to 0. Deletes transfer when remaining_executions = 0.
 CREATE OR REPLACE FUNCTION btracker_backend.process_fill_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -116,12 +141,12 @@ $$
 DECLARE
   __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
   __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
-  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if remaining executions is 0
-  __con_failures INT     := 0;     -- resets consecutive failures on fill is always 0
+  __del_transfer BOOLEAN := FALSE;  -- mark for deletion when all executions complete
+  __con_failures INT     := 0;      -- successful fill resets failure counter
 
   __return btracker_backend.recurrent_transfer_return;
 BEGIN
-  -- if remaining executions is 0, mark transfer for deletion
+  -- All executions complete, delete the transfer
   IF __rem_exec = 0 THEN
     __del_transfer := TRUE;
   END IF;
@@ -181,7 +206,9 @@ $$;
 
 */
 
--- Process failed_recurrent_transfer_operation
+-- Extract failed_recurrent_transfer data (virtual op).
+-- Failed execution (usually insufficient funds). Increments consecutive_failures.
+-- Transfer deleted after 10 consecutive failures OR if explicitly deleted.
 CREATE OR REPLACE FUNCTION btracker_backend.process_fail_recurrent_transfer_operations(IN __operation_body JSONB)
 RETURNS btracker_backend.recurrent_transfer_return
 LANGUAGE 'plpgsql' IMMUTABLE
@@ -190,13 +217,13 @@ $$
 DECLARE
   __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
   __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
-  __deleted      BOOLEAN := (__operation_body->'value'->>'deleted')::BOOLEAN;
-  __del_transfer BOOLEAN := FALSE; -- mark transfer for deletion if remaining executions is 0 or deleted is true
+  __deleted      BOOLEAN := (__operation_body->'value'->>'deleted')::BOOLEAN;  -- true after 10 failures
+  __del_transfer BOOLEAN := FALSE;  -- mark for deletion on 10 failures or explicit delete
   __con_failures INT     := (__operation_body->'value'->>'consecutive_failures')::INT;
 
   __return btracker_backend.recurrent_transfer_return;
 BEGIN
-  -- if remaining executions is 0, mark transfer for deletion
+  -- Delete if no executions remain or max failures reached (deleted=true)
   IF __rem_exec = 0 OR __deleted THEN
     __del_transfer := TRUE;
   END IF;

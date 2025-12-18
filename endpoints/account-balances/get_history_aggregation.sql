@@ -65,9 +65,9 @@ btracker_backend.array_of_aggregated_history:
         description: |
           Sort order:
 
-           * `asc` - Ascending, from oldest to newest 
+           * `asc` - Ascending, from oldest to newest
 
-           * `desc` - Descending, from newest to oldest 
+           * `desc` - Descending, from newest to oldest
       - in: query
         name: from-block
         required: false
@@ -77,7 +77,7 @@ btracker_backend.array_of_aggregated_history:
         description: |
           Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).
 
-          The provided `timestamp` will be converted to a `block-num` by finding the first block 
+          The provided `timestamp` will be converted to a `block-num` by finding the first block
           where the block''s `created_at` is more than or equal to the given `timestamp` (i.e. `block''s created_at >= timestamp`).
 
           The function will interpret and convert the input based on its format, example input:
@@ -91,12 +91,12 @@ btracker_backend.array_of_aggregated_history:
         schema:
           type: string
           default: NULL
-        description: | 
-          Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS). 
+        description: |
+          Similar to the from-block parameter, can either be a block-number (integer) or a timestamp (formatted as YYYY-MM-DD HH:MI:SS).
 
-          The provided `timestamp` will be converted to a `block-num` by finding the first block 
+          The provided `timestamp` will be converted to a `block-num` by finding the first block
           where the block''s `created_at` is less than or equal to the given `timestamp` (i.e. `block''s created_at <= timestamp`).
-          
+
           The function will convert the value depending on its format, example input:
 
           * `2016-09-15 19:47:21`
@@ -112,7 +112,7 @@ btracker_backend.array_of_aggregated_history:
           application/json:
             schema:
               $ref: '#/components/schemas/btracker_backend.array_of_aggregated_history'
-            example: 
+            example:
               - {
                   "date": "2017-01-01T00:00:00",
                   "balance": {
@@ -132,7 +132,7 @@ btracker_backend.array_of_aggregated_history:
                     "savings_balance": "0"
                   }
                 }
-            
+
       '404':
         description: No such account in the database
  */
@@ -154,11 +154,71 @@ SET join_collapse_limit = 16
 SET jit = OFF
 AS
 $$
+/*
+================================================================================
+ENDPOINT: get_balance_aggregation
+================================================================================
+PURPOSE:
+  Returns aggregated balance history for an account at day/month/year granularity.
+  Unlike get_balance_history which shows every operation, this endpoint provides
+  period-end snapshots with min/max values for charting and analysis.
+
+PARAMETERS:
+  - account-name: Hive account name
+  - coin-type: Asset type (HBD, HIVE, or VESTS)
+  - granularity: 'daily', 'monthly', or 'yearly' aggregation level
+  - direction: 'asc' (oldest first) or 'desc' (newest first)
+  - from-block/to-block: Block range filter (accepts block number or timestamp)
+
+ARCHITECTURE:
+  1. Convert block/timestamp parameters to block range
+  2. Validate inputs and set cache headers
+  3. Delegate to backend aggregation function
+  4. Return SETOF records (streaming result)
+
+DATA FLOW (backend):
+  balance_history_by_day/month tables
+    -> generate_series() creates date buckets
+    -> LEFT JOIN balance data to date series
+    -> RECURSIVE CTE fills gaps with previous period's balance
+    -> Return (date, balance, prev_balance, min_balance, max_balance)
+
+AGGREGATION LOGIC:
+  - balance: Closing balance at end of period
+  - prev_balance: Balance at start of period (end of previous period)
+  - min_balance: Lowest balance observed during period
+  - max_balance: Highest balance observed during period
+
+GAP FILLING:
+  Uses RECURSIVE CTE to carry forward balances for periods with no activity.
+  If an account had no transactions in March 2024, the March record shows
+  the February closing balance as both opening and closing.
+
+USE CASES:
+  - Portfolio tracking charts (daily/monthly balance over time)
+  - Historical analysis (yearly summaries)
+  - Performance dashboards
+
+CACHING STRATEGY:
+  - Fully historical range (to-block irreversible): 1 year cache
+  - Includes recent/live data: 2 second cache
+
+RETURN TYPE: SETOF btracker_backend.aggregated_history
+  - date: Period end timestamp
+  - balance: {balance, savings_balance} at period end
+  - prev_balance: {balance, savings_balance} at period start
+  - min_balance: {balance, savings_balance} minimum during period
+  - max_balance: {balance, savings_balance} maximum during period
+================================================================================
+*/
 DECLARE
-  _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block","to-block");
+  _block_range hive.blocks_range := hive.convert_to_blocks_range("from-block", "to-block");
   _coin_type INT                 := btracker_backend.get_nai_type("coin-type");
   _account_id INT                := btracker_backend.get_account_id("account-name", TRUE);
 BEGIN
+  ---------------------------------------------------------------------------
+  -- INPUT VALIDATION
+  ---------------------------------------------------------------------------
   IF _block_range.first_block IS NOT NULL THEN
     PERFORM btracker_backend.validate_negative_limit(_block_range.first_block, 'from-block');
   END IF;
@@ -166,15 +226,23 @@ BEGIN
   IF _block_range.last_block IS NOT NULL THEN
     PERFORM btracker_backend.validate_negative_limit(_block_range.last_block, 'to-block');
   END IF;
-  
+
+  ---------------------------------------------------------------------------
+  -- CACHE HEADER LOGIC
+  -- Immutable historical data -> long cache (1 year)
+  -- Live/recent data -> short cache (2 seconds)
+  ---------------------------------------------------------------------------
   IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
   END IF;
 
+  ---------------------------------------------------------------------------
+  -- RETURN STREAMING RESULTS FROM BACKEND
+  ---------------------------------------------------------------------------
   RETURN QUERY
-  SELECT 
+  SELECT
     ah.date,
     ah.balance,
     ah.prev_balance,
@@ -188,7 +256,6 @@ BEGIN
     _block_range.first_block,
     _block_range.last_block
   ) ah;
-
 END
 $$;
 

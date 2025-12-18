@@ -25,7 +25,7 @@ SET ROLE btracker_owner;
     responses:
       '200':
         description: |
-          Account balances 
+          Account balances
           (VEST balances are represented as string due to json limitations)
 
           * Returns `btracker_backend.balance`
@@ -83,12 +83,50 @@ LANGUAGE 'plpgsql'
 STABLE
 AS
 $$
+/*
+================================================================================
+ENDPOINT: get_account_balances
+================================================================================
+PURPOSE:
+  Returns comprehensive balance information for a single Hive account, including
+  liquid balances, vesting shares, delegations, rewards, savings, power-down state,
+  pending conversions, open market orders, and escrow amounts.
+
+ARCHITECTURE:
+  This is a thin wrapper that:
+  1. Resolves account name to internal account_id (with 404 on missing account)
+  2. Sets HTTP cache headers for PostgREST (2 second cache for live data)
+  3. Delegates to btracker_backend.get_account_balances() for actual query logic
+
+DATA SOURCES (via backend helper):
+  - current_account_balances: Liquid HBD/HIVE/VESTS balances
+  - account_delegations: Delegated and received VESTS summary
+  - account_info_rewards: Lifetime curation and posting rewards
+  - account_rewards: Pending (unclaimed) reward balances
+  - account_savings: Savings balances with pending withdrawal counts
+  - account_withdraws: Power-down state (rate, amounts, routes, delayed vests)
+  - convert_state: Pending HBD<->HIVE conversions
+  - order_state: Open limit orders on internal market
+  - transfer_saving_id: Pending savings withdrawal requests
+  - escrow_state: Active escrow agreements
+
+PERFORMANCE NOTES:
+  - Single account lookup, so all queries are point lookups by account_id
+  - Backend uses MATERIALIZED CTEs to prevent repeated computation
+  - 2-second cache appropriate for frequently-changing balance data
+
+RETURN TYPE: btracker_backend.balance (composite type with 33 fields)
+  - Numeric values use BIGINT for precision
+  - Large values (VESTS) use TEXT to avoid JSON integer overflow
+================================================================================
+*/
 DECLARE
   _account_id INT := btracker_backend.get_account_id("account-name", TRUE);
 BEGIN
+  -- Set short cache duration - balances change frequently with blockchain activity
   PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
 
-  --balance
+  -- Delegate to backend helper which performs the actual multi-table query
   RETURN btracker_backend.get_account_balances(_account_id);
 END
 $$;
