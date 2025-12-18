@@ -1,5 +1,18 @@
 SET ROLE btracker_owner;
 
+/*
+Fallback lookup for previous liquid balance when LAG() returns NULL.
+Called by: btracker_backend.liquid_balance_history() in check_if_prev_balance_is_null CTE
+
+This function handles the edge case where the first row in a page needs a prev_balance
+but LAG() returns NULL (no previous row in the current result set). It looks up the
+actual previous balance from the history table.
+
+Returns:
+  - _prev_balance if not NULL (optimization: skip lookup if already known)
+  - The most recent balance before _from_seq if found
+  - 0 if no prior balance exists (account's first balance change)
+*/
 CREATE OR REPLACE FUNCTION btracker_backend.prev_balance(
     _prev_balance BIGINT,
     _account_id INT,
@@ -11,10 +24,12 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 BEGIN
+  -- Optimization: if prev_balance was already computed by LAG(), return it directly
   IF _prev_balance IS NOT NULL THEN
     RETURN _prev_balance;
   END IF;
 
+  -- Fallback: look up the most recent balance before this sequence number
   _prev_balance := (
     SELECT abh.balance
     FROM btracker_backend.account_balance_history_view abh
@@ -26,10 +41,29 @@ BEGIN
     LIMIT 1
   );
 
+  -- Return 0 if this is the account's first balance change
   RETURN COALESCE(_prev_balance, 0);
 END
 $$;
 
+/*
+Returns paginated liquid balance history for an account with prev_balance calculation.
+Called by: btracker_backend.balance_history() when _balance_type = 'balance'
+
+Pagination approach:
+1. balance_history_range() determines the seq_no boundaries within the block range
+2. calculate_pages() computes offset/limit based on page number and sort direction
+3. Query fetches page_size + 1 rows to enable LAG() calculation for first row's prev_balance
+
+The extra row fetch (+1) is a key optimization:
+- LAG() window function needs the previous row to compute prev_balance
+- Without the extra row, the first item on each page would have NULL prev_balance
+- The extra row is then excluded from final results via LIMIT
+
+prev_balance fallback:
+- LAG() still returns NULL for the very first row (no previous row exists)
+- prev_balance() function handles this by querying the history table directly
+*/
 CREATE OR REPLACE FUNCTION btracker_backend.liquid_balance_history(
     _account_id INT,
     _coin_type INT,
@@ -49,10 +83,14 @@ DECLARE
   _calculate_pages btracker_backend.calculate_pages_return;
 BEGIN
   -----------PAGING LOGIC----------------
+  -- Step 1: Get seq_no boundaries and total count for the block range
   _bh_range        := btracker_backend.balance_history_range(_account_id, _coin_type, 'balance', _from_block, _to_block);
+  -- Step 2: Calculate offset and limit based on page number and direction
   _calculate_pages := btracker_backend.calculate_pages(_bh_range.count, _page, _order_is, _page_size);
 
-  -- Fetching operations
+  -- Step 3: Fetch the page of balance history records
+  -- gather_page: MATERIALIZED to ensure single execution of the filtered query
+  -- Fetches limit+1 rows to enable LAG() calculation for the first row
 	WITH gather_page AS MATERIALIZED (
     SELECT
       ab.balance_seq_no,
@@ -65,15 +103,18 @@ BEGIN
       AND ab.nai             = _coin_type
       AND ab.balance_seq_no >= _bh_range.from_seq
       AND ab.balance_seq_no <= _bh_range.to_seq
+      -- Direction-aware offset: skip rows from the appropriate end
       AND (_order_is = 'desc' OR ab.balance_seq_no >= _bh_range.from_seq + _calculate_pages.offset_filter)
       AND (_order_is = 'asc' OR ab.balance_seq_no <= _bh_range.to_seq - _calculate_pages.offset_filter)
     ORDER BY
       (CASE WHEN _order_is = 'desc' THEN ab.balance_seq_no ELSE NULL END) DESC,
       (CASE WHEN _order_is = 'asc'  THEN ab.balance_seq_no ELSE NULL END) ASC
-    LIMIT _calculate_pages.limit_filter + 1 -- extra row for prev balance calculation
+    -- +1 extra row: needed for LAG() to compute prev_balance for the first result row
+    LIMIT _calculate_pages.limit_filter + 1
   ),
   --------------------------
-  --calculate prev balance--
+  -- Step 4: Calculate prev_balance using LAG() window function
+  -- LAG() looks at the previous row in seq_no order to get the balance before each change
   join_prev_balance AS (
     SELECT
       current.balance_seq_no,
@@ -81,24 +122,30 @@ BEGIN
       current.source_op,
       current.op_type_id,
       current.balance,
+      -- LAG() returns the balance from the previous row (in seq_no order)
       LAG(current.balance) OVER (ORDER BY current.balance_seq_no) AS prev_balance
     FROM gather_page current
     ORDER BY
       (CASE WHEN _order_is = 'desc' THEN current.balance_seq_no ELSE NULL END) DESC,
       (CASE WHEN _order_is = 'asc'  THEN current.balance_seq_no ELSE NULL END) ASC
+    -- Remove the extra row after LAG() has used it
     LIMIT _calculate_pages.limit_filter
   ),
+  -- Step 5: Handle NULL prev_balance for the first row in the result set
+  -- prev_balance() function looks up the actual previous balance from history
   check_if_prev_balance_is_null AS (
     SELECT
       jpb.source_op_block,
       jpb.source_op,
       jpb.op_type_id,
       jpb.balance,
+      -- Fallback lookup if LAG() returned NULL (first row or first page)
       btracker_backend.prev_balance(jpb.prev_balance, _account_id, _coin_type, jpb.balance_seq_no) AS prev_balance,
       bv.created_at
     FROM join_prev_balance jpb
     JOIN hive.blocks_view bv ON bv.num = jpb.source_op_block
   )
+  -- Step 6: Aggregate results into array with computed balance_change
   SELECT array_agg(rows ORDER BY
     (CASE WHEN _order_is = 'desc' THEN rows.source_op::BIGINT ELSE NULL END) DESC,
     (CASE WHEN _order_is = 'asc'  THEN rows.source_op::BIGINT ELSE NULL END) ASC
@@ -111,6 +158,7 @@ BEGIN
       s.op_type_id,
       s.balance,
       s.prev_balance,
+      -- balance_change = current balance - previous balance (the delta for this operation)
       (s.balance - s.prev_balance) AS balance_change,
       s.created_at
     FROM check_if_prev_balance_is_null s
