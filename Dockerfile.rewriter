@@ -1,4 +1,4 @@
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/nginx:ecd325dd43aee24562f59195ef51a20fa15514d4 AS without_tag
+FROM registry.gitlab.syncad.com/hive/common-ci-configuration/nginx:4667716c1454618a0de1ac9dd081dd23aebd3daf AS without_tag
 
 COPY docker/balance_tracker_nginx.conf.template /usr/local/openresty/nginx/conf/nginx.conf.template
 COPY docker/rewriter_entrypoint.sh /entrypoint.sh
