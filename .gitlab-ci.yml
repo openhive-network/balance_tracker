@@ -17,9 +17,11 @@ variables:
   DATA_CACHE_HAF_PREFIX: "/cache/replay_data_haf"
   # NFS cache configuration for sync data sharing across builders
   DATA_CACHE_NFS_PREFIX: "/nfs/ci-cache"
-  SYNC_CACHE_KEY: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
-  SYNC_CACHE_KEY_MOCK: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}_mock"
-  SYNC_CACHE_TYPE: "haf_sync"
+  # Cache keys include both HAF and balance_tracker commits for proper invalidation
+  BTRACKER_CACHE_KEY: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
+  # Cache types for different replay states
+  BTRACKER_SYNC_CACHE_TYPE: "btracker_sync"   # HAF + balance_tracker synced
+  BTRACKER_MOCK_CACHE_TYPE: "btracker_mock"   # HAF + balance_tracker + mock data
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
   # uses registry.gitlab.syncad.com/hive/haf/ci-base-image:ubuntu24.04-10
@@ -281,27 +283,54 @@ sync:
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
   - |
-    # Ensure HAF replay data is available locally (fetch from NFS if needed)
+    # Check for existing btracker sync cache first (HAF + balance_tracker already synced)
+    # If found, we can skip the sync entirely since the cache key includes both commits
+    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
     LOCAL_HAF_CACHE="${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}"
-    if [[ -d "${LOCAL_HAF_CACHE}/datadir" ]]; then
-      echo "Local HAF cache found at ${LOCAL_HAF_CACHE}"
-    else
-      echo "Local HAF cache not found, checking NFS..."
-      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-      if [[ -x "$CACHE_MANAGER" ]]; then
-        if "$CACHE_MANAGER" get haf "${HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
-          echo "Fetched HAF replay data from NFS cache"
-        else
-          echo "ERROR: Failed to fetch HAF replay data from NFS cache"
-          exit 1
-        fi
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    CACHE_HIT="false"
+
+    if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir" ]]; then
+      echo "Local btracker sync cache found at ${LOCAL_BTRACKER_CACHE} - skipping sync"
+      CACHE_HIT="true"
+      export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
+    elif [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Checking NFS for btracker sync cache: ${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+      if "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" 2>/dev/null; then
+        echo "Fetched btracker sync cache from NFS - skipping sync"
+        CACHE_HIT="true"
+        export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
       else
-        echo "ERROR: cache-manager.sh not found and local cache missing"
-        exit 1
+        echo "Btracker sync cache not found, will use HAF-only cache and run sync"
       fi
     fi
+
+    # Fall back to HAF-only cache if no btracker cache
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      if [[ -d "${LOCAL_HAF_CACHE}/datadir" ]]; then
+        echo "Local HAF cache found at ${LOCAL_HAF_CACHE}"
+      else
+        echo "Local HAF cache not found, checking NFS..."
+        if [[ -x "$CACHE_MANAGER" ]]; then
+          if "$CACHE_MANAGER" get haf "${HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
+            echo "Fetched HAF replay data from NFS cache"
+          else
+            echo "ERROR: Failed to fetch HAF replay data from NFS cache"
+            exit 1
+          fi
+        else
+          echo "ERROR: cache-manager.sh not found and local cache missing"
+          exit 1
+        fi
+      fi
+    fi
+
+    # Export for use in script section
+    echo "$CACHE_HIT" > /tmp/cache_hit
   script:
   - |
+    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
     # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
@@ -331,48 +360,19 @@ sync:
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
     echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
-    echo -e "\e[0Ksection_start:$(date +%s):debug[collapsed=true]\r\e[0KDebug: checking database state..."
 
-    # Debug: Check HAF and btracker state before waiting
-    pushd docker
-    IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-    echo "=== HAF State ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT * FROM hafd.hive_state;" || true
-    echo "=== Contexts ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT name, current_block_num, irreversible_block, is_forking FROM hafd.contexts WHERE name = 'btracker_app';" || true
-    echo "=== Context Attachment ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT c.name, ca.is_attached FROM hafd.contexts c JOIN hafd.contexts_attachment ca ON c.id = ca.context_id WHERE c.name = 'btracker_app';" || true
-    echo "=== is_app_in_sync result ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT hive.is_app_in_sync('btracker_app');" || true
-    echo "=== Btracker Table Row Counts ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "
-      SELECT 'current_account_balances' as table_name, COUNT(*) as row_count FROM btracker_app.current_account_balances
-      UNION ALL SELECT 'account_balance_history', COUNT(*) FROM btracker_app.account_balance_history
-      UNION ALL SELECT 'account_rewards', COUNT(*) FROM btracker_app.account_rewards
-      UNION ALL SELECT 'current_accounts_delegations', COUNT(*) FROM btracker_app.current_accounts_delegations
-      UNION ALL SELECT 'account_withdraws', COUNT(*) FROM btracker_app.account_withdraws
-      UNION ALL SELECT 'account_savings', COUNT(*) FROM btracker_app.account_savings
-      ORDER BY table_name;
-    " || true
-    echo "=== Sample balance data (blocktrades account) ==="
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "
-      SELECT a.name, cab.nai, cab.balance
-      FROM btracker_app.current_account_balances cab
-      JOIN hive.accounts_view a ON a.id = cab.account
-      WHERE a.name = 'blocktrades'
-      ORDER BY nai;
-    " || true
-    popd
-
-    echo -e "\e[0Ksection_end:$(date +%s):debug\r\e[0K"
-    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
-
-    "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
-
-    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+    if [[ "$CACHE_HIT" == "true" ]]; then
+      echo "Cache hit - balance_tracker already synced, skipping wait"
+    else
+      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for Balance Tracker to sync..."
+      "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
+      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+    fi
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
+
+    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
 
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
@@ -393,34 +393,34 @@ sync:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
-    # Save sync data to local cache with commit-based key (not pipeline ID)
-    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
-    mkdir -p "${LOCAL_SYNC_CACHE}"
-    sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE}"
-    sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE}"
+    # Only save to cache if this was not a cache hit (avoid re-saving what we loaded)
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      # Save sync data to local cache with commit-based key
+      LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+      mkdir -p "${LOCAL_BTRACKER_CACHE}"
+      sudo cp -a "${DATADIR}" "${LOCAL_BTRACKER_CACHE}"
+      sudo cp -a "${SHM_DIR}" "${LOCAL_BTRACKER_CACHE}"
 
-    # Remove empty blockchain from local cache to trigger symlink creation on test runners
-    # (Docker compose creates empty blockchain dir due to bind mount, but we need symlinks)
-    if [[ -d "${LOCAL_SYNC_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_SYNC_CACHE}/datadir/blockchain")" ]]; then
-      echo "Removing empty blockchain directory from local cache"
-      rmdir "${LOCAL_SYNC_CACHE}/datadir/blockchain"
-    fi
+      # Remove empty blockchain from local cache to trigger symlink creation on test runners
+      if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_BTRACKER_CACHE}/datadir/blockchain")" ]]; then
+        echo "Removing empty blockchain directory from local cache"
+        rmdir "${LOCAL_BTRACKER_CACHE}/datadir/blockchain"
+      fi
 
-    ls -lah "${DATADIR}"
-    ls -lah "${DATADIR}/blockchain"
+      ls -lah "${LOCAL_BTRACKER_CACHE}"
+      ls -lah "${LOCAL_BTRACKER_CACHE}/datadir" || true
+      ls -lah "${LOCAL_BTRACKER_CACHE}/shm_dir" || true
 
-    ls -lah "${LOCAL_SYNC_CACHE}"
-    ls -lah "${LOCAL_SYNC_CACHE}/datadir" || true
-    ls -lah "${LOCAL_SYNC_CACHE}/datadir/blockchain" || true
-    ls -lah "${LOCAL_SYNC_CACHE}/shm_dir" || true
-
-    # Push sync data to NFS cache for sharing across builders
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      echo "Pushing sync data to NFS cache: ${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
-      "$CACHE_MANAGER" put "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}" || echo "Warning: Failed to push to NFS cache"
+      # Push sync data to NFS cache for sharing across builders
+      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+      if [[ -x "$CACHE_MANAGER" ]]; then
+        echo "Pushing btracker sync data to NFS: ${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+        "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" || echo "Warning: Failed to push to NFS cache"
+      else
+        echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+      fi
     else
-      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+      echo "Cache hit - skipping cache save (data already in cache)"
     fi
 
     # Manually remove the copy of the replay data to preserve disk space on the replay server
@@ -450,7 +450,7 @@ sync_with_mock_data:
   - job: docker-ci-runner-build
     artifacts: true
   variables:
-    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}
+    DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}
     DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     HAF_DATA_DIRECTORY: ${DATADIR}
@@ -469,86 +469,96 @@ sync_with_mock_data:
     git config --global --add safe.directory "$CI_PROJECT_DIR"
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
-
-    # Ensure sync data is available locally (fetch from NFS if needed)
-    echo "DEBUG: Setting up cache paths..."
-    LOCAL_SYNC_CACHE="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY}"
+  - |
+    # Check for existing mock cache first (HAF + btracker + mock data already present)
+    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
     CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}"
-    NFS_TAR="${NFS_CACHE_PATH}.tar"
-    echo "DEBUG: LOCAL_SYNC_CACHE=${LOCAL_SYNC_CACHE}"
-    echo "DEBUG: NFS_TAR=${NFS_TAR}"
+    CACHE_HIT="false"
 
-    # Check if local cache exists and is usable
-    # Service container extractions may have broken symlinks, so validate pg_tblspc
-    LOCAL_CACHE_VALID=false
-    echo "DEBUG: Checking local cache..."
-    if [[ -d "${LOCAL_SYNC_CACHE}/datadir" ]]; then
-      echo "DEBUG: Local cache datadir exists"
-      # Check for broken symlinks in pg_tblspc
-      TBLSPC="${LOCAL_SYNC_CACHE}/datadir/haf_db_store/pgdata/pg_tblspc"
-      if [[ -d "$TBLSPC" ]]; then
-        echo "DEBUG: Checking tablespace symlinks in $TBLSPC"
-        # Find broken symlinks portably (find -xtype not available in all find versions)
-        BROKEN_LINKS=0
-        shopt -s nullglob  # Handle empty directories gracefully
-        for link in "$TBLSPC"/*; do
-          if [[ -L "$link" ]] && [[ ! -e "$link" ]]; then
-            BROKEN_LINKS=$((BROKEN_LINKS + 1))
+    # First check for mock cache (already has mock data)
+    if [[ -d "${LOCAL_MOCK_CACHE}/datadir" ]]; then
+      echo "Local mock cache found at ${LOCAL_MOCK_CACHE} - skipping mock fill"
+      CACHE_HIT="true"
+      export DATA_SOURCE="${LOCAL_MOCK_CACHE}"
+    elif [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Checking NFS for mock cache: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+      if "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" 2>/dev/null; then
+        echo "Fetched mock cache from NFS - skipping mock fill"
+        CACHE_HIT="true"
+        export DATA_SOURCE="${LOCAL_MOCK_CACHE}"
+      else
+        echo "Mock cache not found, will use btracker sync cache and fill mock data"
+      fi
+    fi
+
+    # Fall back to btracker sync cache if no mock cache
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      NFS_CACHE_PATH="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+      NFS_TAR="${NFS_CACHE_PATH}.tar"
+
+      # Check if local btracker cache exists and is usable
+      LOCAL_CACHE_VALID=false
+      if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir" ]]; then
+        # Check for broken symlinks in pg_tblspc
+        TBLSPC="${LOCAL_BTRACKER_CACHE}/datadir/haf_db_store/pgdata/pg_tblspc"
+        if [[ -d "$TBLSPC" ]]; then
+          BROKEN_LINKS=0
+          shopt -s nullglob
+          for link in "$TBLSPC"/*; do
+            if [[ -L "$link" ]] && [[ ! -e "$link" ]]; then
+              BROKEN_LINKS=$((BROKEN_LINKS + 1))
+            fi
+          done
+          shopt -u nullglob
+          if [[ "$BROKEN_LINKS" -gt 0 ]]; then
+            echo "Local cache has $BROKEN_LINKS broken symlinks, will re-extract"
+            sudo rm -rf "${LOCAL_BTRACKER_CACHE}" || rm -rf "${LOCAL_BTRACKER_CACHE}" || true
+          else
+            LOCAL_CACHE_VALID=true
           fi
-        done
-        shopt -u nullglob
-        if [[ "$BROKEN_LINKS" -gt 0 ]]; then
-          echo "Local cache has $BROKEN_LINKS broken symlinks in pg_tblspc, will re-extract"
-          sudo rm -rf "${LOCAL_SYNC_CACHE}" || rm -rf "${LOCAL_SYNC_CACHE}" || true
         else
           LOCAL_CACHE_VALID=true
         fi
-      else
-        echo "DEBUG: No pg_tblspc directory, cache is valid"
-        LOCAL_CACHE_VALID=true
       fi
-    else
-      echo "DEBUG: Local cache datadir does not exist"
-    fi
 
-    if [[ "$LOCAL_CACHE_VALID" == "true" ]]; then
-      echo "Local sync cache found at ${LOCAL_SYNC_CACHE}"
-    else
-      echo "Local sync cache not found or invalid, checking NFS..."
-      # Prefer NFS tar extraction over cache-manager for haf_sync type
-      # (cache-manager cp -rL breaks on tablespace symlinks)
-      if [[ -f "$NFS_TAR" ]]; then
-        echo "Extracting from NFS tar: $NFS_TAR"
-        mkdir -p "${LOCAL_SYNC_CACHE}"
-        tar xf "$NFS_TAR" -C "${LOCAL_SYNC_CACHE}"
-        echo "Extracted sync data from NFS tar archive"
-      elif [[ -x "$CACHE_MANAGER" ]]; then
-        if "$CACHE_MANAGER" get "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY}" "${LOCAL_SYNC_CACHE}"; then
-          echo "Fetched sync data from NFS cache via cache-manager"
+      if [[ "$LOCAL_CACHE_VALID" == "true" ]]; then
+        echo "Local btracker sync cache found at ${LOCAL_BTRACKER_CACHE}"
+      else
+        echo "Local btracker cache not found or invalid, checking NFS..."
+        if [[ -f "$NFS_TAR" ]]; then
+          echo "Extracting from NFS tar: $NFS_TAR"
+          mkdir -p "${LOCAL_BTRACKER_CACHE}"
+          tar xf "$NFS_TAR" -C "${LOCAL_BTRACKER_CACHE}"
+          echo "Extracted btracker sync data from NFS tar"
+        elif [[ -x "$CACHE_MANAGER" ]]; then
+          if "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}"; then
+            echo "Fetched btracker sync data from NFS via cache-manager"
+          else
+            echo "ERROR: Failed to fetch btracker sync data from NFS"
+            exit 1
+          fi
+        elif [[ -d "$NFS_CACHE_PATH" ]]; then
+          echo "Using direct NFS copy"
+          mkdir -p "${LOCAL_BTRACKER_CACHE}"
+          (cd "$NFS_CACHE_PATH" && tar cf - .) | (cd "${LOCAL_BTRACKER_CACHE}" && tar xf -)
+          echo "Fetched btracker sync data from NFS via tar pipe"
         else
-          echo "ERROR: Failed to fetch sync data from NFS cache"
+          echo "ERROR: No btracker sync data available"
           exit 1
         fi
-      elif [[ -d "$NFS_CACHE_PATH" ]]; then
-        echo "Using direct NFS copy (cache-manager not available)"
-        mkdir -p "${LOCAL_SYNC_CACHE}"
-        # Use tar pipe to preserve symlinks correctly
-        (cd "$NFS_CACHE_PATH" && tar cf - .) | (cd "${LOCAL_SYNC_CACHE}" && tar xf -)
-        echo "Fetched sync data from NFS cache via tar pipe"
-      else
-        echo "ERROR: No sync data available locally or on NFS"
-        echo "  Local path checked: ${LOCAL_SYNC_CACHE}"
-        echo "  NFS tar checked: ${NFS_TAR}"
-        echo "  NFS path checked: ${NFS_CACHE_PATH}"
-        exit 1
       fi
     fi
+
+    # Export for use in script section
+    echo "$CACHE_HIT" > /tmp/cache_hit
   script:
   - |
+    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
-    # Block log is already in sync cache from sync job, copy_datadir.sh handles it
+    # Block log is already in cache, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
     # Restore PostgreSQL pgdata permissions after copy from cache
@@ -556,11 +566,8 @@ sync_with_mock_data:
     PGDATA_PATH="${DATADIR}/haf_db_store/pgdata"
     if [[ -d "$PGDATA_PATH" ]]; then
       echo "Restoring pgdata permissions to mode 700"
-      # pgdata directory itself must be 700
       sudo chmod 700 "$PGDATA_PATH"
-      # Set ownership to postgres user (UID 105 in HAF container)
       sudo chown -R 105:105 "${DATADIR}/haf_db_store"
-      # Debug: show permissions (don't list inside pgdata - only postgres can read it after chmod 700)
       ls -la "${DATADIR}/haf_db_store/"
     else
       echo "WARNING: pgdata directory not found at $PGDATA_PATH"
@@ -570,9 +577,6 @@ sync_with_mock_data:
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
-    # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
-    # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
-    # which isn't accessible inside the Docker Compose containers (DinD environment)
     echo "Copying blockchain files to docker/blockchain..."
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
     cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
@@ -582,26 +586,29 @@ sync_with_mock_data:
     du -sh "${CI_PROJECT_DIR}/docker/blockchain/"
 
     # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
-    # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
     sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
     echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
-    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
 
-    "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
-
-    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+    if [[ "$CACHE_HIT" == "true" ]]; then
+      echo "Cache hit - mock data already present, skipping wait"
+    else
+      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for mock data fill..."
+      "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
+      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+    fi
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
+    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
 
-    # Force PostgreSQL checkpoint before shutdown to ensure all btracker data is written to disk
-    # Without this, data may be lost when cache-manager excludes WAL files
+    # Force PostgreSQL checkpoint before shutdown
     echo "Forcing PostgreSQL checkpoint..."
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" || true
 
@@ -615,37 +622,37 @@ sync_with_mock_data:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
-    # Save mock sync data to local cache with commit-based key
-    LOCAL_SYNC_CACHE_MOCK="${DATA_CACHE_HAF_PREFIX}_${SYNC_CACHE_KEY_MOCK}"
-    mkdir -p "${LOCAL_SYNC_CACHE_MOCK}"
-    sudo cp -a "${DATADIR}" "${LOCAL_SYNC_CACHE_MOCK}"
-    sudo cp -a "${SHM_DIR}" "${LOCAL_SYNC_CACHE_MOCK}"
+    # Only save to cache if this was not a cache hit
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      # Save mock data to local cache with commit-based key
+      LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+      mkdir -p "${LOCAL_MOCK_CACHE}"
+      sudo cp -a "${DATADIR}" "${LOCAL_MOCK_CACHE}"
+      sudo cp -a "${SHM_DIR}" "${LOCAL_MOCK_CACHE}"
 
-    # Remove empty blockchain from local cache to trigger symlink creation on test runners
-    # (Docker compose creates empty blockchain dir due to bind mount, but we need symlinks)
-    if [[ -d "${LOCAL_SYNC_CACHE_MOCK}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_SYNC_CACHE_MOCK}/datadir/blockchain")" ]]; then
-      echo "Removing empty blockchain directory from local cache"
-      rmdir "${LOCAL_SYNC_CACHE_MOCK}/datadir/blockchain"
-    fi
+      # Remove empty blockchain from local cache
+      if [[ -d "${LOCAL_MOCK_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_MOCK_CACHE}/datadir/blockchain")" ]]; then
+        echo "Removing empty blockchain directory from local cache"
+        rmdir "${LOCAL_MOCK_CACHE}/datadir/blockchain"
+      fi
 
-    ls -lah "${DATADIR}"
-    ls -lah "${DATADIR}/blockchain"
+      ls -lah "${LOCAL_MOCK_CACHE}"
+      ls -lah "${LOCAL_MOCK_CACHE}/datadir" || true
+      ls -lah "${LOCAL_MOCK_CACHE}/shm_dir" || true
 
-    ls -lah "${LOCAL_SYNC_CACHE_MOCK}"
-    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/datadir" || true
-    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/datadir/blockchain" || true
-    ls -lah "${LOCAL_SYNC_CACHE_MOCK}/shm_dir" || true
-
-    # Push mock sync data to NFS cache for sharing across builders
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      echo "Pushing mock sync data to NFS cache: ${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}"
-      "$CACHE_MANAGER" put "${SYNC_CACHE_TYPE}" "${SYNC_CACHE_KEY_MOCK}" "${LOCAL_SYNC_CACHE_MOCK}" || echo "Warning: Failed to push to NFS cache"
+      # Push mock data to NFS cache for sharing across builders
+      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+      if [[ -x "$CACHE_MANAGER" ]]; then
+        echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+        "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
+      else
+        echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+      fi
     else
-      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+      echo "Cache hit - skipping cache save (data already in cache)"
     fi
 
-    # Manually remove the copy of the replay data to preserve disk space on the replay server
+    # Manually remove the copy of the replay data to preserve disk space
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
 
     echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
@@ -671,10 +678,10 @@ sync_with_mock_data:
       "host    all              btracker_user       0.0.0.0/0    trust"
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
-    DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
+    DATA_SOURCE: "/cache/${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
     DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
-    DATA_SOURCE_NFS_TYPE: "${SYNC_CACHE_TYPE}"
-    DATA_SOURCE_NFS_KEY: "${SYNC_CACHE_KEY}"
+    DATA_SOURCE_NFS_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
+    DATA_SOURCE_NFS_KEY: "${BTRACKER_CACHE_KEY}"
   entrypoint:
     - '/bin/bash'
     - '-c'
@@ -765,10 +772,10 @@ sync_with_mock_data:
       "host    all              btracker_user       0.0.0.0/0    trust"
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
-    DATA_SOURCE: "/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
+    DATA_SOURCE: "/cache/${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
     DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
-    DATA_SOURCE_NFS_TYPE: "${SYNC_CACHE_TYPE}"
-    DATA_SOURCE_NFS_KEY: "${SYNC_CACHE_KEY_MOCK}"
+    DATA_SOURCE_NFS_TYPE: "${BTRACKER_MOCK_CACHE_TYPE}"
+    DATA_SOURCE_NFS_KEY: "${BTRACKER_CACHE_KEY}"
   entrypoint:
     - '/bin/bash'
     - '-c'
@@ -866,8 +873,8 @@ sync_with_mock_data:
 # Service containers wait for the .ready marker file before starting PostgreSQL
 .extract-nfs-cache-before-script: &extract-nfs-cache-before-script
   - |
-    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    LOCAL_CACHE="/cache/${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     MARKER_FILE="${LOCAL_CACHE}/.ready"
     echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -937,8 +944,8 @@ sync_with_mock_data:
 # Combined before script for pytest jobs: NFS extraction + pytest setup
 .extract-nfs-cache-pytest-before-script: &extract-nfs-cache-pytest-before-script
   - |
-    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY}"
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    LOCAL_CACHE="/cache/${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     MARKER_FILE="${LOCAL_CACHE}/.ready"
     echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -1013,8 +1020,8 @@ sync_with_mock_data:
 # Before script for mock data extraction
 .extract-nfs-cache-mock-before-script: &extract-nfs-cache-mock-before-script
   - |
-    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    LOCAL_CACHE="/cache/${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     MARKER_FILE="${LOCAL_CACHE}/.ready"
     echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -1082,8 +1089,8 @@ sync_with_mock_data:
 # Combined before script for pytest jobs with mock data: NFS extraction + pytest setup
 .extract-nfs-cache-mock-pytest-before-script: &extract-nfs-cache-mock-pytest-before-script
   - |
-    LOCAL_CACHE="/cache/${SYNC_CACHE_TYPE}_${SYNC_CACHE_KEY_MOCK}"
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    LOCAL_CACHE="/cache/${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     MARKER_FILE="${LOCAL_CACHE}/.ready"
     echo "DEBUG: LOCAL_CACHE=${LOCAL_CACHE}"
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -1180,7 +1187,7 @@ regression-test:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
 
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
 
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -1377,7 +1384,7 @@ pattern-test:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
 
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY}.tar"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
 
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
@@ -1545,7 +1552,7 @@ pattern-test-with-mock-data:
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache (mock data)..."
 
     # Use mock cache key
-    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${SYNC_CACHE_TYPE}/${SYNC_CACHE_KEY_MOCK}.tar"
+    NFS_TAR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}.tar"
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
 
     echo "DEBUG: NFS_TAR=${NFS_TAR}"
