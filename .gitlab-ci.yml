@@ -331,6 +331,22 @@ sync:
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
     echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+    echo -e "\e[0Ksection_start:$(date +%s):debug[collapsed=true]\r\e[0KDebug: checking database state..."
+
+    # Debug: Check HAF and btracker state before waiting
+    pushd docker
+    IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
+    echo "=== HAF State ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT * FROM hafd.hive_state;" || true
+    echo "=== Contexts ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT name, current_block_num, irreversible_block, is_forking FROM hafd.contexts WHERE name = 'btracker_app';" || true
+    echo "=== Context Attachment ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT c.name, ca.is_attached FROM hafd.contexts c JOIN hafd.contexts_attachment ca ON c.id = ca.context_id WHERE c.name = 'btracker_app';" || true
+    echo "=== is_app_in_sync result ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT hive.is_app_in_sync('btracker_app');" || true
+    popd
+
+    echo -e "\e[0Ksection_end:$(date +%s):debug\r\e[0K"
     echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0K$MESSAGE"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
