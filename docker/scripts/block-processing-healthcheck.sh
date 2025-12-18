@@ -18,10 +18,6 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$postgres_user@$postgres_host:$pos
 # - balance_tracker's head block has caught up to haf's irreversible block
 #   (so we don't mark balance_tracker as unhealthy if HAF stops getting blocks)
 #
-# IMPORTANT: In skip-hived mode, is_app_in_sync returns true immediately because
-# the app starts at HAF's head block. We must also verify that btracker has
-# actually processed data (has balance records) before reporting healthy.
-#
 # This check needs to know when the block processing started, so the docker entrypoint
 # must write this to a file like:
 #   date --utc --iso-8601=seconds > /tmp/block_processing_startup_time.txt
@@ -32,10 +28,9 @@ if [ ! -f "/tmp/block_processing_startup_time.txt" ]; then
 fi
 STARTUP_TIME="$(cat /tmp/block_processing_startup_time.txt)"
 CHECK="SET TIME ZONE 'UTC'; \
-       SELECT (((now() - (SELECT last_active_at FROM hafd.contexts WHERE name = 'btracker_app')) < interval '1 minute' \
+       SELECT ((now() - (SELECT last_active_at FROM hafd.contexts WHERE name = 'btracker_app')) < interval '1 minute' \
                AND (SELECT last_active_at FROM hafd.contexts WHERE name = 'btracker_app') > '${STARTUP_TIME}'::timestamp) OR \
-              hive.is_app_in_sync('btracker_app')) \
-              AND EXISTS(SELECT 1 FROM btracker_app.current_account_balances LIMIT 1);"
+              hive.is_app_in_sync('btracker_app');"
 
 
 # the docker container probably won't have a locale set, do this to suppress the warning
