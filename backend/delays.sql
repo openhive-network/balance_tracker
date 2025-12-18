@@ -9,29 +9,7 @@ CREATE TYPE btracker_backend.impacted_delays_return AS
     deposited BIGINT
 );
 
-CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_delayed_balances(IN _operation_body JSONB, IN _op_type_id INT)
-RETURNS btracker_backend.impacted_delays_return
-LANGUAGE plpgsql
-STABLE
-AS
-$BODY$
-BEGIN
-  RETURN (
-    CASE 
-      WHEN _op_type_id = 56 THEN
-        btracker_backend.process_fill_vesting_withdraw_operation(_operation_body)
-
-      WHEN _op_type_id = 77 THEN
-        btracker_backend.process_transfer_to_vesting_completed_operation(_operation_body)
-
-      WHEN _op_type_id = 70 THEN
-        btracker_backend.process_delayed_voting_operation(_operation_body) 
-    END
-  );
-
-END;
-$BODY$;
-
+-- Process fill_vesting_withdraw_operation (for delays)
 CREATE OR REPLACE FUNCTION btracker_backend.process_fill_vesting_withdraw_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delays_return
 LANGUAGE 'plpgsql' STABLE
@@ -56,6 +34,7 @@ BEGIN
 END
 $$;
 
+-- Process transfer_to_vesting_completed_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_transfer_to_vesting_completed_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delays_return
 LANGUAGE 'plpgsql' STABLE
@@ -71,6 +50,7 @@ BEGIN
 END
 $$;
 
+-- Process delayed_voting_operation
 CREATE OR REPLACE FUNCTION btracker_backend.process_delayed_voting_operation(IN _operation_body JSONB)
 RETURNS btracker_backend.impacted_delays_return
 LANGUAGE 'plpgsql' STABLE

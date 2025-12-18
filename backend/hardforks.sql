@@ -7,15 +7,16 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 DECLARE
+  _op_hardfork_hive INT := btracker_backend.op_hardfork_hive();
   __balances INT;
   __rewards INT;
   __savings INT;
 BEGIN
   WITH hardfork_hive_operation AS MATERIALIZED (
-    SELECT 
+    SELECT
       (SELECT av.id FROM accounts_view av WHERE av.name = (ov.body)->'value'->>'account') AS account_id
     FROM operations_view ov
-    WHERE ov.op_type_id = 68 AND block_num = __hardfork_23_block
+    WHERE ov.op_type_id = _op_hardfork_hive AND block_num = __hardfork_23_block
   ),
   update_balances AS (
     UPDATE current_account_balances cab SET
