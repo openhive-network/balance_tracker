@@ -540,7 +540,18 @@ sync_with_mock_data:
     # which isn't accessible inside the Docker Compose containers (DinD environment)
     echo "Copying blockchain files to docker/blockchain..."
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
-    cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+
+    # Check if blockchain directory has files (sync job removes them before caching)
+    if [[ -n "$(ls -A "${DATADIR}/blockchain" 2>/dev/null)" ]]; then
+      cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    elif [[ -d "/cache/blockchain/block_log_5m" ]]; then
+      echo "Blockchain dir empty, copying from shared block_log at /cache/blockchain/block_log_5m"
+      cp -aL /cache/blockchain/block_log_5m/* "${CI_PROJECT_DIR}/docker/blockchain/"
+    else
+      echo "ERROR: No blockchain files available"
+      exit 1
+    fi
+
     echo "Contents of docker/blockchain after copy:"
     ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
     echo "Total size:"
@@ -1133,8 +1144,10 @@ deploy-wax-spec-dev-package:
   extends: .npm_deploy_package_template
   stage: publish
   variables:
-    SOURCE_DIR: "${PACKAGE_SOURCE_DIR}"
-    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+    # Use CI_PROJECT_DIR-based paths instead of dotenv variables from generate-wax-spec
+    # The dotenv contains absolute paths from generate-wax-spec's runner, which may differ from this job's runner
+    SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
+    PACKAGE_TGZ_PATH: "${CI_PROJECT_DIR}/build/hiveio-wax-api-balance-tracker-*.tgz"
     NPM_PACKAGE_SCOPE: "@hiveio"
   needs:
   - job: generate-wax-spec
@@ -1148,8 +1161,9 @@ deploy-wax-spec-production-public-npm:
   variables:
     NPM_PUBLISH_TOKEN: "$INTERNAL_HIDDEN_PUBLISH_TOKEN"
     NPM_PACKAGE_NAME: "wax-api-balance-tracker"
-    SOURCE_DIR: "${PACKAGE_SOURCE_DIR}"
-    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+    # Use CI_PROJECT_DIR-based paths instead of dotenv variables from generate-wax-spec
+    SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
+    PACKAGE_TGZ_PATH: "${CI_PROJECT_DIR}/build/hiveio-wax-api-balance-tracker-*.tgz"
   needs:
   - job: generate-wax-spec
     artifacts: true
