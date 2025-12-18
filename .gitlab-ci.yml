@@ -163,7 +163,9 @@ generate-wax-spec:
   extends: .generate_swagger_package
   stage: build
   variables:
-    INPUT_JSON_SWAGGER_FILE: "${BUILT_JSON_SWAGGER_FILE}"
+    # Use CI_PROJECT_DIR-based path instead of BUILT_JSON_SWAGGER_FILE from dotenv
+    # The dotenv contains an absolute path from extract-swagger-json's runner, which may differ from this job's runner
+    INPUT_JSON_SWAGGER_FILE: "${CI_PROJECT_DIR}/build/swagger-doc.json"
     API_TYPE: "rest"
     NAMESPACE: "balance_tracker"
     NPM_PACKAGE_SCOPE: "@hiveio"
@@ -315,8 +317,9 @@ sync:
       echo "Removing shared_memory.bin, comments-rocksdb-storage, and pgdata to force HAF replay into PostgreSQL"
       rm -f "${SHM_DIR}/shared_memory.bin"
       rm -rf "${SHM_DIR}/comments-rocksdb-storage"
-      rm -rf "${DATADIR}/haf_db_store/pgdata"
-      rm -rf "${DATADIR}/haf_db_store/tablespace"
+      # Use sudo for pgdata/tablespace because cache-manager restores them with mode 700 owned by uid 105 (postgres)
+      sudo rm -rf "${DATADIR}/haf_db_store/pgdata"
+      sudo rm -rf "${DATADIR}/haf_db_store/tablespace"
     fi
 
     # Note: pgdata and tablespace were removed above to force fresh database initialization.
