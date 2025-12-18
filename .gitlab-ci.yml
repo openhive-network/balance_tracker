@@ -344,6 +344,24 @@ sync:
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT c.name, ca.is_attached FROM hafd.contexts c JOIN hafd.contexts_attachment ca ON c.id = ca.context_id WHERE c.name = 'btracker_app';" || true
     echo "=== is_app_in_sync result ==="
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "SELECT hive.is_app_in_sync('btracker_app');" || true
+    echo "=== Btracker Table Row Counts ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "
+      SELECT 'current_account_balances' as table_name, COUNT(*) as row_count FROM btracker_app.current_account_balances
+      UNION ALL SELECT 'account_balance_history', COUNT(*) FROM btracker_app.account_balance_history
+      UNION ALL SELECT 'account_rewards', COUNT(*) FROM btracker_app.account_rewards
+      UNION ALL SELECT 'current_accounts_delegations', COUNT(*) FROM btracker_app.current_accounts_delegations
+      UNION ALL SELECT 'account_withdraws', COUNT(*) FROM btracker_app.account_withdraws
+      UNION ALL SELECT 'account_savings', COUNT(*) FROM btracker_app.account_savings
+      ORDER BY table_name;
+    " || true
+    echo "=== Sample balance data (blocktrades account) ==="
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "
+      SELECT a.name, cab.nai, cab.balance
+      FROM btracker_app.current_account_balances cab
+      JOIN hive.accounts_view a ON a.id = cab.account
+      WHERE a.name = 'blocktrades'
+      ORDER BY nai;
+    " || true
     popd
 
     echo -e "\e[0Ksection_end:$(date +%s):debug\r\e[0K"
