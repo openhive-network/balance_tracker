@@ -3,10 +3,9 @@ services:
   haf:
     image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-9ec94375}
     entrypoint: /home/haf_admin/docker_entrypoint.sh
-    command: $${HAF_COMMAND}
+    command: ["--skip-hived"]
     environment:
       HIVED_UID:
-      HAF_COMMAND: --shared-file-size=1G --plugin database_api --replay --stop-at-block=5000000
       DATADIR: /home/hived/datadir
       SHM_DIR: /home/hived/shm_dir
       PG_ACCESS: "
