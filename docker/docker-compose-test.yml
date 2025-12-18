@@ -1,0 +1,67 @@
+# Docker Compose configuration for running tests against pre-synced HAF data
+# This file is used by pattern-test and pattern-test-with-mock-data CI jobs
+# Unlike docker-compose.yml, this only starts haf and postgrest (no sync/processing needed)
+
+name: 'btracker-test'
+services:
+  haf:
+    image: ${HAF_IMAGE_NAME:-registry.gitlab.syncad.com/hive/haf/instance:latest}
+    entrypoint: /home/haf_admin/docker_entrypoint.sh
+    command: ["--skip-hived"]
+    environment:
+      HIVED_UID: ${HIVED_UID:-}
+      DATADIR: /home/hived/datadir
+      SHM_DIR: /home/hived/shm_dir
+      PGCTLTIMEOUT: 600
+      PG_ACCESS: |
+        host    all    all    all    trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - haf_datadir:/home/hived/datadir
+      - haf_shmdir:/home/hived/shm_dir
+      - ./blockchain:/home/hived/datadir/blockchain
+      - ./scripts/haf-healthcheck.sh:/home/hived/healthcheck.sh
+    networks:
+      - haf-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U haf_admin -d haf_block_log"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  postgrest:
+    image: ${POSTGREST_IMAGE:-registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest}
+    ports:
+      - "3000:3000"
+    environment:
+      PGRST_DB_URI: postgresql://btracker_user@haf:5432/haf_block_log
+      PGRST_DB_SCHEMA: btracker_endpoints
+      PGRST_DB_ANON_ROLE: btracker_user
+      PGRST_DB_POOL: 20
+      PGRST_DB_POOL_ACQUISITION_TIMEOUT: 10
+      PGRST_DB_EXTRA_SEARCH_PATH: btracker_app
+    networks:
+      - haf-network
+    depends_on:
+      haf:
+        condition: service_healthy
+
+networks:
+  haf-network:
+    name: haf-network-test
+
+volumes:
+  haf_datadir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_DATA_DIRECTORY:-/tmp/haf_data}
+  haf_shmdir:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${HAF_SHM_DIRECTORY:-/tmp/haf_shm}
