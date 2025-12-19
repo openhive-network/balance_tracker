@@ -8,10 +8,8 @@ docker/srv/
 docker/.env*
 docker/docker-compose*
 docker/README.md
-gui/
 haf/
 misc/
-server/
 tests/
 
 .dockerignore
@@ -22,8 +20,4 @@ tests/
 .sqlfluff
 docker-bake.hcl
 Dockerfile
-main.py
-postgrest.conf
-py_config.ini
 README.md
-run.sh
