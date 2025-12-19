@@ -87,7 +87,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION btracker_test.load_expected_account(jsonb) IS
-    'Loads a single account''s expected balance data from JSON into the test schema';
+'Loads a single account''s expected balance data from JSON into the test schema';
 
 -- -----------------------------------------------------------------------------
 -- Type: account_stats_type
@@ -173,6 +173,6 @@ END;
 $$;
 
 COMMENT ON FUNCTION btracker_test.get_btracker_account_stats(INT) IS
-    'Retrieves Balance Tracker''s computed values for an account, aggregating from all endpoints';
+'Retrieves Balance Tracker''s computed values for an account, aggregating from all endpoints';
 
 RESET ROLE;
