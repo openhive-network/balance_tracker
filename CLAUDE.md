@@ -8,10 +8,9 @@ Balance Tracker is a HAF (Hive Application Framework) application that tracks HB
 
 ## Architecture
 
-The application uses a three-tier architecture:
+The application uses a two-tier architecture:
 - **Database Layer**: PostgreSQL with HAF extensions. All business logic is in SQL stored procedures.
-- **API Layer**: PostgREST exposes SQL functions as REST endpoints. Alternatively, a Python backend can be used.
-- **Frontend**: React-based web UI (in `gui/`)
+- **API Layer**: PostgREST exposes SQL functions as REST endpoints.
 
 Key database schemas:
 - `btracker_app`: Core application tables and processing functions
@@ -83,7 +82,7 @@ This project uses specialized Claude agents via the Task tool. Agent names follo
 
 - HAF submodule is optional for running the app but required for CI tests
 - Database connection defaults: localhost:5432, database `haf_block_log`
-- PostgREST configuration is in `postgrest.conf`
+- PostgREST is configured via environment variables (PGRST_DB_URI, PGRST_DB_SCHEMA, etc.)
 - Block processing runs as `btracker_owner`, API queries as `btracker_user`
 
 ---
