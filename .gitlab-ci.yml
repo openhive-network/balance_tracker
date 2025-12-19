@@ -678,6 +678,7 @@ sync_with_mock_data:
     HAF_APP_ROLE_PREFIX: "btracker"
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mainnet
     PYTEST_WORKERS: "16"
   before_script:
     - *early_exit_check
@@ -785,8 +786,8 @@ pattern-test-with-mock-data:
     # Use mock cache type instead of regular sync cache
     APP_SYNC_CACHE_TYPE: "${BTRACKER_MOCK_CACHE_TYPE}"
     # Override default tavern paths for mock tests
-    JUNIT_REPORT: tests/tavern_mocks/report.xml
-    TAVERN_DIR: tests/tavern_mocks
+    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/patterns-mock/report.xml
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mock
   script:
     - |
       cd "${CI_PROJECT_DIR}"
