@@ -2,7 +2,7 @@ FROM registry.gitlab.syncad.com/hive/common-ci-configuration/nginx:9f5e12cd984bf
 
 COPY docker/balance_tracker_nginx.conf.template /usr/local/openresty/nginx/conf/nginx.conf.template
 COPY docker/rewriter_entrypoint.sh /entrypoint.sh
-COPY rewrite_rules.conf /usr/local/openresty/nginx/conf/rewrite_rules.conf
+COPY endpoints/rewrite_rules.conf /usr/local/openresty/nginx/conf/rewrite_rules.conf
 
 CMD ["/entrypoint.sh"]
 
