@@ -1509,7 +1509,7 @@ pattern-test:
   script:
   - |
     . venv/bin/activate
-    cd $CI_PROJECT_DIR/tests/tavern
+    cd $TAVERN_DIR
     # In DinD, PostgREST is available at 'docker' host
     BTRACKER_ADDRESS=docker pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
   after_script:
@@ -1536,7 +1536,7 @@ pattern-test:
     - "**/*.out.json"
     - docker/container-logs.tar.gz
     reports:
-      junit: tests/tavern/report.xml
+      junit: tests/tavern/patterns-mainnet/report.xml
     when: always
   tags:
   - data-cache-storage
@@ -1679,7 +1679,7 @@ pattern-test-with-mock-data:
   script:
   - |
     . venv/bin/activate
-    cd $CI_PROJECT_DIR/tests/tavern_mocks
+    cd $TAVERN_DIR
     # In DinD, PostgREST is available at 'docker' host
     BTRACKER_ADDRESS=docker pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
   after_script:
@@ -1706,7 +1706,7 @@ pattern-test-with-mock-data:
     - "**/*.out.json"
     - docker/container-logs.tar.gz
     reports:
-      junit: tests/tavern_mocks/report.xml
+      junit: tests/tavern/patterns-mock/report.xml
     when: always
   tags:
   - data-cache-storage
