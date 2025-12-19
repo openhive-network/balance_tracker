@@ -1,137 +1,289 @@
-# Balance tracker
+# Balance Tracker
 
-1. [Intro](#intro)
-1. [Starting](#starting)
-    1. [Requirements](#requirements)
-    1. [Cloning](#cloning)
-    1. [Setup with PostgREST backend](#setup-with-postgrest-backend)
-    1. [After Setup](#after-setup)
-    1. [Dockerized setup](#run-with-docker)
-1. [Architecture](#architecture)
-1. [Tests](#tests)
+A HAF (Hive Application Framework) application that tracks HBD and Hive balances for Hive blockchain accounts.
 
-## Intro
+## Table of Contents
 
-Balance Tracker app is used to track HBD and Hive balances for Hive accounts. This app was created as a simple example of how to create HAF apps.
-Balance Tracker uses PostgREST to expose the database API as a REST service.
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Quick Start with Docker](#quick-start-with-docker)
+- [Local Installation](#local-installation)
+- [Running Tests](#running-tests)
 
-## Starting
+## Overview
 
-Tested on Ubuntu 20.04 and 22.04
+Balance Tracker indexes balance-related data from the Hive blockchain for fast querying. It tracks:
 
-### Requirements
-
-1. HAF instance
-
-### Cloning
-
-To clone the repository run the following command
-
-```bash
-git clone https://gitlab.syncad.com/hive/balance_tracker.git # or git@gitlab.syncad.com:hive/balance_tracker.git
-cd balance_tracker
-git submodule update --init --recursive
-```
-
-#### Note on HAF submodule
-
-HAF submodule is not necessary to build or run the balance_tracker.
-
-If you already have an instance of HAF running or are planning to set it up separately (for example using a prebuilt Docker image), you can safely disable it by running:
-
-```bash
-git config --local submodule.haf.update none
-```
-
-before checking out the submodules (that is running `git submodule update --init --recursive`).
-
-The submodule is, however, necessary, for test run in CI. As such when updating it please update the commit hash in files [.gitlab-ci.yml](.gitlab-ci.yml) and [docker/.env](docker/.env).
-
-### Setup with PostgREST backend
-
-1. Install backend runtime dependencies:
-   ```bash
-   sudo apt-get update && sudo apt-get -y install apache2-utils curl postgresql-client wget xz-utils
-   ```
-1. Install PostgREST (see [PostgREST releases](https://github.com/PostgREST/postgrest/releases) for latest version):
-   ```bash
-   wget https://github.com/PostgREST/postgrest/releases/download/v11.1.0/postgrest-v11.1.0-linux-static-x64.tar.xz -O postgrest.tar.xz
-   tar -xJf postgrest.tar.xz && sudo mv postgrest /usr/local/bin/ && rm postgrest.tar.xz
-   ```
-1. Set up the database: `./scripts/install_app.sh` (assuming HAF database runs on localhost on port 5432)
-1. Process blocks: `./scripts/process_blocks.sh --blocks=5000000` (assuming HAF database runs on localhost on port 5432 and contains 5'000'000 blocks)
-   If you skip `--blocks` parameter balance tracker will process all blocks in the database and then wait for more. You can keep this running in the background.
-1. Start backend server:
-   ```bash
-   PGRST_DB_URI="postgres://btracker_user@localhost/haf_block_log" \
-   PGRST_DB_SCHEMA="btracker_endpoints" \
-   PGRST_DB_ANON_ROLE="btracker_user" \
-   PGRST_DB_EXTRA_SEARCH_PATH="btracker_app" \
-   postgrest
-   ```
-
-### After Setup
-
-- After blocks were added to *btracker_app* schema, PostgREST backend server can be started up quickly with the command above.
-- If you have added more blocks to `haf_block_log` db, or you want to run live sync, you can run:
-
-```bash
-./scripts/process_blocks.sh --blocks=0
-```
-
-This will keep indexer waiting for new blocks and process them while the backend is running.
-
-### Run with Docker
-
-Running *Balance tracker* with Docker is described in Docker-specific [README](docker/README.md).
+- **Account Balances** - HIVE, HBD, and VESTS with full history
+- **Savings** - Savings balances and pending withdrawals
+- **Delegations** - Vesting share delegations between accounts
+- **Rewards** - Pending and earned rewards (author, curation, benefactor)
+- **Withdrawals** - Power-down state and routing
+- **Recurrent Transfers** - Scheduled recurring transfers
+- **Transfer Statistics** - Aggregated volume by hour/day/month
 
 ## Architecture
 
-`db/` - contains SQL backend code (table definitions, block processing functions)
+Balance Tracker uses a two-tier architecture:
 
-`backend/` - contains SQL backend helper functions
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   REST Client   │────▶│    PostgREST    │────▶│   PostgreSQL    │
+│                 │     │   (API Layer)   │     │   (HAF + App)   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
 
-`endpoints/` - contains endpoint SQL code exposed via PostgREST
+- **Database Layer**: PostgreSQL with HAF extensions. All business logic lives in SQL stored procedures.
+- **API Layer**: PostgREST exposes SQL functions as REST endpoints with zero application code.
 
-`scripts/` - contains shell scripts for installation, block processing, and CI helpers
+### Directory Structure
 
-`tests/regression/` - regression test infrastructure for comparing against hived snapshots
+| Directory | Purpose |
+|-----------|---------|
+| `db/` | Core SQL: table definitions, block processing functions |
+| `backend/` | SQL backend helpers: balance queries, utilities |
+| `endpoints/` | PostgREST API definitions and type definitions |
+| `scripts/` | Shell scripts for installation, processing, CI |
+| `docker/` | Docker Compose setup and configuration |
+| `tests/` | All test suites (see [Running Tests](#running-tests)) |
 
-## Tests
+### Database Schemas
+
+| Schema | Role | Purpose |
+|--------|------|---------|
+| `btracker_app` | `btracker_owner` | Core tables and processing functions |
+| `btracker_backend` | `btracker_owner` | Backend helper functions |
+| `btracker_endpoints` | `btracker_user` | PostgREST-exposed API functions |
+
+## Quick Start with Docker
+
+The fastest way to run Balance Tracker with a demo dataset (5M blocks):
+
+```bash
+# Clone repository
+git clone https://gitlab.syncad.com/hive/balance_tracker.git
+cd balance_tracker
+
+# Download demo blockchain data
+curl https://gtg.openhive.network/get/blockchain/block_log.5M -o docker/blockchain/block_log
+
+# Start all services
+cd docker
+docker compose up -d
+```
+
+The API will be available at `http://localhost:3000`.
+
+### Docker Commands
+
+```bash
+# Stop services (preserves data)
+docker compose stop
+
+# Stop and remove containers
+docker compose down
+
+# Stop and remove ALL data (clean slate)
+docker compose down -v
+
+# Include Swagger UI (port 8080)
+docker compose --profile swagger up -d
+
+# Include database tools (PgHero:2080, PgAdmin:1080)
+docker compose --profile db-tools up -d
+
+# View logs
+docker compose logs -f
+```
+
+### Custom Configuration
+
+Create a `.env.local` file to override defaults:
+
+```bash
+cd docker
+
+cat <<EOF > .env.local
+HAF_REGISTRY=hiveio/haf
+HAF_VERSION=v1.27.5.0
+HAF_COMMAND=--shared-file-size=2G --plugin database_api --replay --stop-at-block=10000000
+EOF
+
+docker compose --env-file .env.local up -d
+```
+
+See [docker/README.md](docker/README.md) for advanced configuration options.
+
+## Local Installation
+
+For development or connecting to an existing HAF instance.
+
+### Prerequisites
+
+- HAF instance running with PostgreSQL accessible
+- Ubuntu 20.04+ (tested)
+
+### Install Dependencies
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apache2-utils curl postgresql-client wget xz-utils
+```
+
+### Install PostgREST
+
+```bash
+wget https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz -O postgrest.tar.xz
+tar -xJf postgrest.tar.xz
+sudo mv postgrest /usr/local/bin/
+rm postgrest.tar.xz
+```
+
+### Setup Database
+
+```bash
+# Clone repository
+git clone https://gitlab.syncad.com/hive/balance_tracker.git
+cd balance_tracker
+
+# Install schema (connects to localhost:5432 by default)
+./scripts/install_app.sh
+
+# Or specify custom connection
+./scripts/install_app.sh --postgres-host=192.168.1.100
+```
+
+### Process Blocks
+
+```bash
+# Process specific number of blocks
+./scripts/process_blocks.sh --blocks=5000000
+
+# Process all available blocks and wait for new ones (live sync)
+./scripts/process_blocks.sh
+```
+
+### Start API Server
+
+```bash
+PGRST_DB_URI="postgres://btracker_user@localhost/haf_block_log" \
+PGRST_DB_SCHEMA="btracker_endpoints" \
+PGRST_DB_ANON_ROLE="btracker_user" \
+PGRST_DB_EXTRA_SEARCH_PATH="btracker_app" \
+postgrest
+```
+
+The API is now available at `http://localhost:3000`.
+
+### Uninstall
+
+```bash
+./scripts/uninstall_app.sh
+```
+
+## Running Tests
+
+Balance Tracker includes multiple test suites:
+
+| Test Suite | Purpose | Requirements |
+|------------|---------|--------------|
+| **Tavern API** | REST endpoint validation | Running API server |
+| **Performance** | Load testing with JMeter | Running API server |
+| **Regression** | Compare against hived snapshots | Database access |
+| **Functional** | Shell script validation | None |
+
+### Tavern API Tests
+
+Pattern-based API tests using the Tavern framework.
+
+```bash
+# Install dependencies
+pip install tavern pytest
+
+# Set target server
+export BTRACKER_ADDRESS=localhost
+export BTRACKER_PORT=3000
+
+# Run mainnet tests (requires synced data)
+cd tests/tavern/patterns-mainnet
+pytest
+
+# Run mock tests (requires mock data loaded)
+cd tests/tavern/patterns-mock
+pytest
+
+# Run specific endpoint
+pytest get_account_balances/ -v
+```
+
+See [tests/tavern/README.md](tests/tavern/README.md) for details.
 
 ### Performance Tests
 
-JMeter performance tests are available for the PostgREST backend.
+JMeter load tests for the PostgREST API.
 
-1. Start PostgREST backend server on port 3000
-1. Install test dependencies:
-   ```bash
-   sudo apt-get update && sudo apt-get -y install openjdk-8-jdk-headless python3 unzip
-   ```
-1. Install JMeter (version 5.6.2 or later):
-   ```bash
-   wget https://downloads.apache.org/jmeter/binaries/apache-jmeter-5.6.2.zip -O jmeter.zip
-   unzip jmeter.zip && sudo mv apache-jmeter-5.6.2 /usr/local/src/
-   sudo ln -sf /usr/local/src/apache-jmeter-5.6.2/bin/jmeter.sh /usr/local/bin/jmeter
-   ```
-1. Run tests: `./scripts/ci-helpers/run_performance_tests.sh`
-
-**Note:** If you already have jmeter installed and on `$PATH` you can skip straight to the last point.
-
-If you want to serve the HTML report on port 8000:
 ```bash
+# Install JMeter
+sudo apt-get install -y openjdk-11-jdk-headless
+wget https://downloads.apache.org/jmeter/binaries/apache-jmeter-5.6.3.zip -O jmeter.zip
+unzip jmeter.zip && sudo mv apache-jmeter-5.6.3 /usr/local/src/
+sudo ln -sf /usr/local/src/apache-jmeter-5.6.3/bin/jmeter.sh /usr/local/bin/jmeter
+rm jmeter.zip
+
+# Run tests (API must be running on port 3000)
+./scripts/ci-helpers/run_performance_tests.sh
+
+# View HTML report
 python3 -m http.server --directory tests/performance/result_report 8000
+# Open http://localhost:8000 in browser
 ```
-You can also simply open *tests/performance/result_report/index.html* in your browser.
 
 ### Regression Tests
 
-Regression tests compare Balance Tracker's computed values against expected values from a hived node snapshot.
+Compare computed balances against expected values from a hived node snapshot.
 
-To run the regression test:
 ```bash
 cd tests/regression
 ./run_test.sh --host=localhost --port=5432
 ```
 
-The test installs a temporary `btracker_test` schema, loads expected values, and reports any discrepancies.
+### Functional Tests
+
+Validate shell scripts and utilities.
+
+```bash
+cd tests/functional
+./test_scripts.sh
+```
+
+### Running All Tests in CI
+
+The GitLab CI pipeline runs all test suites automatically. Key jobs:
+
+- `pattern-test` - Tavern tests against synced mainnet data
+- `pattern-test-with-mock-data` - Tavern tests against mock fixtures
+- `performance-test` - JMeter load tests
+- `regression-test` - Balance comparison tests
+
+## API Examples
+
+```bash
+# Get account balances
+curl -X POST http://localhost:3000/rpc/get_account_balances \
+  -H "Content-Type: application/json" \
+  -d '{"_account_name": "gtg"}'
+
+# Get balance history
+curl -X POST http://localhost:3000/rpc/get_balance_history \
+  -H "Content-Type: application/json" \
+  -d '{"_account_name": "gtg", "_balance_type": "HIVE", "_page_size": 10}'
+
+# Get delegations
+curl -X POST http://localhost:3000/rpc/get_balance_delegations \
+  -H "Content-Type: application/json" \
+  -d '{"_account_name": "blocktrades"}'
+```
+
+## License
+
+See [LICENSE](LICENSE) file.
