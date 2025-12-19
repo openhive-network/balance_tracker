@@ -59,7 +59,7 @@ lint_bash_scripts:
   - find . -name .git -type d -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle
     {} + | tee shellcheck-checkstyle-result.xml
   after_script:
-  - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
+  - xmlstarlet tr scripts/ci-helpers/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
   artifacts:
     paths:
     - shellcheck-checkstyle-result.xml
