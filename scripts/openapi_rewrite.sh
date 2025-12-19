@@ -106,13 +106,13 @@ echo "$ENDPOINTS_IN_ORDER"
 # shellcheck disable=SC2086
 python3 $haf_dir/scripts/process_openapi.py $OUTPUT $ENDPOINTS_IN_ORDER
 
-# Create rewrite_rules.conf
-reverse_lines > "$temp_output_file"
-mv "$temp_output_file" "../$input_file"
-rm "$input_file"
-
-# Move rewriten directory to /postgrest
+# Move rewritten directory to endpoints_openapi
 rm -rf "$SCRIPTDIR/../$rewrite_dir"
 mv "$OUTPUT/../$endpoints" "$SCRIPTDIR/../$rewrite_dir"
 rm -rf "$SCRIPTDIR/output"
+
+# Create rewrite_rules.conf inside endpoints_openapi
+reverse_lines > "$temp_output_file"
+mv "$temp_output_file" "$SCRIPTDIR/../$rewrite_dir/$input_file"
+rm "$input_file"
 echo "Rewritten scripts saved in $rewrite_dir"

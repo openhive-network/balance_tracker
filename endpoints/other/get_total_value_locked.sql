@@ -17,7 +17,7 @@ SET ROLE btracker_owner;
     operationId: btracker_endpoints.get_total_value_locked
     responses:
       '200':
-        description: TVL snapshot (block height is the app's last-synced block)
+        description: TVL snapshot (block height is the app''s last-synced block)
         content:
           application/json:
             schema:
