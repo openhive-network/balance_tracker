@@ -1389,10 +1389,10 @@ pattern-test:
     HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
-    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
+    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/patterns-mainnet/report.xml
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
-    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mainnet
     PYTEST_NUMBER_OF_PROCESSES: 16
   timeout: 30m
   before_script:
@@ -1559,10 +1559,10 @@ pattern-test-with-mock-data:
     HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
-    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
+    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/patterns-mock/report.xml
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
-    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern_mocks
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mock
     PYTEST_NUMBER_OF_PROCESSES: 16
   timeout: 30m
   before_script:
