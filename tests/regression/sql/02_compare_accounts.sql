@@ -217,7 +217,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION btracker_test.compare_accounts() IS
-    'Compares all expected account balances against btracker values, recording discrepancies';
+'Compares all expected account balances against btracker values, recording discrepancies';
 
 -- -----------------------------------------------------------------------------
 -- Function: get_account_comparison
@@ -270,6 +270,6 @@ END;
 $$;
 
 COMMENT ON FUNCTION btracker_test.get_account_comparison(INT) IS
-    'Returns expected vs actual values for a specific account for debugging';
+'Returns expected vs actual values for a specific account for debugging';
 
 RESET ROLE;

@@ -11,6 +11,7 @@ docker/README.md
 haf/
 misc/
 tests/
+!tests/mocks/
 
 .dockerignore
 .gitattributes
