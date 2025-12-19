@@ -79,7 +79,7 @@ case ${TARGET:-} in
     scripts/ci-helpers/build_instance.sh "$BASE_TAG" "$SRCROOTDIR" "$CI_REGISTRY_IMAGE" --progress="$PROGRESS_DISPLAY"
     ;;
   ci-runner|ci-runner-ci)
-    scripts/build_ci-runner_image.sh "$SRCROOTDIR" --registry="$CI_REGISTRY_IMAGE" --tag="$BASE_TAG" --progress="$PROGRESS_DISPLAY" --target="$TARGET"
+    scripts/ci-helpers/build_ci-runner_image.sh "$SRCROOTDIR" --registry="$CI_REGISTRY_IMAGE" --tag="$BASE_TAG" --progress="$PROGRESS_DISPLAY" --target="$TARGET"
     ;;
 esac
 
