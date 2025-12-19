@@ -712,12 +712,12 @@ regression-test:
   script:
     - |
       echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
-      cd "${CI_PROJECT_DIR}/tests/account_balances"
-      ./accounts_dump_test.sh --host=docker
+      cd "${CI_PROJECT_DIR}/tests/regression"
+      ./run_test.sh --host=docker
       echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
     paths:
-      - tests/account_balances/account_dump_test.log
+      - tests/regression/regression_test.log
       - docker/container-logs.tar.gz
     when: always
 
