@@ -1263,9 +1263,9 @@ regression-test:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
-    cd "${CI_PROJECT_DIR}/tests/account_balances"
+    cd "${CI_PROJECT_DIR}/tests/regression"
     # In DinD, PostgreSQL is available at 'docker' host
-    ./accounts_dump_test.sh --host=docker
+    ./run_test.sh --host=docker
 
     echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   after_script:
@@ -1287,7 +1287,7 @@ regression-test:
     echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
   artifacts:
     paths:
-    - tests/account_balances/account_dump_test.log
+    - tests/regression/regression_test.log
     - docker/container-logs.tar.gz
     when: always
   tags:
@@ -1354,7 +1354,7 @@ performance-test:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
-    timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=postgrest-server --postgres-host=haf-instance
+    timeout -k 1m 10m ./scripts/ci-helpers/run_performance_tests.sh --backend-host=postgrest-server --postgres-host=haf-instance
     tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
     cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
     m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
