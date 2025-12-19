@@ -131,9 +131,9 @@ REGRESSION=$(echo "$JOBS" | jq -r '.[] | select(.name == "regression-test")')
 if [[ -n "$REGRESSION" && "$REGRESSION" != "null" ]]; then
     REG_STATUS=$(echo "$REGRESSION" | jq -r '.status')
     echo "=== Test Details ==="
-    echo "regression-test: $REG_STATUS (account_balances/accounts_dump_test.sh)"
+    echo "regression-test: $REG_STATUS (tests/regression/run_test.sh)"
     PERF_STATUS=$(echo "$JOBS" | jq -r '.[] | select(.name == "performance-test") | .status // "pending"')
-    echo "performance-test: $PERF_STATUS (JMeter via balance-tracker.sh run-tests)"
+    echo "performance-test: $PERF_STATUS (JMeter via scripts/ci-helpers/run_performance_tests.sh)"
     PATTERN_STATUS=$(echo "$JOBS" | jq -r '.[] | select(.name == "pattern-test") | .status // "pending"')
     echo "pattern-test: $PATTERN_STATUS (tests/tavern pytest)"
 fi
