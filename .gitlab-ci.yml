@@ -109,7 +109,8 @@ lint_bash_scripts:
   before_script:
   - apk add xmlstarlet
   script:
-  - find . -name .git -type d -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle
+  # Exclude .git and haf submodule (submodules may be stale from other jobs using fetch strategy)
+  - find . -name .git -type d -prune -o -path ./haf -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle
     {} + | tee shellcheck-checkstyle-result.xml
   after_script:
   - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
