@@ -2,7 +2,5 @@
 dialect = postgres
 max_line_length = 150
 exclude_rules = CP03
-# Exclude haf submodule (populated by other jobs using fetch strategy)
-exclude = haf
 
 warnings = LT01, CP05, PRS
