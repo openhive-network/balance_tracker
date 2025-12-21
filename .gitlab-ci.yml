@@ -545,6 +545,13 @@ sync_with_mock_data:
   - |
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
 
+    # If we have a cache hit, the mock data already exists - skip docker-compose entirely
+    if [[ "$CACHE_HIT" == "true" ]]; then
+      echo "Cache hit - mock data already present in cache, skipping docker-compose"
+      echo "Mock cache verified at: ${DATA_SOURCE}"
+      exit 0
+    fi
+
     echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting the test environment..."
 
     # Block log is already in cache, copy_datadir.sh handles it
@@ -581,18 +588,21 @@ sync_with_mock_data:
 
     echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
 
-    if [[ "$CACHE_HIT" == "true" ]]; then
-      echo "Cache hit - mock data already present, skipping wait"
-    else
-      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for mock data fill..."
-      "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
-      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
-    fi
+    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for mock data fill..."
+    "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
+    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+
+    # If cache hit, we skipped docker-compose entirely - nothing to clean up
+    if [[ "$CACHE_HIT" == "true" ]]; then
+      echo "Cache hit - no containers to stop (docker-compose was skipped)"
+      echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
+      exit 0
+    fi
 
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
@@ -611,34 +621,29 @@ sync_with_mock_data:
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
-    # Only save to cache if this was not a cache hit
-    if [[ "$CACHE_HIT" != "true" ]]; then
-      # Save mock data to local cache with commit-based key
-      LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-      mkdir -p "${LOCAL_MOCK_CACHE}"
-      sudo cp -a "${DATADIR}" "${LOCAL_MOCK_CACHE}"
-      sudo cp -a "${SHM_DIR}" "${LOCAL_MOCK_CACHE}"
+    # Save mock data to cache
+    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    mkdir -p "${LOCAL_MOCK_CACHE}"
+    sudo cp -a "${DATADIR}" "${LOCAL_MOCK_CACHE}"
+    sudo cp -a "${SHM_DIR}" "${LOCAL_MOCK_CACHE}"
 
-      # Remove empty blockchain from local cache
-      if [[ -d "${LOCAL_MOCK_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_MOCK_CACHE}/datadir/blockchain")" ]]; then
-        echo "Removing empty blockchain directory from local cache"
-        rmdir "${LOCAL_MOCK_CACHE}/datadir/blockchain"
-      fi
+    # Remove empty blockchain from local cache
+    if [[ -d "${LOCAL_MOCK_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_MOCK_CACHE}/datadir/blockchain")" ]]; then
+      echo "Removing empty blockchain directory from local cache"
+      rmdir "${LOCAL_MOCK_CACHE}/datadir/blockchain"
+    fi
 
-      ls -lah "${LOCAL_MOCK_CACHE}"
-      ls -lah "${LOCAL_MOCK_CACHE}/datadir" || true
-      ls -lah "${LOCAL_MOCK_CACHE}/shm_dir" || true
+    ls -lah "${LOCAL_MOCK_CACHE}"
+    ls -lah "${LOCAL_MOCK_CACHE}/datadir" || true
+    ls -lah "${LOCAL_MOCK_CACHE}/shm_dir" || true
 
-      # Push mock data to NFS cache for sharing across builders
-      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-      if [[ -x "$CACHE_MANAGER" ]]; then
-        echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
-        CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
-      else
-        echo "Warning: cache-manager.sh not found, skipping NFS cache push"
-      fi
+    # Push mock data to NFS cache for sharing across builders
+    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    if [[ -x "$CACHE_MANAGER" ]]; then
+      echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
+      CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
     else
-      echo "Cache hit - skipping cache save (data already in cache)"
+      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
     fi
 
     # Manually remove the copy of the replay data to preserve disk space
