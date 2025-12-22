@@ -1,0 +1,2 @@
+# Exclude haf submodule (populated by other jobs using fetch strategy)
+haf/
