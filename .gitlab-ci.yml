@@ -88,7 +88,25 @@ default:
                   rm -rf "$submod" ".git/modules/$submod"
                 fi
               done
+            else
+              echo "pre_get_sources: no .gitmodules file"
             fi
+
+            # Handle directory-to-submodule transitions inside submodules
+            # Known paths that were converted from directories to submodules in hive
+            # This list matches hive's .gitmodules - clean if they exist as directories
+            if [ -d "haf" ]; then
+              echo "pre_get_sources: checking haf for directory-to-submodule transitions"
+              for nested in hive/libraries/fc hive/libraries/appbase; do
+                nested_path="haf/$nested"
+                # If path exists as directory but not as a submodule, remove it
+                if [ -d "$nested_path" ] && [ ! -f "$nested_path/.git" ]; then
+                  echo "pre_get_sources: removing stale directory for submodule: $nested_path"
+                  rm -rf "$nested_path"
+                fi
+              done
+            fi
+
             echo "pre_get_sources: existing repo OK"
           fi
         else
