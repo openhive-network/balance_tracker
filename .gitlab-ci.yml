@@ -765,9 +765,6 @@ sync_with_mock_data:
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-    DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
-    DATA_SOURCE_NFS_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
-    DATA_SOURCE_NFS_KEY: "${BTRACKER_CACHE_KEY}"
   entrypoint:
     - '/bin/bash'
     - '-c'
@@ -776,51 +773,34 @@ sync_with_mock_data:
       echo "Service container starting..."
       DATA_PATH="${DATA_SOURCE}"
       MARKER_FILE="${DATA_PATH}/.ready"
-      NFS_PREFIX="${DATA_SOURCE_NFS_PREFIX:-/nfs/ci-cache}"
-      NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
-      NFS_KEY="${DATA_SOURCE_NFS_KEY}"
-      NFS_TAR="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}.tar"
 
       echo "DEBUG: DATA_PATH=${DATA_PATH}"
       echo "DEBUG: MARKER_FILE=${MARKER_FILE}"
-      echo "DEBUG: NFS_TAR=${NFS_TAR}"
 
-      # Remove stale marker file to ensure we wait for fresh extraction
-      # (previous runs may have left marker files behind)
-      rm -f "${MARKER_FILE}" 2>/dev/null || true
-
-      # Strategy: Wait for job's extraction, then try NFS directly, then fall back to local cache
-      # This handles timing issues where service starts before job's before_script runs
-      # Note: Job needs ~90s for git clone + cache extraction, so we wait 120s
-
-      # Step 1: Wait up to 120s for job to extract (marker file)
+      # Wait for job to extract cache via cache-manager (single source of truth for extraction)
+      # Timeout matches GitLab Runner's service health check timeout (300s)
+      TIMEOUT=300
       WAITED=0
-      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 120 ]]; do
-        echo "Waiting for job extraction... ($WAITED/120s)"
+      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt $TIMEOUT ]]; do
+        # Also check if datadir exists (job may have extracted but marker write failed)
+        if [[ -d "${DATA_PATH}/datadir" ]]; then
+          echo "Data directory found - proceeding without marker"
+          break
+        fi
+        echo "Waiting for job extraction... ($WAITED/${TIMEOUT}s)"
         sleep 5
         WAITED=$((WAITED + 5))
       done
 
       if [[ -f "$MARKER_FILE" ]]; then
         echo "Marker file found - using job-extracted data"
-      elif [[ -f "$NFS_TAR" ]]; then
-        # Step 2: Job didn't extract yet, try NFS directly
-        echo "Job extraction not ready, extracting from NFS tar directly..."
-        mkdir -p "${DATA_PATH}"
-        tar xf "$NFS_TAR" -C "${DATA_PATH}" --overwrite || {
-          echo "WARNING: NFS tar extraction failed, trying local cache"
-        }
-        touch "${MARKER_FILE}" 2>/dev/null || true
-        echo "NFS extraction complete"
       elif [[ -d "${DATA_PATH}/datadir" ]]; then
-        # Step 3: Fall back to existing local cache
-        echo "WARNING: Using existing local cache (NFS not available)"
-        echo "Data may be stale if sync ran on different builder"
+        echo "Using existing local cache data"
       else
-        echo "ERROR: No data available"
+        echo "ERROR: No data available after ${TIMEOUT}s"
         echo "  - Marker file: ${MARKER_FILE} (not found)"
-        echo "  - NFS tar: ${NFS_TAR} (not found)"
         echo "  - Local cache: ${DATA_PATH}/datadir (not found)"
+        echo "Job must extract cache using cache-manager before service can start"
         exit 1
       fi
 
@@ -860,9 +840,6 @@ sync_with_mock_data:
       "host    all              btracker_owner      0.0.0.0/0    trust"
       "host    all              all              0.0.0.0/0    scram-sha-256"
     DATA_SOURCE: "/cache/${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-    DATA_SOURCE_NFS_PREFIX: "${DATA_CACHE_NFS_PREFIX}"
-    DATA_SOURCE_NFS_TYPE: "${BTRACKER_MOCK_CACHE_TYPE}"
-    DATA_SOURCE_NFS_KEY: "${BTRACKER_CACHE_KEY}"
   entrypoint:
     - '/bin/bash'
     - '-c'
@@ -871,51 +848,34 @@ sync_with_mock_data:
       echo "Service container starting..."
       DATA_PATH="${DATA_SOURCE}"
       MARKER_FILE="${DATA_PATH}/.ready"
-      NFS_PREFIX="${DATA_SOURCE_NFS_PREFIX:-/nfs/ci-cache}"
-      NFS_TYPE="${DATA_SOURCE_NFS_TYPE:-haf_sync}"
-      NFS_KEY="${DATA_SOURCE_NFS_KEY}"
-      NFS_TAR="${NFS_PREFIX}/${NFS_TYPE}/${NFS_KEY}.tar"
 
       echo "DEBUG: DATA_PATH=${DATA_PATH}"
       echo "DEBUG: MARKER_FILE=${MARKER_FILE}"
-      echo "DEBUG: NFS_TAR=${NFS_TAR}"
 
-      # Remove stale marker file to ensure we wait for fresh extraction
-      # (previous runs may have left marker files behind)
-      rm -f "${MARKER_FILE}" 2>/dev/null || true
-
-      # Strategy: Wait for job's extraction, then try NFS directly, then fall back to local cache
-      # This handles timing issues where service starts before job's before_script runs
-      # Note: Job needs ~90s for git clone + cache extraction, so we wait 120s
-
-      # Step 1: Wait up to 120s for job to extract (marker file)
+      # Wait for job to extract cache via cache-manager (single source of truth for extraction)
+      # Timeout matches GitLab Runner's service health check timeout (300s)
+      TIMEOUT=300
       WAITED=0
-      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt 120 ]]; do
-        echo "Waiting for job extraction... ($WAITED/120s)"
+      while [[ ! -f "$MARKER_FILE" ]] && [[ $WAITED -lt $TIMEOUT ]]; do
+        # Also check if datadir exists (job may have extracted but marker write failed)
+        if [[ -d "${DATA_PATH}/datadir" ]]; then
+          echo "Data directory found - proceeding without marker"
+          break
+        fi
+        echo "Waiting for job extraction... ($WAITED/${TIMEOUT}s)"
         sleep 5
         WAITED=$((WAITED + 5))
       done
 
       if [[ -f "$MARKER_FILE" ]]; then
         echo "Marker file found - using job-extracted data"
-      elif [[ -f "$NFS_TAR" ]]; then
-        # Step 2: Job didn't extract yet, try NFS directly
-        echo "Job extraction not ready, extracting from NFS tar directly..."
-        mkdir -p "${DATA_PATH}"
-        tar xf "$NFS_TAR" -C "${DATA_PATH}" --overwrite || {
-          echo "WARNING: NFS tar extraction failed, trying local cache"
-        }
-        touch "${MARKER_FILE}" 2>/dev/null || true
-        echo "NFS extraction complete"
       elif [[ -d "${DATA_PATH}/datadir" ]]; then
-        # Step 3: Fall back to existing local cache
-        echo "WARNING: Using existing local cache (NFS not available)"
-        echo "Data may be stale if sync ran on different builder"
+        echo "Using existing local cache data"
       else
-        echo "ERROR: No data available"
+        echo "ERROR: No data available after ${TIMEOUT}s"
         echo "  - Marker file: ${MARKER_FILE} (not found)"
-        echo "  - NFS tar: ${NFS_TAR} (not found)"
         echo "  - Local cache: ${DATA_PATH}/datadir (not found)"
+        echo "Job must extract cache using cache-manager before service can start"
         exit 1
       fi
 
