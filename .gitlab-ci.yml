@@ -113,6 +113,15 @@ default:
                   fi
                 fi
               done
+
+              # Check if haf/hive submodule has corrupt origin (missing remote config)
+              hive_modules=".git/modules/haf/modules/hive"
+              if [ -d "$hive_modules" ]; then
+                if ! git --git-dir="$hive_modules" remote get-url origin >/dev/null 2>&1; then
+                  echo "pre_get_sources: haf/hive has corrupt origin, cleaning"
+                  rm -rf "haf/hive" "$hive_modules"
+                fi
+              fi
             fi
 
             echo "pre_get_sources: existing repo OK"
