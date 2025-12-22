@@ -54,6 +54,8 @@ default:
       - |
         (
         cd "${CI_PROJECT_DIR:-/builds}" 2>/dev/null || exit 0
+        # Allow file:// transport for nested submodule operations (git 2.38.1+ security)
+        git config --global protocol.file.allow always 2>/dev/null || true
         echo "pre_get_sources: checking $(pwd) for corrupt git state"
         if [ -d ".git" ]; then
           # Remove stale lock files that block git operations
@@ -99,10 +101,16 @@ default:
               echo "pre_get_sources: checking haf for directory-to-submodule transitions"
               for nested in hive/libraries/fc hive/libraries/appbase; do
                 nested_path="haf/$nested"
+                modules_path=".git/modules/haf/modules/$nested"
                 # If path exists as directory but not as a submodule, remove it
                 if [ -d "$nested_path" ] && [ ! -f "$nested_path/.git" ]; then
                   echo "pre_get_sources: removing stale directory for submodule: $nested_path"
                   rm -rf "$nested_path"
+                  # Also clean the .git/modules entry if it exists
+                  if [ -d "$modules_path" ]; then
+                    echo "pre_get_sources: removing stale .git/modules entry: $modules_path"
+                    rm -rf "$modules_path"
+                  fi
                 fi
               done
             fi
