@@ -35,14 +35,14 @@ variables:
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/haf/ci-base-image${BUILDER_IMAGE_TAG}"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "9add4c306ddc0067bf00857c2c70053f21525ae6"
+  HAF_COMMIT: "6070e15d30c885fee954bbd12a0cca3b5a5beca7"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 9add4c306ddc0067bf00857c2c70053f21525ae6   # develop
+  ref: 6070e15d30c885fee954bbd12a0cca3b5a5beca7   # develop
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
