@@ -622,9 +622,10 @@ sync:
       "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
     fi
-  after_script:
-  - |
-    echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
+
+    # === Stop containers and save cache in main script ===
+    # (Moved from after_script to avoid timeout issues with NFS push)
+    echo -e "\e[0Ksection_start:$(date +%s):save_cache[collapsed=true]\r\e[0KStopping containers and saving cache..."
 
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
     EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${BTRACKER_CACHE_KEY}")
@@ -633,10 +634,10 @@ sync:
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
 
     # Force PostgreSQL checkpoint before shutdown to ensure all btracker data is written to disk
-    # Without this, data may be lost when cache-manager excludes WAL files
     echo "Forcing PostgreSQL checkpoint..."
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" || true
 
+    # Collect logs before stopping
     docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
@@ -674,15 +675,25 @@ sync:
         chmod +x "$CACHE_MANAGER"
       fi
       echo "Pushing btracker sync data to NFS: ${BTRACKER_SYNC_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
-      CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" || echo "Warning: Failed to push to NFS cache"
+      if ! CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}"; then
+        echo "ERROR: Failed to push to NFS cache"
+        exit 1
+      fi
+      echo "Successfully pushed cache to NFS"
     else
       echo "Cache hit - skipping cache save (data already in cache)"
     fi
 
-    # Manually remove the copy of the replay data to preserve disk space on the replay server
-    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
+    echo -e "\e[0Ksection_end:$(date +%s):save_cache\r\e[0K"
+  after_script:
+  - |
+    # Cleanup only - cache push moved to main script to avoid timeout
+    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up..."
 
-    echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
+    # Manually remove the copy of the replay data to preserve disk space on the replay server
+    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID} 2>/dev/null || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
   artifacts:
     paths:
     - docker/container-logs.tar.gz
@@ -866,19 +877,13 @@ sync_with_mock_data:
     echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for mock data fill..."
     "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
     echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
-  after_script:
-  - |
-    echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
+
+    # === Stop containers and save cache in main script ===
+    # (Moved from after_script to avoid timeout issues with NFS push)
+    echo -e "\e[0Ksection_start:$(date +%s):save_cache[collapsed=true]\r\e[0KStopping containers and saving cache..."
 
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
     EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${BTRACKER_CACHE_KEY}")
-
-    # If cache hit, we skipped docker-compose entirely - nothing to clean up
-    if [[ "$CACHE_HIT" == "true" ]]; then
-      echo "Cache hit - no containers to stop (docker-compose was skipped)"
-      echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
-      exit 0
-    fi
 
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
@@ -887,6 +892,7 @@ sync_with_mock_data:
     echo "Forcing PostgreSQL checkpoint..."
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" || true
 
+    # Collect logs before stopping
     docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs fill-db-with-mock-data > fill-db-with-mock-data.log
     docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
@@ -921,12 +927,22 @@ sync_with_mock_data:
       chmod +x "$CACHE_MANAGER"
     fi
     echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
-    CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
+    if ! CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_MOCK_CACHE}"; then
+      echo "ERROR: Failed to push to NFS cache"
+      exit 1
+    fi
+    echo "Successfully pushed mock cache to NFS"
+
+    echo -e "\e[0Ksection_end:$(date +%s):save_cache\r\e[0K"
+  after_script:
+  - |
+    # Cleanup only - cache push moved to main script to avoid timeout
+    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up..."
 
     # Manually remove the copy of the replay data to preserve disk space
-    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
+    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID} 2>/dev/null || true
 
-    echo -e "\e[0Ksection_end:$(date +%s):compose2\r\e[0K"
+    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
   artifacts:
     paths:
     - docker/container-logs.tar.gz
