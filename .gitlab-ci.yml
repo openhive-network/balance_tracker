@@ -505,7 +505,7 @@ sync:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/ci.yml
       --ansi never
-  timeout: 1 hours
+  timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
@@ -729,7 +729,7 @@ sync_with_mock_data:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
       overrides/ci.yml --ansi never
-  timeout: 1 hours
+  timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
