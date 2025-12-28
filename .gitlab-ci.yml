@@ -1693,6 +1693,8 @@ pattern-test-with-mock-data:
 python_api_client_test:
   extends: .project_develop_configuration_template
   stage: test
+  # TODO: Remove allow_failure when pydantic-core releases Python 3.14-compatible version
+  allow_failure: true
   needs:
   - job: generate_python_api_client
     artifacts: true
