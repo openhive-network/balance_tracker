@@ -54,8 +54,7 @@ variables:
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   # Python 3.12 image for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
-  # Uses HAF's base image which has Python 3.12 (TEST_HAF_IMAGE_TAG comes from HAF include)
-  PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/haf/ci-base-image${TEST_HAF_IMAGE_TAG}"
+  PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python-scripts:latest"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
   HAF_COMMIT: "7559639514d53f8b7e644a61fb2172468427abf9"
@@ -371,6 +370,7 @@ generate_python_api_client:
   - job: extract-swagger-json
     artifacts: true
   before_script:
+  - pip install poetry
   - poetry -C "${PYPROJECT_DIR}" lock
   - poetry -C "${PYPROJECT_DIR}" install
   script:
@@ -1718,6 +1718,7 @@ python_api_client_test:
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
+  - pip install poetry
   - poetry -C "${PYPROJECT_DIR}" lock
   - poetry -C "${PYPROJECT_DIR}" install
   script:
