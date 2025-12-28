@@ -53,6 +53,8 @@ variables:
   BUILDER_IMAGE_TAG: ":ubuntu24.04-py3.14-1"
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
+  # Python 3.12 image for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
+  PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-1"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
   HAF_COMMIT: "7559639514d53f8b7e644a61fb2172468427abf9"
@@ -361,16 +363,15 @@ extract-swagger-json:
 generate_python_api_client:
   extends: .project_develop_configuration_template
   stage: build
-  # TODO: Remove allow_failure when pydantic-core releases Python 3.14-compatible version
-  # Issue: pydantic-core's jiter dependency uses Python Unicode APIs that changed in 3.14
-  allow_failure: true
+  image: "${PYTHON_COMPAT_IMAGE}"
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
-    # PyO3 doesn't support Python 3.14 yet (max 3.13). Use stable ABI for forward compatibility.
-    PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
   needs:
   - job: extract-swagger-json
     artifacts: true
+  before_script:
+  - poetry -C "${PYPROJECT_DIR}" lock
+  - poetry -C "${PYPROJECT_DIR}" install
   script:
   - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
   artifacts:
@@ -1709,13 +1710,15 @@ pattern-test-with-mock-data:
 python_api_client_test:
   extends: .project_develop_configuration_template
   stage: test
-  # TODO: Remove allow_failure when pydantic-core releases Python 3.14-compatible version
-  allow_failure: true
+  image: "${PYTHON_COMPAT_IMAGE}"
   needs:
   - job: generate_python_api_client
     artifacts: true
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  before_script:
+  - poetry -C "${PYPROJECT_DIR}" lock
+  - poetry -C "${PYPROJECT_DIR}" install
   script:
   - pytest "${PYPROJECT_DIR}/tests"
   tags:
