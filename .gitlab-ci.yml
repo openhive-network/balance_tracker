@@ -1,4 +1,5 @@
 stages:
+- detect
 - lint
 - build
 - sync
@@ -7,6 +8,24 @@ stages:
 - publish
 
 variables:
+  # =============================================================================
+  # QUICK TEST MODE - Skip sync and use cached data
+  # =============================================================================
+  # Set QUICK_TEST=true to skip sync and use pre-cached HAF data.
+  # Useful for testing SQL changes, API changes, or test fixes without full sync.
+  #
+  # Usage:
+  #   QUICK_TEST=true
+  #   QUICK_TEST_HAF_COMMIT=<sha>  (required - find with list-haf-caches.sh)
+  #
+  # Find available caches: ssh hive-builder-10 'ls -lt /nfs/ci-cache/haf/*.tar | head -5'
+  # =============================================================================
+  QUICK_TEST: "false"
+  QUICK_TEST_HAF_COMMIT: ""   # Required when QUICK_TEST=true
+  # Auto-populated by detect_changes job:
+  AUTO_SKIP_SYNC: "false"     # Set to true when only tests/docs/gui changed
+  AUTO_CACHE_HAF_COMMIT: ""   # Most recent cached HAF commit
+
   # Git configuration
   # Fetch strategy reuses workspace between jobs, reducing GitLab server load.
   # Full clone (depth 0) enables efficient incremental fetches - shallow clones
@@ -131,6 +150,117 @@ default:
           echo "pre_get_sources: no .git directory (fresh workspace)"
         fi
         )
+
+# =============================================================================
+# Change Detection - Auto-skip sync when only tests/docs/gui change
+# =============================================================================
+# Detects if only tests/docs/gui changed and finds cached data to use.
+# Exports:
+#   AUTO_SKIP_SYNC        - true if sync can be skipped
+#   AUTO_CACHE_HAF_COMMIT - HAF commit SHA for cached data
+detect_changes:
+  stage: detect
+  image: "${BUILDER_IMAGE_PATH}"
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    # Skip for tags (always do full sync for releases)
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: on_success
+  script:
+    - |
+      # Initialize defaults
+      CAN_SKIP_SYNC=false
+      CACHE_COMMIT=""
+
+      # Handle manual QUICK_TEST mode
+      if [[ "$QUICK_TEST" == "true" ]]; then
+        echo "=== Manual QUICK_TEST Mode ==="
+        CAN_SKIP_SYNC=true
+        CACHE_COMMIT="${QUICK_TEST_HAF_COMMIT}"
+        if [[ -z "$CACHE_COMMIT" ]]; then
+          echo "ERROR: QUICK_TEST_HAF_COMMIT must be set when QUICK_TEST=true"
+          echo ""
+          echo "Find available caches:"
+          echo "  ssh hive-builder-10 'ls -lt /nfs/ci-cache/haf/*.tar | head -5'"
+          exit 1
+        fi
+        echo "Using cached data from: $CACHE_COMMIT"
+      else
+        # Automatic detection mode
+        echo "=== Detecting Changed Files ==="
+
+        # Get changed files based on pipeline type
+        if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]]; then
+          BASE_SHA="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+          echo "MR pipeline: comparing against target branch"
+        elif [[ "${CI_PIPELINE_SOURCE:-}" == "push" ]]; then
+          BASE_SHA="HEAD~1"
+          echo "Push pipeline: comparing against previous commit"
+        else
+          BASE_SHA=$(git merge-base HEAD origin/develop 2>/dev/null || echo "HEAD~1")
+          echo "Other pipeline: comparing against develop"
+        fi
+
+        echo "Comparing $BASE_SHA to HEAD"
+        CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+
+        echo "Changed files:"
+        echo "$CHANGED_FILES" | head -50
+
+        # Files that don't require re-sync:
+        # - tests/ (test changes don't affect sync)
+        # - docs/ (documentation)
+        # - gui/ (frontend only)
+        # - *.md, README, CHANGELOG, LICENSE (docs)
+        # Note: SQL changes DO require sync (affect database schema)
+        SKIP_SYNC_PATTERNS="^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$"
+
+        NEEDS_SYNC=$(echo "$CHANGED_FILES" | grep -vE "$SKIP_SYNC_PATTERNS" || true)
+
+        if [[ -z "$NEEDS_SYNC" ]]; then
+          echo ""
+          echo "=== Can skip sync (only tests/docs/gui/CI changed) ==="
+          CAN_SKIP_SYNC=true
+
+          # Find most recent HAF cache
+          NFS_CACHE_PATH="/nfs/ci-cache/haf"
+          if [[ -d "$NFS_CACHE_PATH" ]]; then
+            for TAR in $(ls -t "$NFS_CACHE_PATH"/*.tar 2>/dev/null | head -5); do
+              CACHE_COMMIT=$(basename "$TAR" .tar)
+              echo "Found cached HAF data: $CACHE_COMMIT"
+              break
+            done
+          fi
+
+          if [[ -z "$CACHE_COMMIT" ]]; then
+            echo "WARNING: No cached HAF data found - cannot skip sync"
+            CAN_SKIP_SYNC=false
+          fi
+        else
+          echo ""
+          echo "=== Full sync required ==="
+          echo "Files requiring sync:"
+          echo "$NEEDS_SYNC" | head -20
+        fi
+      fi
+
+      # Export results
+      echo "AUTO_SKIP_SYNC=$CAN_SKIP_SYNC" >> detect_changes.env
+      if [[ -n "$CACHE_COMMIT" ]]; then
+        echo "AUTO_CACHE_HAF_COMMIT=$CACHE_COMMIT" >> detect_changes.env
+      fi
+
+      echo ""
+      echo "=== Summary ==="
+      cat detect_changes.env
+  artifacts:
+    reports:
+      dotenv: detect_changes.env
+    expire_in: 1 day
+  tags:
+    - data-cache-storage  # Needs NFS access to find caches
 
 .lint_job:
   stage: lint
@@ -353,6 +483,9 @@ sync:
   stage: sync
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-16
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true  # Optional for tagged builds
   - prepare_haf_image
   - prepare_haf_data
   - docker-setup-docker-image-build
@@ -378,20 +511,45 @@ sync:
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
   - |
+    # Handle QUICK_TEST mode or AUTO_SKIP_SYNC - use cached HAF data
+    EFFECTIVE_HAF_COMMIT="${HAF_COMMIT}"
+    if [[ "${QUICK_TEST:-false}" == "true" ]]; then
+      echo "=== QUICK_TEST Mode (manual) ==="
+      if [[ -z "${QUICK_TEST_HAF_COMMIT}" ]]; then
+        echo "ERROR: QUICK_TEST=true but QUICK_TEST_HAF_COMMIT not set"
+        echo ""
+        echo "Find available caches:"
+        echo "  ssh hive-builder-10 'ls -lt /nfs/ci-cache/haf/*.tar | head -5'"
+        exit 1
+      fi
+      EFFECTIVE_HAF_COMMIT="${QUICK_TEST_HAF_COMMIT}"
+      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
+    elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]] && [[ -n "${AUTO_CACHE_HAF_COMMIT}" ]]; then
+      echo "=== AUTO_SKIP_SYNC Mode (only tests/docs/gui changed) ==="
+      EFFECTIVE_HAF_COMMIT="${AUTO_CACHE_HAF_COMMIT}"
+      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
+    fi
+
     # Check for existing btracker sync cache first (HAF + balance_tracker already synced)
     # If found, we can skip the sync entirely since the cache key includes both commits
-    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-    LOCAL_HAF_CACHE="${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}"
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    EFFECTIVE_CACHE_KEY="${EFFECTIVE_HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
+    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
+    LOCAL_HAF_CACHE="${DATA_CACHE_HAF_PREFIX}_${EFFECTIVE_HAF_COMMIT}"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
     CACHE_HIT="false"
 
     if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir" ]]; then
       echo "Local btracker sync cache found at ${LOCAL_BTRACKER_CACHE} - skipping sync"
       CACHE_HIT="true"
       export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
-    elif [[ -x "$CACHE_MANAGER" ]]; then
-      echo "Checking NFS for btracker sync cache: ${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" 2>/dev/null; then
+    else
+      echo "Checking NFS for btracker sync cache: ${BTRACKER_SYNC_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
+      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" 2>/dev/null; then
         echo "Fetched btracker sync cache from NFS - skipping sync"
         CACHE_HIT="true"
         export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
@@ -406,22 +564,18 @@ sync:
         echo "Local HAF cache found at ${LOCAL_HAF_CACHE}"
       else
         echo "Local HAF cache not found, checking NFS..."
-        if [[ -x "$CACHE_MANAGER" ]]; then
-          if "$CACHE_MANAGER" get haf "${HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
-            echo "Fetched HAF replay data from NFS cache"
-          else
-            echo "ERROR: Failed to fetch HAF replay data from NFS cache"
-            exit 1
-          fi
+        if "$CACHE_MANAGER" get haf "${EFFECTIVE_HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
+          echo "Fetched HAF replay data from NFS cache"
         else
-          echo "ERROR: cache-manager.sh not found and local cache missing"
+          echo "ERROR: Failed to fetch HAF replay data from NFS cache"
           exit 1
         fi
       fi
     fi
 
-    # Export for use in script section
+    # Export for use in script and after_script sections
     echo "$CACHE_HIT" > /tmp/cache_hit
+    echo "$EFFECTIVE_CACHE_KEY" > /tmp/effective_cache_key
   script:
   - |
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
@@ -468,6 +622,7 @@ sync:
     echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+    EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${BTRACKER_CACHE_KEY}")
 
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
@@ -491,7 +646,7 @@ sync:
     # Only save to cache if this was not a cache hit (avoid re-saving what we loaded)
     if [[ "$CACHE_HIT" != "true" ]]; then
       # Save sync data to local cache with commit-based key
-      LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+      LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
       mkdir -p "${LOCAL_BTRACKER_CACHE}"
       sudo cp -a "${DATADIR}" "${LOCAL_BTRACKER_CACHE}"
       sudo cp -a "${SHM_DIR}" "${LOCAL_BTRACKER_CACHE}"
@@ -507,13 +662,14 @@ sync:
       ls -lah "${LOCAL_BTRACKER_CACHE}/shm_dir" || true
 
       # Push sync data to NFS cache for sharing across builders
-      CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-      if [[ -x "$CACHE_MANAGER" ]]; then
-        echo "Pushing btracker sync data to NFS: ${BTRACKER_SYNC_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
-        CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" || echo "Warning: Failed to push to NFS cache"
-      else
-        echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+      # Fetch cache-manager from common-ci-configuration
+      CACHE_MANAGER="/tmp/cache-manager.sh"
+      if [[ ! -x "$CACHE_MANAGER" ]]; then
+        curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+        chmod +x "$CACHE_MANAGER"
       fi
+      echo "Pushing btracker sync data to NFS: ${BTRACKER_SYNC_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
+      CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" || echo "Warning: Failed to push to NFS cache"
     else
       echo "Cache hit - skipping cache save (data already in cache)"
     fi
@@ -536,6 +692,9 @@ sync_with_mock_data:
   stage: sync
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-16
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true  # Optional for tagged builds
   - job: sync
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -565,10 +724,32 @@ sync_with_mock_data:
     git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
     echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
   - |
+    # Handle QUICK_TEST mode or AUTO_SKIP_SYNC - use cached HAF data
+    EFFECTIVE_HAF_COMMIT="${HAF_COMMIT}"
+    if [[ "${QUICK_TEST:-false}" == "true" ]]; then
+      echo "=== QUICK_TEST Mode (manual) ==="
+      if [[ -z "${QUICK_TEST_HAF_COMMIT}" ]]; then
+        echo "ERROR: QUICK_TEST=true but QUICK_TEST_HAF_COMMIT not set"
+        exit 1
+      fi
+      EFFECTIVE_HAF_COMMIT="${QUICK_TEST_HAF_COMMIT}"
+      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
+    elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]] && [[ -n "${AUTO_CACHE_HAF_COMMIT}" ]]; then
+      echo "=== AUTO_SKIP_SYNC Mode (only tests/docs/gui changed) ==="
+      EFFECTIVE_HAF_COMMIT="${AUTO_CACHE_HAF_COMMIT}"
+      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
+    fi
+
     # Check for existing mock cache first (HAF + btracker + mock data already present)
-    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    EFFECTIVE_CACHE_KEY="${EFFECTIVE_HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
+    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
+    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
     CACHE_HIT="false"
 
     # First check for mock cache (already has mock data)
@@ -576,9 +757,9 @@ sync_with_mock_data:
       echo "Local mock cache found at ${LOCAL_MOCK_CACHE} - skipping mock fill"
       CACHE_HIT="true"
       export DATA_SOURCE="${LOCAL_MOCK_CACHE}"
-    elif [[ -x "$CACHE_MANAGER" ]]; then
-      echo "Checking NFS for mock cache: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" 2>/dev/null; then
+    else
+      echo "Checking NFS for mock cache: ${BTRACKER_MOCK_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
+      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" 2>/dev/null; then
         echo "Fetched mock cache from NFS - skipping mock fill"
         CACHE_HIT="true"
         export DATA_SOURCE="${LOCAL_MOCK_CACHE}"
@@ -618,22 +799,18 @@ sync_with_mock_data:
         echo "Local btracker sync cache found at ${LOCAL_BTRACKER_CACHE}"
       else
         echo "Local btracker cache not found or invalid, fetching from NFS..."
-        if [[ -x "$CACHE_MANAGER" ]]; then
-          if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}"; then
-            echo "Fetched btracker sync data from NFS via cache-manager"
-          else
-            echo "ERROR: Failed to fetch btracker sync data from NFS"
-            exit 1
-          fi
+        if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}"; then
+          echo "Fetched btracker sync data from NFS via cache-manager"
         else
-          echo "ERROR: cache-manager.sh not found at $CACHE_MANAGER"
+          echo "ERROR: Failed to fetch btracker sync data from NFS"
           exit 1
         fi
       fi
     fi
 
-    # Export for use in script section
+    # Export for use in script and after_script sections
     echo "$CACHE_HIT" > /tmp/cache_hit
+    echo "$EFFECTIVE_CACHE_KEY" > /tmp/effective_cache_key
   script:
   - |
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
@@ -689,6 +866,7 @@ sync_with_mock_data:
     echo -e "\e[0Ksection_start:$(date +%s):compose2[collapsed=true]\r\e[0KStopping test environment..."
 
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+    EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${BTRACKER_CACHE_KEY}")
 
     # If cache hit, we skipped docker-compose entirely - nothing to clean up
     if [[ "$CACHE_HIT" == "true" ]]; then
@@ -715,7 +893,7 @@ sync_with_mock_data:
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
 
     # Save mock data to cache
-    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${BTRACKER_CACHE_KEY}"
+    LOCAL_MOCK_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_MOCK_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
     mkdir -p "${LOCAL_MOCK_CACHE}"
     sudo cp -a "${DATADIR}" "${LOCAL_MOCK_CACHE}"
     sudo cp -a "${SHM_DIR}" "${LOCAL_MOCK_CACHE}"
@@ -731,13 +909,14 @@ sync_with_mock_data:
     ls -lah "${LOCAL_MOCK_CACHE}/shm_dir" || true
 
     # Push mock data to NFS cache for sharing across builders
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${BTRACKER_CACHE_KEY}"
-      CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
-    else
-      echo "Warning: cache-manager.sh not found, skipping NFS cache push"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
     fi
+    echo "Pushing mock data to NFS: ${BTRACKER_MOCK_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
+    CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_MOCK_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_MOCK_CACHE}" || echo "Warning: Failed to push to NFS cache"
 
     # Manually remove the copy of the replay data to preserve disk space
     sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID}
@@ -981,7 +1160,12 @@ regression-test:
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
 
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
 
     echo "DEBUG: JOB_DIR=${JOB_DIR}"
     echo "DEBUG: CACHE_TYPE=${BTRACKER_SYNC_CACHE_TYPE}"
@@ -989,15 +1173,10 @@ regression-test:
 
     # Use cache-manager to get data (handles local cache check + NFS tar extraction)
     mkdir -p "${JOB_DIR}"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
-        echo "Cache extraction complete"
-      else
-        echo "ERROR: Failed to get cache via cache-manager"
-        exit 1
-      fi
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
     else
-      echo "ERROR: cache-manager.sh not found at $CACHE_MANAGER"
+      echo "ERROR: Failed to get cache via cache-manager"
       exit 1
     fi
 
@@ -1199,7 +1378,12 @@ pattern-test:
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
 
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
 
     echo "DEBUG: JOB_DIR=${JOB_DIR}"
     echo "DEBUG: CACHE_TYPE=${BTRACKER_SYNC_CACHE_TYPE}"
@@ -1207,15 +1391,10 @@ pattern-test:
 
     # Use cache-manager to get data (handles local cache check + NFS tar extraction)
     mkdir -p "${JOB_DIR}"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
-        echo "Cache extraction complete"
-      else
-        echo "ERROR: Failed to get cache via cache-manager"
-        exit 1
-      fi
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
     else
-      echo "ERROR: cache-manager.sh not found at $CACHE_MANAGER"
+      echo "ERROR: Failed to get cache via cache-manager"
       exit 1
     fi
 
@@ -1369,7 +1548,12 @@ pattern-test-with-mock-data:
     echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache (mock data)..."
 
     JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
-    CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
 
     echo "DEBUG: JOB_DIR=${JOB_DIR}"
     echo "DEBUG: CACHE_TYPE=${BTRACKER_MOCK_CACHE_TYPE}"
@@ -1377,15 +1561,10 @@ pattern-test-with-mock-data:
 
     # Use cache-manager to get data (handles local cache check + NFS tar extraction)
     mkdir -p "${JOB_DIR}"
-    if [[ -x "$CACHE_MANAGER" ]]; then
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
-        echo "Cache extraction complete"
-      else
-        echo "ERROR: Failed to get cache via cache-manager"
-        exit 1
-      fi
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
     else
-      echo "ERROR: cache-manager.sh not found at $CACHE_MANAGER"
+      echo "ERROR: Failed to get cache via cache-manager"
       exit 1
     fi
 
