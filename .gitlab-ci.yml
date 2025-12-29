@@ -49,22 +49,22 @@ variables:
   BTRACKER_MOCK_CACHE_TYPE: "btracker_mock"   # HAF + balance_tracker + mock data
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
-  # uses registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-1
-  BUILDER_IMAGE_TAG: ":ubuntu24.04-py3.14-1"
+  # uses registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2
+  BUILDER_IMAGE_TAG: ":ubuntu24.04-py3.14-2"
   BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
-  # Python 3.12 image for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
-  PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python-scripts:latest"
+  # Python 3.12 image with poetry for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
+  PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "7559639514d53f8b7e644a61fb2172468427abf9"
+  HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 7559639514d53f8b7e644a61fb2172468427abf9
+  ref: 1ac5d12439b9cca33e6db383adc59967cae75fc4
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
@@ -370,7 +370,6 @@ generate_python_api_client:
   - job: extract-swagger-json
     artifacts: true
   before_script:
-  - pip install poetry
   - poetry -C "${PYPROJECT_DIR}" lock
   - poetry -C "${PYPROJECT_DIR}" install
   script:
@@ -1718,7 +1717,6 @@ python_api_client_test:
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
-  - pip install poetry
   - poetry -C "${PYPROJECT_DIR}" lock
   - poetry -C "${PYPROJECT_DIR}" install
   script:
