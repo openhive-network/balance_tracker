@@ -1711,6 +1711,7 @@ python_api_client_test:
   extends: .project_develop_configuration_template
   stage: test
   image: "${PYTHON_COMPAT_IMAGE}"
+  allow_failure: true  # Depends on external api.syncad.com which may be unavailable
   needs:
   - job: generate_python_api_client
     artifacts: true
