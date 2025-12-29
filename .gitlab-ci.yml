@@ -44,9 +44,9 @@ variables:
   DATA_CACHE_NFS_PREFIX: "/nfs/ci-cache"
   # Cache keys include both HAF and balance_tracker commits for proper invalidation
   BTRACKER_CACHE_KEY: "${HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
-  # Cache types for different replay states
-  BTRACKER_SYNC_CACHE_TYPE: "btracker_sync"   # HAF + balance_tracker synced
-  BTRACKER_MOCK_CACHE_TYPE: "btracker_mock"   # HAF + balance_tracker + mock data
+  # Cache types for different replay states (prefixed with haf_ for proper pgdata permission handling)
+  BTRACKER_SYNC_CACHE_TYPE: "haf_btracker_sync"   # HAF + balance_tracker synced
+  BTRACKER_MOCK_CACHE_TYPE: "haf_btracker_mock"   # HAF + balance_tracker + mock data
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
   # uses registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2
