@@ -177,113 +177,16 @@ default:
 # =============================================================================
 # Change Detection - Auto-skip sync when only tests/docs/gui change
 # =============================================================================
-# Detects if only tests/docs/gui changed and finds cached data to use.
-# Exports:
-#   AUTO_SKIP_SYNC        - true if sync can be skipped
-#   AUTO_CACHE_HAF_COMMIT - HAF commit SHA for cached data
+# Detects if only tests/docs/gui changed and can use cached data.
+# Exports: AUTO_SKIP_SYNC, AUTO_CACHE_HAF_COMMIT (via template)
 detect_changes:
-  stage: detect
-  image: "${BUILDER_IMAGE_PATH}"
+  extends: .haf_app_detect_changes
   variables:
-    GIT_SUBMODULE_STRATEGY: none
-  rules:
-    # Skip for tags (always do full sync for releases)
-    - if: $CI_COMMIT_TAG
-      when: never
-    - when: on_success
-  script:
-    - |
-      # Initialize defaults
-      CAN_SKIP_SYNC=false
-      CACHE_COMMIT=""
-
-      # Handle manual QUICK_TEST mode
-      if [[ "$QUICK_TEST" == "true" ]]; then
-        echo "=== Manual QUICK_TEST Mode ==="
-        CAN_SKIP_SYNC=true
-        CACHE_COMMIT="${QUICK_TEST_HAF_COMMIT}"
-        if [[ -z "$CACHE_COMMIT" ]]; then
-          echo "ERROR: QUICK_TEST_HAF_COMMIT must be set when QUICK_TEST=true"
-          echo ""
-          echo "Find available caches:"
-          echo "  ssh hive-builder-10 'ls -lt /nfs/ci-cache/haf/*.tar | head -5'"
-          exit 1
-        fi
-        echo "Using cached data from: $CACHE_COMMIT"
-      else
-        # Automatic detection mode
-        echo "=== Detecting Changed Files ==="
-
-        # Get changed files based on pipeline type
-        if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]]; then
-          BASE_SHA="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
-          echo "MR pipeline: comparing against target branch"
-        elif [[ "${CI_PIPELINE_SOURCE:-}" == "push" ]]; then
-          BASE_SHA="HEAD~1"
-          echo "Push pipeline: comparing against previous commit"
-        else
-          BASE_SHA=$(git merge-base HEAD origin/develop 2>/dev/null || echo "HEAD~1")
-          echo "Other pipeline: comparing against develop"
-        fi
-
-        echo "Comparing $BASE_SHA to HEAD"
-        CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
-
-        echo "Changed files:"
-        echo "$CHANGED_FILES" | head -50
-
-        # Files that don't require re-sync:
-        # - tests/ (test changes don't affect sync)
-        # - docs/ (documentation)
-        # - gui/ (frontend only)
-        # - *.md, README, CHANGELOG, LICENSE (docs)
-        # Note: SQL changes DO require sync (affect database schema)
-        SKIP_SYNC_PATTERNS="^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$"
-
-        NEEDS_SYNC=$(echo "$CHANGED_FILES" | grep -vE "$SKIP_SYNC_PATTERNS" || true)
-
-        if [[ -z "$NEEDS_SYNC" ]]; then
-          echo ""
-          echo "=== Can skip sync (only tests/docs/gui/CI changed) ==="
-          CAN_SKIP_SYNC=true
-
-          # Find most recent HAF cache
-          NFS_CACHE_PATH="/nfs/ci-cache/haf"
-          if [[ -d "$NFS_CACHE_PATH" ]]; then
-            for TAR in $(ls -t "$NFS_CACHE_PATH"/*.tar 2>/dev/null | head -5); do
-              CACHE_COMMIT=$(basename "$TAR" .tar)
-              echo "Found cached HAF data: $CACHE_COMMIT"
-              break
-            done
-          fi
-
-          if [[ -z "$CACHE_COMMIT" ]]; then
-            echo "WARNING: No cached HAF data found - cannot skip sync"
-            CAN_SKIP_SYNC=false
-          fi
-        else
-          echo ""
-          echo "=== Full sync required ==="
-          echo "Files requiring sync:"
-          echo "$NEEDS_SYNC" | head -20
-        fi
-      fi
-
-      # Export results
-      echo "AUTO_SKIP_SYNC=$CAN_SKIP_SYNC" >> detect_changes.env
-      if [[ -n "$CACHE_COMMIT" ]]; then
-        echo "AUTO_CACHE_HAF_COMMIT=$CACHE_COMMIT" >> detect_changes.env
-      fi
-
-      echo ""
-      echo "=== Summary ==="
-      cat detect_changes.env
-  artifacts:
-    reports:
-      dotenv: detect_changes.env
-    expire_in: 1 day
-  tags:
-    - data-cache-storage  # Needs NFS access to find caches
+    # Files that don't require re-sync:
+    # - tests/, docs/, gui/ (don't affect sync)
+    # - *.md, README, CHANGELOG, LICENSE (docs)
+    # Note: SQL changes DO require sync (affect database schema)
+    HAF_APP_SKIP_PATTERNS: '^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$'
 
 .lint_job:
   stage: lint
