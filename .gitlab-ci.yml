@@ -389,7 +389,9 @@ docker-setup-docker-image-build:
     TARGET: "full-ci"
 
 sync:
-  extends: .docker_image_builder_job_template
+  extends:
+  - .docker_image_builder_job_template
+  - .haf_app_sync_variables
   stage: sync
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
@@ -402,109 +404,17 @@ sync:
   - docker-ci-runner-build
   variables:
     DATA_SOURCE: ${DATA_CACHE_HAF_PREFIX}_${HAF_COMMIT}
-    DATADIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
-    SHM_DIR: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
-    HAF_DATA_DIRECTORY: ${DATADIR}
-    HAF_SHM_DIRECTORY: ${SHM_DIR}
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/ci.yml
       --ansi never
+    # Aliases for sync templates
+    APP_SYNC_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
+    APP_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
   timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
-  - |
-    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
-    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-    echo -e "\e[0Ksection_start:$(date +%s):git[collapsed=true]\r\e[0KConfiguring Git..."
-    git config --global --add safe.directory "$CI_PROJECT_DIR"
-    git config --global --add safe.directory "$CI_PROJECT_DIR/haf"
-    echo -e "\e[0Ksection_end:$(date +%s):git\r\e[0K"
-  - |
-    # Handle QUICK_TEST mode or AUTO_SKIP_SYNC - use cached HAF data
-    EFFECTIVE_HAF_COMMIT="${HAF_COMMIT}"
-    if [[ "${QUICK_TEST:-false}" == "true" ]]; then
-      echo "=== QUICK_TEST Mode (manual) ==="
-      if [[ -z "${QUICK_TEST_HAF_COMMIT}" ]]; then
-        echo "ERROR: QUICK_TEST=true but QUICK_TEST_HAF_COMMIT not set"
-        echo ""
-        echo "Find available caches:"
-        echo "  ssh hive-builder-10 'ls -lt /nfs/ci-cache/haf/*.tar | head -5'"
-        exit 1
-      fi
-      EFFECTIVE_HAF_COMMIT="${QUICK_TEST_HAF_COMMIT}"
-      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
-    elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]] && [[ -n "${AUTO_CACHE_HAF_COMMIT}" ]]; then
-      echo "=== AUTO_SKIP_SYNC Mode (only tests/docs/gui changed) ==="
-      EFFECTIVE_HAF_COMMIT="${AUTO_CACHE_HAF_COMMIT}"
-      echo "Using cached HAF data from: ${EFFECTIVE_HAF_COMMIT}"
-    fi
-
-    # Check for existing btracker sync cache first (HAF + balance_tracker already synced)
-    # If found, we can skip the sync entirely since the cache key includes both commits
-    EFFECTIVE_CACHE_KEY="${EFFECTIVE_HAF_COMMIT}_${CI_COMMIT_SHORT_SHA}"
-    LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
-    LOCAL_HAF_CACHE="${DATA_CACHE_HAF_PREFIX}_${EFFECTIVE_HAF_COMMIT}"
-    # Fetch cache-manager from common-ci-configuration
-    CACHE_MANAGER="/tmp/cache-manager.sh"
-    if [[ ! -x "$CACHE_MANAGER" ]]; then
-      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
-      chmod +x "$CACHE_MANAGER"
-    fi
-    CACHE_HIT="false"
-
-    if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir" ]]; then
-      echo "Local btracker sync cache found at ${LOCAL_BTRACKER_CACHE} - skipping sync"
-      CACHE_HIT="true"
-      export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
-    else
-      echo "Checking NFS for btracker sync cache: ${BTRACKER_SYNC_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}" 2>/dev/null; then
-        echo "Fetched btracker sync cache from NFS - skipping sync"
-        CACHE_HIT="true"
-        export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
-      elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]]; then
-        # For docs-only changes, we can use ANY btracker cache with matching HAF commit
-        # since we know the balance_tracker SQL hasn't changed
-        echo "Exact cache not found, searching for any btracker cache with HAF commit ${EFFECTIVE_HAF_COMMIT}..."
-        NFS_CACHE_DIR="${DATA_CACHE_NFS_PREFIX}/${BTRACKER_SYNC_CACHE_TYPE}"
-        FOUND_CACHE=$(ls -t "${NFS_CACHE_DIR}/${EFFECTIVE_HAF_COMMIT}_"*.tar 2>/dev/null | head -1 || true)
-        if [[ -n "$FOUND_CACHE" ]]; then
-          FOUND_KEY=$(basename "$FOUND_CACHE" .tar)
-          echo "Found compatible btracker cache: ${FOUND_KEY}"
-          LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${FOUND_KEY}"
-          if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${FOUND_KEY}" "${LOCAL_BTRACKER_CACHE}" 2>/dev/null; then
-            echo "Fetched compatible btracker sync cache from NFS - skipping sync"
-            CACHE_HIT="true"
-            export DATA_SOURCE="${LOCAL_BTRACKER_CACHE}"
-          fi
-        fi
-        if [[ "$CACHE_HIT" != "true" ]]; then
-          echo "No compatible btracker cache found, will use HAF-only cache and run sync"
-        fi
-      else
-        echo "Btracker sync cache not found, will use HAF-only cache and run sync"
-      fi
-    fi
-
-    # Fall back to HAF-only cache if no btracker cache
-    if [[ "$CACHE_HIT" != "true" ]]; then
-      if [[ -d "${LOCAL_HAF_CACHE}/datadir" ]]; then
-        echo "Local HAF cache found at ${LOCAL_HAF_CACHE}"
-      else
-        echo "Local HAF cache not found, checking NFS..."
-        if "$CACHE_MANAGER" get haf "${EFFECTIVE_HAF_COMMIT}" "${LOCAL_HAF_CACHE}"; then
-          echo "Fetched HAF replay data from NFS cache"
-        else
-          echo "ERROR: Failed to fetch HAF replay data from NFS cache"
-          exit 1
-        fi
-      fi
-    fi
-
-    # Export for use in script and after_script sections
-    echo "$CACHE_HIT" > /tmp/cache_hit
-    echo "$EFFECTIVE_CACHE_KEY" > /tmp/effective_cache_key
+  - !reference [.haf_app_sync_setup, script]
+  - !reference [.haf_app_smart_cache_lookup, script]
   script:
   - |
     CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
@@ -514,25 +424,15 @@ sync:
     # Block log is already in HAF cache from prepare_haf_data, copy_datadir.sh handles it
     "${CI_PROJECT_DIR}/haf/scripts/copy_datadir.sh"
 
-    # Using --skip-hived: pre-replayed HAF data from NFS cache contains both
-    # PostgreSQL database (pgdata) and shared_memory.bin. HAF just runs PostgreSQL
-    # without hived, using the existing replayed data. No need to delete pgdata.
-
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
     # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
-    # This is needed because datadir/blockchain may contain symlinks to /cache/blockchain/block_log_5m/
-    # which isn't accessible inside the Docker Compose containers (DinD environment)
     echo "Copying blockchain files to docker/blockchain..."
     rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
     cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
-    echo "Contents of docker/blockchain after copy:"
     ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
-    echo "Total size:"
-    du -sh "${CI_PROJECT_DIR}/docker/blockchain/"
 
-    # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
-    # Docker Compose will use ./blockchain bind mount exclusively for /home/hived/datadir/blockchain
+    # Remove blockchain dir from datadir so Docker volume mount doesn't conflict
     sudo rm -rf "${DATADIR}/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
@@ -546,83 +446,11 @@ sync:
       "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
     fi
-
-    # === Stop containers and save cache in main script ===
-    # (Moved from after_script to avoid timeout issues with NFS push)
-    echo -e "\e[0Ksection_start:$(date +%s):save_cache[collapsed=true]\r\e[0KStopping containers and saving cache..."
-
-    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
-    EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${BTRACKER_CACHE_KEY}")
-
-    pushd docker
-    IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
-
-    # Force PostgreSQL checkpoint before shutdown to ensure all btracker data is written to disk
-    echo "Forcing PostgreSQL checkpoint..."
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" || true
-
-    # Collect logs before stopping
-    docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
-    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log
-    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
-    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log
-
-    # Use longer timeout (60s) for graceful PostgreSQL shutdown
-    docker compose "${COMPOSE_OPTIONS[@]}" down --volumes --timeout 60
-    popd
-
-    tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
-
-    # Only save to cache if this was not a cache hit (avoid re-saving what we loaded)
-    if [[ "$CACHE_HIT" != "true" ]]; then
-      # Save sync data to local cache with commit-based key
-      LOCAL_BTRACKER_CACHE="${DATA_CACHE_HAF_PREFIX}_${BTRACKER_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
-      mkdir -p "${LOCAL_BTRACKER_CACHE}"
-      sudo cp -a "${DATADIR}" "${LOCAL_BTRACKER_CACHE}"
-      sudo cp -a "${SHM_DIR}" "${LOCAL_BTRACKER_CACHE}"
-
-      # Remove empty blockchain from local cache to trigger symlink creation on test runners
-      if [[ -d "${LOCAL_BTRACKER_CACHE}/datadir/blockchain" ]] && [[ -z "$(ls -A "${LOCAL_BTRACKER_CACHE}/datadir/blockchain")" ]]; then
-        echo "Removing empty blockchain directory from local cache"
-        rmdir "${LOCAL_BTRACKER_CACHE}/datadir/blockchain"
-      fi
-
-      ls -lah "${LOCAL_BTRACKER_CACHE}"
-      ls -lah "${LOCAL_BTRACKER_CACHE}/datadir" || true
-      ls -lah "${LOCAL_BTRACKER_CACHE}/shm_dir" || true
-
-      # Push sync data to NFS cache for sharing across builders
-      # Fetch cache-manager from common-ci-configuration
-      CACHE_MANAGER="/tmp/cache-manager.sh"
-      if [[ ! -x "$CACHE_MANAGER" ]]; then
-        curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
-        chmod +x "$CACHE_MANAGER"
-      fi
-      echo "Pushing btracker sync data to NFS: ${BTRACKER_SYNC_CACHE_TYPE}/${EFFECTIVE_CACHE_KEY}"
-      if ! CACHE_HANDLING=haf "$CACHE_MANAGER" put "${BTRACKER_SYNC_CACHE_TYPE}" "${EFFECTIVE_CACHE_KEY}" "${LOCAL_BTRACKER_CACHE}"; then
-        echo "ERROR: Failed to push to NFS cache"
-        exit 1
-      fi
-      echo "Successfully pushed cache to NFS"
-    else
-      echo "Cache hit - skipping cache save (data already in cache)"
-    fi
-
-    echo -e "\e[0Ksection_end:$(date +%s):save_cache\r\e[0K"
-  after_script:
-  - |
-    # Cleanup only - cache push moved to main script to avoid timeout
-    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up..."
-
-    # Manually remove the copy of the replay data to preserve disk space on the replay server
-    sudo rm -rf ${CI_PROJECT_DIR}/${CI_JOB_ID} 2>/dev/null || true
-
-    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
-  artifacts:
-    paths:
-    - docker/container-logs.tar.gz
-    expire_in: 1 week
-    when: always
+  # Shutdown and save cache
+  - !reference [.haf_app_sync_shutdown, script]
+  - !reference [.haf_app_sync_save_cache_conditional, script]
+  after_script: !reference [.haf_app_sync_cleanup, after_script]
+  artifacts: !reference [.haf_app_sync_artifacts, artifacts]
   tags:
   - data-cache-storage
   - fast
