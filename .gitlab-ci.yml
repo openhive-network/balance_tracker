@@ -68,6 +68,21 @@ include:
   file: /scripts/ci-helpers/prepare_data_image_job.yml
   # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
 
+# =============================================================================
+# Early exit for doc-only changes
+# =============================================================================
+# Jobs can reference this to skip work when only docs/tests/gui changed.
+# The job still runs and passes, but exits immediately without doing work.
+.early_exit_for_docs_only:
+  script: &early_exit_check
+    - |
+      if [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]]; then
+        echo "=== Skipping (docs/tests/gui only change) ==="
+        echo "Only documentation, tests, or GUI files changed."
+        echo "No work needed - exiting with success."
+        exit 0
+      fi
+
 default:
   hooks:
     pre_get_sources_script:
@@ -268,6 +283,10 @@ detect_changes:
   stage: lint
   variables:
     GIT_SUBMODULE_STRATEGY: none
+  needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   artifacts:
     name: lint-results
     when: always
@@ -280,6 +299,7 @@ lint_bash_scripts:
   before_script:
   - apk add xmlstarlet
   script:
+  - *early_exit_check
   # Exclude .git and haf submodule (submodules may be stale from other jobs using fetch strategy)
   - find . -name .git -type d -prune -o -path ./haf -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle
     {} + | tee shellcheck-checkstyle-result.xml
@@ -298,6 +318,7 @@ lint_sql_scripts:
     name: sqlfluff/sqlfluff:2.1.4
     entrypoint: [""]
   script:
+  - *early_exit_check
   - sqlfluff lint --format yaml --write-output sql-lint.yaml
   artifacts:
     paths:
@@ -1161,6 +1182,9 @@ regression-test:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: sync
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -1173,6 +1197,7 @@ regression-test:
     COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
   timeout: 30m
   before_script:
+  - *early_exit_check
   - !reference [.docker_image_builder_job_template, before_script]
   - |
     echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
@@ -1292,6 +1317,9 @@ setup-scripts-test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   stage: test
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: sync
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -1300,7 +1328,9 @@ setup-scripts-test:
     artifacts: true
   services:
   - *haf-instance-with-nfs-fallback
-  before_script: *extract-nfs-cache-before-script
+  before_script:
+  - *early_exit_check
+  - *extract-nfs-cache-before-script
   script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
@@ -1317,6 +1347,9 @@ performance-test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   stage: test
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: sync
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -1326,7 +1359,9 @@ performance-test:
   services:
   - *haf-instance-with-nfs-fallback
   - *postgrest-service
-  before_script: *extract-nfs-cache-before-script
+  before_script:
+  - *early_exit_check
+  - *extract-nfs-cache-before-script
   script:
   - |
     # Wait for PostgREST to be ready (healthcheck on port 3000)
@@ -1374,6 +1409,9 @@ pattern-test:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: sync
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -1391,6 +1429,7 @@ pattern-test:
     PYTEST_NUMBER_OF_PROCESSES: 16
   timeout: 30m
   before_script:
+  - *early_exit_check
   - !reference [.docker_image_builder_job_template, before_script]
   - |
     echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
@@ -1544,6 +1583,9 @@ pattern-test-with-mock-data:
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: sync_with_mock_data
     artifacts: true
   - job: docker-setup-docker-image-build
@@ -1561,6 +1603,7 @@ pattern-test-with-mock-data:
     PYTEST_NUMBER_OF_PROCESSES: 16
   timeout: 30m
   before_script:
+  - *early_exit_check
   - !reference [.docker_image_builder_job_template, before_script]
   - |
     echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
@@ -1713,11 +1756,15 @@ python_api_client_test:
   image: "${PYTHON_COMPAT_IMAGE}"
   allow_failure: true  # Depends on external api.syncad.com which may be unavailable
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: generate_python_api_client
     artifacts: true
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
+  - *early_exit_check
   - poetry -C "${PYPROJECT_DIR}" lock
   - poetry -C "${PYPROJECT_DIR}" install
   script:
@@ -1744,6 +1791,9 @@ build_and_publish_image:
 deploy_python_api_packages_to_gitlab:
   stage: publish
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: build_python_api_client_wheel
     artifacts: true
   - job: generate_python_api_client
@@ -1752,6 +1802,8 @@ deploy_python_api_packages_to_gitlab:
   extends: .deploy_wheel_to_gitlab_template
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  before_script:
+  - *early_exit_check
   when: on_success
   tags:
   - public-runner-docker
@@ -1765,6 +1817,7 @@ deploy-wax-spec-dev-package:
     SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
     NPM_PACKAGE_SCOPE: "@hiveio"
   before_script:
+    - *early_exit_check
     - git config --global --add safe.directory '*'
     - . "${NVM_DIR}/nvm.sh"
     - nvm use "${NODEJS_VERSION}"
@@ -1778,6 +1831,9 @@ deploy-wax-spec-dev-package:
     - tar -xf "${PACKAGE_TGZ_PATH}" -C "${SOURCE_DIR}" --strip-components=1
     - echo -e "\e[0Ksection_end:$(date +%s):package_tgz_unpack\r\e[0K"
   needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
   - job: generate-wax-spec
     artifacts: true
   tags:
