@@ -16,8 +16,15 @@ CACHE_KEY="${2:?Usage: $0 <cache_type> <cache_key> [--skip-postgres-wait]}"
 SKIP_POSTGRES_WAIT="${3:-}"
 
 LOCAL_CACHE="/cache/${CACHE_TYPE}_${CACHE_KEY}"
-CACHE_MANAGER="${CI_PROJECT_DIR}/haf/scripts/ci-helpers/cache-manager.sh"
 MARKER_FILE="${LOCAL_CACHE}/.ready"
+
+# Fetch cache-manager from common-ci-configuration
+CACHE_MANAGER="/tmp/cache-manager.sh"
+if [[ ! -x "$CACHE_MANAGER" ]]; then
+    echo "Fetching cache-manager from common-ci-configuration..."
+    curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+    chmod +x "$CACHE_MANAGER"
+fi
 
 echo "=== Cache Extraction ==="
 echo "CACHE_TYPE: ${CACHE_TYPE}"
@@ -47,17 +54,12 @@ if [[ "$MARKER_PIPELINE" != "${CI_PIPELINE_ID}" ]] && [[ "$PG_RUNNING" != "true"
     echo "Fetching cache via cache-manager..."
     # Remove existing cache to avoid permission errors on overwrite
     sudo rm -rf "${LOCAL_CACHE}" 2>/dev/null || rm -rf "${LOCAL_CACHE}" 2>/dev/null || true
-    if [[ -x "$CACHE_MANAGER" ]]; then
-        if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${CACHE_TYPE}" "${CACHE_KEY}" "${LOCAL_CACHE}"; then
-            echo "Cache extraction complete: ${LOCAL_CACHE}"
-            echo "${CI_PIPELINE_ID}" > "${MARKER_FILE}"
-            echo "Created marker file: ${MARKER_FILE} (pipeline ${CI_PIPELINE_ID})"
-        else
-            echo "ERROR: cache-manager failed to get cache"
-            exit 1
-        fi
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${CACHE_TYPE}" "${CACHE_KEY}" "${LOCAL_CACHE}"; then
+        echo "Cache extraction complete: ${LOCAL_CACHE}"
+        echo "${CI_PIPELINE_ID}" > "${MARKER_FILE}"
+        echo "Created marker file: ${MARKER_FILE} (pipeline ${CI_PIPELINE_ID})"
     else
-        echo "ERROR: cache-manager.sh not found at $CACHE_MANAGER"
+        echo "ERROR: cache-manager failed to get cache"
         exit 1
     fi
 elif [[ "$PG_RUNNING" == "true" ]]; then
