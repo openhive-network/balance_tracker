@@ -14,7 +14,8 @@ RUN <<EOF
   echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/main" >> /etc/apk/repositories
   echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/community" >> /etc/apk/repositories
   # gcompat provides glibc compatibility for pre-built Python wheels (e.g., hiveio-wax)
-  apk add --no-cache bash ca-certificates openjdk11-jre postgresql-client gcc musl-dev python3-dev linux-headers gcompat libstdc++
+  # util-linux provides proper flock support for NFS (BusyBox flock fails on NFS)
+  apk add --no-cache bash ca-certificates openjdk11-jre postgresql-client gcc musl-dev python3-dev linux-headers gcompat libstdc++ util-linux
   apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/main python3~3.12 py3-pip
   apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/community py3-psycopg2
 
