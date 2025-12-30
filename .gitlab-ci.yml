@@ -1344,7 +1344,9 @@ performance-test:
 # pattern-test uses Docker-in-Docker to avoid service container race conditions
 # This ensures NFS data is extracted BEFORE containers start
 pattern-test:
-  extends: .docker_image_builder_job_template
+  extends:
+    - .docker_image_builder_job_template
+    - .tavern_test_variables
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
@@ -1361,11 +1363,9 @@ pattern-test:
     HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
-    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/report.xml
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
-    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern
-    PYTEST_NUMBER_OF_PROCESSES: 16
+    PYTEST_WORKERS: "16"
   timeout: 30m
   before_script:
   - *early_exit_check
@@ -1466,25 +1466,17 @@ pattern-test:
     echo "PostgREST is ready at docker:3000!"
 
     echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+  - !reference [.tavern_install_deps, script]
   - |
-    echo -e "\e[0Ksection_start:$(date +%s):venv[collapsed=true]\r\e[0KSetting up Python environment..."
-
-    # Install test dependencies directly (avoid full hive-local-tools which has incompatible hiveio-wax wheel)
-    python3 -m venv venv/
-    . venv/bin/activate
-
-    echo "Installing test dependencies..."
-    pip install tavern==2.2.0 pytest-xdist==3.2.0 pyyaml requests deepdiff prettytable
     # Install tests_api for validate_response module (required by tavern tests)
+    . venv/bin/activate
     pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
-
-    echo -e "\e[0Ksection_end:$(date +%s):venv\r\e[0K"
   script:
   - |
     . venv/bin/activate
-    cd $CI_PROJECT_DIR/tests/tavern
+    cd "${TAVERN_DIR}"
     # In DinD, PostgREST is available at 'docker' host
-    BTRACKER_ADDRESS=docker pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" .
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
@@ -1504,13 +1496,7 @@ pattern-test:
     sudo rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || true
 
     echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
-  artifacts:
-    paths:
-    - "**/*.out.json"
-    - docker/container-logs.tar.gz
-    reports:
-      junit: tests/tavern/report.xml
-    when: always
+  artifacts: !reference [.tavern_test_artifacts, artifacts]
   tags:
   - data-cache-storage
   - fast
@@ -1518,7 +1504,9 @@ pattern-test:
 # pattern-test-with-mock-data uses Docker-in-Docker to avoid service container race conditions
 # This ensures NFS data is extracted BEFORE containers start
 pattern-test-with-mock-data:
-  extends: .docker_image_builder_job_template
+  extends:
+    - .docker_image_builder_job_template
+    - .tavern_test_variables
   stage: test
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
@@ -1535,11 +1523,12 @@ pattern-test-with-mock-data:
     HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
     HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
     COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
-    JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern_mocks/report.xml
+    # Override default tavern paths for mock tests
+    JUNIT_REPORT: tests/tavern_mocks/report.xml
+    TAVERN_DIR: tests/tavern_mocks
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
-    TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern_mocks
-    PYTEST_NUMBER_OF_PROCESSES: 16
+    PYTEST_WORKERS: "16"
   timeout: 30m
   before_script:
   - *early_exit_check
@@ -1640,25 +1629,17 @@ pattern-test-with-mock-data:
     echo "PostgREST is ready at docker:3000!"
 
     echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+  - !reference [.tavern_install_deps, script]
   - |
-    echo -e "\e[0Ksection_start:$(date +%s):venv[collapsed=true]\r\e[0KSetting up Python environment..."
-
-    # Install test dependencies directly (avoid full hive-local-tools which has incompatible hiveio-wax wheel)
-    python3 -m venv venv/
-    . venv/bin/activate
-
-    echo "Installing test dependencies..."
-    pip install tavern==2.2.0 pytest-xdist==3.2.0 pyyaml requests deepdiff prettytable
     # Install tests_api for validate_response module (required by tavern tests)
+    . venv/bin/activate
     pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
-
-    echo -e "\e[0Ksection_end:$(date +%s):venv\r\e[0K"
   script:
   - |
     . venv/bin/activate
-    cd $CI_PROJECT_DIR/tests/tavern_mocks
+    cd "${TAVERN_DIR}"
     # In DinD, PostgREST is available at 'docker' host
-    BTRACKER_ADDRESS=docker pytest -n $PYTEST_NUMBER_OF_PROCESSES --junitxml report.xml .
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
@@ -1678,13 +1659,7 @@ pattern-test-with-mock-data:
     sudo rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || true
 
     echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
-  artifacts:
-    paths:
-    - "**/*.out.json"
-    - docker/container-logs.tar.gz
-    reports:
-      junit: tests/tavern_mocks/report.xml
-    when: always
+  artifacts: !reference [.tavern_test_artifacts, artifacts]
   tags:
   - data-cache-storage
   - fast
