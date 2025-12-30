@@ -62,7 +62,7 @@ variables:
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
-  CACHE_MANAGER_REF: "feature/haf-app-testing-templates"
+  CACHE_MANAGER_REF: "develop"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
@@ -71,7 +71,7 @@ include:
   file: /scripts/ci-helpers/prepare_data_image_job.yml
 # HAF app testing templates from common-ci-configuration
 - project: 'hive/common-ci-configuration'
-  ref: feature/haf-app-testing-templates
+  ref: develop
   file: '/templates/haf_app_testing.gitlab-ci.yml'
 
 # =============================================================================
