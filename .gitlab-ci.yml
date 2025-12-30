@@ -60,13 +60,19 @@ variables:
   HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
+  # Cache manager configuration (from common-ci-configuration)
+  CACHE_MANAGER: "/tmp/cache-manager.sh"
+  CACHE_MANAGER_REF: "feature/haf-app-testing-templates"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
   ref: 1ac5d12439b9cca33e6db383adc59967cae75fc4
   file: /scripts/ci-helpers/prepare_data_image_job.yml
-  # Do not include common-ci-configuration here, it is already referenced by scripts/ci-helpers/prepare_data_image_job.yml included from Haf/Hive repos
+# HAF app testing templates from common-ci-configuration
+- project: 'hive/common-ci-configuration'
+  ref: feature/haf-app-testing-templates
+  file: '/templates/haf_app_testing.gitlab-ci.yml'
 
 # =============================================================================
 # Early exit for doc-only changes
@@ -325,38 +331,12 @@ lint_sql_scripts:
     - sql-lint.yaml
 
 validate_haf_commit:
+  extends: .haf_commit_validation
   stage: build
-  image: alpine:latest
-  script:
-  - |
-    set -e
-    apk add --no-cache git
-    # Validate that HAF_COMMIT variable matches both the submodule and include ref
-    # This prevents cache misses due to mismatched commits
-    SUBMODULE_COMMIT=$(cat .git/modules/haf/HEAD 2>/dev/null || git -C haf rev-parse HEAD)
-    INCLUDE_REF=$(grep -A2 "project:.*hive/haf" .gitlab-ci.yml | grep "ref:" | head -1 | sed 's/.*ref: *\([a-f0-9]*\).*/\1/' || true)
-
-    echo "HAF_COMMIT variable: $HAF_COMMIT"
-    echo "HAF submodule HEAD:  $SUBMODULE_COMMIT"
-    echo "Include ref:         $INCLUDE_REF"
-
-    ERRORS=0
-    if [ "$HAF_COMMIT" != "$SUBMODULE_COMMIT" ]; then
-      echo "ERROR: HAF_COMMIT variable does not match submodule commit!"
-      echo "       Update HAF_COMMIT in .gitlab-ci.yml to: $SUBMODULE_COMMIT"
-      ERRORS=1
-    fi
-    if [ "$HAF_COMMIT" != "$INCLUDE_REF" ]; then
-      echo "ERROR: HAF_COMMIT variable does not match include ref!"
-      echo "       Both should be: $HAF_COMMIT"
-      ERRORS=1
-    fi
-    if [ $ERRORS -eq 1 ]; then
-      echo ""
-      echo "To fix: ensure HAF_COMMIT, include ref, and submodule all use the same commit"
-      exit 1
-    fi
-    echo "All HAF commit references are consistent"
+  variables:
+    HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+    HAF_INCLUDE_REF: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+    HAF_SUBMODULE_PATH: "haf"
   tags:
   - public-runner-docker
 
