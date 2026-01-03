@@ -71,7 +71,7 @@ include:
   file: /scripts/ci-helpers/prepare_data_image_job.yml
 # HAF app testing templates from common-ci-configuration
 - project: 'hive/common-ci-configuration'
-  ref: develop
+  ref: feature/haf-app-lint-test-templates  # Testing new lint templates
   file: '/templates/haf_app_testing.gitlab-ci.yml'
 
 # =============================================================================
@@ -188,50 +188,30 @@ detect_changes:
     # Note: SQL changes DO require sync (affect database schema)
     HAF_APP_SKIP_PATTERNS: '^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$'
 
-.lint_job:
+# =============================================================================
+# LINT JOBS - Using common-ci-configuration templates
+# =============================================================================
+# These jobs use the new reusable lint templates from common-ci-configuration.
+# The templates provide standardized linting with proper artifact handling.
+
+lint_bash_scripts:
+  extends: .haf_app_lint_bash
   stage: lint
   variables:
-    GIT_SUBMODULE_STRATEGY: none
+    LINT_SCRIPTS_DIR: "."  # Search from root
+    LINT_EXCLUDE_PATHS: "haf"  # Exclude submodule
   needs:
   - job: detect_changes
     artifacts: true
     optional: true
-  artifacts:
-    name: lint-results
-    when: always
-  tags:
-  - public-runner-docker
-
-lint_bash_scripts:
-  extends: .lint_job
-  image: koalaman/shellcheck-alpine:latest
-  before_script:
-  - apk add xmlstarlet
-  script:
-  - *early_exit_check
-  # Exclude .git and haf submodule (submodules may be stale from other jobs using fetch strategy)
-  - find . -name .git -type d -prune -o -path ./haf -prune -o -type f -name \*.sh -exec shellcheck -f checkstyle
-    {} + | tee shellcheck-checkstyle-result.xml
-  after_script:
-  - xmlstarlet tr misc/checkstyle2junit.xslt shellcheck-checkstyle-result.xml > shellcheck-junit-result.xml
-  artifacts:
-    paths:
-    - shellcheck-checkstyle-result.xml
-    - shellcheck-junit-result.xml
-    reports:
-      junit: shellcheck-junit-result.xml
 
 lint_sql_scripts:
-  extends: .lint_job
-  image:
-    name: sqlfluff/sqlfluff:2.1.4
-    entrypoint: [""]
-  script:
-  - *early_exit_check
-  - sqlfluff lint --format yaml --write-output sql-lint.yaml
-  artifacts:
-    paths:
-    - sql-lint.yaml
+  extends: .haf_app_lint_sql
+  stage: lint
+  needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
 
 validate_haf_commit:
   extends: .haf_commit_validation
