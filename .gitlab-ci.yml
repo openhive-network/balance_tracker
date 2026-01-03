@@ -71,7 +71,7 @@ include:
   file: /scripts/ci-helpers/prepare_data_image_job.yml
 # HAF app testing templates from common-ci-configuration
 - project: 'hive/common-ci-configuration'
-  ref: feature/haf-app-lint-test-templates  # Testing new lint templates
+  ref: develop
   file: '/templates/haf_app_testing.gitlab-ci.yml'
 
 # =============================================================================
