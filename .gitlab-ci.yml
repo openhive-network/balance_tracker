@@ -223,8 +223,7 @@ validate_haf_commit:
   extends: .haf_commit_validation
   stage: build
   variables:
-    HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
-    HAF_INCLUDE_REF: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+    # Uses HAF_COMMIT from global variables - no need to duplicate here
     HAF_SUBMODULE_PATH: "haf"
   tags:
   - public-runner-docker
