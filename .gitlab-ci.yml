@@ -57,7 +57,9 @@ variables:
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
   # HAF submodule commit - must match the 'ref:' in the include section below
   # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+  HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+  # Hive scripts ref - used by HAF templates to fetch CI scripts from hive repo
+  HIVE_SCRIPTS_REF: "8d24f312c29a3d61cf684b5bf707cc3b65d304cf"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
@@ -67,7 +69,7 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 - project: hive/haf
-  ref: 1ac5d12439b9cca33e6db383adc59967cae75fc4
+  ref: 70c30036c6a5d0cb882d05aa22f42523a8f34970
   file: /scripts/ci-helpers/prepare_data_image_job.yml
 # HAF app testing templates from common-ci-configuration
 - project: 'hive/common-ci-configuration'
@@ -217,8 +219,8 @@ validate_haf_commit:
   extends: .haf_commit_validation
   stage: build
   variables:
-    HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
-    HAF_INCLUDE_REF: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+    HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+    HAF_INCLUDE_REF: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
     HAF_SUBMODULE_PATH: "haf"
   tags:
   - public-runner-docker
@@ -304,6 +306,69 @@ prepare_haf_data:
     SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
     CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
+    # Override script source to use common-ci-configuration for prepare_data_and_shm_dir.sh
+    PREPARE_DATA_SCRIPT_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/prepare_data_and_shm_dir.sh"
+  script:
+  - |
+    # Fetch build_data.sh from hive repo
+    HIVE_RAW_URL="https://gitlab.syncad.com/hive/hive/-/raw/${HIVE_SCRIPTS_REF}/scripts/ci-helpers"
+    TARGET="$SCRIPTS_PATH/ci-helpers/build_data.sh"
+    rm -f "$TARGET"
+    echo "Fetching build_data.sh from hive@${HIVE_SCRIPTS_REF}..."
+    curl -fsSL "${HIVE_RAW_URL}/build_data.sh" -o "$TARGET"
+    chmod +x "$TARGET"
+    # Fetch prepare_data_and_shm_dir.sh from common-ci-configuration (has fix for same-file detection)
+    TARGET="$SCRIPTS_PATH/ci-helpers/prepare_data_and_shm_dir.sh"
+    rm -f "$TARGET"
+    echo "Fetching prepare_data_and_shm_dir.sh from common-ci-configuration..."
+    curl -fsSL "${PREPARE_DATA_SCRIPT_URL}" -o "$TARGET"
+    chmod +x "$TARGET"
+  - |
+    # Check for cached data: local first, then NFS
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
+    CACHE_KEY="${HAF_COMMIT}"
+    CACHE_HIT=false
+
+    if [[ -d "${DATA_CACHE_DIR}/datadir" && -f "${DATA_CACHE_DIR}/datadir/status" ]]; then
+      LOCAL_STATUS=$(cat "${DATA_CACHE_DIR}/datadir/status" 2>/dev/null || echo "1")
+      if [[ "$LOCAL_STATUS" == "0" ]]; then
+        echo "Local cache hit for HAF commit $CACHE_KEY at ${DATA_CACHE_DIR}"
+        CACHE_HIT=true
+      fi
+    fi
+
+    if [[ "$CACHE_HIT" != "true" ]] && [[ -x "$CACHE_MANAGER" ]]; then
+      if "$CACHE_MANAGER" get haf "$CACHE_KEY" "${DATA_CACHE_DIR}"; then
+        echo "NFS cache hit for HAF commit $CACHE_KEY"
+        CACHE_HIT=true
+      fi
+    fi
+
+    if [[ "$CACHE_HIT" == "true" ]]; then
+      echo "Cache hit for HAF commit $CACHE_KEY"
+      if [[ ! -f "${DATA_CACHE_DIR}/datadir/hived_uid.env" ]]; then
+        echo "HIVED_UID=$(id -u)" > "${DATA_CACHE_DIR}/datadir/hived_uid.env"
+      fi
+    else
+      echo "Cache miss for HAF commit $CACHE_KEY - performing replay"
+      mkdir "${DATA_CACHE_DIR}/datadir" -pv
+      (flock "${DATA_CACHE_DIR}/datadir" $SCRIPTS_PATH/ci-helpers/build_data.sh $HAF_IMAGE_NAME \
+        --data-cache="${DATA_CACHE_DIR}" --block-log-source-dir="$BLOCK_LOG_SOURCE_DIR" \
+        --config-ini-source="$CONFIG_INI_SOURCE")
+
+      if [[ -x "$CACHE_MANAGER" ]] && [[ -z "${FILTERED_CACHE_KEY:-}" ]]; then
+        "$CACHE_MANAGER" put haf "$CACHE_KEY" "${DATA_CACHE_DIR}" || echo "Warning: Failed to push to NFS cache"
+      elif [[ -n "${FILTERED_CACHE_KEY:-}" ]]; then
+        echo "Skipping main HAF cache push (job uses FILTERED_CACHE_KEY)"
+      fi
+    fi
+  - cp "${DATA_CACHE_DIR}/datadir/hived_uid.env" "$CI_PROJECT_DIR/hived_uid.env"
+  - cp "${DATA_CACHE_DIR}/datadir/docker_entrypoint.log" "${CI_PROJECT_DIR}/docker_entrypoint.log" 2>/dev/null || true
+  - ls -la "${DATA_CACHE_DIR}/datadir/"
   tags:
   - data-cache-storage
   - fast
