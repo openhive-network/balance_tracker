@@ -55,9 +55,8 @@ variables:
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   # Python 3.12 image with poetry for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
-  # HAF submodule commit - must match the 'ref:' in the include section below
-  # This is needed for service containers which can't access dotenv artifacts
-  HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+  # HAF submodule commit - used for data caching and service containers
+  HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
@@ -66,13 +65,18 @@ variables:
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
-- project: hive/haf
-  ref: 1ac5d12439b9cca33e6db383adc59967cae75fc4
-  file: /scripts/ci-helpers/prepare_data_image_job.yml
-# HAF app testing templates from common-ci-configuration
+# All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
   ref: develop
-  file: '/templates/haf_app_testing.gitlab-ci.yml'
+  file:
+    - '/templates/base.gitlab-ci.yml'
+    - '/templates/docker_image_jobs.gitlab-ci.yml'
+    - '/templates/haf_data_preparation.gitlab-ci.yml'
+    - '/templates/cache_cleanup.gitlab-ci.yml'
+    - '/templates/python_projects.gitlab-ci.yml'
+    - '/templates/npm_projects.gitlab-ci.yml'
+    - '/templates/test_jobs.gitlab-ci.yml'
+    - '/templates/haf_app_testing.gitlab-ci.yml'
 
 # =============================================================================
 # Early exit for doc-only changes
@@ -429,6 +433,17 @@ sync:
   # Shutdown and save cache
   - !reference [.haf_app_sync_shutdown, script]
   - !reference [.haf_app_sync_save_cache_conditional, script]
+  - |
+    # Also copy shm_dir to cache root level (copy_datadir.sh expects it there)
+    CACHE_HIT=$(cat /tmp/cache_hit 2>/dev/null || echo "false")
+    EFFECTIVE_CACHE_KEY=$(cat /tmp/effective_cache_key 2>/dev/null || echo "${APP_CACHE_KEY}")
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      LOCAL_APP_CACHE="${DATA_CACHE_HAF_PREFIX}_${APP_SYNC_CACHE_TYPE}_${EFFECTIVE_CACHE_KEY}"
+      if [[ -d "${LOCAL_APP_CACHE}/datadir/shm_dir" ]] && [[ ! -e "${LOCAL_APP_CACHE}/shm_dir" ]]; then
+        echo "Copying shm_dir to cache root level for copy_datadir.sh compatibility"
+        sudo cp -a "${LOCAL_APP_CACHE}/datadir/shm_dir" "${LOCAL_APP_CACHE}/shm_dir"
+      fi
+    fi
   after_script: !reference [.haf_app_sync_cleanup, after_script]
   artifacts: !reference [.haf_app_sync_artifacts, artifacts]
   tags:
