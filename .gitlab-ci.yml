@@ -57,6 +57,8 @@ variables:
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
   # HAF submodule commit - used for data caching and service containers
   HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+  # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
+  HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
@@ -221,8 +223,8 @@ validate_haf_commit:
   extends: .haf_commit_validation
   stage: build
   variables:
-    HAF_COMMIT: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
-    HAF_INCLUDE_REF: "1ac5d12439b9cca33e6db383adc59967cae75fc4"
+    HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+    HAF_INCLUDE_REF: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
     HAF_SUBMODULE_PATH: "haf"
   tags:
   - public-runner-docker
