@@ -64,12 +64,15 @@ variables:
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
   CACHE_MANAGER_REF: "develop"
+  # HAF app tools reference (from common-ci-configuration/haf-app-tools)
+  HAF_APP_TOOLS_REF: "feature/haf-app-tools"
+  COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${HAF_APP_TOOLS_REF}"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: fix/shm-dir-cache-structure
+  ref: feature/haf-app-tools
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
@@ -141,36 +144,6 @@ default:
               done
             else
               echo "pre_get_sources: no .gitmodules file"
-            fi
-
-            # Handle directory-to-submodule transitions inside submodules
-            # Known paths that were converted from directories to submodules in hive
-            # This list matches hive's .gitmodules - clean if they exist as directories
-            if [ -d "haf" ]; then
-              echo "pre_get_sources: checking haf for directory-to-submodule transitions"
-              for nested in hive/libraries/fc hive/libraries/appbase; do
-                nested_path="haf/$nested"
-                modules_path=".git/modules/haf/modules/$nested"
-                # If path exists as directory but not as a submodule, remove it
-                if [ -d "$nested_path" ] && [ ! -f "$nested_path/.git" ]; then
-                  echo "pre_get_sources: removing stale directory for submodule: $nested_path"
-                  rm -rf "$nested_path"
-                  # Also clean the .git/modules entry if it exists
-                  if [ -d "$modules_path" ]; then
-                    echo "pre_get_sources: removing stale .git/modules entry: $modules_path"
-                    rm -rf "$modules_path"
-                  fi
-                fi
-              done
-
-              # Check if haf/hive submodule has corrupt origin (missing remote config)
-              hive_modules=".git/modules/haf/modules/hive"
-              if [ -d "$hive_modules" ]; then
-                if ! git --git-dir="$hive_modules" remote get-url origin >/dev/null 2>&1; then
-                  echo "pre_get_sources: haf/hive has corrupt origin, cleaning"
-                  rm -rf "haf/hive" "$hive_modules"
-                fi
-              fi
             fi
 
             echo "pre_get_sources: existing repo OK"
@@ -306,9 +279,10 @@ prepare_haf_data:
   stage: build
   timeout: 80m
   variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
-    CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
+    CONFIG_INI_SOURCE: "/tmp/config_5M.ini"
+  before_script:
+    - curl -fsSL "${COMMON_CI_URL}/haf-app-tools/config/config_5M.ini" -o /tmp/config_5M.ini
   tags:
   - data-cache-storage
   - fast
@@ -1189,7 +1163,7 @@ pattern-test:
   - |
     # Install tests_api for validate_response module (required by tavern tests)
     . venv/bin/activate
-    pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
+    pip install -e "${CI_PROJECT_DIR}/tests_api"
   script:
   - |
     . venv/bin/activate
@@ -1352,7 +1326,7 @@ pattern-test-with-mock-data:
   - |
     # Install tests_api for validate_response module (required by tavern tests)
     . venv/bin/activate
-    pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
+    pip install -e "${CI_PROJECT_DIR}/tests_api"
   script:
   - |
     . venv/bin/activate
