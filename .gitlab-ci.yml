@@ -396,6 +396,8 @@ sync:
     # Aliases for sync templates
     APP_SYNC_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
     APP_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
+    # Override default in copy_datadir.sh - NFS structure has blockchain/ subdirectory
+    SHARED_BLOCK_LOG_DIR: "/nfs/ci-cache/hive/blockchain/block_log_5m"
   timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - !reference [.haf_app_sync_setup, script]
@@ -477,6 +479,8 @@ sync_with_mock_data:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
       overrides/ci.yml --ansi never
+    # Override default in copy_datadir.sh - NFS structure has blockchain/ subdirectory
+    SHARED_BLOCK_LOG_DIR: "/nfs/ci-cache/hive/blockchain/block_log_5m"
   timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - |
@@ -1542,6 +1546,7 @@ deploy_python_api_packages_to_gitlab:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
   - *early_exit_check
+  - !reference [.deploy_wheel_base, before_script]
   when: on_success
   tags:
   - public-runner-docker
