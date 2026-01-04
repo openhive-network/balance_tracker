@@ -877,6 +877,12 @@ regression-test:
       exit 1
     fi
 
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
+    fi
+
     # Handle blockchain symlinks - dereference and copy to docker dir
     if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
       echo "Copying blockchain data to docker directory..."
@@ -1109,6 +1115,12 @@ pattern-test:
       exit 1
     fi
 
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
+    fi
+
     # Handle blockchain symlinks - dereference and copy to docker dir
     if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
       echo "Copying blockchain data to docker directory..."
@@ -1270,6 +1282,12 @@ pattern-test-with-mock-data:
     else
       echo "ERROR: Failed to get cache via cache-manager"
       exit 1
+    fi
+
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
     fi
 
     # Handle blockchain symlinks - dereference and copy to docker dir
