@@ -195,24 +195,31 @@ lint_sql_scripts:
 validate_haf_commit:
   extends: .haf_commit_validation
   stage: build
-  variables:
-    # Uses HAF_COMMIT from global variables - no need to duplicate here
-    HAF_SUBMODULE_PATH: "haf"
+  # Uses HAF_COMMIT from global variables
   tags:
   - public-runner-docker
 
+# Use existing HAF image from registry (no submodule needed)
+# The validate_haf_commit job already verifies the image exists
 prepare_haf_image:
   stage: build
-  extends: .prepare_haf_image
-  variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
-    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
-    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
-  before_script:
-  - git config --global --add safe.directory $CI_PROJECT_DIR/haf
+  image: "${BUILDER_IMAGE_PATH}"
+  needs:
+    - job: validate_haf_commit
+      artifacts: true
+  script:
+    - |
+      # Construct HAF image name from validated commit
+      HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_COMMIT}"
+      echo "Using HAF image: ${HAF_IMAGE_NAME}"
+      echo "HAF_IMAGE_NAME=${HAF_IMAGE_NAME}" > docker_image_name.env
+  artifacts:
+    reports:
+      dotenv: docker_image_name.env
+    paths:
+      - docker_image_name.env
   tags:
   - public-runner-docker
-  - bigjob
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
