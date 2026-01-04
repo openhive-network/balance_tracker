@@ -212,7 +212,9 @@ prepare_haf_image:
       # Construct HAF image name from validated commit
       HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_COMMIT}"
       echo "Using HAF image: ${HAF_IMAGE_NAME}"
+      # Export both HAF_IMAGE_NAME and HAF_REGISTRY_TAG for Docker Compose scripts
       echo "HAF_IMAGE_NAME=${HAF_IMAGE_NAME}" > docker_image_name.env
+      echo "HAF_REGISTRY_TAG=${HAF_COMMIT}" >> docker_image_name.env
   artifacts:
     reports:
       dotenv: docker_image_name.env
