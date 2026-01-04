@@ -65,15 +65,15 @@ variables:
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
   CACHE_MANAGER_REF: "develop"
-  # HAF app tools reference (from common-ci-configuration/haf-app-tools)
-  HAF_APP_TOOLS_REF: "feature/haf-app-tools"
-  COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${HAF_APP_TOOLS_REF}"
+  # Common CI configuration reference
+  COMMON_CI_REF: "develop"
+  COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: feature/haf-app-tools
+  ref: develop
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
