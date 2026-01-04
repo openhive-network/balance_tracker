@@ -69,7 +69,7 @@ include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: fix/detect-changes-cache-override
+  ref: fix/shm-dir-cache-structure
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
