@@ -56,7 +56,7 @@ variables:
   # Python 3.12 image with poetry for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
   # HAF submodule commit - used for data caching and service containers
-  HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+  HAF_COMMIT: "219ef44775ee1ed85630cf513d8671f6ca4ccc49"  # Known cached HAF commit with published image
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
   HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
