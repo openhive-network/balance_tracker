@@ -209,12 +209,13 @@ prepare_haf_image:
       artifacts: true
   script:
     - |
-      # Construct HAF image name from validated commit
-      HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_COMMIT}"
+      # HAF Docker images use 8-character short SHA tags
+      HAF_SHORT_COMMIT="${HAF_COMMIT:0:8}"
+      HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_SHORT_COMMIT}"
       echo "Using HAF image: ${HAF_IMAGE_NAME}"
-      # Export both HAF_IMAGE_NAME and HAF_REGISTRY_TAG for Docker Compose scripts
+      # Export both full commit (for caching) and short (for Docker image tag)
       echo "HAF_IMAGE_NAME=${HAF_IMAGE_NAME}" > docker_image_name.env
-      echo "HAF_REGISTRY_TAG=${HAF_COMMIT}" >> docker_image_name.env
+      echo "HAF_REGISTRY_TAG=${HAF_SHORT_COMMIT}" >> docker_image_name.env
   artifacts:
     reports:
       dotenv: docker_image_name.env
