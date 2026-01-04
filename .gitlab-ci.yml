@@ -55,8 +55,11 @@ variables:
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   # Python 3.12 image with poetry for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
-  # HAF submodule commit - used for data caching and service containers
-  HAF_COMMIT: "219ef44775ee1ed85630cf513d8671f6ca4ccc49"  # Known cached HAF commit with published image
+  # HAF configuration (no submodule needed)
+  # HAF_COMMIT: Used for data cache key lookup - must match cached replay data
+  # HAF_DOCKER_TAG: Docker image tag to use for service containers
+  HAF_COMMIT: "219ef44775ee1ed85630cf513d8671f6ca4ccc49"  # Known cached HAF commit
+  HAF_DOCKER_TAG: "instance-v1.27.5-rc0"  # Available published HAF image
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
   HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
@@ -209,13 +212,12 @@ prepare_haf_image:
       artifacts: true
   script:
     - |
-      # HAF Docker images use 8-character short SHA tags
-      HAF_SHORT_COMMIT="${HAF_COMMIT:0:8}"
-      HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_SHORT_COMMIT}"
+      # Use HAF_DOCKER_TAG for Docker image (separate from HAF_COMMIT used for caching)
+      HAF_IMAGE_NAME="registry.gitlab.syncad.com/hive/haf/instance:${HAF_DOCKER_TAG}"
       echo "Using HAF image: ${HAF_IMAGE_NAME}"
-      # Export both full commit (for caching) and short (for Docker image tag)
+      # Export image name and tag for Docker Compose scripts
       echo "HAF_IMAGE_NAME=${HAF_IMAGE_NAME}" > docker_image_name.env
-      echo "HAF_REGISTRY_TAG=${HAF_SHORT_COMMIT}" >> docker_image_name.env
+      echo "HAF_REGISTRY_TAG=${HAF_DOCKER_TAG}" >> docker_image_name.env
   artifacts:
     reports:
       dotenv: docker_image_name.env
