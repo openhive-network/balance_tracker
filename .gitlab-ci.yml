@@ -560,6 +560,12 @@ sync_with_mock_data:
       fi
     fi
 
+    # Relocate shm_dir from inside datadir to be a sibling (for old caches)
+    if [[ -d "${JOB_DATA_DIR}/datadir/shm_dir" && ! -d "${JOB_DATA_DIR}/shm_dir" ]]; then
+      echo "Moving shm_dir from datadir/ to be a sibling..."
+      sudo mv "${JOB_DATA_DIR}/datadir/shm_dir" "${JOB_DATA_DIR}/shm_dir"
+    fi
+
     # Export for use in script and after_script sections
     echo "$CACHE_HIT" > /tmp/cache_hit
     echo "$EFFECTIVE_CACHE_KEY" > /tmp/effective_cache_key
