@@ -401,6 +401,13 @@ sync:
     echo "Data ready at DATADIR=${DATADIR}"
     ls -la "${DATADIR}/" || true
 
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${DATADIR}/shm_dir" ]] && [[ ! -d "${SHM_DIR}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${DATADIR}/shm_dir" "${SHM_DIR}"
+    fi
+    ls -la "${SHM_DIR}/" || true
+
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
     # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
