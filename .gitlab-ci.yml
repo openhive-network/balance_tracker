@@ -47,10 +47,6 @@ variables:
   # Cache types for different replay states (prefixed with haf_ for proper pgdata permission handling)
   BTRACKER_SYNC_CACHE_TYPE: "haf_btracker_sync"   # HAF + balance_tracker synced
   BTRACKER_MOCK_CACHE_TYPE: "haf_btracker_mock"   # HAF + balance_tracker + mock data
-  # Aliases for Phase 4 templates (common-ci-configuration)
-  APP_SYNC_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
-  APP_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
-  HAF_APP_SCHEMA: "btracker_app"
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
   # uses registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2
@@ -59,8 +55,15 @@ variables:
   PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   # Python 3.12 image with poetry for pydantic-core based tools (pydantic-core doesn't support 3.14 yet)
   PYTHON_COMPAT_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/python:3.12.9-1"
-  # HAF submodule commit - used for data caching and service containers
-  HAF_COMMIT: "70c30036c6a5d0cb882d05aa22f42523a8f34970"
+  # =============================================================================
+  # Upstream Image Detection (No Submodules Required)
+  # =============================================================================
+  # HAF image is dynamically detected by find_haf_image job using common-ci-configuration
+  # scripts. No manual updates needed - always uses the latest built image from HAF repo.
+  #
+  # Output variables (set by detect stage job):
+  #   HAF_UPSTREAM_IMAGE, HAF_UPSTREAM_COMMIT, HAF_UPSTREAM_TAG
+  # =============================================================================
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
   HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
@@ -68,6 +71,9 @@ variables:
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
   CACHE_MANAGER_REF: "develop"
+  # Common CI configuration reference
+  COMMON_CI_REF: "develop"
+  COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}"
 
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
@@ -83,6 +89,7 @@ include:
     - '/templates/npm_projects.gitlab-ci.yml'
     - '/templates/test_jobs.gitlab-ci.yml'
     - '/templates/haf_app_testing.gitlab-ci.yml'
+    - '/templates/source_change_detection.gitlab-ci.yml'
 
 # =============================================================================
 # Early exit for doc-only changes
@@ -98,152 +105,6 @@ include:
         echo "No work needed - exiting with success."
         exit 0
       fi
-
-# =============================================================================
-# DinD Test Base Template (Phase 4)
-# =============================================================================
-# Consolidates common DinD test patterns: cache extraction, docker compose,
-# service waiting, and cleanup.
-#
-# Variables that can be overridden:
-#   BTRACKER_TEST_CACHE_TYPE: Cache type to extract (default: BTRACKER_SYNC_CACHE_TYPE)
-#   BTRACKER_TEST_CACHE_KEY: Cache key to extract (default: BTRACKER_CACHE_KEY)
-#   COMPOSE_OPTIONS_STRING: Docker compose options (default: --file docker-compose-test.yml --ansi never)
-#   WAIT_FOR_POSTGREST: Set to "true" to also wait for PostgREST at docker:3000
-#
-.btracker-dind-test:
-  extends: .docker_image_builder_job_template
-  stage: test
-  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
-  variables:
-    HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
-    HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
-    COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
-    BTRACKER_TEST_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
-    BTRACKER_TEST_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
-    WAIT_FOR_POSTGREST: "false"
-  timeout: 30m
-  before_script:
-    - *early_exit_check
-    - !reference [.docker_image_builder_job_template, before_script]
-    # Docker login
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-    # Extract cache
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
-      JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
-
-      # Fetch cache-manager from common-ci-configuration
-      if [[ ! -x "$CACHE_MANAGER" ]]; then
-        curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${CACHE_MANAGER_REF}/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
-        chmod +x "$CACHE_MANAGER"
-      fi
-
-      echo "DEBUG: JOB_DIR=${JOB_DIR}"
-      echo "DEBUG: CACHE_TYPE=${BTRACKER_TEST_CACHE_TYPE}"
-      echo "DEBUG: CACHE_KEY=${BTRACKER_TEST_CACHE_KEY}"
-
-      mkdir -p "${JOB_DIR}"
-      if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_TEST_CACHE_TYPE}" "${BTRACKER_TEST_CACHE_KEY}" "${JOB_DIR}"; then
-        echo "Cache extraction complete"
-      else
-        echo "ERROR: Failed to get cache via cache-manager"
-        exit 1
-      fi
-
-      # Handle blockchain symlinks - dereference and copy to docker dir
-      if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
-        echo "Copying blockchain data to docker directory..."
-        mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
-        cp -aL "${HAF_DATA_DIRECTORY}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/" 2>/dev/null || true
-        rm -rf "${HAF_DATA_DIRECTORY}/blockchain"
-      fi
-
-      ls -la "${HAF_DATA_DIRECTORY}/"
-      ls -la "${HAF_SHM_DIRECTORY}/" || true
-      echo -e "\e[0Ksection_end:$(date +%s):extract\r\e[0K"
-    # Start docker compose
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting test environment..."
-      cd "${CI_PROJECT_DIR}/docker"
-
-      # Create ci.env for docker-compose
-      cat <<-EOF | tee ci.env
-      HAF_IMAGE_NAME=${HAF_IMAGE_NAME}
-      HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY}
-      HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY}
-      HIVED_UID=$(id -u)
-      POSTGREST_IMAGE=registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest
-      EOF
-
-      IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
-      docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" config
-      docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull
-      echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
-    # Wait for services
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for services to be ready..."
-      cd "${CI_PROJECT_DIR}/docker"
-      IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
-
-      # Wait for HAF PostgreSQL to be healthy
-      WAITED=0
-      MAX_WAIT=300
-      until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf pg_isready -U haf_admin -d haf_block_log 2>/dev/null; do
-        echo "Waiting for PostgreSQL... ($WAITED/$MAX_WAIT seconds)"
-        sleep 5
-        WAITED=$((WAITED + 5))
-        if [[ $WAITED -ge $MAX_WAIT ]]; then
-          echo "ERROR: PostgreSQL did not become ready in time"
-          docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf | tail -50
-          exit 1
-        fi
-      done
-      echo "PostgreSQL is ready!"
-
-      # Optionally wait for PostgREST
-      if [[ "${WAIT_FOR_POSTGREST}" == "true" ]]; then
-        WAITED=0
-        until curl -s http://docker:3000/ > /dev/null 2>&1; do
-          echo "Waiting for PostgREST at docker:3000... ($WAITED/$MAX_WAIT seconds)"
-          sleep 5
-          WAITED=$((WAITED + 5))
-          if [[ $WAITED -ge $MAX_WAIT ]]; then
-            echo "ERROR: PostgREST did not become ready in time"
-            docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest | tail -50
-            exit 1
-          fi
-        done
-        echo "PostgREST is ready at docker:3000!"
-      fi
-      echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
-  after_script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
-      cd "${CI_PROJECT_DIR}/docker"
-      IFS=" " read -ra COMPOSE_OPTIONS <<< "${COMPOSE_OPTIONS_STRING:---file docker-compose-test.yml --ansi never}"
-
-      # Capture logs before stopping
-      docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf > haf.log 2>&1 || true
-      docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest > postgrest.log 2>&1 || true
-
-      docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" down --volumes || true
-
-      tar -czvf container-logs.tar.gz haf.log postgrest.log 2>/dev/null || true
-
-      # Clean up job-specific data directory
-      sudo rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || true
-      echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
-  artifacts:
-    paths:
-      - docker/container-logs.tar.gz
-    when: always
-  tags:
-    - data-cache-storage
-    - fast
 
 default:
   hooks:
@@ -293,36 +154,6 @@ default:
               echo "pre_get_sources: no .gitmodules file"
             fi
 
-            # Handle directory-to-submodule transitions inside submodules
-            # Known paths that were converted from directories to submodules in hive
-            # This list matches hive's .gitmodules - clean if they exist as directories
-            if [ -d "haf" ]; then
-              echo "pre_get_sources: checking haf for directory-to-submodule transitions"
-              for nested in hive/libraries/fc hive/libraries/appbase; do
-                nested_path="haf/$nested"
-                modules_path=".git/modules/haf/modules/$nested"
-                # If path exists as directory but not as a submodule, remove it
-                if [ -d "$nested_path" ] && [ ! -f "$nested_path/.git" ]; then
-                  echo "pre_get_sources: removing stale directory for submodule: $nested_path"
-                  rm -rf "$nested_path"
-                  # Also clean the .git/modules entry if it exists
-                  if [ -d "$modules_path" ]; then
-                    echo "pre_get_sources: removing stale .git/modules entry: $modules_path"
-                    rm -rf "$modules_path"
-                  fi
-                fi
-              done
-
-              # Check if haf/hive submodule has corrupt origin (missing remote config)
-              hive_modules=".git/modules/haf/modules/hive"
-              if [ -d "$hive_modules" ]; then
-                if ! git --git-dir="$hive_modules" remote get-url origin >/dev/null 2>&1; then
-                  echo "pre_get_sources: haf/hive has corrupt origin, cleaning"
-                  rm -rf "haf/hive" "$hive_modules"
-                fi
-              fi
-            fi
-
             echo "pre_get_sources: existing repo OK"
           fi
         else
@@ -343,6 +174,53 @@ detect_changes:
     # - *.md, README, CHANGELOG, LICENSE (docs)
     # Note: SQL changes DO require sync (affect database schema)
     HAF_APP_SKIP_PATTERNS: '^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$'
+
+# =============================================================================
+# Upstream Image Detection Job
+# =============================================================================
+# Automatically find the latest built HAF image from upstream repo by analyzing
+# which commits changed source files. Uses .find_upstream_image template from
+# common-ci-configuration.
+#
+# Outputs variables with HAF_UPSTREAM_ prefix:
+#   HAF_UPSTREAM_IMAGE, HAF_UPSTREAM_COMMIT, HAF_UPSTREAM_TAG
+# =============================================================================
+find_haf_image:
+  extends: .find_upstream_image
+  stage: detect
+  variables:
+    UPSTREAM_REPO_URL: "https://gitlab.syncad.com/hive/haf.git"
+    UPSTREAM_REGISTRY: "registry.gitlab.syncad.com/hive/haf"
+    UPSTREAM_BRANCH: "develop"
+    UPSTREAM_OUTPUT: "haf_image.env"
+  before_script:
+    - apk add --no-cache git bash curl
+    # Fetch source patterns from HAF's script (single source of truth)
+    - |
+      PATTERNS_URL="https://gitlab.syncad.com/hive/haf/-/raw/develop/scripts/ci-helpers/source-patterns.sh"
+      echo "Fetching source patterns from: $PATTERNS_URL"
+      if UPSTREAM_PATTERNS=$(curl -sf "$PATTERNS_URL" | sh); then
+        echo "Loaded patterns: $UPSTREAM_PATTERNS"
+        export UPSTREAM_PATTERNS
+      else
+        echo "ERROR: Could not fetch source-patterns.sh from HAF"
+        exit 1
+      fi
+  script:
+    - !reference [.find_upstream_image, script]
+    # Rename UPSTREAM_* to HAF_UPSTREAM_* to avoid collisions with other upstream jobs
+    - |
+      if [ -f "$UPSTREAM_OUTPUT" ]; then
+        sed -i 's/^UPSTREAM_/HAF_UPSTREAM_/' "$UPSTREAM_OUTPUT"
+        echo "Renamed variables in $UPSTREAM_OUTPUT:"
+        cat "$UPSTREAM_OUTPUT"
+      fi
+  artifacts:
+    reports:
+      dotenv: haf_image.env
+    expire_in: 1 day
+  tags:
+    - public-runner-docker
 
 # =============================================================================
 # LINT JOBS - Using common-ci-configuration templates
@@ -369,27 +247,33 @@ lint_sql_scripts:
     artifacts: true
     optional: true
 
-validate_haf_commit:
-  extends: .haf_commit_validation
-  stage: build
-  variables:
-    # Uses HAF_COMMIT from global variables - no need to duplicate here
-    HAF_SUBMODULE_PATH: "haf"
-  tags:
-  - public-runner-docker
-
+# Use existing HAF image from registry (no submodule needed)
+# The find_haf_image job already verifies the image exists and provides:
+#   HAF_UPSTREAM_IMAGE, HAF_UPSTREAM_COMMIT, HAF_UPSTREAM_TAG
 prepare_haf_image:
   stage: build
-  extends: .prepare_haf_image
-  variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
-    REGISTRY_USER: "$HAF_DEPLOY_USERNAME"
-    REGISTRY_PASS: "$HAF_DEPLOY_TOKEN"
-  before_script:
-  - git config --global --add safe.directory $CI_PROJECT_DIR/haf
+  image: "${BUILDER_IMAGE_PATH}"
+  needs:
+    - job: find_haf_image
+      artifacts: true
+  script:
+    - |
+      # Use dynamically detected HAF image from find_haf_image job
+      echo "Using HAF image: ${HAF_UPSTREAM_IMAGE}"
+      echo "HAF commit: ${HAF_UPSTREAM_COMMIT}"
+      # Export image name and tag for Docker Compose scripts
+      # Map HAF_UPSTREAM_* to HAF_* for compatibility with downstream jobs
+      echo "HAF_IMAGE_NAME=${HAF_UPSTREAM_IMAGE}" > docker_image_name.env
+      echo "HAF_REGISTRY_TAG=${HAF_UPSTREAM_TAG}" >> docker_image_name.env
+      echo "HAF_COMMIT=${HAF_UPSTREAM_COMMIT}" >> docker_image_name.env
+      cat docker_image_name.env
+  artifacts:
+    reports:
+      dotenv: docker_image_name.env
+    paths:
+      - docker_image_name.env
   tags:
   - public-runner-docker
-  - bigjob
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
@@ -451,14 +335,20 @@ generate-wax-spec:
 prepare_haf_data:
   extends: .prepare_haf_data_5m
   needs:
-  - job: prepare_haf_image
+  - job: find_haf_image
     artifacts: true
   stage: build
   timeout: 80m
   variables:
-    SUBMODULE_DIR: "$CI_PROJECT_DIR/haf"
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
-    CONFIG_INI_SOURCE: "$CI_PROJECT_DIR/haf/docker/config_5M.ini"
+    CONFIG_INI_SOURCE: "/tmp/config_5M.ini"
+    # Map HAF_UPSTREAM_* from find_haf_image to HAF_* expected by template
+    HAF_IMAGE_NAME: "${HAF_UPSTREAM_IMAGE}"
+    HAF_COMMIT: "${HAF_UPSTREAM_COMMIT}"
+  before_script:
+    - curl -fsSL "${COMMON_CI_URL}/haf-app-tools/config/config_5M.ini" -o /tmp/config_5M.ini
+    # Log the mapped variables
+    - echo "Using HAF image:${HAF_IMAGE_NAME} (commit:${HAF_COMMIT})"
   tags:
   - data-cache-storage
   - fast
@@ -558,6 +448,13 @@ sync:
     # cache-manager extracted directly to job directory with block_log symlinks and pgdata permissions fixed
     echo "Data ready at DATADIR=${DATADIR}"
     ls -la "${DATADIR}/" || true
+
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${DATADIR}/shm_dir" ]] && [[ ! -d "${SHM_DIR}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${DATADIR}/shm_dir" "${SHM_DIR}"
+    fi
+    ls -la "${SHM_DIR}/" || true
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
     # Copy blockchain files there so HAF can see them.
@@ -983,29 +880,149 @@ sync_with_mock_data:
   - cd "${POETRY_INSTALL_ROOT_DIR}"
   - poetry install
 
-# regression-test uses Docker-in-Docker via .btracker-dind-test template
+# regression-test uses Docker-in-Docker to avoid service container race conditions
+# This ensures NFS data is extracted BEFORE containers start
 regression-test:
-  extends: .btracker-dind-test
+  extends: .docker_image_builder_job_template
+  stage: test
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
-    - job: detect_changes
-      artifacts: true
-      optional: true
-    - job: sync
-      artifacts: true
-    - job: docker-setup-docker-image-build
-      artifacts: true
-    - job: prepare_haf_image
-      artifacts: true
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: sync
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: prepare_haf_image
+    artifacts: true
+  variables:
+    HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
+    HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
+    COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
+  timeout: 30m
+  before_script:
+  - *early_exit_check
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
+
+    JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
+
+    echo "DEBUG: JOB_DIR=${JOB_DIR}"
+    echo "DEBUG: CACHE_TYPE=${BTRACKER_SYNC_CACHE_TYPE}"
+    echo "DEBUG: CACHE_KEY=${BTRACKER_CACHE_KEY}"
+
+    # Use cache-manager to get data (handles local cache check + NFS tar extraction)
+    mkdir -p "${JOB_DIR}"
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
+    else
+      echo "ERROR: Failed to get cache via cache-manager"
+      exit 1
+    fi
+
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
+    fi
+
+    # Handle blockchain symlinks - dereference and copy to docker dir
+    if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
+      echo "Copying blockchain data to docker directory..."
+      mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
+      cp -aL "${HAF_DATA_DIRECTORY}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/" 2>/dev/null || true
+      rm -rf "${HAF_DATA_DIRECTORY}/blockchain"
+    fi
+
+    ls -la "${HAF_DATA_DIRECTORY}/"
+    ls -la "${HAF_SHM_DIRECTORY}/" || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):extract\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+
+    # Create ci.env for docker-compose
+    cat <<-EOF | tee ci.env
+    HAF_IMAGE_NAME=${HAF_IMAGE_NAME}
+    HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY}
+    HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY}
+    HIVED_UID=$(id -u)
+    POSTGREST_IMAGE=registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest
+    EOF
+
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" config
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull
+
+    echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for services to be ready..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Wait for HAF PostgreSQL to be healthy
+    TIMEOUT=300
+    ELAPSED=0
+    until pg_isready -h docker -p 5432 -U haf_admin -d haf_block_log 2>/dev/null; do
+      sleep 1
+      ELAPSED=$((ELAPSED + 1))
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "Timeout waiting for PostgreSQL"
+        docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs
+        exit 1
+      fi
+    done
+    echo "PostgreSQL is ready!"
+
+    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
   script:
-    - |
-      cd "${CI_PROJECT_DIR}/tests/account_balances"
-      # In DinD, PostgreSQL is available at 'docker' host
-      ./accounts_dump_test.sh --host=docker
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+
+    cd "${CI_PROJECT_DIR}/tests/account_balances"
+    # In DinD, PostgreSQL is available at 'docker' host
+    ./accounts_dump_test.sh --host=docker
+
+    echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  after_script:
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Capture container logs before cleanup
+    docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log 2>&1 || true
+
+    # Stop and remove containers
+    docker compose "${COMPOSE_OPTIONS[@]}" down -v --remove-orphans || true
+
+    # Archive logs
+    tar -czvf container-logs.tar.gz *.log 2>/dev/null || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
   artifacts:
     paths:
-      - tests/account_balances/account_dump_test.log
-      - docker/container-logs.tar.gz
+    - tests/account_balances/account_dump_test.log
+    - docker/container-logs.tar.gz
     when: always
+  tags:
+  - data-cache-storage
 
 setup-scripts-test:
   image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
@@ -1096,76 +1113,340 @@ performance-test:
   - data-cache-storage
   - fast
 
-# pattern-test uses .btracker-dind-test template with PostgREST wait and Tavern
+# pattern-test uses Docker-in-Docker to avoid service container race conditions
+# This ensures NFS data is extracted BEFORE containers start
 pattern-test:
   extends:
-    - .btracker-dind-test
+    - .docker_image_builder_job_template
     - .tavern_test_variables
+  stage: test
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
-    - job: detect_changes
-      artifacts: true
-      optional: true
-    - job: sync
-      artifacts: true
-    - job: docker-setup-docker-image-build
-      artifacts: true
-    - job: prepare_haf_image
-      artifacts: true
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: sync
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: prepare_haf_image
+    artifacts: true
   variables:
-    WAIT_FOR_POSTGREST: "true"
+    HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
+    HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
+    COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
+    BTRACKER_ADDRESS: localhost
+    BTRACKER_PORT: 3000
     PYTEST_WORKERS: "16"
+  timeout: 30m
   before_script:
-    - !reference [.btracker-dind-test, before_script]
-    - !reference [.tavern_install_deps, script]
-    - |
-      # Install tests_api for validate_response module (required by tavern tests)
-      . venv/bin/activate
-      pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
-  script:
-    - |
-      . venv/bin/activate
-      cd "${TAVERN_DIR}"
-      # In DinD, PostgREST is available at 'docker' host
-      BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
-  artifacts: !reference [.tavern_test_artifacts, artifacts]
+  - *early_exit_check
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache..."
 
-# pattern-test-with-mock-data uses .btracker-dind-test with mock cache
+    JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
+
+    echo "DEBUG: JOB_DIR=${JOB_DIR}"
+    echo "DEBUG: CACHE_TYPE=${BTRACKER_SYNC_CACHE_TYPE}"
+    echo "DEBUG: CACHE_KEY=${BTRACKER_CACHE_KEY}"
+
+    # Use cache-manager to get data (handles local cache check + NFS tar extraction)
+    mkdir -p "${JOB_DIR}"
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_SYNC_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
+    else
+      echo "ERROR: Failed to get cache via cache-manager"
+      exit 1
+    fi
+
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
+    fi
+
+    # Handle blockchain symlinks - dereference and copy to docker dir
+    if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
+      echo "Copying blockchain data to docker directory..."
+      mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
+      cp -aL "${HAF_DATA_DIRECTORY}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/" 2>/dev/null || true
+      rm -rf "${HAF_DATA_DIRECTORY}/blockchain"
+    fi
+
+    ls -la "${HAF_DATA_DIRECTORY}/"
+    ls -la "${HAF_SHM_DIRECTORY}/" || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):extract\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+
+    # Create ci.env for docker-compose
+    cat <<-EOF | tee ci.env
+    HAF_IMAGE_NAME=${HAF_IMAGE_NAME}
+    HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY}
+    HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY}
+    HIVED_UID=$(id -u)
+    POSTGREST_IMAGE=registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest
+    EOF
+
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" config
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull
+
+    echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for services to be ready..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Wait for HAF PostgreSQL to be healthy
+    WAITED=0
+    MAX_WAIT=300
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf pg_isready -U haf_admin -d haf_block_log 2>/dev/null; do
+      echo "Waiting for PostgreSQL... ($WAITED/$MAX_WAIT seconds)"
+      sleep 5
+      WAITED=$((WAITED + 5))
+      if [[ $WAITED -ge $MAX_WAIT ]]; then
+        echo "ERROR: PostgreSQL did not become ready in time"
+        docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf | tail -50
+        exit 1
+      fi
+    done
+    echo "PostgreSQL is ready!"
+
+    # Wait for PostgREST to be ready
+    # In DinD, exposed ports are available at 'docker' host, not localhost
+    WAITED=0
+    until curl -s http://docker:3000/ > /dev/null 2>&1; do
+      echo "Waiting for PostgREST at docker:3000... ($WAITED/$MAX_WAIT seconds)"
+      sleep 5
+      WAITED=$((WAITED + 5))
+      if [[ $WAITED -ge $MAX_WAIT ]]; then
+        echo "ERROR: PostgREST did not become ready in time"
+        docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest | tail -50
+        exit 1
+      fi
+    done
+    echo "PostgREST is ready at docker:3000!"
+
+    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+  - !reference [.tavern_install_deps, script]
+  - |
+    # Install tests_api for validate_response module (required by tavern tests)
+    . venv/bin/activate
+    pip install -e "${CI_PROJECT_DIR}/tests_api"
+  script:
+  - |
+    . venv/bin/activate
+    cd "${TAVERN_DIR}"
+    # In DinD, PostgREST is available at 'docker' host
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" .
+  after_script:
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Capture logs before stopping
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf > haf.log 2>&1 || true
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest > postgrest.log 2>&1 || true
+
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" down --volumes || true
+
+    tar -czvf container-logs.tar.gz haf.log postgrest.log 2>/dev/null || true
+
+    # Clean up job-specific data directory
+    sudo rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
+  artifacts: !reference [.tavern_test_artifacts, artifacts]
+  tags:
+  - data-cache-storage
+  - fast
+
+# pattern-test-with-mock-data uses Docker-in-Docker to avoid service container race conditions
+# This ensures NFS data is extracted BEFORE containers start
 pattern-test-with-mock-data:
   extends:
-    - .btracker-dind-test
+    - .docker_image_builder_job_template
     - .tavern_test_variables
+  stage: test
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   needs:
-    - job: detect_changes
-      artifacts: true
-      optional: true
-    - job: sync_with_mock_data
-      artifacts: true
-    - job: docker-setup-docker-image-build
-      artifacts: true
-    - job: prepare_haf_image
-      artifacts: true
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: sync_with_mock_data
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: prepare_haf_image
+    artifacts: true
   variables:
-    WAIT_FOR_POSTGREST: "true"
-    # Use mock cache instead of sync cache
-    BTRACKER_TEST_CACHE_TYPE: "${BTRACKER_MOCK_CACHE_TYPE}"
+    HAF_DATA_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/datadir
+    HAF_SHM_DIRECTORY: ${CI_PROJECT_DIR}/${CI_JOB_ID}/shm_dir
+    COMPOSE_OPTIONS_STRING: --file docker-compose-test.yml --ansi never
     # Override default tavern paths for mock tests
     JUNIT_REPORT: tests/tavern_mocks/report.xml
     TAVERN_DIR: tests/tavern_mocks
+    BTRACKER_ADDRESS: localhost
+    BTRACKER_PORT: 3000
     PYTEST_WORKERS: "16"
+  timeout: 30m
   before_script:
-    - !reference [.btracker-dind-test, before_script]
-    - !reference [.tavern_install_deps, script]
-    - |
-      # Install tests_api for validate_response module (required by tavern tests)
-      . venv/bin/activate
-      pip install -e "${CI_PROJECT_DIR}/haf/hive/tests/python/hive-local-tools/tests_api"
+  - *early_exit_check
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):extract[collapsed=true]\r\e[0KExtracting NFS cache (mock data)..."
+
+    JOB_DIR="${CI_PROJECT_DIR}/${CI_JOB_ID}"
+    # Fetch cache-manager from common-ci-configuration
+    CACHE_MANAGER="/tmp/cache-manager.sh"
+    if [[ ! -x "$CACHE_MANAGER" ]]; then
+      curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/cache-manager.sh" -o "$CACHE_MANAGER"
+      chmod +x "$CACHE_MANAGER"
+    fi
+
+    echo "DEBUG: JOB_DIR=${JOB_DIR}"
+    echo "DEBUG: CACHE_TYPE=${BTRACKER_MOCK_CACHE_TYPE}"
+    echo "DEBUG: CACHE_KEY=${BTRACKER_CACHE_KEY}"
+
+    # Use cache-manager to get data (handles local cache check + NFS tar extraction)
+    mkdir -p "${JOB_DIR}"
+    if CACHE_HANDLING=haf "$CACHE_MANAGER" get "${BTRACKER_MOCK_CACHE_TYPE}" "${BTRACKER_CACHE_KEY}" "${JOB_DIR}"; then
+      echo "Cache extraction complete"
+    else
+      echo "ERROR: Failed to get cache via cache-manager"
+      exit 1
+    fi
+
+    # Relocate shm_dir from inside datadir to be a sibling (for old cache formats)
+    if [[ -d "${HAF_DATA_DIRECTORY}/shm_dir" ]] && [[ ! -d "${HAF_SHM_DIRECTORY}" ]]; then
+      echo "Relocating shm_dir to parallel location..."
+      mv "${HAF_DATA_DIRECTORY}/shm_dir" "${HAF_SHM_DIRECTORY}"
+    fi
+
+    # Handle blockchain symlinks - dereference and copy to docker dir
+    if [[ -L "${HAF_DATA_DIRECTORY}/blockchain" ]] || [[ -d "${HAF_DATA_DIRECTORY}/blockchain" ]]; then
+      echo "Copying blockchain data to docker directory..."
+      mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
+      cp -aL "${HAF_DATA_DIRECTORY}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/" 2>/dev/null || true
+      rm -rf "${HAF_DATA_DIRECTORY}/blockchain"
+    fi
+
+    ls -la "${HAF_DATA_DIRECTORY}/"
+    ls -la "${HAF_SHM_DIRECTORY}/" || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):extract\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):compose[collapsed=true]\r\e[0KStarting test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+
+    # Create ci.env for docker-compose
+    cat <<-EOF | tee ci.env
+    HAF_IMAGE_NAME=${HAF_IMAGE_NAME}
+    HAF_DATA_DIRECTORY=${HAF_DATA_DIRECTORY}
+    HAF_SHM_DIRECTORY=${HAF_SHM_DIRECTORY}
+    HIVED_UID=$(id -u)
+    POSTGREST_IMAGE=registry.gitlab.syncad.com/hive/haf_api_node/postgrest:latest
+    EOF
+
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" config
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull
+
+    echo -e "\e[0Ksection_end:$(date +%s):compose\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):wait[collapsed=true]\r\e[0KWaiting for services to be ready..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Wait for HAF PostgreSQL to be healthy
+    WAITED=0
+    MAX_WAIT=300
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf pg_isready -U haf_admin -d haf_block_log 2>/dev/null; do
+      echo "Waiting for PostgreSQL... ($WAITED/$MAX_WAIT seconds)"
+      sleep 5
+      WAITED=$((WAITED + 5))
+      if [[ $WAITED -ge $MAX_WAIT ]]; then
+        echo "ERROR: PostgreSQL did not become ready in time"
+        docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf | tail -50
+        exit 1
+      fi
+    done
+    echo "PostgreSQL is ready!"
+
+    # Wait for PostgREST to be ready
+    # In DinD, exposed ports are available at 'docker' host, not localhost
+    WAITED=0
+    until curl -s http://docker:3000/ > /dev/null 2>&1; do
+      echo "Waiting for PostgREST at docker:3000... ($WAITED/$MAX_WAIT seconds)"
+      sleep 5
+      WAITED=$((WAITED + 5))
+      if [[ $WAITED -ge $MAX_WAIT ]]; then
+        echo "ERROR: PostgREST did not become ready in time"
+        docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest | tail -50
+        exit 1
+      fi
+    done
+    echo "PostgREST is ready at docker:3000!"
+
+    echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
+  - !reference [.tavern_install_deps, script]
+  - |
+    # Install tests_api for validate_response module (required by tavern tests)
+    . venv/bin/activate
+    pip install -e "${CI_PROJECT_DIR}/tests_api"
   script:
-    - |
-      . venv/bin/activate
-      cd "${TAVERN_DIR}"
-      # In DinD, PostgREST is available at 'docker' host
-      BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
+  - |
+    . venv/bin/activate
+    cd "${TAVERN_DIR}"
+    # In DinD, PostgREST is available at 'docker' host
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
+  after_script:
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
+
+    cd "${CI_PROJECT_DIR}/docker"
+    IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
+
+    # Capture logs before stopping
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs haf > haf.log 2>&1 || true
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" logs postgrest > postgrest.log 2>&1 || true
+
+    docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" down --volumes || true
+
+    tar -czvf container-logs.tar.gz haf.log postgrest.log 2>/dev/null || true
+
+    # Clean up job-specific data directory
+    sudo rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || rm -rf "${CI_PROJECT_DIR}/${CI_JOB_ID}" 2>/dev/null || true
+
+    echo -e "\e[0Ksection_end:$(date +%s):cleanup\r\e[0K"
   artifacts: !reference [.tavern_test_artifacts, artifacts]
+  tags:
+  - data-cache-storage
+  - fast
 
 python_api_client_test:
   extends: .project_develop_configuration_template
