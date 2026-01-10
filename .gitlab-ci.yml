@@ -77,8 +77,9 @@ variables:
 include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
+# TEMP: using fix branch for change detection fix - revert to develop after MR !175 merges
 - project: 'hive/common-ci-configuration'
-  ref: develop
+  ref: fix/detect-changes-feature-branches
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
