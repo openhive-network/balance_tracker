@@ -1240,7 +1240,7 @@ pattern-test:
   script:
   - |
     . venv/bin/activate
-    cd "${TAVERN_DIR}"
+    cd "${CI_PROJECT_DIR}/${TAVERN_DIR}"
     # In DinD, PostgREST is available at 'docker' host
     BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" .
   after_script:
@@ -1410,7 +1410,7 @@ pattern-test-with-mock-data:
   script:
   - |
     . venv/bin/activate
-    cd "${TAVERN_DIR}"
+    cd "${CI_PROJECT_DIR}/${TAVERN_DIR}"
     # In DinD, PostgREST is available at 'docker' host
     BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
   after_script:
