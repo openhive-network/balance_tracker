@@ -78,7 +78,7 @@ include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: feature/centralized-needs-templates  # TODO: change to develop after MR !184 merges
+  ref: develop
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
@@ -515,7 +515,7 @@ sync_with_mock_data:
     BACKEND_VERSION: "$CI_COMMIT_SHORT_SHA"
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
-      overrides/ci.yml --ansi never
+      overrides/ci.yml --file overrides/ci-mocks.yml --ansi never
   timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - |
