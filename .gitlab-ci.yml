@@ -1078,6 +1078,7 @@ performance-test:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
 
+    cd "${CI_PROJECT_DIR}"
     # In DinD, services are available at 'docker' host
     timeout -k 1m 10m ./balance-tracker.sh run-tests --backend-host=docker --postgres-host=docker
     tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
