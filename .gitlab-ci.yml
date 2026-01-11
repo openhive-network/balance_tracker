@@ -1240,9 +1240,10 @@ pattern-test:
   script:
   - |
     . venv/bin/activate
-    cd "${CI_PROJECT_DIR}/${TAVERN_DIR}"
+    cd "${CI_PROJECT_DIR}"
     # In DinD, PostgREST is available at 'docker' host
-    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" .
+    # Run from project root so pattern file paths resolve correctly
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
@@ -1410,9 +1411,10 @@ pattern-test-with-mock-data:
   script:
   - |
     . venv/bin/activate
-    cd "${CI_PROJECT_DIR}/${TAVERN_DIR}"
+    cd "${CI_PROJECT_DIR}"
     # In DinD, PostgREST is available at 'docker' host
-    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" .
+    # Run from project root so pattern file paths resolve correctly
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
   after_script:
   - |
     echo -e "\e[0Ksection_start:$(date +%s):cleanup[collapsed=true]\r\e[0KCleaning up test environment..."
