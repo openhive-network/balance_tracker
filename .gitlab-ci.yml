@@ -1217,9 +1217,9 @@ pattern-test:
     echo "PostgreSQL is ready!"
 
     # Wait for PostgREST to be ready
-    # Use docker compose exec to check from inside the network (more reliable than external curl)
+    # Use TCP port check from inside HAF container (curl/wget may not be available)
     WAITED=0
-    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf curl -s http://postgrest:3000/ > /dev/null 2>&1; do
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf bash -c 'echo > /dev/tcp/postgrest/3000' 2>/dev/null; do
       echo "Waiting for PostgREST... ($WAITED/$MAX_WAIT seconds)"
       sleep 5
       WAITED=$((WAITED + 5))
@@ -1387,9 +1387,9 @@ pattern-test-with-mock-data:
     echo "PostgreSQL is ready!"
 
     # Wait for PostgREST to be ready
-    # Use docker compose exec to check from inside the network (more reliable than external curl)
+    # Use TCP port check from inside HAF container (curl/wget may not be available)
     WAITED=0
-    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf curl -s http://postgrest:3000/ > /dev/null 2>&1; do
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf bash -c 'echo > /dev/tcp/postgrest/3000' 2>/dev/null; do
       echo "Waiting for PostgREST... ($WAITED/$MAX_WAIT seconds)"
       sleep 5
       WAITED=$((WAITED + 5))
