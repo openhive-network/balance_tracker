@@ -1,9 +1,10 @@
 # CI override for mock tests - use --skip-hived since data is already synced
 # The sync cache already has data replayed to 5M blocks, so we don't need
 # hived to replay again. Just start PostgreSQL to serve the existing data.
+#
+# Note: We override 'command' directly instead of using HAF_COMMAND environment
+# variable because docker-compose's $${HAF_COMMAND} passes the literal string
+# "${HAF_COMMAND}" to the entrypoint (the entrypoint doesn't expand env vars).
 services:
   haf:
-    environment:
-      # Override the HAF_COMMAND to skip hived replay
-      # Data is already synced from the btracker_sync cache
-      HAF_COMMAND: --skip-hived
+    command: ["--skip-hived"]
