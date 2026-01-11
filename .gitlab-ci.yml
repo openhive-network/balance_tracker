@@ -747,12 +747,17 @@ sync_with_mock_data:
     - job: prepare_haf_image
       artifacts: true
 
-# Template for Tavern-based tests (extends .test-with-docker-compose)
+# Template for Tavern-based tests (uses centralized common-ci template)
 .test-with-docker-compose-tavern:
   extends:
-    - .test-with-docker-compose
-    - .tavern_test_variables
+    - .docker_image_builder_job_template
+    - .haf_app_dind_tavern_tests
+  image: registry.gitlab.syncad.com/hive/balance_tracker/ci-runner:docker-24.0.1-17
   variables:
+    # Map balance_tracker variables to common-ci template variables
+    APP_SYNC_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
+    APP_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
+    HAF_APP_ROLE_PREFIX: "btracker"
     BTRACKER_ADDRESS: localhost
     BTRACKER_PORT: 3000
     PYTEST_WORKERS: "16"
@@ -763,10 +768,7 @@ sync_with_mock_data:
       echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
       docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
       echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-    - !reference [.haf_app_dind_extract_cache, script]
-    - !reference [.haf_app_dind_compose_startup, script]
-    - !reference [.haf_app_dind_wait_for_services, script]
-    - !reference [.tavern_install_deps, script]
+    - !reference [.haf_app_dind_tavern_tests, before_script]
     - |
       # Install tests_api for validate_response module (required by tavern tests)
       . venv/bin/activate
@@ -775,7 +777,6 @@ sync_with_mock_data:
     - data-cache-storage
     - standard
     - fast
-  artifacts: !reference [.tavern_test_artifacts, artifacts]
 
 # =============================================================================
 # Test Jobs
