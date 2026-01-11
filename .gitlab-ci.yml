@@ -79,7 +79,7 @@ include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: develop
+  ref: feature/centralized-needs-templates  # TODO: change to develop after MR !184 merges
   file:
     - '/templates/base.gitlab-ci.yml'
     - '/templates/docker_image_jobs.gitlab-ci.yml'
@@ -339,10 +339,7 @@ generate-wax-spec:
   - standard
 
 prepare_haf_data:
-  extends: .prepare_haf_data_5m
-  needs:
-  - job: find_haf_image
-    artifacts: true
+  extends: .haf_app_prepare_data_with_find
   stage: build
   timeout: 80m
   variables:
