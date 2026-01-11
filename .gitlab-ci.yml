@@ -22,9 +22,8 @@ variables:
   # =============================================================================
   QUICK_TEST: "false"
   QUICK_TEST_HAF_COMMIT: ""   # Required when QUICK_TEST=true
-  # Auto-populated by detect_changes job:
-  AUTO_SKIP_SYNC: "false"     # Set to true when only tests/docs/gui changed
-  AUTO_CACHE_HAF_COMMIT: "219ef44775ee1ed85630cf513d8671f6ca4ccc49"   # Most recent cached HAF commit
+  # Auto-set by detect_changes job when only tests/docs/gui changed:
+  AUTO_SKIP_SYNC: "false"
 
   # Git configuration
   # Fetch strategy reuses workspace between jobs, reducing GitLab server load.
