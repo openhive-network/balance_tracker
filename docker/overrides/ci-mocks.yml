@@ -1,0 +1,9 @@
+# CI override for mock tests - use --skip-hived since data is already synced
+# The sync cache already has data replayed to 5M blocks, so we don't need
+# hived to replay again. Just start PostgreSQL to serve the existing data.
+services:
+  haf:
+    environment:
+      # Override the HAF_COMMAND to skip hived replay
+      # Data is already synced from the btracker_sync cache
+      HAF_COMMAND: --skip-hived
