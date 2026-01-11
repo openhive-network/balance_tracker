@@ -1217,10 +1217,10 @@ pattern-test:
     echo "PostgreSQL is ready!"
 
     # Wait for PostgREST to be ready
-    # In DinD, exposed ports are available at 'docker' host, not localhost
+    # Use docker compose exec to check from inside the network (more reliable than external curl)
     WAITED=0
-    until curl -s --connect-timeout 5 --max-time 10 http://docker:3000/ > /dev/null 2>&1; do
-      echo "Waiting for PostgREST at docker:3000... ($WAITED/$MAX_WAIT seconds)"
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf curl -s http://postgrest:3000/ > /dev/null 2>&1; do
+      echo "Waiting for PostgREST... ($WAITED/$MAX_WAIT seconds)"
       sleep 5
       WAITED=$((WAITED + 5))
       if [[ $WAITED -ge $MAX_WAIT ]]; then
@@ -1229,7 +1229,7 @@ pattern-test:
         exit 1
       fi
     done
-    echo "PostgREST is ready at docker:3000!"
+    echo "PostgREST is ready!"
 
     echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
   - !reference [.tavern_install_deps, script]
@@ -1387,10 +1387,10 @@ pattern-test-with-mock-data:
     echo "PostgreSQL is ready!"
 
     # Wait for PostgREST to be ready
-    # In DinD, exposed ports are available at 'docker' host, not localhost
+    # Use docker compose exec to check from inside the network (more reliable than external curl)
     WAITED=0
-    until curl -s --connect-timeout 5 --max-time 10 http://docker:3000/ > /dev/null 2>&1; do
-      echo "Waiting for PostgREST at docker:3000... ($WAITED/$MAX_WAIT seconds)"
+    until docker compose --env-file ci.env "${COMPOSE_OPTIONS[@]}" exec -T haf curl -s http://postgrest:3000/ > /dev/null 2>&1; do
+      echo "Waiting for PostgREST... ($WAITED/$MAX_WAIT seconds)"
       sleep 5
       WAITED=$((WAITED + 5))
       if [[ $WAITED -ge $MAX_WAIT ]]; then
@@ -1399,7 +1399,7 @@ pattern-test-with-mock-data:
         exit 1
       fi
     done
-    echo "PostgREST is ready at docker:3000!"
+    echo "PostgREST is ready!"
 
     echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
   - !reference [.tavern_install_deps, script]
