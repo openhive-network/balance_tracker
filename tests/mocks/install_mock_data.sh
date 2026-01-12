@@ -173,6 +173,7 @@ TRANSFERS_DATA=$(cat "$FIXTURES_DIR/recurrent_transfers/data.json")
 DELEGATIONS_DATA=$(cat "$FIXTURES_DIR/delegations/data.json")
 DELAYS_DATA=$(cat "$FIXTURES_DIR/delays/data.json")
 ESCROW_DATA=$(cat "$FIXTURES_DIR/escrow/data.json")
+MULTI_BALANCE_DATA=$(cat "$FIXTURES_DIR/multi_balance_ops/data.json")
 
 # Step 3: Insert mock blocks
 echo "Step 3: Inserting mock block headers..."
@@ -205,6 +206,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
 echo "  - Escrow operations..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$ESCROW_DATA')"
+
+echo "  - Multi-balance operations (escrow rejection regression test)..."
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
+    -c "SELECT btracker_backend.insert_mock_operations('$MULTI_BALANCE_DATA')"
 echo ""
 
 # Step 5: Update HAF state to recognize mock blocks

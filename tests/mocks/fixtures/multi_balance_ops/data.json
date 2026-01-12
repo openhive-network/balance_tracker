@@ -1,0 +1,41 @@
+{
+  "operations": [
+    {
+      "block_num": 90000050,
+      "op_type_id": 27,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_transfer_operation",
+        "value": {
+          "from": "smooth",
+          "to": "arhag",
+          "agent": "freedom",
+          "escrow_id": 90005001,
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",    "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "1000", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "1000", "precision": 3 }
+        }
+      }
+    },
+
+    {
+      "block_num": 90000051,
+      "op_type_id": 90,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "escrow_rejected_operation",
+        "value": {
+          "from": "smooth",
+          "to": "arhag",
+          "agent": "freedom",
+          "escrow_id": 90005001,
+          "hbd_amount":  { "nai": "@@000000013", "amount": "0",    "precision": 3 },
+          "hive_amount": { "nai": "@@000000021", "amount": "1000", "precision": 3 },
+          "fee":         { "nai": "@@000000021", "amount": "1000", "precision": 3 }
+        }
+      }
+    }
+  ]
+}
