@@ -235,11 +235,12 @@ union_latest_balance_with_impacted_balances AS (
  *   operations but only the FINAL STATE (rn=1) goes into current_account_balances.
  *   This enables fast sync because we avoid updating the same row multiple times.
  *
- * WHY NAMED WINDOWS:
- *   Both window functions share the same PARTITION BY clause. Using named windows
- *   via the WINDOW clause improves readability and allows PostgreSQL to potentially
- *   share partition data between calculations. However, since ORDER BY differs
- *   (ascending vs descending), separate sorts are still required.
+ * WHY TWO SEPARATE CTEs (sum_balances + prepare_balance_history):
+ *   The ROW_NUMBER() must order by the COMPUTED running balance, not the input delta.
+ *   PostgreSQL window functions in a WINDOW clause can only reference input columns,
+ *   not computed output columns from the same SELECT. Therefore, we must first compute
+ *   the running balance in sum_balances, then compute ROW_NUMBER in prepare_balance_history
+ *   where sb.balance refers to the already-computed running sum.
  *
  * EDGE CASE - escrow_rejected_operation:
  *   Some operations (like escrow rejection) can trigger MULTIPLE balance changes
@@ -274,23 +275,36 @@ union_latest_balance_with_impacted_balances AS (
  *   | 0         | 1000    | 4   | <- synthetic row (will be filtered out)
  */
 
--- Combine both window function calculations in a single pass to avoid redundant sorting.
--- The row number must be calculated after the sum since operations like escrow_rejected_operation
--- can trigger multiple balance changes for the same asset, leading to multiple rows with the
--- same source_op and balance.
-prepare_balance_history AS MATERIALIZED (
+-- First compute running balances with SUM window function.
+-- This must be a separate CTE because ROW_NUMBER needs to order by the COMPUTED
+-- running balance, not the input delta.
+sum_balances AS (
   SELECT
     ulb.account_id,
     ulb.nai,
     SUM(ulb.balance) OVER w_asc AS balance,
     SUM(ulb.balance_seq_no) OVER w_asc AS balance_seq_no,
     ulb.source_op,
-    ulb.source_op_block,
-    ROW_NUMBER() OVER w_desc AS rn
+    ulb.source_op_block
   FROM union_latest_balance_with_impacted_balances ulb
   WINDOW
-    w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
-    w_desc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op DESC, ulb.balance DESC)
+    w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+),
+
+-- The row number must be calculated AFTER the sum since operations like escrow_rejected_operation
+-- can trigger multiple balance changes for the same asset, leading to multiple rows with the
+-- same source_op. The ROW_NUMBER must order by the COMPUTED running balance (sb.balance),
+-- not the input delta, to correctly identify the last operation.
+prepare_balance_history AS MATERIALIZED (
+  SELECT
+    sb.account_id,
+    sb.nai,
+    sb.balance,
+    sb.balance_seq_no,
+    sb.source_op,
+    sb.source_op_block,
+    ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
+  FROM sum_balances sb
 ),
 
 /*
