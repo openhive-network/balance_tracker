@@ -95,7 +95,9 @@ target "full-ci" {
     "type=registry,mode=max,image-manifest=true,ref=${registry-name("cache", "")}:${PSQL_CLIENT_VERSION}"
   ]
   tags = [
-    equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
+    # Only add :latest on develop branch (not on tag pipelines)
+    # When CI_COMMIT_TAG is set, we're on a tag pipeline so skip :latest
+    notequal(CI_COMMIT_TAG, "") ? "" : equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest" : "",
     notempty(CI_COMMIT_TAG) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}": "",
     "${CI_REGISTRY_IMAGE}:${TAG}"
   ]
