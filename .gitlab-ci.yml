@@ -903,6 +903,10 @@ build_and_publish_image:
   extends: .publish_docker_image_template
   before_script:
   - !reference [.publish_docker_image_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
   script:
   - |
     scripts/ci-helpers/build_and_publish_instance.sh
