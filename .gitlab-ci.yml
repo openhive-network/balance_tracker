@@ -774,8 +774,8 @@ sync_with_mock_data:
     - !reference [.haf_app_dind_tavern_tests, before_script]
     - |
       # Install tests_api for validate_response module (required by tavern tests)
-      # venv is in docker/ dir (created by compose_startup -> tavern_install_deps)
-      . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
+      # venv is created by tavern_install_deps in project root
+      . "${CI_PROJECT_DIR}/venv/bin/activate"
       pip install -e "${CI_PROJECT_DIR}/tests_api"
   tags:
     - data-cache-storage
@@ -843,7 +843,7 @@ pattern-test:
   <<: *test-needs-sync
   script:
     - |
-      . docker/venv/bin/activate
+      . venv/bin/activate
       cd "${CI_PROJECT_DIR}"
       # In DinD, PostgREST is available at 'docker' host
       # Run from project root so pattern file paths resolve correctly
@@ -869,7 +869,7 @@ pattern-test-with-mock-data:
     TAVERN_DIR: tests/tavern_mocks
   script:
     - |
-      . docker/venv/bin/activate
+      . venv/bin/activate
       cd "${CI_PROJECT_DIR}"
       # In DinD, PostgREST is available at 'docker' host
       # Run from project root so pattern file paths resolve correctly
