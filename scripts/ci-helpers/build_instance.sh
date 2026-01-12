@@ -115,6 +115,8 @@ case "$BUILD_IMAGE_TAG" in
     ;;
 esac
 
+# Pass TAG to docker-bake.hcl so it uses the correct image tag instead of 'latest'
+export TAG="$BUILD_IMAGE_TAG"
 docker buildx bake --provenance=false --progress="$PROGRESS_DISPLAY" "$TARGET"
 
 # shellcheck disable=SC2086
