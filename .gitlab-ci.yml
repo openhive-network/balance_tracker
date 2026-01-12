@@ -773,8 +773,20 @@ sync_with_mock_data:
       echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
     - !reference [.haf_app_dind_tavern_tests, before_script]
     - |
+      # Debug: Check where venv was created
+      echo "=== Checking for venv locations ==="
+      ls -la "${CI_PROJECT_DIR}/venv" 2>/dev/null || echo "No venv at ${CI_PROJECT_DIR}/venv"
+      ls -la "${CI_PROJECT_DIR}/docker/venv" 2>/dev/null || echo "No venv at ${CI_PROJECT_DIR}/docker/venv"
+      echo "Current directory: $(pwd)"
+      ls -la ./venv 2>/dev/null || echo "No venv at ./venv"
+
+      # Create venv if it doesn't exist (fallback)
+      if [[ ! -d "${CI_PROJECT_DIR}/venv" ]]; then
+        echo "Creating venv manually..."
+        python3 -m venv "${CI_PROJECT_DIR}/venv"
+      fi
+
       # Install tests_api for validate_response module (required by tavern tests)
-      # venv is created by tavern_install_deps in project root (separate script blocks don't share cwd)
       . "${CI_PROJECT_DIR}/venv/bin/activate"
       pip install -e "${CI_PROJECT_DIR}/tests_api"
   tags:
