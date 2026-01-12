@@ -843,7 +843,8 @@ pattern-test:
   <<: *test-needs-sync
   script:
     - |
-      . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
+      cd "${CI_PROJECT_DIR}"
+      . docker/venv/bin/activate
       # In DinD, PostgREST is available at 'docker' host
       # Run from project root so pattern file paths resolve correctly
       BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
@@ -868,7 +869,8 @@ pattern-test-with-mock-data:
     TAVERN_DIR: tests/tavern_mocks
   script:
     - |
-      . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
+      cd "${CI_PROJECT_DIR}"
+      . docker/venv/bin/activate
       # In DinD, PostgREST is available at 'docker' host
       # Run from project root so pattern file paths resolve correctly
       BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
