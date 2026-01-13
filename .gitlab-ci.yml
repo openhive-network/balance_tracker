@@ -901,12 +901,8 @@ python_api_client_test:
 build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
-  variables:
-    HIVE_BLOG_IMAGE_SOURCE: "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG"
-    HIVE_BLOG_IMAGE_TARGET: "balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
   script:
   - scripts/ci-helpers/build_and_publish_instance.sh
-  - !reference [.hive_blog_push, script]
   tags:
   - public-runner-docker
   - bigjob
