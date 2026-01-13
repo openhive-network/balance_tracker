@@ -906,7 +906,7 @@ build_and_publish_image:
     scripts/ci-helpers/build_and_publish_instance.sh
     if [[ -n "$CI_COMMIT_TAG" ]]; then
       docker tag "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG" "registry-upload.hive.blog/balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
-      docker push "registry-upload.hive.blog/balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
+      docker push "registry-upload.hive.blog/balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG" || echo "WARNING: hive.blog registry push failed, continuing..."
     fi
   tags:
   - public-runner-docker
