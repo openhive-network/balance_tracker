@@ -901,12 +901,17 @@ python_api_client_test:
 build_and_publish_image:
   stage: publish
   extends: .publish_docker_image_template
-  variables:
-    HIVE_BLOG_IMAGE_SOURCE: "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG"
-    HIVE_BLOG_IMAGE_TARGET: "balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
   script:
   - scripts/ci-helpers/build_and_publish_instance.sh
-  - !reference [.hive_blog_push, script]
+  - |
+    # Push both main app and postgrest-rewriter to hive.blog registry
+    echo "Pushing main app to hive.blog: ${HIVE_BLOG_REGISTRY}/balance_tracker:${CI_COMMIT_TAG}"
+    docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" "${HIVE_BLOG_REGISTRY}/balance_tracker:${CI_COMMIT_TAG}"
+    docker push "${HIVE_BLOG_REGISTRY}/balance_tracker:${CI_COMMIT_TAG}"
+
+    echo "Pushing postgrest-rewriter to hive.blog: ${HIVE_BLOG_REGISTRY}/balance_tracker/postgrest-rewriter:${CI_COMMIT_TAG}"
+    docker tag "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG" "${HIVE_BLOG_REGISTRY}/balance_tracker/postgrest-rewriter:${CI_COMMIT_TAG}"
+    docker push "${HIVE_BLOG_REGISTRY}/balance_tracker/postgrest-rewriter:${CI_COMMIT_TAG}"
   tags:
   - public-runner-docker
   - bigjob
