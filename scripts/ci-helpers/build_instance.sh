@@ -102,23 +102,27 @@ if [ -z "$GIT_LAST_COMMIT_DATE" ]; then
 fi
 export GIT_LAST_COMMIT_DATE
 
-# This script can be called with BUILD_IMAGE_TAG set to either a short commit hash
-# or a release tag like 1.27.5rc6.  If it's a release tag, we need to build the
-# image differently to include the release string in.
-case "$BUILD_IMAGE_TAG" in
-  1.*)
-    REWRITER_TARGET=with_tag
-    TAG_BUILD_ARGS="--build-arg GIT_COMMIT_TAG=$BUILD_IMAGE_TAG"
-    ;;
-  *)
-    REWRITER_TARGET=without_tag
-    ;;
-esac
-
-# Pass TAG to docker-bake.hcl so it uses the correct image tag instead of 'latest'
-export TAG="$BUILD_IMAGE_TAG"
+# Build main image via docker-bake (handles tagging: short SHA + latest on develop + version on tags)
 docker buildx bake --provenance=false --progress="$PROGRESS_DISPLAY" "$TARGET"
 
+# Build rewriter image tags
+REWRITER_TAGS="--tag $REGISTRY/postgrest-rewriter:$BUILD_IMAGE_TAG"
+
+# Tag with 'latest' on develop branch
+if [[ "${CI_COMMIT_BRANCH:-}" == "${CI_DEFAULT_BRANCH:-develop}" ]]; then
+  REWRITER_TAGS="$REWRITER_TAGS --tag $REGISTRY/postgrest-rewriter:latest"
+fi
+
+# Determine rewriter target and tag with version on protected tags
+REWRITER_TARGET="without_tag"
+TAG_BUILD_ARGS=""
+if [[ -n "${CI_COMMIT_TAG:-}" ]]; then
+  REWRITER_TARGET="with_tag"
+  TAG_BUILD_ARGS="--build-arg GIT_COMMIT_TAG=$CI_COMMIT_TAG"
+  REWRITER_TAGS="$REWRITER_TAGS --tag $REGISTRY/postgrest-rewriter:$CI_COMMIT_TAG"
+fi
+
+# Build and push the rewriter image
 # shellcheck disable=SC2086
 docker buildx build \
     --build-arg BUILD_TIME="$BUILD_TIME" \
@@ -129,17 +133,13 @@ docker buildx build \
     --build-arg GIT_LAST_COMMIT_DATE="$GIT_LAST_COMMIT_DATE" \
     --target=$REWRITER_TARGET \
     $TAG_BUILD_ARGS \
-    --tag "$REGISTRY/postgrest-rewriter:$BUILD_IMAGE_TAG" \
-    --load \
+    $REWRITER_TAGS \
+    --push \
     --file Dockerfile.rewriter .
-docker push "$REGISTRY/postgrest-rewriter:$BUILD_IMAGE_TAG"
 
 popd
 
-# On CI pull the image form the registry since it's pushed directly to the registry after build
+# On CI pull the image from the registry since it's pushed directly to the registry after build
 if [[ -n ${CI:-} ]]; then
   docker pull "$REGISTRY:$BUILD_IMAGE_TAG"
 fi
-
-docker tag "$REGISTRY:$BUILD_IMAGE_TAG" "$REGISTRY/instance:$BUILD_IMAGE_TAG"
-docker tag "$REGISTRY:$BUILD_IMAGE_TAG" "$REGISTRY/minimal-instance:$BUILD_IMAGE_TAG"

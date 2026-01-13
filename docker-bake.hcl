@@ -5,6 +5,9 @@ variable "CI_REGISTRY_IMAGE" {
 variable "TAG" {
   default = "latest"
 }
+variable "CI_COMMIT_SHORT_SHA" {
+  default = ""
+}
 variable "CI_COMMIT_TAG" {
   default = ""
 }
@@ -81,8 +84,10 @@ target "full" {
   ]
 }
 
-## On develop, tag image with "latest" and commit hash,
-## on any other branch tag image with just commit hash
+## Standardized tagging for CI builds:
+## - Always: short commit SHA (for traceability)
+## - develop branch: also 'latest'
+## - Protected tags: also version tag
 target "full-ci" {
   inherits = ["full"]
   contexts = {
@@ -95,11 +100,12 @@ target "full-ci" {
     "type=registry,mode=max,image-manifest=true,ref=${registry-name("cache", "")}:${PSQL_CLIENT_VERSION}"
   ]
   tags = [
-    # Only add :latest on develop branch (not on tag pipelines)
-    # When CI_COMMIT_TAG is set, we're on a tag pipeline so skip :latest
-    notequal(CI_COMMIT_TAG, "") ? "" : equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest" : "",
+    # Always tag with short commit SHA
+    notempty(CI_COMMIT_SHORT_SHA) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}": "",
+    # Tag with 'latest' on develop branch
+    equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
+    # Tag with version on protected tags
     notempty(CI_COMMIT_TAG) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}": "",
-    "${CI_REGISTRY_IMAGE}:${TAG}"
   ]
   output = [
     "type=registry"

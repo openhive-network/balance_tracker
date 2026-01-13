@@ -850,14 +850,14 @@ python_api_client_test:
   - public-runner-docker
   - standard
 
-build_and_publish_image:
-  stage: publish
-  extends: .publish_docker_image_template
-  script:
-  - scripts/ci-helpers/build_and_publish_instance.sh
+# Publish to registry.hive.blog - pull/retag/push only, no rebuild
+publish_images:
+  extends: .docker_publish_job_template
+  variables:
+    PUBLISH_IMAGES: "balance_tracker postgrest-rewriter"
   tags:
   - public-runner-docker
-  - bigjob
+  - standard
 
 deploy_python_api_packages_to_gitlab:
   stage: publish
