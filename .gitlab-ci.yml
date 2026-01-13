@@ -904,6 +904,13 @@ build_and_publish_image:
   variables:
     HIVE_BLOG_IMAGE_SOURCE: "$CI_REGISTRY_IMAGE/postgrest-rewriter:$CI_COMMIT_TAG"
     HIVE_BLOG_IMAGE_TARGET: "balance_tracker/postgrest-rewriter:$CI_COMMIT_TAG"
+  before_script:
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):registry_login[collapsed=true]\r\e[0KLogging to Docker registries..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo "$BLOG_REGISTRY_PASSWORD" | docker login --username "$BLOG_REGISTRY_USER" --password-stdin registry-upload.hive.blog
+    echo -e "\e[0Ksection_end:$(date +%s):registry_login\r\e[0K"
   script:
   - scripts/ci-helpers/build_and_publish_instance.sh
   - !reference [.hive_blog_push, script]
