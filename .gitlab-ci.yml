@@ -350,7 +350,6 @@ prepare_haf_data:
     fi
     echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
-  - public-runner-docker
   - bigjob
 
 docker-ci-runner-build:
