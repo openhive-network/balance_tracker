@@ -175,7 +175,6 @@ find_haf_image:
     expire_in: 1 day
   tags:
     - public-runner-docker
-    - standard
 
 # =============================================================================
 # LINT JOBS - Using common-ci-configuration templates
@@ -229,7 +228,6 @@ prepare_haf_image:
       - docker_image_name.env
   tags:
   - public-runner-docker
-  - standard
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
@@ -238,7 +236,6 @@ extract-swagger-json:
     INPUT_SQL_SWAGGER_FILE: "${CI_PROJECT_DIR}/endpoints/endpoint_schema.sql"
   tags:
   - public-runner-docker
-  - standard
 
 generate_python_api_client:
   extends: .project_develop_configuration_template
@@ -260,7 +257,6 @@ generate_python_api_client:
     - "${PYPROJECT_DIR}/balance_api/balance_api_client"
   tags:
   - public-runner-docker
-  - standard
 
 build_python_api_client_wheel:
   extends: .build_wheel_template
@@ -272,7 +268,6 @@ build_python_api_client_wheel:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   tags:
   - public-runner-docker
-  - standard
 
 generate-wax-spec:
   extends: .generate_swagger_package
@@ -290,7 +285,6 @@ generate-wax-spec:
     artifacts: true
   tags:
   - public-runner-docker
-  - standard
 
 prepare_haf_data:
   extends: .haf_app_prepare_data_with_find
@@ -308,7 +302,6 @@ prepare_haf_data:
     - echo "Using HAF image:${HAF_IMAGE_NAME} (commit:${HAF_COMMIT})"
   tags:
   - data-cache-storage
-  - standard
   - fast
 
 .docker-build-template:
@@ -442,7 +435,6 @@ sync:
   artifacts: !reference [.haf_app_sync_artifacts, artifacts]
   tags:
   - data-cache-storage
-  - standard
   - fast
 
 sync_with_mock_data:
@@ -647,7 +639,6 @@ sync_with_mock_data:
     when: always
   tags:
   - data-cache-storage
-  - standard
   - fast
 
 # =============================================================================
@@ -730,7 +721,6 @@ sync_with_mock_data:
       pip install -e "${CI_PROJECT_DIR}/tests_api"
   tags:
     - data-cache-storage
-    - standard
     - fast
 
 # =============================================================================
@@ -767,7 +757,6 @@ performance-test:
   <<: *test-needs-sync
   tags:
     - data-cache-storage
-    - standard
     - fast
   script:
     - |
@@ -847,7 +836,6 @@ python_api_client_test:
   - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests"
   tags:
   - public-runner-docker
-  - standard
 
 # Publish to registry.hive.blog - pull/retag/push only, no rebuild
 publish_images:
@@ -856,7 +844,6 @@ publish_images:
     PUBLISH_IMAGES: "balance_tracker postgrest-rewriter"
   tags:
   - public-runner-docker
-  - standard
 
 deploy_python_api_packages_to_gitlab:
   stage: publish
@@ -878,7 +865,6 @@ deploy_python_api_packages_to_gitlab:
   when: on_success
   tags:
   - public-runner-docker
-  - standard
 
 deploy-wax-spec-dev-package:
   extends: .npm_deploy_package_template
@@ -910,7 +896,6 @@ deploy-wax-spec-dev-package:
     artifacts: true
   tags:
   - public-runner-docker
-  - standard
 
 deploy-wax-spec-production-public-npm:
   extends: .registry_npmjs_org_deploy_package_template
@@ -939,7 +924,6 @@ deploy-wax-spec-production-public-npm:
     artifacts: true
   tags:
   - public-runner-docker
-  - standard
 
 cleanup_haf_cache_manual:
   extends: .cleanup_cache_manual_template
@@ -948,5 +932,4 @@ cleanup_haf_cache_manual:
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
   tags:
   - data-cache-storage
-  - standard
   - fast
