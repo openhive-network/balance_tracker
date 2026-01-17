@@ -581,17 +581,38 @@ sync_with_mock_data:
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
 
-    # Force PostgreSQL checkpoint before shutdown
-    echo "Forcing PostgreSQL checkpoint..."
-    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" || true
+    # === Clean PostgreSQL shutdown ===
+    # Using pg_ctl stop ensures PostgreSQL flushes all data to disk and creates
+    # a clean shutdown checkpoint. This is more reliable than docker-compose down
+    # which just sends SIGTERM and may not wait for full data flush.
 
-    # Collect logs before stopping
-    docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log
-    docker compose "${COMPOSE_OPTIONS[@]}" logs fill-db-with-mock-data > fill-db-with-mock-data.log
-    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log
+    # First try checkpoint (informational - pg_ctl stop will do its own)
+    echo "Requesting PostgreSQL checkpoint..."
+    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" 2>&1; then
+      echo "WARNING: Checkpoint request failed - PostgreSQL may be unhealthy"
+      echo "Proceeding with pg_ctl stop which will attempt clean shutdown..."
+    fi
 
-    # Use longer timeout (60s) for graceful PostgreSQL shutdown
-    docker compose "${COMPOSE_OPTIONS[@]}" down --volumes --timeout 60
+    # Use pg_ctl stop for clean shutdown - this ensures:
+    # 1. All pending WAL is flushed
+    # 2. A shutdown checkpoint is created
+    # 3. All required PostgreSQL directories remain intact
+    echo "Stopping PostgreSQL with pg_ctl (smart mode, 60s timeout)..."
+    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
+        /usr/lib/postgresql/17/bin/pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60 2>&1; then
+      echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
+      docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
+        /usr/lib/postgresql/17/bin/pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30 2>&1 || true
+    fi
+
+    # Collect logs before stopping containers
+    docker compose "${COMPOSE_OPTIONS[@]}" logs haf > haf.log || true
+    docker compose "${COMPOSE_OPTIONS[@]}" logs fill-db-with-mock-data > fill-db-with-mock-data.log || true
+    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log || true
+
+    # Now stop containers - PostgreSQL should already be stopped cleanly
+    # Note: Don't use --volumes as it can interfere with bind-mount data persistence
+    docker compose "${COMPOSE_OPTIONS[@]}" down --timeout 60
     popd
 
     tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
