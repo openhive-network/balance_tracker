@@ -30,7 +30,7 @@ variables:
   # Full clone (depth 0) enables efficient incremental fetches - shallow clones
   # don't reduce server CPU and make fetch less effective.
   GIT_STRATEGY: fetch
-  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_STRATEGY: none
   GIT_DEPTH: 0
   GIT_SUBMODULE_DEPTH: 0
   GIT_SUBMODULE_UPDATE_FLAGS: --jobs 4
@@ -729,6 +729,11 @@ sync_with_mock_data:
     PYTEST_WORKERS: "16"
   before_script:
     - *early_exit_check
+    # Fetch tests_api submodule (not needed by other test jobs)
+    - |
+      curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}/scripts/fetch-submodules.sh" -o /tmp/fetch-submodules.sh
+      chmod +x /tmp/fetch-submodules.sh
+      /tmp/fetch-submodules.sh tests_api
     - !reference [.docker_image_builder_job_template, before_script]
     - |
       echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
