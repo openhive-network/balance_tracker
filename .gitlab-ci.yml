@@ -8,6 +8,8 @@ stages:
 - publish
 
 variables:
+  # Override HAF image to use specific feature branch commit
+  UPSTREAM_OVERRIDE_TAG: "92e16281e47074d4bbd511f5aa2c0ec25ecb7999"
   # =============================================================================
   # QUICK TEST MODE - Skip sync and use cached data
   # =============================================================================
