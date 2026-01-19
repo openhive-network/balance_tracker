@@ -301,6 +301,7 @@ prepare_haf_data:
     # Log the mapped variables
     - echo "Using HAF image:${HAF_IMAGE_NAME} (commit:${HAF_COMMIT})"
   tags:
+  - public-runner-docker
   - data-cache-storage
   - fast
 
@@ -434,6 +435,7 @@ sync:
   after_script: !reference [.haf_app_sync_cleanup, after_script]
   artifacts: !reference [.haf_app_sync_artifacts, artifacts]
   tags:
+  - public-runner-docker
   - data-cache-storage
   - fast
 
@@ -659,6 +661,7 @@ sync_with_mock_data:
     expire_in: 1 week
     when: always
   tags:
+  - public-runner-docker
   - data-cache-storage
   - fast
 
@@ -697,6 +700,7 @@ sync_with_mock_data:
       - docker/container-logs.tar.gz
     expire_in: 1 week
   tags:
+    - public-runner-docker
     - data-cache-storage
     - fast
 
@@ -746,6 +750,7 @@ sync_with_mock_data:
       . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
       pip install -e "${CI_PROJECT_DIR}/tests_api"
   tags:
+    - public-runner-docker
     - data-cache-storage
     - fast
 
@@ -782,6 +787,7 @@ performance-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync
   tags:
+    - public-runner-docker
     - data-cache-storage
     - fast
   script:
@@ -957,5 +963,6 @@ cleanup_haf_cache_manual:
   variables:
     CLEANUP_PATH_PATTERN: "${DATA_CACHE_HAF_PREFIX}_*"
   tags:
+  - public-runner-docker
   - data-cache-storage
   - fast
