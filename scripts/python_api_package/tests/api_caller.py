@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from beekeepy._communication import HttpUrl
+from beekeepy._communication.url import HttpUrl
 from beekeepy._remote_handle import AbstractAsyncHandle, RemoteHandleSettings, AsyncBatchHandle
 from beekeepy._runnable_handle.settings import Settings
 
