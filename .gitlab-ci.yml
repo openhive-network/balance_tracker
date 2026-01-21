@@ -365,15 +365,22 @@ sync:
     ls -la "${SHM_DIR}/" || true
 
     # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
-    # Copy blockchain files there so HAF can see them.
-    # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
-    echo "Copying blockchain files to docker/blockchain..."
-    rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
-    cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
-    ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
+    # Copy blockchain files there so HAF can see them (only needed for fresh sync).
+    # When CACHE_HIT is true, blockchain dir doesn't exist in cache (was removed during original sync).
+    if [[ "$CACHE_HIT" != "true" ]]; then
+      # Use cp -aL to dereference symlinks (copy actual files, not symlink references)
+      echo "Copying blockchain files to docker/blockchain..."
+      rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
+      cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
+      ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
 
-    # Remove blockchain dir from datadir so Docker volume mount doesn't conflict
-    sudo rm -rf "${DATADIR}/blockchain"
+      # Remove blockchain dir from datadir so Docker volume mount doesn't conflict
+      sudo rm -rf "${DATADIR}/blockchain"
+    else
+      # Cache hit: HAF runs with --skip-hived, blockchain files not needed
+      echo "Cache hit - skipping blockchain copy (not needed for --skip-hived mode)"
+      mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
+    fi
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
