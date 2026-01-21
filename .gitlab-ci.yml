@@ -600,6 +600,7 @@ build_and_publish_image:
 
 deploy_python_api_packages_to_gitlab:
   stage: publish
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image:ubuntu24.04-py3.14-1
   needs:
   - job: build_python_api_client_wheel
     artifacts: true
