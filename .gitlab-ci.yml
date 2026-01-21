@@ -77,7 +77,6 @@ prepare_haf_image:
   - git config --global --add safe.directory $CI_PROJECT_DIR/haf
   tags:
   - public-runner-docker
-  - hived-for-tests
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
@@ -187,7 +186,6 @@ prepare_haf_data:
     echo -e "\e[0Ksection_end:$(date +%s):build\r\e[0K"
   tags:
   - public-runner-docker
-  - hived-for-tests
 
 docker-ci-runner-build:
   extends: .docker-build-template
@@ -596,7 +594,6 @@ build_and_publish_image:
     fi
   tags:
   - public-runner-docker
-  - hived-for-tests
 
 deploy_python_api_packages_to_gitlab:
   stage: publish
