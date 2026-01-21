@@ -615,9 +615,15 @@ deploy-wax-spec-dev-package:
   extends: .npm_deploy_package_template
   stage: publish
   variables:
-    SOURCE_DIR: "${PACKAGE_SOURCE_DIR}"
-    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+    # Override dotenv absolute paths with local paths
+    # Dotenv paths are from generator job's runner which may differ from this runner
+    SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
     NPM_PACKAGE_SCOPE: "@hiveio"
+  before_script:
+    # Find the tgz file dynamically since dotenv contains absolute paths from generator runner
+    - export PACKAGE_TGZ_PATH=$(ls ${CI_PROJECT_DIR}/build/*.tgz 2>/dev/null | head -1)
+    - echo "Using PACKAGE_TGZ_PATH=${PACKAGE_TGZ_PATH}"
+    - !reference [.npm_deploy_package_template, before_script]
   needs:
   - job: generate-wax-spec
     artifacts: true
@@ -630,8 +636,13 @@ deploy-wax-spec-production-public-npm:
   variables:
     NPM_PUBLISH_TOKEN: "$INTERNAL_HIDDEN_PUBLISH_TOKEN"
     NPM_PACKAGE_NAME: "wax-api-balance-tracker"
-    SOURCE_DIR: "${PACKAGE_SOURCE_DIR}"
-    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+    # Override dotenv absolute paths with local paths
+    SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
+  before_script:
+    # Find the tgz file dynamically since dotenv contains absolute paths from generator runner
+    - export PACKAGE_TGZ_PATH=$(ls ${CI_PROJECT_DIR}/build/*.tgz 2>/dev/null | head -1)
+    - echo "Using PACKAGE_TGZ_PATH=${PACKAGE_TGZ_PATH}"
+    - !reference [.registry_npmjs_org_deploy_package_template, before_script]
   needs:
   - job: generate-wax-spec
     artifacts: true
