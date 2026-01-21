@@ -27,7 +27,7 @@ source = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<4"
+python = ">=3.14,<4"
 api_client_generator = "1.7.1.dev4+6fe5c3e.dirty"
 
 [tool.poetry.group.dev.dependencies]
