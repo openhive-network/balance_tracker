@@ -121,7 +121,9 @@ generate-wax-spec:
   extends: .generate_swagger_package
   stage: build
   variables:
-    INPUT_JSON_SWAGGER_FILE: "${BUILT_JSON_SWAGGER_FILE}"
+    # Use artifact path directly - dotenv BUILT_JSON_SWAGGER_FILE contains absolute
+    # path from previous job's runner which doesn't exist on this runner
+    INPUT_JSON_SWAGGER_FILE: "${CI_PROJECT_DIR}/build/swagger-doc.json"
     API_TYPE: "rest"
     NAMESPACE: "balance_tracker"
     NPM_PACKAGE_SCOPE: "@hiveio"
