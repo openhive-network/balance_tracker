@@ -89,6 +89,7 @@ extract-swagger-json:
 
 generate_python_api_client:
   extends: .project_develop_configuration_template
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image:ubuntu24.04-py3.14-1
   stage: build
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
@@ -106,6 +107,7 @@ generate_python_api_client:
 
 build_python_api_client_wheel:
   extends: .build_wheel_template
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image:ubuntu24.04-py3.14-1
   stage: build
   needs:
   - job: generate_python_api_client
@@ -566,6 +568,7 @@ pattern-test-with-mock-data:
 
 python_api_client_test:
   extends: .project_develop_configuration_template
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image:ubuntu24.04-py3.14-1
   stage: test
   needs:
   - job: generate_python_api_client
