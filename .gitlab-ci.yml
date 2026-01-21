@@ -509,18 +509,9 @@ sync_with_mock_data:
     echo "Data ready at DATADIR=${DATADIR}"
     ls -la "${DATADIR}/" || true
 
-    # Docker Compose bind mounts docker/blockchain over datadir/blockchain.
-    # Copy blockchain files there so HAF can see them.
-    echo "Copying blockchain files to docker/blockchain..."
-    rm -rf "${CI_PROJECT_DIR}/docker/blockchain"/*
-    cp -aL "${DATADIR}/blockchain"/* "${CI_PROJECT_DIR}/docker/blockchain/"
-    echo "Contents of docker/blockchain after copy:"
-    ls -la "${CI_PROJECT_DIR}/docker/blockchain/"
-    echo "Total size:"
-    du -sh "${CI_PROJECT_DIR}/docker/blockchain/"
-
-    # Remove blockchain dir from datadir so Docker volume mount doesn't conflict with bind mount
-    sudo rm -rf "${DATADIR}/blockchain"
+    # Note: Blockchain files not needed - HAF runs with --skip-hived (PostgreSQL only)
+    # The docker/blockchain bind mount will be empty, which is fine for database-only mode
+    mkdir -p "${CI_PROJECT_DIR}/docker/blockchain"
 
     "${CI_PROJECT_DIR}/scripts/ci-helpers/start-ci-test-environment.sh"
 
