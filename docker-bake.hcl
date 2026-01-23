@@ -17,9 +17,6 @@ variable "CI_COMMIT_BRANCH" {
 variable "CI_DEFAULT_BRANCH" {
   default = "develop"
 }
-variable "TAG_CI" {
-  default = "docker-24.0.1-11"
-}
 variable "PSQL_CLIENT_VERSION" {
   default = "14"
 }
@@ -106,33 +103,6 @@ target "full-ci" {
     equal(CI_COMMIT_BRANCH, CI_DEFAULT_BRANCH) ? "${CI_REGISTRY_IMAGE}:latest": "",
     # Tag with version on protected tags
     notempty(CI_COMMIT_TAG) ? "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}": "",
-  ]
-  output = [
-    "type=registry"
-  ]
-}
-
-target "ci-runner" {
-  dockerfile = "Dockerfile"
-  context = "docker/ci"
-  tags = [
-    "${registry-name("ci-runner", "")}:${TAG_CI}"
-  ]
-  output = [
-    "type=docker"
-  ]
-}
-
-target "ci-runner-ci" {
-  inherits = ["ci-runner"]
-  cache-from = [
-    "type=registry,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
-  ]
-  cache-to = [
-    "type=registry,mode=max,image-manifest=true,ref=${registry-name("ci-runner", "cache")}:${TAG_CI}"
-  ]
-  tags = [
-    "${registry-name("ci-runner", "")}:${TAG_CI}"
   ]
   output = [
     "type=registry"
