@@ -62,8 +62,9 @@ variables:
   # HAF image is dynamically detected by find_haf_image job using common-ci-configuration
   # scripts. No manual updates needed - always uses the latest built image from HAF repo.
   #
-  # Output variables (set by detect stage job):
+  # Output variables (set by find_haf_image job):
   #   HAF_UPSTREAM_IMAGE, HAF_UPSTREAM_COMMIT, HAF_UPSTREAM_TAG
+  #   HAF_IMAGE_NAME, HAF_COMMIT (convenience aliases)
   # =============================================================================
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
   HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
@@ -160,33 +161,8 @@ lint_sql_scripts:
     artifacts: true
     optional: true
 
-# Use existing HAF image from registry (no submodule needed)
-# The find_haf_image job already verifies the image exists and provides:
-#   HAF_UPSTREAM_IMAGE, HAF_UPSTREAM_COMMIT, HAF_UPSTREAM_TAG
-prepare_haf_image:
-  stage: build
-  image: "${BUILDER_IMAGE_PATH}"
-  needs:
-    - job: find_haf_image
-      artifacts: true
-  script:
-    - |
-      # Use dynamically detected HAF image from find_haf_image job
-      echo "Using HAF image: ${HAF_UPSTREAM_IMAGE}"
-      echo "HAF commit: ${HAF_UPSTREAM_COMMIT}"
-      # Export image name and tag for Docker Compose scripts
-      # Map HAF_UPSTREAM_* to HAF_* for compatibility with downstream jobs
-      echo "HAF_IMAGE_NAME=${HAF_UPSTREAM_IMAGE}" > docker_image_name.env
-      echo "HAF_REGISTRY_TAG=${HAF_UPSTREAM_TAG}" >> docker_image_name.env
-      echo "HAF_COMMIT=${HAF_UPSTREAM_COMMIT}" >> docker_image_name.env
-      cat docker_image_name.env
-  artifacts:
-    reports:
-      dotenv: docker_image_name.env
-    paths:
-      - docker_image_name.env
-  tags:
-  - public-runner-docker
+# Note: prepare_haf_image job removed - find_haf_image now provides
+# HAF_IMAGE_NAME and HAF_COMMIT aliases directly (common-ci-configuration !285)
 
 extract-swagger-json:
   extends: .filter_out_swagger_json
@@ -252,9 +228,7 @@ prepare_haf_data:
   variables:
     BLOCK_LOG_SOURCE_DIR: $BLOCK_LOG_SOURCE_DIR_5M
     CONFIG_INI_SOURCE: "/tmp/config_5M.ini"
-    # Map HAF_UPSTREAM_* from find_haf_image to HAF_* expected by template
-    HAF_IMAGE_NAME: "${HAF_UPSTREAM_IMAGE}"
-    HAF_COMMIT: "${HAF_UPSTREAM_COMMIT}"
+    # HAF_IMAGE_NAME and HAF_COMMIT are now provided directly by find_haf_image
   before_script:
     - curl -fsSL "${COMMON_CI_URL}/haf-app-tools/config/config_5M.ini" -o /tmp/config_5M.ini
     # Log the mapped variables
@@ -325,7 +299,7 @@ sync:
   - job: detect_changes
     artifacts: true
     optional: true  # Optional for tagged builds
-  - prepare_haf_image
+  - find_haf_image
   - prepare_haf_data
   - docker-setup-docker-image-build
   variables:
@@ -337,6 +311,8 @@ sync:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose.yml --file overrides/ci.yml
       --ansi never
+    # HAF_REGISTRY_TAG needed by start-ci-test-environment.sh for ci.env
+    HAF_REGISTRY_TAG: "${HAF_UPSTREAM_TAG}"
     # Aliases for sync templates
     APP_SYNC_CACHE_TYPE: "${BTRACKER_SYNC_CACHE_TYPE}"
     APP_CACHE_KEY: "${BTRACKER_CACHE_KEY}"
@@ -412,7 +388,7 @@ sync_with_mock_data:
     artifacts: true
   - job: docker-setup-docker-image-build
     artifacts: true
-  - job: prepare_haf_image
+  - job: find_haf_image
     artifacts: true
   variables:
     # DinD variables for Docker-in-Docker
@@ -427,6 +403,8 @@ sync_with_mock_data:
     POSTGRES_ACCESS: postgresql://haf_admin@docker:5432/haf_block_log
     COMPOSE_OPTIONS_STRING: --env-file ci.env --file docker-compose-mocks.yml --file
       overrides/ci.yml --file overrides/ci-mocks.yml --ansi never
+    # HAF_REGISTRY_TAG needed by start-ci-test-environment.sh for ci.env
+    HAF_REGISTRY_TAG: "${HAF_UPSTREAM_TAG}"
   timeout: 2 hours  # NFS cache push can take 50+ minutes on slow days
   before_script:
   - |
@@ -672,7 +650,7 @@ sync_with_mock_data:
       artifacts: true
     - job: docker-setup-docker-image-build
       artifacts: true
-    - job: prepare_haf_image
+    - job: find_haf_image
       artifacts: true
 
 # Template for Tavern-based tests (uses centralized common-ci template)
@@ -794,7 +772,7 @@ pattern-test-with-mock-data:
       artifacts: true
     - job: docker-setup-docker-image-build
       artifacts: true
-    - job: prepare_haf_image
+    - job: find_haf_image
       artifacts: true
   variables:
     # Use mock cache type instead of regular sync cache
