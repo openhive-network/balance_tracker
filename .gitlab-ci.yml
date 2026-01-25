@@ -265,10 +265,20 @@ prepare_haf_data:
     if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
       echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG} already exists. Skipping..."
       if [[ -n "$CI_COMMIT_TAG" && "$TARGET" == "full-ci" ]]; then
-        echo "Tagging pre-existing image with Git tag..."
+        echo "Tagging pre-existing images with Git tag..."
+        # Tag main image
         docker pull "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG}"
         docker tag "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG}" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
         docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+        # Tag postgrest-rewriter image (also built by build_instance.sh)
+        if image-exists "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${BASE_TAG}"; then
+          echo "Tagging postgrest-rewriter image..."
+          docker pull "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${BASE_TAG}"
+          docker tag "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${BASE_TAG}" "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${CI_COMMIT_TAG}"
+          docker push "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${CI_COMMIT_TAG}"
+        else
+          echo "WARNING: postgrest-rewriter:${BASE_TAG} not found, skipping retag"
+        fi
       fi
     else
       echo "Baking $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG} image..."
