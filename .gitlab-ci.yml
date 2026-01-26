@@ -67,7 +67,7 @@ variables:
   #   HAF_IMAGE_NAME, HAF_COMMIT (convenience aliases)
   # =============================================================================
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
-  HIVE_SCRIPTS_REF: "1179c5456dbb6be65c73178eb53d2e02223de3a2"
+  HIVE_SCRIPTS_REF: "611a1726bcbc0f9689fa2c3fb5392795bf2a630f"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
