@@ -6,6 +6,7 @@ tests/performance/*.tar.gz
 tests/performance/.~lock.log.jtl#
 tests/regression/accounts_dump.json
 set_version_in_sql.pgsql
+process_openapi.py
 db/__pycache__
 server/__pycache__
 btracker_sync.*
