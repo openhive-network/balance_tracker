@@ -280,4 +280,12 @@ BEGIN
 END;
 $$;
 
+-- Custom JSON operations (used for RC delegations)
+CREATE OR REPLACE FUNCTION btracker_backend.op_custom_json()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::custom_json_operation');
+END;
+$$;
+
 RESET ROLE;

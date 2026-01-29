@@ -55,4 +55,12 @@ BEGIN
 END;
 $$;
 
+-- HF26: Introduced RC (Resource Credit) delegations
+CREATE OR REPLACE FUNCTION btracker_backend.hf_rc_delegations()
+RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  RETURN 26;
+END;
+$$;
+
 RESET ROLE;
