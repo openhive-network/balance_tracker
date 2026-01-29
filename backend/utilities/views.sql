@@ -390,5 +390,29 @@ CREATE OR REPLACE VIEW btracker_backend.saving_history_by_day_view AS
     hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
   FROM balance_history_by_day t;
 
+/**
+ * current_rc_delegations_view
+ * ---------------------------
+ * View over current_rc_delegations with extracted block/type info.
+ *
+ * Base table: current_rc_delegations
+ * Purpose: Active RC (Resource Credit) delegations between accounts
+ *
+ * Each row represents an RC delegation from delegator to delegatee.
+ * max_rc is the amount of Resource Credits delegated.
+ * When max_rc becomes 0, the delegation is removed.
+ *
+ * Note: RC delegations were introduced in HF26.
+ */
+CREATE OR REPLACE VIEW btracker_backend.current_rc_delegations_view AS
+  SELECT
+    t.delegator,
+    t.delegatee,
+    t.max_rc,
+    t.source_op,
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    hafd.operation_id_to_type_id( t.source_op ) AS op_type_id
+  FROM current_rc_delegations t;
+
 
 RESET ROLE;
