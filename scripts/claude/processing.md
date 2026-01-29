@@ -11,6 +11,7 @@ HAFBE (hafbe_app.sql)
   └─> btracker_process_blocks(_context, _block_range, _is_massif_sync)
       ├─> process_balances()        # Core HIVE/HBD/VESTS
       ├─> process_delegations()     # Delegation pairs
+      ├─> process_block_range_rc_delegations()  # RC delegation pairs
       ├─> process_rewards()         # Pending rewards
       ├─> process_savings()         # Savings accounts
       ├─> process_withdrawals()     # Power-down state
@@ -27,6 +28,7 @@ HAFBE (hafbe_app.sql)
 |----------|------|-------------------|----------------|
 | `process_balances` | `db/process_balances.sql` | All balance-affecting ops | `current_account_balances`, `account_balance_history` |
 | `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares | `current_accounts_delegations`, `account_delegations` |
+| `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc) | `current_rc_delegations`, `account_rc_delegations` |
 | `process_rewards` | `db/process_rewards.sql` | author_reward, curation_reward, claim_reward_balance | `account_rewards` |
 | `process_savings` | `db/process_savings.sql` | transfer_to_savings, transfer_from_savings, fill_transfer_from_savings | `account_savings`, `account_savings_history`, `savings_withdraws` |
 | `process_withdrawals` | `db/process_withdrawals.sql` | withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw | `account_withdraws`, `withdraw_routes` |
@@ -149,6 +151,7 @@ Each processing area has its own detailed documentation:
 |------|---------------|-------------|
 | **Balances** | [balances.md](processing/balances.md) | Core HIVE/HBD/VESTS tracking with history |
 | **Delegations** | [delegations.md](processing/delegations.md) | HF23 return-to-self handling |
+| **RC Delegations** | [rc_delegations.md](processing/rc_delegations.md) | HF26+ Resource Credit delegations |
 | **Rewards** | [rewards.md](processing/rewards.md) | Recursive claim processing for NAI 38 |
 | **Savings** | [savings.md](processing/savings.md) | 3-day withdrawal delay matching |
 | **Withdrawals** | [withdrawals.md](processing/withdrawals.md) | Power-down with routes and delayed voting |

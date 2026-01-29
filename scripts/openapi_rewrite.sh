@@ -29,6 +29,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/types/sort_direction.sql
 ../$endpoints/types/balances.sql
 ../$endpoints/types/delegations.sql
+../$endpoints/types/rc_delegations.sql
 ../$endpoints/types/recurrent_transfers.sql
 ../$endpoints/types/transfer_stats.sql
 ../$endpoints/types/ranked_holder.sql
@@ -37,6 +38,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
 ../$endpoints/account-balances/get_account_delegations.sql
+../$endpoints/account-balances/get_rc_delegations.sql
 ../$endpoints/account-balances/get_recurrent_transfers.sql
 ../$endpoints/account-balances/get_top_holders.sql
 ../$endpoints/transfers/get_transfer_statistics.sql

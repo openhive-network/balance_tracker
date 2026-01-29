@@ -12,6 +12,7 @@ Balance Tracker extracts and indexes balance-related data from the Hive blockcha
 | **Savings** | Savings balances, pending withdrawal requests |
 | **Rewards** | Pending rewards (author, curation, benefactor), lifetime earned |
 | **Delegations** | VESTS delegated to/received from other accounts |
+| **RC Delegations** | Resource Credits delegated to/received from other accounts |
 | **Power-down** | Withdrawal rates, amounts, routing rules |
 | **Recurrent Transfers** | Scheduled recurring transfers |
 | **Conversions** | Pending HBD↔HIVE conversions (3.5-day delay) |
@@ -155,8 +156,10 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `current_account_balances` - Latest HIVE/HBD/VESTS
 - `account_savings` - Latest savings balances
 - `account_rewards` - Pending reward balances
-- `account_delegations` - Total delegated/received summary
-- `current_accounts_delegations` - Active delegation pairs
+- `account_delegations` - Total delegated/received VESTS summary
+- `current_accounts_delegations` - Active VESTS delegation pairs
+- `account_rc_delegations` - Total delegated/received RC summary
+- `current_rc_delegations` - Active RC delegation pairs
 - `account_withdraws` - Power-down state
 - `recurrent_transfers` - Active scheduled transfers
 - `order_state` - Open market orders
