@@ -1,0 +1,30 @@
+{
+  "outgoing_delegations": [
+    {
+      "delegatee": "blocktrades",
+      "max_rc": "3000000000",
+      "operation_id": "386547249913528594",
+      "block_num": 90000045
+    },
+    {
+      "delegatee": "gtg",
+      "max_rc": "1500000000",
+      "operation_id": "386547249913528594",
+      "block_num": 90000045
+    },
+    {
+      "delegatee": "cvk",
+      "max_rc": "1500000000",
+      "operation_id": "386547249913528594",
+      "block_num": 90000045
+    }
+  ],
+  "incoming_delegations": [
+    {
+      "delegator": "blocktrades",
+      "max_rc": "2000000000",
+      "operation_id": "386547232733659410",
+      "block_num": 90000041
+    }
+  ]
+}

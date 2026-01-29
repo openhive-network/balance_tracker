@@ -1,0 +1,30 @@
+{
+  "outgoing_delegations": [
+    {
+      "delegatee": "gtg",
+      "max_rc": "10000000000",
+      "operation_id": "386547241323594002",
+      "block_num": 90000043
+    },
+    {
+      "delegatee": "steem",
+      "max_rc": "2000000000",
+      "operation_id": "386547232733659410",
+      "block_num": 90000041
+    },
+    {
+      "delegatee": "cvk",
+      "max_rc": "2000000000",
+      "operation_id": "386547232733659410",
+      "block_num": 90000041
+    }
+  ],
+  "incoming_delegations": [
+    {
+      "delegator": "steem",
+      "max_rc": "3000000000",
+      "operation_id": "386547249913528594",
+      "block_num": 90000045
+    }
+  ]
+}
