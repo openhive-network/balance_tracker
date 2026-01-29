@@ -435,6 +435,67 @@ declare
           }
         }
       },
+      "btracker_backend.incoming_rc_delegations": {
+        "type": "object",
+        "properties": {
+          "delegator": {
+            "type": "string",
+            "description": "account name of the delegator"
+          },
+          "max_rc": {
+            "type": "string",
+            "description": "amount of RC delegated"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "block number"
+          }
+        }
+      },
+      "btracker_backend.outgoing_rc_delegations": {
+        "type": "object",
+        "properties": {
+          "delegatee": {
+            "type": "string",
+            "description": "account name of the delegatee"
+          },
+          "max_rc": {
+            "type": "string",
+            "description": "amount of RC delegated"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with an encoded block number and operation type id"
+          },
+          "block_num": {
+            "type": "integer",
+            "description": "block number"
+          }
+        }
+      },
+      "btracker_backend.rc_delegations": {
+        "type": "object",
+        "properties": {
+          "outgoing_delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.outgoing_rc_delegations"
+            },
+            "description": "List of outgoing RC delegations from the account"
+          },
+          "incoming_delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.incoming_rc_delegations"
+            },
+            "description": "List of incoming RC delegations to the account"
+          }
+        }
+      },
       "btracker_backend.amount": {
         "type": "object",
         "properties": {
@@ -1000,6 +1061,46 @@ declare
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/btracker_backend.delegations"
+                },
+                "example": {
+                  "outgoing_delegations": [],
+                  "incoming_delegations": []
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/rc-delegations": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Account RC delegations",
+        "description": "List of incoming and outgoing RC (Resource Credit) delegations\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_rc_delegations(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/rc-delegations''`\n",
+        "operationId": "btracker_endpoints.get_rc_delegations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incoming and outgoing RC delegations\n\n* Returns `btracker_backend.rc_delegations`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.rc_delegations"
                 },
                 "example": {
                   "outgoing_delegations": [],
