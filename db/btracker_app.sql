@@ -25,31 +25,35 @@
  *    - account_rewards: Pending unclaimed rewards
  *    - account_info_rewards: Lifetime posting/curation rewards
  *
- * 4. DELEGATIONS
+ * 4. DELEGATIONS (VESTS)
  *    - current_accounts_delegations: Active delegation pairs
  *    - account_delegations: Summary per account (total received/delegated)
  *
- * 5. RECURRENT TRANSFERS
+ * 5. RC DELEGATIONS (Resource Credits)
+ *    - current_rc_delegations: Active RC delegation pairs
+ *    - account_rc_delegations: Summary per account (total received/delegated RC)
+ *
+ * 6. RECURRENT TRANSFERS
  *    - recurrent_transfers: Active scheduled recurring transfers
  *
- * 6. WITHDRAWALS (Power-down)
+ * 7. WITHDRAWALS (Power-down)
  *    - account_withdraws: Power-down state per account
  *    - account_routes: Vesting withdrawal routing rules
  *
- * 7. SAVINGS
+ * 8. SAVINGS
  *    - account_savings: Current savings balances
  *    - account_savings_history: Complete savings history
  *    - transfer_saving_id: Pending savings withdrawal requests
  *    - saving_history_by_day/month: Aggregated savings snapshots
  *
- * 8. TRANSFER STATISTICS
+ * 9. TRANSFER STATISTICS
  *    - transfer_stats_by_hour/day/month: Aggregated transfer volumes
  *
- * 9. MARKET & CONVERSIONS
+ * 10. MARKET & CONVERSIONS
  *    - convert_state: Pending HBD↔HIVE conversions
  *    - order_state: Open market limit orders
  *
- * 10. ESCROWS
+ * 11. ESCROWS
  *    - escrow_state: Active escrow agreements
  *    - escrow_fees: Pending escrow agent fees
  *
@@ -450,6 +454,30 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'escrow_fees', __schema_name);
 
+  ------------- RC DELEGATIONS ----------------
+  -- Current state of each RC delegation pair
+  CREATE TABLE IF NOT EXISTS current_rc_delegations
+  (
+    delegator INT    NOT NULL, -- Account ID (FK to hive.accounts)
+    delegatee INT    NOT NULL, -- Account ID (FK to hive.accounts)
+    max_rc    BIGINT NOT NULL, -- Amount of RC delegated
+    source_op BIGINT NOT NULL, -- Operation ID of last change
+
+    CONSTRAINT pk_current_rc_delegations PRIMARY KEY (delegator, delegatee)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'current_rc_delegations', __schema_name);
+
+  -- Aggregated RC delegation totals per account
+  CREATE TABLE IF NOT EXISTS account_rc_delegations
+  (
+    account      INT    NOT NULL,     -- Account ID
+    received_rc  BIGINT DEFAULT 0,    -- Total RC received from all delegators
+    delegated_rc BIGINT DEFAULT 0,    -- Total RC delegated to all delegatees
+
+    CONSTRAINT pk_account_rc_delegations PRIMARY KEY (account)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
+
 
 END
 $$;
@@ -597,11 +625,12 @@ $$;
  * 3. Savings
  * 4. Rewards
  * 5. Delegations
- * 6. Recurrent transfers
- * 7. Transfer statistics
- * 8. Conversions
- * 9. Market orders
- * 10. Escrows
+ * 6. RC Delegations
+ * 7. Recurrent transfers
+ * 8. Transfer statistics
+ * 9. Conversions
+ * 10. Market orders
+ * 11. Escrows
  *
  * @param _from  First block number to process
  * @param _to    Last block number to process
@@ -641,6 +670,7 @@ BEGIN
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
+    PERFORM process_block_range_rc_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
     PERFORM process_block_range_converts(_from,        __hardfork_23_block);
@@ -658,6 +688,7 @@ BEGIN
       PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_rc_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_converts(__hardfork_23_block+1, _to);
@@ -672,6 +703,7 @@ BEGIN
     PERFORM process_block_range_savings(_from, _to);
     PERFORM process_block_range_rewards(_from, _to);
     PERFORM process_block_range_delegations(_from, _to);
+    PERFORM process_block_range_rc_delegations(_from, _to);
     PERFORM process_block_range_recurrent_transfers(_from, _to);
     PERFORM process_transfer_stats(_from, _to);
     PERFORM process_block_range_converts(_from, _to);
@@ -722,6 +754,7 @@ BEGIN
   PERFORM process_block_range_savings(_block, _block);
   PERFORM process_block_range_rewards(_block, _block);
   PERFORM process_block_range_delegations(_block, _block);
+  PERFORM process_block_range_rc_delegations(_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
   PERFORM process_transfer_stats(_block, _block);
   PERFORM process_block_range_converts(_block, _block);
@@ -860,6 +893,10 @@ $$;
  *   - idx_current_accounts_delegations_delegatee_idx
  *     Filter by delegatee for incoming delegations
  *
+ * RC Delegations:
+ *   - idx_current_rc_delegations_delegatee
+ *     Filter by delegatee for "who delegated RC TO me?" queries
+ *
  * Recurrent Transfers:
  *   - idx_recurrent_transfers_to_account_idx
  *     Filter by to_account for incoming transfers
@@ -884,6 +921,8 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON account_savings(nai,balance DESC);
   -- Delegations: filter by delegatee for incoming delegation queries
   CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON current_accounts_delegations(delegatee);
+  -- RC Delegations: filter by delegatee for "who delegated RC TO me?" queries
+  CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON current_rc_delegations(delegatee);
   -- Recurrent transfers: filter by recipient for incoming transfer queries
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
 END
