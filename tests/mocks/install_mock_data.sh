@@ -37,6 +37,7 @@
 #       ├── rewards/             # Rewards operations test data
 #       ├── recurrent_transfers/ # Recurrent transfer test data
 #       ├── delegations/         # Vesting delegation test data
+#       ├── rc_delegations/      # RC delegation test data (HF26)
 #       ├── delays/              # Delayed voting (HF24) test data
 #       └── escrow/              # Escrow operations test data
 #
@@ -171,6 +172,7 @@ SAVINGS_DATA=$(cat "$FIXTURES_DIR/savings/data.json")
 REWARDS_DATA=$(cat "$FIXTURES_DIR/rewards/data.json")
 TRANSFERS_DATA=$(cat "$FIXTURES_DIR/recurrent_transfers/data.json")
 DELEGATIONS_DATA=$(cat "$FIXTURES_DIR/delegations/data.json")
+RC_DELEGATIONS_DATA=$(cat "$FIXTURES_DIR/rc_delegations/data.json")
 DELAYS_DATA=$(cat "$FIXTURES_DIR/delays/data.json")
 ESCROW_DATA=$(cat "$FIXTURES_DIR/escrow/data.json")
 MULTI_BALANCE_DATA=$(cat "$FIXTURES_DIR/multi_balance_ops/data.json")
@@ -198,6 +200,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
 echo "  - Delegation operations..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$DELEGATIONS_DATA')"
+
+echo "  - RC delegation operations..."
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
+    -c "SELECT btracker_backend.insert_mock_operations('$RC_DELEGATIONS_DATA')"
 
 echo "  - Delayed voting operations..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \

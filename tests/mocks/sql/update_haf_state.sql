@@ -103,6 +103,14 @@ BEGIN
     (hardfork_num, block_num, hardfork_vop_id)
   SELECT 24, _mock_start_block_num, 386547060934967584;
 
+  -- Simulate 26th hardfork, required for RC delegations
+  -- HF26 introduced RC (Resource Credit) delegations (block ~68676505 on mainnet)
+  -- Insert at the first mock block so RC delegation tests work
+  -- Note: Reuse same hardfork_vop_id as HF24 since it's just a mock entry
+  INSERT INTO hafd.applied_hardforks
+    (hardfork_num, block_num, hardfork_vop_id)
+  SELECT 26, _mock_start_block_num, 386547060934967584;
+
   -- Return the detected block range for logging purposes
   RETURN QUERY SELECT _mock_start_block_num, _mock_end_block_num;
 END;

@@ -1,0 +1,94 @@
+{
+    "operations": [
+        {
+            "block_num": 90000040,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["blocktrades"],
+                    "id": "rc",
+                    "json": "[\"delegate_rc\",{\"from\":\"blocktrades\",\"delegatees\":[\"gtg\"],\"max_rc\":5000000000}]"
+                }
+            }
+        },
+        {
+            "block_num": 90000041,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["blocktrades"],
+                    "id": "rc",
+                    "json": "[\"delegate_rc\",{\"from\":\"blocktrades\",\"delegatees\":[\"steem\",\"cvk\"],\"max_rc\":2000000000}]"
+                }
+            }
+        },
+        {
+            "block_num": 90000042,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["gtg"],
+                    "id": "rc",
+                    "json": "[\"delegate_rc\",{\"from\":\"gtg\",\"delegatees\":[\"blocktrades\"],\"max_rc\":1000000000}]"
+                }
+            }
+        },
+        {
+            "block_num": 90000043,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["blocktrades"],
+                    "id": "rc",
+                    "json": "[\"delegate_rc\",{\"from\":\"blocktrades\",\"delegatees\":[\"gtg\"],\"max_rc\":10000000000}]"
+                }
+            }
+        },
+        {
+            "block_num": 90000044,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["gtg"],
+                    "id": "rc",
+                    "json": "[\"delegate_rc\",{\"from\":\"gtg\",\"delegatees\":[\"blocktrades\"],\"max_rc\":0}]"
+                }
+            }
+        },
+        {
+            "block_num": 90000045,
+            "op_type_id": 18,
+            "op_pos": 1,
+            "trx_in_block": 0,
+            "body": {
+                "type": "custom_json_operation",
+                "value": {
+                    "required_auths": [],
+                    "required_posting_auths": ["steem"],
+                    "id": "rc",
+                    "json": "[[\"delegate_rc\",{\"from\":\"steem\",\"delegatees\":[\"blocktrades\"],\"max_rc\":3000000000}],[\"delegate_rc\",{\"from\":\"steem\",\"delegatees\":[\"gtg\",\"cvk\"],\"max_rc\":1500000000}]]"
+                }
+            }
+        }
+    ]
+}
