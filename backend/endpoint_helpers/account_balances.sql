@@ -21,14 +21,11 @@ DECLARE
 BEGIN
   WITH
     -- Get delegation summary (VESTS delegated to/received from other accounts)
-    -- Uses dummy table pattern to ensure a row is returned even with no delegations
+    -- Calculates totals from current_accounts_delegations using helper functions
     get_delegations AS (
       SELECT
-        COALESCE(ad.delegated_vests, 0)::BIGINT AS delegated_vests,
-        COALESCE(ad.received_vests, 0)::BIGINT  AS received_vests
-      FROM (VALUES(1)) AS dummy(_)
-      LEFT JOIN account_delegations ad
-        ON ad.account = _account_id
+        btracker_backend.total_delegated_vests(_account_id) AS delegated_vests,
+        btracker_backend.total_received_vests(_account_id) AS received_vests
     ),
 
     -- Get current liquid balances for all asset types

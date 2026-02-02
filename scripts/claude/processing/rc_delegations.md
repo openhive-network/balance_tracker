@@ -50,7 +50,8 @@ The inner JSON contains:
 | Table | Purpose |
 |-------|---------|
 | `current_rc_delegations` | Active RC delegation pairs (delegator, delegatee, max_rc) |
-| `account_rc_delegations` | Summary totals (total RC delegated out, total RC received) |
+
+Note: Summary totals (total RC delegated out, total RC received) can be calculated on-demand from `current_rc_delegations`.
 
 ## C++ Parser Function
 
@@ -79,11 +80,9 @@ custom_json_operation (id='rc')
   │
   ├─> IF max_rc > 0: CREATE/UPDATE RC delegation pair
   │   └─> Upsert to current_rc_delegations
-  │   └─> Update account_rc_delegations (both parties)
   │
   └─> IF max_rc == 0: REMOVE RC delegation
       └─> Delete from current_rc_delegations
-      └─> Update account_rc_delegations (reduce totals)
 ```
 
 ## Key Differences from VESTS Delegations
@@ -162,5 +161,5 @@ Returns incoming and outgoing RC delegations for the specified account.
 When modifying RC delegation processing:
 - Maintain HF26 check at function start
 - Use the C++ parser (don't parse JSON manually)
-- Update both `current_rc_delegations` AND `account_rc_delegations`
+- Update `current_rc_delegations` (summary totals calculated on-demand)
 - Follow the squashing pattern for correct delta calculation

@@ -249,7 +249,7 @@ curl 'http://localhost:3000/balance-api/top-holders?coin-type=HBD&balance-type=s
 
 | Endpoint | Primary Tables |
 |----------|---------------|
-| get_account_balances | current_account_balances, account_delegations, account_rewards, account_savings, account_withdraws, convert_state, order_state, escrow_state |
+| get_account_balances | current_account_balances, current_accounts_delegations, account_rewards, account_savings, account_withdraws, convert_state, order_state, escrow_state |
 | get_balance_history | account_balance_history, account_savings_history |
 | get_balance_aggregation | balance_history_by_day, balance_history_by_month |
 | get_top_holders | current_account_balances, account_savings |

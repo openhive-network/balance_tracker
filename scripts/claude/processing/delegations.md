@@ -17,7 +17,8 @@ Processes `delegate_vesting_shares` operations to track VESTS delegated between 
 | Table | Purpose |
 |-------|---------|
 | `current_accounts_delegations` | Active delegation pairs (delegator, delegatee, amount) |
-| `account_delegations` | Summary totals (total delegated out, total received) |
+
+Note: Summary totals (total delegated out, total received) are calculated on-demand from `current_accounts_delegations` via helper functions.
 
 ## HF23 Edge Case
 
@@ -37,11 +38,9 @@ delegate_vesting_shares operation
   │
   ├─> IF amount > 0: CREATE/UPDATE delegation pair
   │   └─> Update current_accounts_delegations
-  │   └─> Update account_delegations (both parties)
   │
   └─> IF amount == 0: REMOVE delegation
       └─> Delete from current_accounts_delegations
-      └─> Update account_delegations (reduce totals)
 ```
 
 ## Key SQL Patterns
@@ -84,5 +83,5 @@ GROUP BY delegatee
 
 When modifying delegation processing:
 - Maintain HF23 self-delegation filter
-- Update both `current_accounts_delegations` AND `account_delegations`
+- Update `current_accounts_delegations` (summary totals calculated on-demand)
 - Consider impact on effective vesting power calculations

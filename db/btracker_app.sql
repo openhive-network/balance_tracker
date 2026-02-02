@@ -27,11 +27,9 @@
  *
  * 4. DELEGATIONS (VESTS)
  *    - current_accounts_delegations: Active delegation pairs
- *    - account_delegations: Summary per account (total received/delegated)
  *
  * 5. RC DELEGATIONS (Resource Credits)
  *    - current_rc_delegations: Active RC delegation pairs
- *    - account_rc_delegations: Summary per account (total received/delegated RC)
  *
  * 6. RECURRENT TRANSFERS
  *    - recurrent_transfers: Active scheduled recurring transfers
@@ -226,17 +224,6 @@ BEGIN
     CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
   );
   PERFORM hive.app_register_table( __schema_name, 'current_accounts_delegations', __schema_name );
-
-  -- summarized delegated vests info
-  CREATE TABLE IF NOT EXISTS account_delegations
-  (
-    account         INT    NOT NULL,  -- Balance owner account id
-    received_vests  BIGINT DEFAULT 0, -- Total received vests
-    delegated_vests BIGINT DEFAULT 0, -- Total delegated vests
-
-    CONSTRAINT pk_temp_vests PRIMARY KEY (account)
-  );
-  PERFORM hive.app_register_table( __schema_name, 'account_delegations', __schema_name );
 
   ------------- RECURRENT TRANSFERS ----------------
   CREATE TABLE IF NOT EXISTS recurrent_transfers
@@ -466,18 +453,6 @@ BEGIN
     CONSTRAINT pk_current_rc_delegations PRIMARY KEY (delegator, delegatee)
   );
   PERFORM hive.app_register_table(__schema_name, 'current_rc_delegations', __schema_name);
-
-  -- Aggregated RC delegation totals per account
-  CREATE TABLE IF NOT EXISTS account_rc_delegations
-  (
-    account      INT    NOT NULL,     -- Account ID
-    received_rc  BIGINT DEFAULT 0,    -- Total RC received from all delegators
-    delegated_rc BIGINT DEFAULT 0,    -- Total RC delegated to all delegatees
-
-    CONSTRAINT pk_account_rc_delegations PRIMARY KEY (account)
-  );
-  PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
-
 
 END
 $$;

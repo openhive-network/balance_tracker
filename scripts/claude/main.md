@@ -156,9 +156,7 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `current_account_balances` - Latest HIVE/HBD/VESTS
 - `account_savings` - Latest savings balances
 - `account_rewards` - Pending reward balances
-- `account_delegations` - Total delegated/received VESTS summary
 - `current_accounts_delegations` - Active VESTS delegation pairs
-- `account_rc_delegations` - Total delegated/received RC summary
 - `current_rc_delegations` - Active RC delegation pairs
 - `account_withdraws` - Power-down state
 - `recurrent_transfers` - Active scheduled transfers

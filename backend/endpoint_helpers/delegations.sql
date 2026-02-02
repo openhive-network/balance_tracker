@@ -44,4 +44,32 @@ BEGIN
 END
 $$;
 
+/*
+Returns total VESTS delegated out to other accounts.
+Called by: btracker_backend.get_account_balances()
+Uses PK index (delegator, delegatee) for efficient lookup on delegator column.
+*/
+CREATE OR REPLACE FUNCTION btracker_backend.total_delegated_vests(IN _account_id INT)
+RETURNS BIGINT
+LANGUAGE 'sql' STABLE
+AS $$
+  SELECT COALESCE(SUM(balance), 0)::BIGINT
+  FROM btracker_app.current_accounts_delegations
+  WHERE delegator = _account_id;
+$$;
+
+/*
+Returns total VESTS received from other accounts.
+Called by: btracker_backend.get_account_balances()
+Uses idx_current_accounts_delegations_delegatee_idx for efficient lookup.
+*/
+CREATE OR REPLACE FUNCTION btracker_backend.total_received_vests(IN _account_id INT)
+RETURNS BIGINT
+LANGUAGE 'sql' STABLE
+AS $$
+  SELECT COALESCE(SUM(balance), 0)::BIGINT
+  FROM btracker_app.current_accounts_delegations
+  WHERE delegatee = _account_id;
+$$;
+
 RESET ROLE;

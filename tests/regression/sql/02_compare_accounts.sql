@@ -78,13 +78,22 @@ btracker_balances AS MATERIALIZED (
     GROUP BY cab.account
 ),
 
--- Balance Tracker's computed delegation totals
+-- Balance Tracker's computed delegation totals (calculated from current_accounts_delegations)
 btracker_delegations AS MATERIALIZED (
     SELECT
-        ad.account AS account_id,
-        ad.delegated_vests AS delegated_vesting_shares,
-        ad.received_vests AS received_vesting_shares
-    FROM btracker_app.account_delegations ad
+        account_id,
+        COALESCE(SUM(delegated), 0) AS delegated_vesting_shares,
+        COALESCE(SUM(received), 0) AS received_vesting_shares
+    FROM (
+        -- Delegated out
+        SELECT delegator AS account_id, balance AS delegated, 0 AS received
+        FROM btracker_app.current_accounts_delegations
+        UNION ALL
+        -- Received in
+        SELECT delegatee AS account_id, 0 AS delegated, balance AS received
+        FROM btracker_app.current_accounts_delegations
+    ) sub
+    GROUP BY account_id
 ),
 
 -- Balance Tracker's computed pending rewards

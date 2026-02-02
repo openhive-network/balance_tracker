@@ -100,7 +100,7 @@ ARCHITECTURE:
 
 DATA SOURCES (via backend helper):
   - current_account_balances: Liquid HBD/HIVE/VESTS balances
-  - account_delegations: Delegated and received VESTS summary
+  - current_accounts_delegations: Delegation totals (calculated via SUM)
   - account_info_rewards: Lifetime curation and posting rewards
   - account_rewards: Pending (unclaimed) reward balances
   - account_savings: Savings balances with pending withdrawal counts

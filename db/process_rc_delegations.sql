@@ -25,7 +25,6 @@ SET ROLE btracker_owner;
  *   3. Resolve account names to IDs
  *   4. Calculate deltas using window functions
  *   5. UPSERT final state / DELETE zero delegations
- *   6. Update summary table
  */
 CREATE OR REPLACE FUNCTION process_block_range_rc_delegations(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
@@ -43,7 +42,6 @@ DECLARE
   -- Counters
   __insert_current_rc_delegations INT;
   __delete_canceled_rc_delegations INT;
-  __insert_rc_delegations INT;
 BEGIN
 ------------------------------------------------------------------------------
 -- HF26 CHECK: RC delegations were formalized in HF26
@@ -207,46 +205,7 @@ rc_delegation_delta AS MATERIALIZED (
     w_desc AS (PARTITION BY delegator, delegatee ORDER BY source_op DESC)
 ),
 ------------------------------------------------------------------------------
--- STEP 7: Calculate aggregated RC changes per account
---
--- When alice delegates 1000 RC to bob:
---   - Alice's delegated_rc goes up by 1000
---   - Bob's received_rc goes up by 1000
---
--- The account_rc_delegations table stores CUMULATIVE totals.
-------------------------------------------------------------------------------
-union_rc_delegations AS (
-  -- Delegator side (RC going OUT)
-  SELECT
-    dd.delegator AS account_id,
-    0 AS received_rc,
-    dd.rc_delta AS delegated_rc
-  FROM rc_delegation_delta dd
-  WHERE dd.source_op > 0  -- Exclude synthetic previous record
-
-  UNION ALL
-
-  -- Delegatee side (RC coming IN)
-  SELECT
-    delegatee AS account_id,
-    rc_delta AS received_rc,
-    0
-  FROM rc_delegation_delta
-  WHERE source_op > 0  -- Exclude synthetic previous record
-),
-------------------------------------------------------------------------------
--- Aggregate all RC delegation changes per account
-------------------------------------------------------------------------------
-sum_rc_delegations AS (
-  SELECT
-    ud.account_id,
-    SUM(ud.received_rc) AS received_rc,
-    SUM(ud.delegated_rc) AS delegated_rc
-  FROM union_rc_delegations ud
-  GROUP BY ud.account_id
-),
-------------------------------------------------------------------------------
--- STEP 8: Extract FINAL RC delegation state for each (delegator, delegatee) pair
+-- STEP 7: Extract FINAL RC delegation state for each (delegator, delegatee) pair
 --
 -- SQUASHING RESULT: From all the operations processed, we only need the
 -- LATEST state (rn=1) to store in current_rc_delegations.
@@ -296,39 +255,17 @@ delete_canceled_rc_delegations AS (
     crd.delegator = pn.delegator AND
     crd.delegatee = pn.delegatee AND pn.max_rc = 0
   RETURNING crd.delegator AS delegator
-),
-------------------------------------------------------------------------------
--- STEP 11: Update account_rc_delegations summary table (UPSERT)
---
--- account_rc_delegations stores CUMULATIVE totals per account:
---   - received_rc: Total RC received from all delegators
---   - delegated_rc: Total RC delegated out to all delegatees
-------------------------------------------------------------------------------
-insert_rc_delegations AS (
-  INSERT INTO account_rc_delegations
-    (account, received_rc, delegated_rc)
-  SELECT
-    sd.account_id,
-    sd.received_rc,
-    sd.delegated_rc
-  FROM sum_rc_delegations sd
-  ON CONFLICT ON CONSTRAINT pk_account_rc_delegations
-  DO UPDATE SET
-      received_rc = account_rc_delegations.received_rc + EXCLUDED.received_rc,
-      delegated_rc = account_rc_delegations.delegated_rc + EXCLUDED.delegated_rc
-  RETURNING account AS updated_account
 )
 
 ------------------------------------------------------------------------------
--- STEP 12: Return counts for logging/debugging
+-- STEP 10: Return counts for logging/debugging
 --
 -- Execute all CTEs and capture counts from data-modifying CTEs.
 ------------------------------------------------------------------------------
 SELECT
   (SELECT count(*) FROM insert_current_rc_delegations) AS insert_current_rc_delegations,
-  (SELECT count(*) FROM delete_canceled_rc_delegations) AS delete_canceled_rc_delegations,
-  (SELECT count(*) FROM insert_rc_delegations) AS insert_rc_delegations
-INTO __insert_current_rc_delegations, __delete_canceled_rc_delegations, __insert_rc_delegations;
+  (SELECT count(*) FROM delete_canceled_rc_delegations) AS delete_canceled_rc_delegations
+INTO __insert_current_rc_delegations, __delete_canceled_rc_delegations;
 
 END
 $$;

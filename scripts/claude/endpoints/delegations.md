@@ -101,7 +101,8 @@ curl -X GET 'http://localhost:3000/balance-api/accounts/blocktrades/delegations'
 | Table | Purpose |
 |-------|---------|
 | `current_accounts_delegations` | Active delegation pairs (delegator → delegatee → amount) |
-| `account_delegations` | Summary totals (total delegated, total received per account) |
+
+Note: Delegation totals (total delegated, total received per account) are calculated on-demand using `btracker_backend.total_delegated_vests()` and `btracker_backend.total_received_vests()` helper functions.
 
 ## Delegation Processing
 

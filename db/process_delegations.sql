@@ -26,7 +26,6 @@ DECLARE
   -- Counters
   __insert_current_delegations       INT;
   __delete_canceled_delegations      INT;
-  __insert_delegations               INT;
 BEGIN
 ------------------------------------------------------------------------------
 -- STEP 1: Fetch all delegation-related operations in the block range
@@ -332,99 +331,8 @@ delegation_delta AS MATERIALIZED (
     w_asc AS (PARTITION BY delegator, delegatee ORDER BY source_op),      -- For LAG (chronological)
     w_desc AS (PARTITION BY delegator, delegatee ORDER BY source_op DESC) -- For ROW_NUMBER (reverse)
 ),
----------------------------------------------------------------------------------------
--- STEP 7: Calculate aggregated vesting share changes per account
---
--- DELEGATION VESTING SHARE MECHANICS:
--- When alice delegates 1000 VESTS to bob:
---   - Alice's effective voting power DECREASES by 1000 (delegated_vests goes up)
---   - Bob's effective voting power INCREASES by 1000 (received_vests goes up)
---
--- The account_delegations table stores CUMULATIVE totals:
---   - delegated_vests: Total VESTS this account has delegated OUT to others
---   - received_vests: Total VESTS this account has received FROM others
---
--- We aggregate all balance_deltas per account to get the net change.
----------------------------------------------------------------------------------------
-union_delegations AS (
-  ------------------------------------------------------------------------------
-  -- PART A: Delegator side (vests going OUT)
-  --
-  -- HF23 SPECIAL HANDLING:
-  -- For HF23 resets, balance_delta is negative (e.g., -1000 if alice had
-  -- delegated 1000). Normally we'd use GREATEST(balance_delta, 0) to only
-  -- count positive delegations, but HF23 operations MUST reduce delegated_vests.
-  --
-  -- The CASE expression checks if this operation IS the HF23 reset itself
-  -- (matching delegator and source_op). If so, allow negative deltas.
-  -- Otherwise, use GREATEST to ignore reductions (handled by return_vesting).
-  ------------------------------------------------------------------------------
-  SELECT
-    dd.delegator AS account_id,
-    0 AS received_vests,
-    (
-      CASE
-        WHEN NOT EXISTS (SELECT 1 FROM process_block_range_data_b gl WHERE gl.delegator = dd.delegator AND gl.op_type_id = _op_hardfork_hive AND gl.source_op = dd.source_op) THEN
-          -- Normal case: only count positive delegations (increases)
-          -- Reductions happen via return_vesting_delegation later
-          GREATEST(dd.balance_delta, 0)
-        ELSE
-          -- HF23 case: this IS the reset operation, allow negative delta
-          dd.balance_delta
-        END
-    ) AS delegated_vests
-  FROM delegation_delta dd
-  WHERE dd.source_op > 0  -- Exclude synthetic previous record
-
-  UNION ALL
-
-  ------------------------------------------------------------------------------
-  -- PART B: Delegatee side (vests coming IN)
-  --
-  -- Every delegation change affects the delegatee's received_vests.
-  -- Unlike delegator side, we always use the full delta (positive or negative)
-  -- because delegatees see immediate effect of delegation changes.
-  ------------------------------------------------------------------------------
-  SELECT
-    delegatee AS account_id,
-    balance_delta AS received_vests,
-    0
-  FROM delegation_delta
-  WHERE source_op > 0  -- Exclude synthetic previous record
-
-  UNION ALL
-
-  ------------------------------------------------------------------------------
-  -- PART C: Return vesting delegation (vests returning to delegator)
-  --
-  -- When a delegation is removed, the delegatee loses access immediately,
-  -- but the delegator doesn't get the vests back for ~5 days (security measure).
-  -- The return_vesting_delegation_operation is a virtual operation that marks
-  -- when vests actually return.
-  --
-  -- The balance here is NEGATIVE (from process_return_vesting_shares_operation),
-  -- representing vests being "returned" = reducing delegated_vests.
-  ------------------------------------------------------------------------------
-  SELECT
-    delegator,
-    0 AS received_vests,
-    balance  -- Negative value: reduces delegated_vests
-  FROM process_block_range_data_b
-  WHERE op_type_id = _op_return_vesting_delegation
-),
 ------------------------------------------------------------------------------
--- Aggregate all delegation changes per account
-------------------------------------------------------------------------------
-sum_delegations AS (
-  SELECT
-    ud.account_id,
-    SUM(ud.received_vests) AS received_vests,
-    SUM(ud.delegated_vests) AS delegated_vests
-  FROM union_delegations ud
-  GROUP BY ud.account_id
-),
-------------------------------------------------------------------------------
--- STEP 8: Extract FINAL delegation state for each (delegator, delegatee) pair
+-- STEP 7: Extract FINAL delegation state for each (delegator, delegatee) pair
 --
 -- SQUASHING RESULT: From all the operations processed, we only need the
 -- LATEST state (rn=1) to store in current_accounts_delegations.
@@ -487,46 +395,18 @@ delete_canceled_delegations AS (
     cad.delegator = pn.delegator AND
     cad.delegatee = pn.delegatee AND pn.balance = 0
   RETURNING cad.delegator AS delegator
-),
----------------------------------------------------------------------------------------
--- STEP 11: Update account_delegations summary table (UPSERT)
---
--- account_delegations stores CUMULATIVE totals per account:
---   - received_vests: Total VESTS received from all delegators
---   - delegated_vests: Total VESTS delegated out to all delegatees
---
--- ON CONFLICT pattern adds the new delta to existing values:
---   new_value = old_value + delta
---
--- This is an aggregate/summary table for fast lookups without
--- scanning all individual delegation records.
----------------------------------------------------------------------------------------
-insert_delegations AS (
-  INSERT INTO account_delegations
-    (account, received_vests, delegated_vests)
-  SELECT
-    sd.account_id,
-    sd.received_vests,
-    sd.delegated_vests
-  FROM sum_delegations sd
-  ON CONFLICT ON CONSTRAINT pk_temp_vests
-  DO UPDATE SET
-      received_vests = account_delegations.received_vests + EXCLUDED.received_vests,
-      delegated_vests = account_delegations.delegated_vests + EXCLUDED.delegated_vests
-  RETURNING account AS updated_account
 )
 
 ------------------------------------------------------------------------------
--- STEP 12: Return counts for logging/debugging
+-- STEP 10: Return counts for logging/debugging
 --
 -- Execute all CTEs and capture counts from data-modifying CTEs.
 -- The SELECT triggers execution of the entire CTE chain.
 ------------------------------------------------------------------------------
 SELECT
   (SELECT count(*) FROM insert_current_delegations) AS insert_current_delegations,
-  (SELECT count(*) FROM delete_canceled_delegations) AS delete_canceled_delegations,
-  (SELECT count(*) FROM insert_delegations) AS insert_delegations
-INTO __insert_current_delegations, __delete_canceled_delegations, __insert_delegations;
+  (SELECT count(*) FROM delete_canceled_delegations) AS delete_canceled_delegations
+INTO __insert_current_delegations, __delete_canceled_delegations;
 
 END
 $$;
