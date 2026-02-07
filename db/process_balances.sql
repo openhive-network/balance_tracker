@@ -82,7 +82,7 @@ ops_in_range AS MATERIALIZED
     ho.id AS source_op,
     ho.block_num AS source_op_block,
     ho.body_binary
-  FROM _batch_ops ho --- Pre-populated temp table; operations_view was scanned once in populate_batch_ops().
+  FROM operations_view ho
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
   CROSS JOIN hive.get_impacted_balances(
     ho.body_binary,

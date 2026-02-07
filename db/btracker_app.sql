@@ -577,10 +577,10 @@ $$;
  * Creates (if needed) and populates the _batch_ops temp table with all
  * operations relevant to balance_tracker in the given block range.
  *
- * The temp table contains only the 5 columns used by processing functions:
+ * The temp table contains only the 4 columns used by processing functions:
  *   - id, block_num, op_type_id: for filtering and ordering
  *   - body (jsonb): used by 13 of 14 scan paths
- *   - body_binary: used only by process_balances for hive.get_impacted_balances()
+ * Note: process_balances reads from operations_view directly (needs body_binary).
  *
  * @param _from  First block number in range
  * @param _to    Last block number in range
@@ -595,19 +595,16 @@ BEGIN
     id          BIGINT   NOT NULL,
     block_num   INT      NOT NULL,
     op_type_id  SMALLINT NOT NULL,
-    body        JSONB,
-    body_binary hafd.operation
+    body        JSONB
   ) ON COMMIT PRESERVE ROWS;
 
   TRUNCATE _batch_ops;
 
-  INSERT INTO _batch_ops (id, block_num, op_type_id, body, body_binary)
-  SELECT ov.id, ov.block_num, ov.op_type_id, ov.body, ov.body_binary
+  INSERT INTO _batch_ops (id, block_num, op_type_id, body)
+  SELECT ov.id, ov.block_num, ov.op_type_id, ov.body
   FROM operations_view ov
   WHERE ov.block_num BETWEEN _from AND _to
     AND ov.op_type_id = ANY(btracker_backend.get_all_tracked_op_type_ids());
-
-  ANALYZE _batch_ops;
 END
 $$;
 
