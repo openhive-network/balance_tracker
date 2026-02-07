@@ -565,6 +565,53 @@ END
 $$;
 
 -- ============================================================================
+-- BATCH OPERATIONS CACHE
+-- ============================================================================
+-- Single-pass optimization: scan operations_view ONCE per batch into a temp
+-- table, then all 10 processing functions read from the temp table instead
+-- of each scanning operations_view independently.
+
+/**
+ * populate_batch_ops()
+ * --------------------
+ * Creates (if needed) and populates the _batch_ops temp table with all
+ * operations relevant to balance_tracker in the given block range.
+ *
+ * The temp table contains only the 5 columns used by processing functions:
+ *   - id, block_num, op_type_id: for filtering and ordering
+ *   - body (jsonb): used by 13 of 14 scan paths
+ *   - body_binary: used only by process_balances for hive.get_impacted_balances()
+ *
+ * @param _from  First block number in range
+ * @param _to    Last block number in range
+ */
+CREATE OR REPLACE FUNCTION populate_batch_ops(IN _from INT, IN _to INT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  CREATE TEMP TABLE IF NOT EXISTS _batch_ops (
+    id          BIGINT   NOT NULL,
+    block_num   INT      NOT NULL,
+    op_type_id  SMALLINT NOT NULL,
+    body        JSONB,
+    body_binary hafd.operation
+  ) ON COMMIT PRESERVE ROWS;
+
+  TRUNCATE _batch_ops;
+
+  INSERT INTO _batch_ops (id, block_num, op_type_id, body, body_binary)
+  SELECT ov.id, ov.block_num, ov.op_type_id, ov.body, ov.body_binary
+  FROM operations_view ov
+  WHERE ov.block_num BETWEEN _from AND _to
+    AND ov.op_type_id = ANY(btracker_backend.get_all_tracked_op_type_ids());
+
+  ANALYZE _batch_ops;
+END
+$$;
+
+-- ============================================================================
 -- BLOCK PROCESSING FUNCTIONS
 -- ============================================================================
 -- These functions handle block processing dispatch and execution.
@@ -664,7 +711,9 @@ BEGIN
 
   -- Check if the block number hf_23 is within the range
   IF __hardfork_23_block BETWEEN _from AND _to THEN
-    -- Enter a loop iterating from _from to hf_23
+    -- Populate batch ops for first sub-range (up to HF23)
+    PERFORM populate_batch_ops(_from, __hardfork_23_block);
+
     PERFORM process_block_range_balances(_from, __hardfork_23_block);
     PERFORM process_block_range_withdrawals(_from, __hardfork_23_block);
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
@@ -682,7 +731,9 @@ BEGIN
     RAISE NOTICE 'Btracker processed hardfork 23 successfully';
 
     IF __hardfork_23_block != _to THEN
-      -- Continue the loop from hf_23 to _to
+      -- Populate batch ops for second sub-range (after HF23)
+      PERFORM populate_batch_ops(__hardfork_23_block + 1, _to);
+
       PERFORM process_block_range_balances(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_withdrawals(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
@@ -697,7 +748,9 @@ BEGIN
     END IF;
 
   ELSE
-    -- If 41818752 is not in range, process the full range normally
+    -- Populate batch ops for the full range
+    PERFORM populate_batch_ops(_from, _to);
+
     PERFORM process_block_range_balances(_from, _to);
     PERFORM process_block_range_withdrawals(_from, _to);
     PERFORM process_block_range_savings(_from, _to);
@@ -748,6 +801,8 @@ BEGIN
     RAISE NOTICE 'Btracker processing block: %...', _block;
     __start_ts := clock_timestamp();
   END IF;
+
+  PERFORM populate_batch_ops(_block, _block);
 
   PERFORM process_block_range_balances(_block, _block);
   PERFORM process_block_range_withdrawals(_block, _block);

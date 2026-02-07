@@ -63,7 +63,7 @@ BEGIN
 -- Example: Processing blocks 1-1000 in one call vs 1000 separate calls.
 WITH ops AS MATERIALIZED (
   SELECT ov.body, ov.op_type_id, ov.id AS source_op, ov.block_num AS source_op_block
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id = ANY(ARRAY[_op_claim_reward_balance, _op_author_reward, _op_curation_reward, _op_comment_reward, _op_comment_benefactor_reward]) AND
     ov.block_num BETWEEN _from AND _to

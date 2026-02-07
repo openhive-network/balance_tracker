@@ -39,7 +39,7 @@ BEGIN
 ------------------------------------------------------------------------------
 WITH ops AS MATERIALIZED (
   SELECT ov.body, ov.op_type_id, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation, _op_return_vesting_delegation, _op_hardfork_hive) AND
     ov.block_num BETWEEN _from AND _to

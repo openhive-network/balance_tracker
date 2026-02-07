@@ -42,7 +42,7 @@ BEGIN
          *   - limit_order_cancelled: System auto-cancels (e.g., expired order)
          */
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, (ov.body)::jsonb AS body
-        FROM operations_view ov
+        FROM _batch_ops ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
     ),

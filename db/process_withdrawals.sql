@@ -58,7 +58,7 @@ WITH ops_withdraw AS MATERIALIZED (
   -- MATERIALIZED: prevents re-scanning operations_view when referenced later.
   -- Single scan extracts both operation types - more efficient than two separate queries.
   SELECT ov.body, ov.op_type_id, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive) AND
     ov.block_num BETWEEN _from AND _to
@@ -154,7 +154,7 @@ DO UPDATE SET
 ------------------------------------------------------------------------------
 WITH ops_routes AS MATERIALIZED (
   SELECT ov.body, ov.id
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id = _op_set_withdraw_vesting_route AND
     ov.block_num BETWEEN _from AND _to
@@ -312,7 +312,7 @@ WITH ops_hf23 AS MATERIALIZED (
   -- Will be empty for all block ranges except the one containing HF23.
   -- No performance impact when empty - PostgreSQL optimizes empty CTE chains.
   SELECT ov.body, ov.id
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id = _op_hardfork_hive AND
     ov.block_num BETWEEN _from AND _to
@@ -393,7 +393,7 @@ INTO __delete_hf23_routes_count, __delete_hf23_routes;
 ------------------------------------------------------------------------------
 WITH ops_fill AS MATERIALIZED (
   SELECT ov.body, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id = _op_fill_vesting_withdraw AND
     ov.block_num BETWEEN _from AND _to
@@ -512,7 +512,7 @@ INTO __insert_not_yet_filled_withdrawals, __reset_filled_withdrawals;
 ------------------------------------------------------------------------------
 WITH ops_delays AS MATERIALIZED (
   SELECT ov.body, ov.op_type_id, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _batch_ops ov
   WHERE
     ov.op_type_id IN (_op_fill_vesting_withdraw, _op_transfer_to_vesting_completed, _op_delayed_voting) AND
     ov.block_num BETWEEN _from AND _to
