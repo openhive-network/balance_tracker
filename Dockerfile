@@ -7,6 +7,9 @@ FROM psql as version-calculcation
 COPY --chown=haf_admin:users . /home/haf_admin/src
 WORKDIR /home/haf_admin/src
 RUN scripts/generate_version_sql.sh $(pwd)
+RUN API_VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo dev)" \
+    && sed -i 's|"version": "[^"]*"|"version": "'"$API_VERSION"'"|' endpoints/endpoint_schema.sql \
+    && sed -i 's|^  version: .*|  version: '"$API_VERSION"'|' endpoints/endpoint_schema.sql
 
 FROM psql AS full
 
@@ -46,7 +49,7 @@ COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
 COPY db /app/db
 COPY backend /app/backend
-COPY endpoints /app/endpoints
+COPY --from=version-calculcation /home/haf_admin/src/endpoints /app/endpoints
 COPY tests/mocks /app/tests/mocks
 COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
 COPY docker/scripts/docker_entrypoint.sh /app/docker_entrypoint.sh
