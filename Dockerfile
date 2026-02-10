@@ -3,13 +3,12 @@ ARG PSQL_CLIENT_VERSION=14-1
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation
+ARG API_VERSION="dev"
 
 COPY --chown=haf_admin:users . /home/haf_admin/src
 WORKDIR /home/haf_admin/src
 RUN scripts/generate_version_sql.sh $(pwd)
-RUN git fetch --tags --quiet 2>/dev/null || true \
-    && API_VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo dev)" \
-    && sed -i 's|"version": "[^"]*"|"version": "'"$API_VERSION"'"|' endpoints/endpoint_schema.sql \
+RUN sed -i 's|"version": "[^"]*"|"version": "'"$API_VERSION"'"|' endpoints/endpoint_schema.sql \
     && sed -i 's|^  version: .*|  version: '"$API_VERSION"'|' endpoints/endpoint_schema.sql
 
 FROM psql AS full

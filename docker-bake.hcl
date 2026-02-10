@@ -38,6 +38,9 @@ variable "GIT_LAST_COMMITTER" {
 variable "GIT_LAST_COMMIT_DATE" {
   default = "[unknown]"
 }
+variable "API_VERSION" {
+  default = "dev"
+}
 
 # Functions
 function "notempty" {
@@ -72,6 +75,7 @@ target "full" {
     GIT_LAST_LOG_MESSAGE = "${GIT_LAST_LOG_MESSAGE}",
     GIT_LAST_COMMITTER = "${GIT_LAST_COMMITTER}",
     GIT_LAST_COMMIT_DATE = "${GIT_LAST_COMMIT_DATE}",
+    API_VERSION = "${API_VERSION}",
   }
   platforms = [
     "linux/amd64"
