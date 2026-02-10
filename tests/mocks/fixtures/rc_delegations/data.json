@@ -3,7 +3,7 @@
         {
             "block_num": 90000040,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",
@@ -18,7 +18,7 @@
         {
             "block_num": 90000041,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",
@@ -33,7 +33,7 @@
         {
             "block_num": 90000042,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",
@@ -48,7 +48,7 @@
         {
             "block_num": 90000043,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",
@@ -63,7 +63,7 @@
         {
             "block_num": 90000044,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",
@@ -78,7 +78,7 @@
         {
             "block_num": 90000045,
             "op_type_id": 18,
-            "op_pos": 1,
+            "op_pos": 2,
             "trx_in_block": 0,
             "body": {
                 "type": "custom_json_operation",

@@ -31,7 +31,7 @@ SET ROLE btracker_owner;
 DROP TYPE IF EXISTS btracker_backend.operation_type CASCADE;
 CREATE TYPE btracker_backend.operation_type AS (
     block_num INT,
-    op_type_id INT,
+    op_type_id SMALLINT,
     op_pos INT,
     trx_in_block INT,
     body JSON

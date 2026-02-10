@@ -98,10 +98,10 @@ BEGIN
 
   -- Simulate 24th hardfork, required for delayed votes test
   -- HF24 introduced delayed voting (30-day delay before full voting power)
-  -- Insert at the first mock block (matching original hardcoded behavior)
+  -- Reference the first operation in the first mock block (op_pos=1)
   INSERT INTO hafd.applied_hardforks
     (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 24, _mock_start_block_num, 386547060934967584;
+  SELECT 24, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
 
   -- Simulate 26th hardfork, required for RC delegations
   -- HF26 introduced RC (Resource Credit) delegations (block ~68676505 on mainnet)
@@ -109,7 +109,7 @@ BEGIN
   -- Note: Reuse same hardfork_vop_id as HF24 since it's just a mock entry
   INSERT INTO hafd.applied_hardforks
     (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 26, _mock_start_block_num, 386547060934967584;
+  SELECT 26, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
 
   -- Return the detected block range for logging purposes
   RETURN QUERY SELECT _mock_start_block_num, _mock_end_block_num;

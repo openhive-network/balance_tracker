@@ -5,7 +5,7 @@
       "balance_change": "0",
       "block_num": 90000001,
       "op_type_id": 59,
-      "operation_id": "386547060934969147",
+      "operation_id": "386547060934967303",
       "prev_balance": "8100",
       "timestamp": "2016-09-15T19:47:24"
     },
@@ -14,7 +14,7 @@
       "balance_change": "1000",
       "block_num": 90000001,
       "op_type_id": 34,
-      "operation_id": "386547060934968866",
+      "operation_id": "386547060934967302",
       "prev_balance": "7100",
       "timestamp": "2016-09-15T19:47:24"
     },
@@ -23,7 +23,7 @@
       "balance_change": "-2000",
       "block_num": 90000001,
       "op_type_id": 33,
-      "operation_id": "386547060934968609",
+      "operation_id": "386547060934967301",
       "prev_balance": "9100",
       "timestamp": "2016-09-15T19:47:24"
     },
@@ -32,7 +32,7 @@
       "balance_change": "-1000",
       "block_num": 90000001,
       "op_type_id": 33,
-      "operation_id": "386547060934968353",
+      "operation_id": "386547060934967300",
       "prev_balance": "10100",
       "timestamp": "2016-09-15T19:47:24"
     },
@@ -41,7 +41,7 @@
       "balance_change": "100",
       "block_num": 90000001,
       "op_type_id": 55,
-      "operation_id": "386547060934968119",
+      "operation_id": "386547060934967299",
       "prev_balance": "10000",
       "timestamp": "2016-09-15T19:47:24"
     },
@@ -50,7 +50,7 @@
       "balance_change": "10000",
       "block_num": 90000001,
       "op_type_id": 32,
-      "operation_id": "386547060934967584",
+      "operation_id": "386547060934967297",
       "prev_balance": "0",
       "timestamp": "2016-09-15T19:47:24"
     }

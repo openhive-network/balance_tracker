@@ -4,13 +4,13 @@
     {
       "delegator": "blocktrades",
       "max_rc": "10000000000",
-      "operation_id": "386547241323594002",
+      "operation_id": "386547241323593730",
       "block_num": 90000043
     },
     {
       "delegator": "steem",
       "max_rc": "1500000000",
-      "operation_id": "386547249913528594",
+      "operation_id": "386547249913528322",
       "block_num": 90000045
     }
   ]
