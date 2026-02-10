@@ -36,7 +36,7 @@ SET ROLE btracker_owner;
 -- Notes:
 --   - op_type_id must match hive.operation_types
 --   - Operation body is converted to binary using hafd.operation_from_jsontext
---   - Operation ID is generated from (block_num, op_type_id, op_pos)
+--   - Operation ID is generated from (block_num, op_pos)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION btracker_backend.insert_mock_operations(IN _block_json JSON)
 RETURNS VOID
@@ -46,12 +46,13 @@ AS
 $BODY$
 BEGIN
   INSERT INTO hafd.operations(
-    id, trx_in_block, op_pos, body_binary)
+    id, trx_in_block, op_pos, op_type_id, body_binary)
   SELECT
-    -- Generate operation ID from block num, operation type ID and operation position
-    hafd.operation_id(block_num, op_type_id, op_pos),
+    -- Generate operation ID from block num and operation position
+    hafd.operation_id(block_num, op_pos),
     trx_in_block,
     op_pos,
+    op_type_id,
     -- Convert JSON text to binary representation of operation
     hafd.operation_from_jsontext(body::TEXT)
   FROM json_populate_recordset(

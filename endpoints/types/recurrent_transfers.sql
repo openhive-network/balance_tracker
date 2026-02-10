@@ -53,7 +53,7 @@ btracker_backend.incoming_recurrent_transfers:
       type: string
       description: >-
         Unique operation identifier with
-        an encoded block number and operation type id
+        an encoded block number and operation position
     block_num:
       type: integer
       description: Block number
@@ -107,7 +107,7 @@ btracker_backend.outgoing_recurrent_transfers:
       type: string
       description: >-
         Unique operation identifier with
-        an encoded block number and operation type id
+        an encoded block number and operation position
     block_num:
       type: integer
       description: Block number

@@ -4,7 +4,7 @@
   "operations_result": [
     {
       "block_num": 4999992,
-      "operation_id": "21474802120262208",
+      "operation_id": "21474802120261634",
       "op_type_id": 64,
       "balance": "8172549681941451",
       "prev_balance": "8172546678091286",
@@ -13,7 +13,7 @@
     },
     {
       "block_num": 4999959,
-      "operation_id": "21474660386343488",
+      "operation_id": "21474660386340874",
       "op_type_id": 64,
       "balance": "8172546678091286",
       "prev_balance": "8172543674223181",
@@ -22,7 +22,7 @@
     },
     {
       "block_num": 4999950,
-      "operation_id": "21474621731637824",
+      "operation_id": "21474621731635210",
       "op_type_id": 64,
       "balance": "8172543674223181",
       "prev_balance": "8172540670350183",
@@ -31,7 +31,7 @@
     },
     {
       "block_num": 4999950,
-      "operation_id": "21474621731637070",
+      "operation_id": "21474621731635207",
       "op_type_id": 78,
       "balance": "8172540670350183",
       "prev_balance": "8172535638862911",
@@ -40,7 +40,7 @@
     },
     {
       "block_num": 4999916,
-      "operation_id": "21474475702752064",
+      "operation_id": "21474475702747155",
       "op_type_id": 64,
       "balance": "8172535638862911",
       "prev_balance": "8172532634970519",
@@ -49,7 +49,7 @@
     },
     {
       "block_num": 4999904,
-      "operation_id": "21474424163144512",
+      "operation_id": "21474424163139603",
       "op_type_id": 64,
       "balance": "8172532634970519",
       "prev_balance": "8172529631071299",
@@ -58,7 +58,7 @@
     },
     {
       "block_num": 4999877,
-      "operation_id": "21474308199024448",
+      "operation_id": "21474308199022599",
       "op_type_id": 64,
       "balance": "8172529631071299",
       "prev_balance": "8172526627156794",
@@ -67,7 +67,7 @@
     },
     {
       "block_num": 4999850,
-      "operation_id": "21474192234906432",
+      "operation_id": "21474192234905603",
       "op_type_id": 64,
       "balance": "8172526627156794",
       "prev_balance": "8172523623227610",
@@ -76,7 +76,7 @@
     },
     {
       "block_num": 4999837,
-      "operation_id": "21474136400331584",
+      "operation_id": "21474136400330755",
       "op_type_id": 64,
       "balance": "8172523623227610",
       "prev_balance": "8172520619291359",
@@ -85,7 +85,7 @@
     },
     {
       "block_num": 4999815,
-      "operation_id": "21474041911051072",
+      "operation_id": "21474041911050243",
       "op_type_id": 64,
       "balance": "8172520619291359",
       "prev_balance": "8172517615342540",
@@ -94,7 +94,7 @@
     },
     {
       "block_num": 4999802,
-      "operation_id": "21473986076476224",
+      "operation_id": "21473986076475395",
       "op_type_id": 64,
       "balance": "8172517615342540",
       "prev_balance": "8172514611386653",

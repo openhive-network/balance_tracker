@@ -247,9 +247,10 @@ btracker_backend.balance_history:
       type: string
       description: >-
         unique operation identifier with
-        an encoded block number and operation type id
+        an encoded block number and operation position
     op_type_id:
       type: integer
+      x-sql-datatype: SMALLINT
       description: operation type identifier
     balance:
       type: string
@@ -270,7 +271,7 @@ DROP TYPE IF EXISTS btracker_backend.balance_history CASCADE;
 CREATE TYPE btracker_backend.balance_history AS (
     "block_num" INT,
     "operation_id" TEXT,
-    "op_type_id" INT,
+    "op_type_id" SMALLINT,
     "balance" TEXT,
     "prev_balance" TEXT,
     "balance_change" TEXT,

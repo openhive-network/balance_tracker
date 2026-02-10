@@ -4,7 +4,7 @@
   "operations_result": [
     {
       "block_num": 4998632,
-      "operation_id": "21468960964740610",
+      "operation_id": "21468960964739078",
       "op_type_id": 2,
       "balance": "29594875",
       "prev_balance": "29605903",
@@ -13,7 +13,7 @@
     },
     {
       "block_num": 4998632,
-      "operation_id": "21468960964739917",
+      "operation_id": "21468960964739075",
       "op_type_id": 77,
       "balance": "29605903",
       "prev_balance": "29778337",

@@ -14,7 +14,7 @@ btracker_backend.incoming_delegations:
       type: string
       description: >-
         unique operation identifier with
-        an encoded block number and operation type id
+        an encoded block number and operation position
     block_num:
       type: integer
       description: block number
@@ -43,7 +43,7 @@ btracker_backend.outgoing_delegations:
       type: string
       description: >-
         unique operation identifier with
-        an encoded block number and operation type id
+        an encoded block number and operation position
     block_num:
       type: integer
       description: block number

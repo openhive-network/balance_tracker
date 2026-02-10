@@ -3,7 +3,7 @@
         {
             "block_num":90000023,
             "op_type_id":40,
-            "op_pos":1,
+            "op_pos":3,
             "trx_in_block":-1,
             "body": {
                 "type": "delegate_vesting_shares_operation",
@@ -21,7 +21,7 @@
         {
             "block_num":90000023,
             "op_type_id":40,
-            "op_pos":2,
+            "op_pos":4,
             "trx_in_block":-1,
             "body": {
                 "type": "delegate_vesting_shares_operation",
@@ -39,7 +39,7 @@
         {
             "block_num":90000023,
             "op_type_id":62,
-            "op_pos":1,
+            "op_pos":5,
             "trx_in_block":-1,
             "body": {
                 "type": "return_vesting_delegation_operation",
@@ -56,7 +56,7 @@
         {
             "block_num":90000024,
             "op_type_id":40,
-            "op_pos":1,
+            "op_pos":2,
             "trx_in_block":-1,
             "body": {
                 "type": "delegate_vesting_shares_operation",
