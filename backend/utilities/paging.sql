@@ -376,11 +376,14 @@ DECLARE
   __to_seq INT;
   __from_seq INT;
 BEGIN
+  -- Boundary queries use the base table directly (not the view) to avoid
+  -- the unnecessary JOIN with hafd.operations that prevents index usage.
+  -- The view is only needed by gather_page which requires op_type_id/source_op_block.
   IF _to IS NULL THEN
     __to_seq := (
       SELECT
         ab.balance_seq_no
-      FROM btracker_backend.account_balance_history_view ab
+      FROM account_balance_history ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no DESC LIMIT 1
@@ -389,20 +392,20 @@ BEGIN
     __to_seq := (
       WITH last_block AS (
         SELECT
-          ab.source_op_block
-        FROM btracker_backend.account_balance_history_view ab
+          hafd.operation_id_to_block_num(ab.source_op) AS source_op_block
+        FROM account_balance_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block <= _to
-        ORDER BY ab.source_op_block DESC LIMIT 1
+          AND hafd.operation_id_to_block_num(ab.source_op) <= _to
+        ORDER BY hafd.operation_id_to_block_num(ab.source_op) DESC LIMIT 1
       ),
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM btracker_backend.account_balance_history_view ab
+        FROM account_balance_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block = (SELECT source_op_block FROM last_block)
+          AND hafd.operation_id_to_block_num(ab.source_op) = (SELECT source_op_block FROM last_block)
       )
       SELECT MAX(gs.balance_seq_no)
       FROM get_sequence gs
@@ -413,7 +416,7 @@ BEGIN
     __from_seq := (
       SELECT
         ab.balance_seq_no
-      FROM btracker_backend.account_balance_history_view ab
+      FROM account_balance_history ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no ASC LIMIT 1
@@ -422,20 +425,20 @@ BEGIN
     __from_seq := (
       WITH first_block AS (
         SELECT
-          ab.source_op_block
-        FROM btracker_backend.account_balance_history_view ab
+          hafd.operation_id_to_block_num(ab.source_op) AS source_op_block
+        FROM account_balance_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block >= _from
-        ORDER BY ab.source_op_block ASC LIMIT 1
+          AND hafd.operation_id_to_block_num(ab.source_op) >= _from
+        ORDER BY hafd.operation_id_to_block_num(ab.source_op) ASC LIMIT 1
       ),
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM btracker_backend.account_balance_history_view ab
+        FROM account_balance_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block = (SELECT source_op_block FROM first_block)
+          AND hafd.operation_id_to_block_num(ab.source_op) = (SELECT source_op_block FROM first_block)
       )
       SELECT MIN(gs.balance_seq_no)
       FROM get_sequence gs
@@ -484,11 +487,13 @@ DECLARE
   __to_seq INT;
   __from_seq INT;
 BEGIN
+  -- Boundary queries use the base table directly (not the view) to avoid
+  -- the unnecessary JOIN with hafd.operations that prevents index usage.
   IF _to IS NULL THEN
     __to_seq := (
       SELECT
         ab.balance_seq_no
-      FROM btracker_backend.account_savings_history_view ab
+      FROM account_savings_history ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no DESC LIMIT 1
@@ -497,20 +502,20 @@ BEGIN
     __to_seq := (
       WITH last_block AS (
         SELECT
-          ab.source_op_block
-        FROM btracker_backend.account_savings_history_view ab
+          hafd.operation_id_to_block_num(ab.source_op) AS source_op_block
+        FROM account_savings_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block <= _to
-        ORDER BY ab.source_op_block DESC LIMIT 1
+          AND hafd.operation_id_to_block_num(ab.source_op) <= _to
+        ORDER BY hafd.operation_id_to_block_num(ab.source_op) DESC LIMIT 1
       ),
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM btracker_backend.account_savings_history_view ab
+        FROM account_savings_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block = (SELECT source_op_block FROM last_block)
+          AND hafd.operation_id_to_block_num(ab.source_op) = (SELECT source_op_block FROM last_block)
       )
       SELECT MAX(gs.balance_seq_no)
       FROM get_sequence gs
@@ -521,7 +526,7 @@ BEGIN
     __from_seq := (
       SELECT
         ab.balance_seq_no
-      FROM btracker_backend.account_savings_history_view ab
+      FROM account_savings_history ab
       WHERE ab.account = _account_id
         AND ab.nai = _coin_type
       ORDER BY ab.balance_seq_no ASC LIMIT 1
@@ -530,20 +535,20 @@ BEGIN
     __from_seq := (
       WITH first_block AS (
         SELECT
-          ab.source_op_block
-        FROM btracker_backend.account_savings_history_view ab
+          hafd.operation_id_to_block_num(ab.source_op) AS source_op_block
+        FROM account_savings_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block >= _from
-        ORDER BY ab.source_op_block ASC LIMIT 1
+          AND hafd.operation_id_to_block_num(ab.source_op) >= _from
+        ORDER BY hafd.operation_id_to_block_num(ab.source_op) ASC LIMIT 1
       ),
       get_sequence AS (
         SELECT
           ab.balance_seq_no
-        FROM btracker_backend.account_savings_history_view ab
+        FROM account_savings_history ab
         WHERE ab.account = _account_id
           AND ab.nai = _coin_type
-          AND ab.source_op_block = (SELECT source_op_block FROM first_block)
+          AND hafd.operation_id_to_block_num(ab.source_op) = (SELECT source_op_block FROM first_block)
       )
       SELECT MIN(gs.balance_seq_no)
       FROM get_sequence gs
