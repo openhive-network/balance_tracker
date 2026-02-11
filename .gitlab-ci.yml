@@ -376,6 +376,21 @@ sync:
       "${CI_PROJECT_DIR}/scripts/ci-helpers/wait-for-bt-startup.sh"
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
     fi
+
+    # Create indexes after sync (before cache save).
+    # In CI the MASSIVE_PROCESSING stage never transitions to LIVE, so
+    # create_btracker_indexes() is not called during block processing.
+    # Creating them here bakes them into the cache for all downstream jobs.
+    echo -e "\e[0Ksection_start:$(date +%s):indexes[collapsed=true]\r\e[0KCreating indexes and running ANALYZE..."
+    psql "$POSTGRES_ACCESS" <<'EOSQL'
+    SET search_path TO btracker_app, public;
+    SET ROLE btracker_owner;
+    SELECT create_btracker_indexes();
+    RESET ROLE;
+    ANALYZE;
+    EOSQL
+    echo -e "\e[0Ksection_end:$(date +%s):indexes\r\e[0K"
+
   # Shutdown and save cache
   - !reference [.haf_app_sync_shutdown, script]
   - !reference [.haf_app_sync_save_cache_conditional, script]
@@ -783,17 +798,10 @@ pattern-test:
       . docker/venv/bin/activate
       PGACCESS="postgresql://haf_admin@docker:5432/haf_block_log"
 
-      # Ensure indexes exist: in CI the sync runs entirely in MASSIVE_PROCESSING
-      # stage (node stops before LIVE transition), so create_btracker_indexes()
-      # is never called. Create them now + refresh planner statistics.
-      echo -e "\e[0Ksection_start:$(date +%s):analyze[collapsed=true]\r\e[0KCreating indexes and running ANALYZE..."
-      psql "$PGACCESS" <<'EOSQL_ANALYZE'
-      SET search_path TO btracker_app, public;
-      SET ROLE btracker_owner;
-      SELECT create_btracker_indexes();
-      RESET ROLE;
-      ANALYZE;
-      EOSQL_ANALYZE
+      # Indexes are created during sync (baked into cache).
+      # Refresh planner stats after cache restore.
+      echo -e "\e[0Ksection_start:$(date +%s):analyze[collapsed=true]\r\e[0KRunning ANALYZE..."
+      psql "$PGACCESS" -c "ANALYZE;"
       echo -e "\e[0Ksection_end:$(date +%s):analyze\r\e[0K"
 
       # Diagnostic: run the slowest query (VESTS balance history for blocktrades)
