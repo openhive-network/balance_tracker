@@ -915,6 +915,15 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op));
   -- Savings history: block range filtering (function-based index on source_op)
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op));
+
+  -- Increase planner statistics for account column (default 100 → 1000).
+  -- With millions of accounts, 100 MCV entries may miss high-activity accounts
+  -- like blocktrades, causing the planner to fall back to generic selectivity
+  -- estimates and choose Seq Scan over Index Scan.
+  ALTER TABLE account_balance_history ALTER COLUMN account SET STATISTICS 1000;
+  ALTER TABLE account_savings_history ALTER COLUMN account SET STATISTICS 1000;
+  ANALYZE account_balance_history(account);
+  ANALYZE account_savings_history(account);
   -- Top holders: order by balance descending
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai, balance DESC);
   -- Top savings holders: order by savings balance descending

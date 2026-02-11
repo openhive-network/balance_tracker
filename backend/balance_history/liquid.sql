@@ -29,10 +29,12 @@ BEGIN
     RETURN _prev_balance;
   END IF;
 
-  -- Fallback: look up the most recent balance before this sequence number
+  -- Fallback: look up the most recent balance before this sequence number.
+  -- Uses base table directly (not the view) to enable index-only scan on
+  -- (account, nai, balance_seq_no) without the unnecessary hafd.operations JOIN.
   _prev_balance := (
     SELECT abh.balance
-    FROM btracker_backend.account_balance_history_view abh
+    FROM account_balance_history abh
     WHERE
       abh.account = _account_id AND
       abh.nai = _coin_type AND
