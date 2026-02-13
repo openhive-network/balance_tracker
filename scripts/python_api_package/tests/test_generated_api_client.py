@@ -6,7 +6,7 @@ import aiohttp
 
 from tests.api_caller import HafbeApiCaller
 
-from beekeepy._communication import HttpUrl
+from beekeepy.interfaces import HttpUrl
 
 FALLBACK_ENDPOINTS: Final[list[HttpUrl]] = [
     HttpUrl("https://api.syncad.com"),
