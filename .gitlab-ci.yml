@@ -73,6 +73,8 @@ variables:
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
   CACHE_MANAGER_REF: "develop"
+  # Set to "true" to run poetry update before install (uses latest dependency versions)
+  TEST_WITH_LATEST_DEPENDENCIES: "false"
   # Common CI configuration reference
   COMMON_CI_REF: "develop"
   COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}"
@@ -181,9 +183,6 @@ generate_python_api_client:
   needs:
   - job: extract-swagger-json
     artifacts: true
-  before_script:
-  - poetry -C "${PYPROJECT_DIR}" lock
-  - poetry -C "${PYPROJECT_DIR}" install
   script:
   - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
   artifacts:
@@ -871,8 +870,8 @@ python_api_client_test:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
   - *early_exit_check
-  - poetry -C "${PYPROJECT_DIR}" lock
-  - poetry -C "${PYPROJECT_DIR}" install
+  - !reference [.project_develop_configuration_template, before_script]
+  - !reference [.update_deps_for_tests, script]
   script:
   - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests"
   tags:
