@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from beekeepy._apis.abc.sendable import AsyncSendable
+from beekeepy.handle.remote import AsyncSendable
 
 from balance_api.balance_api_client.balance_api_client import BalanceApi
 
