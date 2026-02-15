@@ -602,7 +602,14 @@ BEGIN
   END IF;
 
   IF NOT isIndexesCreated() THEN
+    -- create_btracker_indexes() performs DDL (ALTER TABLE SET STATISTICS) on
+    -- tables registered in the hafbe_bal context.  HAF's event trigger
+    -- hive.on_edit_registered_tables() verifies that CURRENT_USER matches the
+    -- context owner.  When called from the block-explorer processing loop the
+    -- session runs as hafbe_owner, so we must switch to btracker_owner first.
+    SET LOCAL ROLE btracker_owner;
     PERFORM create_btracker_indexes();
+    RESET ROLE;
   END IF;
   CALL btracker_single_processing(_block_range.first_block, _logs);
 END
