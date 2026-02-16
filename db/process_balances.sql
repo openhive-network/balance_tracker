@@ -86,7 +86,7 @@ ops_in_range AS MATERIALIZED
   JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
   CROSS JOIN hive.get_impacted_balances(
     ho.body_binary,
-    ho.block_num > ah.block_num
+    ho.block_num > hafd.block_id_to_num(ah.block_id)
   ) AS get_impacted_balances
   WHERE
     ho.op_type_id IN (SELECT id FROM balance_impacting_ops) AND
