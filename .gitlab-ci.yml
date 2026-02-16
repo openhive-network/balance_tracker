@@ -135,6 +135,8 @@ detect_changes:
 find_haf_image:
   extends: .find_haf_image
   stage: detect
+  variables:
+    UPSTREAM_BRANCH: "mi/refactoring_reversible_cc_squashed2"
 
 # =============================================================================
 # LINT JOBS - Using common-ci-configuration templates
