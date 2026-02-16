@@ -38,9 +38,9 @@ AS
 $BODY$
 BEGIN
   RETURN QUERY
-  SELECT MIN(b.num)::INT, MAX(b.num)::INT
+  SELECT MIN(hafd.block_id_to_num(b.block_id))::INT, MAX(hafd.block_id_to_num(b.block_id))::INT
   FROM hafd.blocks b
-  WHERE b.num >= 90000000;
+  WHERE hafd.block_id_to_num(b.block_id) >= 90000000;
 END;
 $BODY$;
 
@@ -98,10 +98,11 @@ BEGIN
 
   -- Simulate 24th hardfork, required for delayed votes test
   -- HF24 introduced delayed voting (30-day delay before full voting power)
-  -- Reference the first operation in the first mock block (op_pos=1)
+  -- Reference the first operation in the first mock block (type=0, op_pos=1)
+  -- Note: hafd.operation_id now takes 3 params: (block_num, op_type, op_pos)
   INSERT INTO hafd.applied_hardforks
     (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 24, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
+  SELECT 24, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 0, 1);
 
   -- Simulate 26th hardfork, required for RC delegations
   -- HF26 introduced RC (Resource Credit) delegations (block ~68676505 on mainnet)
@@ -109,7 +110,7 @@ BEGIN
   -- Note: Reuse same hardfork_vop_id as HF24 since it's just a mock entry
   INSERT INTO hafd.applied_hardforks
     (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 26, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
+  SELECT 26, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 0, 1);
 
   -- Return the detected block range for logging purposes
   RETURN QUERY SELECT _mock_start_block_num, _mock_end_block_num;

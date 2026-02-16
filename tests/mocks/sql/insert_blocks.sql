@@ -45,7 +45,7 @@ AS
 $BODY$
 BEGIN
   INSERT INTO hafd.blocks(
-    num,
+    block_id,
     hash,
     prev,
     created_at,
@@ -64,7 +64,7 @@ BEGIN
     dhf_interval_ledger
   )
   SELECT
-    block_num,
+    hafd.make_block_id(block_num, 1),  -- fork_id=1 for mock irreversible data
     decode(hash, 'hex'),
     decode(prev, 'hex'),
     created_at,
