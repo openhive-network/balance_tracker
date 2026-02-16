@@ -5,13 +5,9 @@ requires = [
 ]
 build-backend = "poetry_dynamic_versioning.backend"
 
-
 [tool.poetry]
 name = "balance_api"
 version = "0.0.0"
-description = ""
-authors = []
-
 packages = [
     { include = "balance_api" },
 ]
@@ -26,7 +22,6 @@ source = [
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
 hiveio-beekeepy = ">=1.28.5"
-hiveio-api-client-generator = {version = ">=1.7.1", python = ">=3.14"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3"
