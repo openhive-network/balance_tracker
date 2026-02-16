@@ -44,9 +44,9 @@ BEGIN
 -- with NULL return NULL (falsy), so pre-hardfork logic applies automatically:
 --   block_num > NULL => NULL => pre-hardfork behavior used
 SELECT
-  MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN block_num END),
-  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
-  MAX(CASE WHEN hardfork_num = _hf_delayed_voting THEN block_num END)
+  MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN hafd.block_id_to_num(block_id) END),
+  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN hafd.block_id_to_num(block_id) END),
+  MAX(CASE WHEN hardfork_num = _hf_delayed_voting THEN hafd.block_id_to_num(block_id) END)
 INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_delayed_voting_block
 FROM hafd.applied_hardforks
 WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_delayed_voting);

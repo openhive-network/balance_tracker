@@ -654,7 +654,7 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
-  __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
+  __hardfork_23_block INT := (SELECT hafd.block_id_to_num(block_id) FROM hafd.applied_hardforks WHERE hardfork_num = 23);
 BEGIN
   PERFORM set_config('synchronous_commit', 'OFF', false);
 
