@@ -184,8 +184,8 @@ generate_python_api_client:
   - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
   artifacts:
     paths:
-    - "${CI_PROJECT_DIR}/scripts/python_api_package/balance_api"
-    - "${CI_PROJECT_DIR}/scripts/python_api_package/balance_api/balance_api_client"
+    - "${CI_PROJECT_DIR}/scripts/python_api_package/hiveio_balance_api"
+    - "${CI_PROJECT_DIR}/scripts/python_api_package/hiveio_balance_api/balance_api_client"
   tags:
   - public-runner-docker
 
