@@ -864,6 +864,10 @@ python_api_client_test:
     artifacts: true
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+    PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py${PYTHON_VERSION}-2"
+  parallel:
+    matrix:
+    - PYTHON_VERSION: ["3.12", "3.14"]
   before_script:
   - *early_exit_check
   - !reference [.project_develop_configuration_template, before_script]
