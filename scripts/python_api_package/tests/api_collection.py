@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from beekeepy.handle.remote import AsyncSendable
 
-from balance_api.balance_api_client.balance_api_client import BalanceApi
+from hiveio_balance_api.balance_api_client.balance_api_client import BalanceApi
 
 
 class BalanceApiCollection:
