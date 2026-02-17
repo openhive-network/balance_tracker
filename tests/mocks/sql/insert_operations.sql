@@ -46,7 +46,7 @@ AS
 $BODY$
 BEGIN
   INSERT INTO hafd.operations(
-    id, block_id, trx_in_block, op_pos, body_binary)
+    id, block_id, trx_in_block, op_pos, op_type_id, body_binary)
   SELECT
     -- Generate operation ID from block num, op_type_id, and position
     hafd.operation_id(block_num, op_pos),
@@ -54,6 +54,7 @@ BEGIN
     hafd.make_block_id(block_num, 1),
     trx_in_block,
     op_pos,
+    op_type_id,
     -- Convert JSON text to binary representation of operation
     hafd.operation_from_jsontext(body::TEXT)
   FROM json_populate_recordset(
