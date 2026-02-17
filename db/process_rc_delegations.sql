@@ -52,7 +52,7 @@ BEGIN
 -- If range spans HF26, adjust _from to start at HF26 block.
 ------------------------------------------------------------------------------
 SELECT block_num INTO __hardfork_26_block
-FROM hafd.applied_hardforks
+FROM hive.applied_hardforks_view
 WHERE hardfork_num = btracker_backend.hf_rc_delegations();
 
 -- If HF26 hasn't been applied yet (e.g., during early sync), skip entirely
