@@ -51,7 +51,7 @@ BEGIN
 -- Skip processing if block range is entirely before HF26.
 -- If range spans HF26, adjust _from to start at HF26 block.
 ------------------------------------------------------------------------------
-SELECT hafd.block_id_to_num(block_id) INTO __hardfork_26_block
+SELECT block_num INTO __hardfork_26_block
 FROM hafd.applied_hardforks
 WHERE hardfork_num = btracker_backend.hf_rc_delegations();
 
