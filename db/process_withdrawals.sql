@@ -25,7 +25,7 @@ DECLARE
   _hf_vests_precision                 INT := btracker_backend.hf_vests_precision();
   _hf_withdraw_rate                   INT := btracker_backend.hf_withdraw_rate();
   _hf_delayed_voting                  INT := btracker_backend.hf_delayed_voting();
-  -- Hardfork blocks (looked up from hafd.applied_hardforks)
+  -- Hardfork blocks (looked up from hive.applied_hardforks_view)
   _hf_vests_precision_block           INT;
   _hf_withdraw_rate_block             INT;
   _hf_delayed_voting_block            INT;
@@ -48,7 +48,7 @@ SELECT
   MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_delayed_voting THEN block_num END)
 INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_delayed_voting_block
-FROM hafd.applied_hardforks
+FROM hive.applied_hardforks_view
 WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_delayed_voting);
 
 ------------------------------------------------------------------------------
