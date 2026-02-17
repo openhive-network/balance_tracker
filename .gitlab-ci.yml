@@ -873,7 +873,33 @@ python_api_client_test:
   - !reference [.project_develop_configuration_template, before_script]
   - !reference [.update_deps_for_tests, script]
   script:
-  - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests"
+  - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
+  tags:
+  - public-runner-docker
+
+test_python_api_wheel:
+  extends: .project_develop_configuration_template
+  stage: test
+  needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: build_python_api_client_wheel
+    artifacts: true
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+    DIST_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package/dist"
+    PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py${PYTHON_VERSION}-2"
+  parallel:
+    matrix:
+    - PYTHON_VERSION: ["3.12", "3.14"]
+  before_script:
+  - *early_exit_check
+  - !reference [.configuration_template, before_script]
+  - poetry -C "${PYPROJECT_DIR}" install --no-root
+  script:
+  - pip install --no-deps "${DIST_DIR}"/*.whl
+  - pytest "${PYPROJECT_DIR}/tests/test_package_import.py" -v
   tags:
   - public-runner-docker
 
@@ -896,6 +922,7 @@ deploy_python_api_packages_to_gitlab:
   - job: generate_python_api_client
     artifacts: true
   - job: python_api_client_test
+  - job: test_python_api_wheel
   extends: .deploy_wheel_to_gitlab_template
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
