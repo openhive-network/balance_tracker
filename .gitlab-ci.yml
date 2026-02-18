@@ -871,7 +871,6 @@ pattern-test-with-mock-data:
 python_api_client_test:
   extends: .project_develop_configuration_template
   stage: test
-  allow_failure: true  # Depends on external api.syncad.com which may be unavailable
   needs:
   - job: detect_changes
     artifacts: true
