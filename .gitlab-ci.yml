@@ -161,6 +161,22 @@ lint_sql_scripts:
     artifacts: true
     optional: true
 
+verify_poetry_lock_stability_api_package:
+  stage: lint
+  extends: .verify_poetry_lock_stability_template
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  tags:
+    - public-runner-docker
+
+verify_poetry_lock_stability_api_generation:
+  stage: lint
+  extends: .verify_poetry_lock_stability_template
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/api_generation"
+  tags:
+    - public-runner-docker
+
 # Note: prepare_haf_image job removed - find_haf_image now provides
 # HAF_IMAGE_NAME and HAF_COMMIT aliases directly (common-ci-configuration !285)
 
