@@ -50,8 +50,8 @@ BEGIN
   SELECT
     -- Generate operation ID from block num, op_type_id, and position
     hafd.operation_id(block_num, op_pos),
-    -- Use block_id with fork_id=1 for mock irreversible data
-    hafd.make_block_id(block_num, 1),
+    -- Use block_id with current fork_id (matches what hive.push_block uses)
+    hafd.make_block_id(block_num, (SELECT MAX(id) FROM hafd.fork)),
     trx_in_block,
     op_pos,
     op_type_id,

@@ -64,7 +64,7 @@ BEGIN
     dhf_interval_ledger
   )
   SELECT
-    hafd.make_block_id(block_num, 1),  -- fork_id=1 for mock irreversible data
+    hafd.make_block_id(block_num, (SELECT MAX(id) FROM hafd.fork)),  -- use current fork_id
     decode(hash, 'hex'),
     decode(prev, 'hex'),
     created_at,

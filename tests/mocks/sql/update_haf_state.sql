@@ -85,9 +85,9 @@ BEGIN
     RAISE EXCEPTION 'No mock blocks found in hafd.blocks (expected blocks >= 90000000)';
   END IF;
 
-  -- Set consistent block to the end of mock data range
+  -- Set consistent block to the end of mock data range (must be block_id, not plain integer)
   UPDATE hafd.hive_state
-  SET consistent_block = _mock_end_block_num;
+  SET consistent_block = hafd.make_block_id(_mock_end_block_num, (SELECT MAX(id) FROM hafd.fork));
 
   -- Set current and irreversible block to ONE BEFORE the start of mock data range
   -- HAF processes blocks AFTER current_block_num, so this ensures the first
@@ -101,16 +101,16 @@ BEGIN
   -- Reference the first operation in the first mock block (type=0, op_pos=1)
   -- Note: hafd.operation_id takes 2 params: (block_num, op_pos)
   INSERT INTO hafd.applied_hardforks
-    (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 24, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
+    (hardfork_num, block_id, hardfork_vop_id)
+  SELECT 24, hafd.make_block_id(_mock_start_block_num, (SELECT MAX(id) FROM hafd.fork)), hafd.operation_id(_mock_start_block_num, 1);
 
   -- Simulate 26th hardfork, required for RC delegations
   -- HF26 introduced RC (Resource Credit) delegations (block ~68676505 on mainnet)
   -- Insert at the first mock block so RC delegation tests work
   -- Note: Reuse same hardfork_vop_id as HF24 since it's just a mock entry
   INSERT INTO hafd.applied_hardforks
-    (hardfork_num, block_num, hardfork_vop_id)
-  SELECT 26, _mock_start_block_num, hafd.operation_id(_mock_start_block_num, 1);
+    (hardfork_num, block_id, hardfork_vop_id)
+  SELECT 26, hafd.make_block_id(_mock_start_block_num, (SELECT MAX(id) FROM hafd.fork)), hafd.operation_id(_mock_start_block_num, 1);
 
   -- Return the detected block range for logging purposes
   RETURN QUERY SELECT _mock_start_block_num, _mock_end_block_num;
