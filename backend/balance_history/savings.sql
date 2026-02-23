@@ -98,8 +98,9 @@ BEGIN
       ab.balance,
       ab.source_op,
       ab.source_op_block,
-      ab.op_type_id
+      ops.op_type_id
     FROM btracker_backend.account_savings_history_view ab
+    JOIN hafd.operations ops ON ops.id = ab.source_op
     WHERE ab.account         = _account_id
       AND ab.nai             = _coin_type
       AND ab.balance_seq_no >= _bh_range.from_seq
