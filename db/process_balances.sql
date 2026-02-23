@@ -81,6 +81,7 @@ ops_in_range AS MATERIALIZED
     get_impacted_balances.amount AS balance,
     ho.id AS source_op,
     ho.block_num AS source_op_block,
+    ho.op_type_id,
     ho.body_binary
   FROM operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
   JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
@@ -193,7 +194,8 @@ union_latest_balance_with_impacted_balances AS (
     cp.balance,
     1 AS balance_seq_no,
     cp.source_op,
-    cp.source_op_block
+    cp.source_op_block,
+    cp.op_type_id
   FROM ops_in_range cp
 
   UNION ALL
@@ -205,7 +207,8 @@ union_latest_balance_with_impacted_balances AS (
     glb.balance,
     glb.balance_seq_no,
     glb.source_op,
-    glb.source_op_block
+    glb.source_op_block,
+    0::SMALLINT AS op_type_id
   FROM get_latest_balance glb
 ),
 
@@ -285,7 +288,8 @@ sum_balances AS (
     SUM(ulb.balance) OVER w_asc AS balance,
     SUM(ulb.balance_seq_no) OVER w_asc AS balance_seq_no,
     ulb.source_op,
-    ulb.source_op_block
+    ulb.source_op_block,
+    ulb.op_type_id
   FROM union_latest_balance_with_impacted_balances ulb
   WINDOW
     w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
@@ -303,6 +307,7 @@ prepare_balance_history AS MATERIALIZED (
     sb.balance_seq_no,
     sb.source_op,
     sb.source_op_block,
+    sb.op_type_id,
     ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
   FROM sum_balances sb
 ),
@@ -338,12 +343,13 @@ prepare_balance_history AS MATERIALIZED (
  */
 insert_current_account_balances AS (
   INSERT INTO current_account_balances AS acc_balances
-    (account, nai, balance_change_count, source_op, balance)
+    (account, nai, balance_change_count, source_op, op_type_id, balance)
   SELECT
     rd.account_id,
     rd.nai,
     rd.balance_seq_no,
     rd.source_op,
+    rd.op_type_id,
     rd.balance
   FROM prepare_balance_history rd
   WHERE rd.rn = 1
@@ -351,7 +357,8 @@ insert_current_account_balances AS (
   UPDATE SET
     balance = EXCLUDED.balance,
     balance_change_count = EXCLUDED.balance_change_count,
-    source_op = EXCLUDED.source_op
+    source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id
   RETURNING (xmax = 0) as is_new_entry, acc_balances.account
 ),
 
@@ -384,6 +391,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
     pbh.balance_seq_no,
     pbh.source_op,
     pbh.source_op_block,
+    pbh.op_type_id,
     pbh.balance
   FROM prepare_balance_history pbh
   -- Remove the synthetic row that contained the prepared previous balance
@@ -409,12 +417,13 @@ remove_latest_stored_balance_record AS MATERIALIZED (
  */
 insert_account_balance_history AS (
   INSERT INTO account_balance_history AS acc_history
-    (account, nai, balance_seq_no, source_op, balance)
+    (account, nai, balance_seq_no, source_op, op_type_id, balance)
   SELECT
     pbh.account_id,
     pbh.nai,
     pbh.balance_seq_no,
     pbh.source_op,
+    pbh.op_type_id,
     pbh.balance
   FROM remove_latest_stored_balance_record pbh
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
@@ -446,6 +455,7 @@ join_created_at_to_balance_history AS MATERIALIZED (
     rls.nai,
     rls.source_op,
     rls.source_op_block,
+    rls.op_type_id,
     rls.balance,
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
@@ -509,6 +519,7 @@ aggregated_balance_history AS MATERIALIZED (
     account_id,
     nai,
     source_op,
+    op_type_id,
     balance,
     by_day,
     by_month,
@@ -563,11 +574,12 @@ aggregated_balance_history AS MATERIALIZED (
 -- Now using the combined aggregated_balance_history CTE which has all data in one scan
 insert_account_balance_history_by_day AS (
   INSERT INTO balance_history_by_day AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, op_type_id, updated_at, balance, min_balance, max_balance)
   SELECT
     abh.account_id,
     abh.nai,
     abh.source_op,
+    abh.op_type_id,
     abh.by_day,
     abh.balance,
     abh.min_balance_day,
@@ -577,6 +589,7 @@ insert_account_balance_history_by_day AS (
   ON CONFLICT ON CONSTRAINT pk_balance_history_by_day DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
@@ -598,11 +611,12 @@ insert_account_balance_history_by_day AS (
  */
 insert_account_balance_history_by_month AS (
   INSERT INTO balance_history_by_month AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, op_type_id, updated_at, balance, min_balance, max_balance)
   SELECT
     abh.account_id,
     abh.nai,
     abh.source_op,
+    abh.op_type_id,
     abh.by_month,
     abh.balance,
     abh.min_balance_month,
@@ -612,6 +626,7 @@ insert_account_balance_history_by_month AS (
   ON CONFLICT ON CONSTRAINT pk_balance_history_by_month DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)

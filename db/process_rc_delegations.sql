@@ -71,7 +71,7 @@ END IF;
 -- operation body has id='rc' to identify RC delegation operations.
 ------------------------------------------------------------------------------
 WITH ops AS MATERIALIZED (
-  SELECT ov.body, ov.id, ov.block_num
+  SELECT ov.body, ov.id, ov.block_num, ov.op_type_id
   FROM operations_view ov
   WHERE
     ov.op_type_id = _op_custom_json AND
@@ -94,7 +94,8 @@ parsed_rc_delegations AS MATERIALIZED (
     parsed.to_account,
     parsed.max_rc,
     o.id AS source_op,
-    o.block_num AS source_op_block
+    o.block_num AS source_op_block,
+    o.op_type_id
   FROM ops o
   CROSS JOIN LATERAL hive.parse_rc_delegation((o.body->'value'->>'json')::text) AS parsed
   WHERE parsed.from_account IS NOT NULL
@@ -124,7 +125,8 @@ rc_delegations_with_ids AS MATERIALIZED (
     delegatee.account_id AS delegatee,
     p.max_rc,
     p.source_op,
-    p.source_op_block
+    p.source_op_block,
+    p.op_type_id
   FROM parsed_rc_delegations p
   JOIN account_ids delegator ON delegator.account_name = p.from_account
   JOIN account_ids delegatee ON delegatee.account_name = p.to_account
@@ -155,7 +157,8 @@ get_prev_rc_delegation AS (
     gb.delegatee,
     COALESCE(crd.max_rc, 0) as max_rc,
     0 AS source_op,
-    0 AS source_op_block
+    0 AS source_op_block,
+    0::SMALLINT AS op_type_id
   FROM group_by_delegator_delegatee gb
   LEFT JOIN current_rc_delegations crd ON crd.delegator = gb.delegator AND crd.delegatee = gb.delegatee
 ),
@@ -169,7 +172,8 @@ add_prev_rc_delegation AS (
     delegatee,
     max_rc,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM rc_delegations_with_ids
 
   UNION ALL
@@ -179,7 +183,8 @@ add_prev_rc_delegation AS (
     delegatee,
     max_rc,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM get_prev_rc_delegation
 ),
 ------------------------------------------------------------------------------
@@ -200,6 +205,7 @@ rc_delegation_delta AS MATERIALIZED (
     max_rc - LAG(max_rc, 1, 0) OVER w_asc AS rc_delta,
     source_op,
     source_op_block,
+    op_type_id,
     ROW_NUMBER() OVER w_desc AS rn  -- rn=1 is the LATEST operation
   FROM add_prev_rc_delegation
   WINDOW
@@ -257,7 +263,8 @@ prepare_newest_rc_delegation_pairs AS MATERIALIZED (
     dd.delegatee,
     dd.max_rc,
     dd.source_op,
-    dd.source_op_block
+    dd.source_op_block,
+    dd.op_type_id
   FROM rc_delegation_delta dd
   WHERE dd.rn = 1 AND dd.source_op > 0
 ),
@@ -269,18 +276,20 @@ prepare_newest_rc_delegation_pairs AS MATERIALIZED (
 ------------------------------------------------------------------------------
 insert_current_rc_delegations AS (
   INSERT INTO current_rc_delegations AS crd
-    (delegator, delegatee, max_rc, source_op)
+    (delegator, delegatee, max_rc, source_op, op_type_id)
   SELECT
     delegator,
     delegatee,
     max_rc,
-    source_op
+    source_op,
+    op_type_id
   FROM prepare_newest_rc_delegation_pairs
   WHERE max_rc > 0  -- Only active delegations
   ON CONFLICT ON CONSTRAINT pk_current_rc_delegations
   DO UPDATE SET
       max_rc = EXCLUDED.max_rc,
-      source_op = EXCLUDED.source_op
+      source_op = EXCLUDED.source_op,
+      op_type_id = EXCLUDED.op_type_id
   RETURNING crd.delegator AS delegator
 ),
 ------------------------------------------------------------------------------

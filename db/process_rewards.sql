@@ -750,9 +750,11 @@ sum_operations AS (
     a.reward_vests,
     a.reward_vest_balance,
     a.source_op_block,
-    a.source_op
+    a.source_op,
+    pbd.op_type_id
   FROM all_accounts_sum a
   JOIN account_ids ai ON ai.account_name = a.account_name
+  JOIN process_block_range_data_b pbd ON pbd.source_op = a.source_op
 ),
 
 -- ============================================================================
@@ -788,7 +790,8 @@ convert_rewards AS (
     unnest(ARRAY[_nai_hbd, _nai_hive, _nai_vests, _nai_vests_as_hive]) AS nai,
     unnest(ARRAY[so.reward_hbd, so.reward_hive, so.reward_vests, so.reward_vest_balance]) AS balance,
     so.source_op,
-    so.source_op_block
+    so.source_op_block,
+    so.op_type_id
   FROM sum_operations so
 ),
 
@@ -803,7 +806,8 @@ prepare_ops_before_insert AS (
     nai,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM convert_rewards
   WHERE balance != 0
 ),
@@ -829,12 +833,13 @@ prepare_ops_before_insert AS (
 -- source_op is updated to the latest operation, providing an audit trail.
 insert_sum_of_rewards AS (
   INSERT INTO account_rewards
-    (account, nai, balance, source_op)
+    (account, nai, balance, source_op, op_type_id)
   SELECT
     po.account_id,
     po.nai,
     po.balance,
-    po.source_op
+    po.source_op,
+    po.op_type_id
   FROM prepare_ops_before_insert po
   -- pk_account_rewards is PRIMARY KEY (account, nai)
   ON CONFLICT ON CONSTRAINT pk_account_rewards
@@ -842,7 +847,8 @@ insert_sum_of_rewards AS (
       -- Add delta to existing balance (squashing pattern)
       balance = account_rewards.balance + EXCLUDED.balance,
       -- Track which operation last modified this row
-      source_op = EXCLUDED.source_op
+      source_op = EXCLUDED.source_op,
+      op_type_id = EXCLUDED.op_type_id
   RETURNING account AS new_updated_acccounts
 ),
 

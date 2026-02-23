@@ -116,7 +116,8 @@ BEGIN
       e.hive_nai,
       e.hive_amount,
       e.hbd_nai,
-      e.hbd_amount
+      e.hbd_amount,
+      o.op_type_id
     FROM ops_in_range o
     CROSS JOIN btracker_backend.get_escrow_transfers(o.body) AS e
     JOIN account_ids ai ON ai.account_name = e.from_name
@@ -348,7 +349,8 @@ BEGIN
       hive_amount,
       hbd_nai,
       hbd_amount,
-      op_id
+      op_id,
+      op_type_id
     FROM escrow_transfers
     -- latest transfer per (from_id, escrow_id)
     ORDER BY from_id, escrow_id, op_id DESC
@@ -426,7 +428,8 @@ BEGIN
       hive_amount,
       hbd_nai,
       hbd_amount,
-      op_id
+      op_id,
+      op_type_id
     FROM filter_out_rejected_transfers
     UNION ALL
     SELECT
@@ -436,7 +439,8 @@ BEGIN
       hive_amount,
       hbd_nai,
       hbd_amount,
-      op_id
+      op_id,
+      0::SMALLINT AS op_type_id
     FROM releases_related_to_in_range_transfers
   ),
   aggregate_in_range_transfers AS (
@@ -456,7 +460,8 @@ BEGIN
       SUM(uit.hive_amount) AS hive_amount,
       MAX(uit.hbd_nai) AS hbd_nai,
       SUM(uit.hbd_amount) AS hbd_amount,
-      MIN(uit.op_id) AS op_id -- earliest op_id among the group is transfer creation
+      MIN(uit.op_id) AS op_id, -- earliest op_id among the group is transfer creation
+      MAX(uit.op_type_id) AS op_type_id
     FROM union_in_range_transfers_with_related_releases uit
     GROUP BY uit.from_id, uit.escrow_id
   ),
@@ -587,7 +592,8 @@ BEGIN
       (es.hive_amount + ar.hive_amount) AS hive_amount,
       es.hbd_nai,
       (es.hbd_amount + ar.hbd_amount) AS hbd_amount,
-      es.source_op AS op_id -- keep first op_id from escrow_state
+      es.source_op AS op_id, -- keep first op_id from escrow_state
+      es.op_type_id
     FROM aggregate_releases_to_pre_range_transfers ar
     JOIN escrow_state es ON
       es.from_id = ar.from_id AND
@@ -637,7 +643,8 @@ BEGIN
       frit.hive_amount,
       frit.hbd_nai,
       frit.hbd_amount,
-      frit.op_id
+      frit.op_id,
+      frit.op_type_id
     FROM filter_out_released_transfers frit
     UNION ALL
     SELECT
@@ -647,7 +654,8 @@ BEGIN
       jesp.hive_amount,
       jesp.hbd_nai,
       jesp.hbd_amount,
-      jesp.op_id
+      jesp.op_id,
+      jesp.op_type_id
     FROM join_escrow_state_pre_range jesp
     WHERE jesp.hive_amount > 0 OR jesp.hbd_amount > 0
   ),
@@ -779,6 +787,7 @@ BEGIN
       hbd_nai,
       hbd_amount,
       source_op,
+      op_type_id,
       to_approved,
       disputed
     )
@@ -790,6 +799,7 @@ BEGIN
       ui.hbd_nai,
       ui.hbd_amount,
       ui.op_id,
+      ui.op_type_id,
       EXISTS (
         SELECT 1 FROM unique_escrow_approves uea
         WHERE uea.from_id = ui.from_id AND uea.escrow_id = ui.escrow_id
@@ -803,6 +813,7 @@ BEGIN
       hive_amount = EXCLUDED.hive_amount,
       hbd_amount  = EXCLUDED.hbd_amount,
       source_op   = EXCLUDED.source_op,
+      op_type_id  = EXCLUDED.op_type_id,
       to_approved = escrow_state.to_approved OR EXCLUDED.to_approved,
       disputed    = escrow_state.disputed OR EXCLUDED.disputed
     RETURNING 1

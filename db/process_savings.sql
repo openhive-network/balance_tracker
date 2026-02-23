@@ -675,6 +675,7 @@ prepare_savings_history AS (
     SUM(uo.balance_seq_no) OVER w_asc AS balance_seq_no,
     uo.source_op,
     uo.source_op_block,
+    uo.op_type_id,
     ROW_NUMBER() OVER w_desc AS rn
   FROM union_operations_with_latest_balance uo
   WINDOW
@@ -770,6 +771,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
     pbh.balance,
     pbh.source_op,
     pbh.source_op_block,
+    pbh.op_type_id,
     pbh.savings_withdraw_request,
     pbh.rn
   FROM prepare_savings_history pbh
@@ -798,13 +800,14 @@ remove_latest_stored_balance_record AS MATERIALIZED (
  */
 insert_sum_of_transfers AS (
   INSERT INTO account_savings AS acc_history
-    (account, nai, balance_change_count, balance, source_op, savings_withdraw_requests)
+    (account, nai, balance_change_count, balance, source_op, op_type_id, savings_withdraw_requests)
   SELECT
     ps.account_id,
     ps.nai,
     ps.balance_seq_no,
     ps.balance,
     ps.source_op,
+    ps.op_type_id,
     ps.savings_withdraw_request
   FROM remove_latest_stored_balance_record ps
   WHERE rn = 1
@@ -813,6 +816,7 @@ insert_sum_of_transfers AS (
       balance = EXCLUDED.balance,
       balance_change_count = EXCLUDED.balance_change_count,
       source_op = EXCLUDED.source_op,
+      op_type_id = EXCLUDED.op_type_id,
       savings_withdraw_requests = EXCLUDED.savings_withdraw_requests
   RETURNING acc_history.account
 ),
@@ -833,12 +837,13 @@ insert_sum_of_transfers AS (
  */
 insert_saving_balance_history AS (
   INSERT INTO account_savings_history AS acc_history
-    (account, nai, balance_seq_no, source_op, balance)
+    (account, nai, balance_seq_no, source_op, op_type_id, balance)
   SELECT
     pbh.account_id,
     pbh.nai,
     pbh.balance_seq_no,
     pbh.source_op,
+    pbh.op_type_id,
     pbh.balance
   FROM remove_latest_stored_balance_record pbh
   RETURNING acc_history.account
@@ -871,6 +876,7 @@ join_created_at_to_balance_history AS MATERIALIZED (
     rls.nai,
     rls.source_op,
     rls.source_op_block,
+    rls.op_type_id,
     rls.balance,
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
@@ -906,6 +912,7 @@ aggregated_savings_history AS MATERIALIZED (
     account_id,
     nai,
     source_op,
+    op_type_id,
     balance,
     by_day,
     by_month,
@@ -954,11 +961,12 @@ aggregated_savings_history AS MATERIALIZED (
  */
 insert_saving_balance_history_by_day AS (
   INSERT INTO saving_history_by_day AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, op_type_id, updated_at, balance, min_balance, max_balance)
   SELECT
     ash.account_id,
     ash.nai,
     ash.source_op,
+    ash.op_type_id,
     ash.by_day,
     ash.balance,
     ash.min_balance_day,
@@ -968,6 +976,7 @@ insert_saving_balance_history_by_day AS (
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_day DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
@@ -991,11 +1000,12 @@ insert_saving_balance_history_by_day AS (
  */
 insert_saving_balance_history_by_month AS (
   INSERT INTO saving_history_by_month AS acc_history
-    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+    (account, nai, source_op, op_type_id, updated_at, balance, min_balance, max_balance)
   SELECT
     ash.account_id,
     ash.nai,
     ash.source_op,
+    ash.op_type_id,
     ash.by_month,
     ash.balance,
     ash.min_balance_month,
@@ -1005,6 +1015,7 @@ insert_saving_balance_history_by_month AS (
   ON CONFLICT ON CONSTRAINT pk_saving_history_by_month DO
   UPDATE SET
     source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id,
     balance = EXCLUDED.balance,
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)

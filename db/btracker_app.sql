@@ -133,6 +133,7 @@ BEGIN
     balance              BIGINT   NOT NULL, -- Balance value (amount of held tokens)
     balance_change_count INT      NOT NULL, -- Number of balance changes (for pagination)
     source_op            BIGINT   NOT NULL, -- The operation triggered last balance change
+    op_type_id           SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_current_account_balances PRIMARY KEY (account, nai)
   );
@@ -145,7 +146,8 @@ BEGIN
     nai            SMALLINT NOT NULL, -- Balance type (currency)
     balance        BIGINT   NOT NULL, -- Balance value after a change
     balance_seq_no INT      NOT NULL, -- Sequence number of the balance change
-    source_op      BIGINT   NOT NULL  -- The operation triggered given balance change
+    source_op      BIGINT   NOT NULL, -- The operation triggered given balance change
+    op_type_id     SMALLINT NOT NULL  -- Operation type that triggered the change
 
     /** source_op_block removed to reduce table size,
         can be extracted using hafd.operation_id_to_block_num.
@@ -171,6 +173,7 @@ BEGIN
     max_balance BIGINT    NOT NULL, -- Maximum balance during the period
 
     source_op   BIGINT    NOT NULL, -- The operation triggered last balance change
+    op_type_id  SMALLINT  NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at)
   );
@@ -187,6 +190,7 @@ BEGIN
     max_balance BIGINT    NOT NULL, -- Maximum balance during the period
 
     source_op   BIGINT    NOT NULL, -- The operation triggered last balance change
+    op_type_id  SMALLINT  NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at)
   );
@@ -199,6 +203,7 @@ BEGIN
     nai       SMALLINT NOT NULL, -- Balance type (currency)
     balance   BIGINT   NOT NULL, -- Balance value (amount of held tokens)
     source_op BIGINT   NOT NULL, -- The operation triggered last balance change
+    op_type_id SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai)
   );
@@ -222,6 +227,7 @@ BEGIN
     delegatee INT    NOT NULL, -- ID of the delegatee account
     balance   BIGINT NOT NULL, -- Amount of delegated vests
     source_op BIGINT NOT NULL, -- The operation triggered last balance change
+    op_type_id SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_current_accounts_delegations PRIMARY KEY (delegator, delegatee)
   );
@@ -257,6 +263,7 @@ BEGIN
     recurrence           INT      NOT NULL, -- Recurrence in number of hours
     memo                 TEXT     NOT NULL, -- Memo attached to the recurrent transfer
     source_op            BIGINT   NOT NULL, -- The operation triggered last change
+    op_type_id           SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_recurrent_transfers PRIMARY KEY (from_account, to_account, transfer_id)
   );
@@ -272,6 +279,7 @@ BEGIN
     withdraw_routes       BIGINT DEFAULT 0, -- Number of withdraw routes (routes are accounts to which vesting is withdrawn)
     delayed_vests         BIGINT DEFAULT 0, -- Amount of VESTS in delayed withdraw ()
     source_op             BIGINT,           -- The operation triggered last change
+    op_type_id            SMALLINT,         -- Operation type that triggered the change
 
     CONSTRAINT pk_account_withdraws PRIMARY KEY (account)
   );
@@ -283,6 +291,7 @@ BEGIN
     to_account INT    NOT NULL, -- Route account ID
     percent    INT    NOT NULL, -- Percentage of the withdraw routed to the to_account
     source_op  BIGINT NOT NULL, -- The operation triggered last change
+    op_type_id SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_account_routes PRIMARY KEY (account, to_account)
   );
@@ -296,6 +305,7 @@ BEGIN
     balance                   BIGINT   DEFAULT 0, -- Balance value (amount of held tokens)
     balance_change_count      INT      NOT NULL,  -- Number of balance changes (for pagination)
     source_op                 BIGINT   NOT NULL,  -- The operation triggered last balance change
+    op_type_id                SMALLINT NOT NULL,  -- Operation type that triggered the change
     savings_withdraw_requests INT      DEFAULT 0, -- Number of active withdraw requests (see transfer_saving_id table)
 
     CONSTRAINT pk_account_savings PRIMARY KEY (account, nai)
@@ -321,7 +331,8 @@ BEGIN
     nai            SMALLINT NOT NULL, -- Balance type (currency)
     balance        BIGINT   NOT NULL, -- Balance value after a change
     balance_seq_no INT      NOT NULL, -- Sequence number of the balance change
-    source_op      BIGINT   NOT NULL  -- The operation triggered given balance change
+    source_op      BIGINT   NOT NULL, -- The operation triggered given balance change
+    op_type_id     SMALLINT NOT NULL  -- Operation type that triggered the change
   );
   PERFORM hive.app_register_table( __schema_name, 'account_savings_history', __schema_name );
 
@@ -336,6 +347,7 @@ BEGIN
     max_balance BIGINT    NOT NULL, -- Maximum balance during the period
 
     source_op   BIGINT    NOT NULL, -- The operation triggered last balance change
+    op_type_id  SMALLINT  NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_saving_history_by_month PRIMARY KEY (account, nai, updated_at)
   );
@@ -352,6 +364,7 @@ BEGIN
     max_balance BIGINT    NOT NULL, -- Maximum balance during the period
 
     source_op   BIGINT    NOT NULL, -- The operation triggered last balance change
+    op_type_id  SMALLINT  NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_saving_history_by_day PRIMARY KEY (account, nai, updated_at)
   );
@@ -436,6 +449,7 @@ BEGIN
     hbd_nai        SMALLINT NOT NULL, -- 13=HBD, 21=HIVE
     hbd_amount     BIGINT   NOT NULL, -- satoshis (×1000)
     source_op      BIGINT   NOT NULL, -- last operation affecting escrow
+    op_type_id     SMALLINT NOT NULL, -- Operation type that triggered the change
     to_approved    BOOLEAN  NOT NULL DEFAULT FALSE, -- true if escrow_approved_operation was processed
     disputed       BOOLEAN  NOT NULL DEFAULT FALSE, -- true if escrow_dispute_operation was processed
 
@@ -462,6 +476,7 @@ BEGIN
     delegatee INT    NOT NULL, -- Account ID (FK to hive.accounts)
     max_rc    BIGINT NOT NULL, -- Amount of RC delegated
     source_op BIGINT NOT NULL, -- Operation ID of last change
+    op_type_id SMALLINT NOT NULL, -- Operation type that triggered the change
 
     CONSTRAINT pk_current_rc_delegations PRIMARY KEY (delegator, delegatee)
   );

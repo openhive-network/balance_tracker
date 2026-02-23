@@ -122,7 +122,8 @@ join_prev_balance_to_hf23_accounts AS MATERIALIZED (
     prev.delegatee,
     cpfd.balance, -- This is 0 from process_hf23_acccounts, resetting the delegation
     cpfd.source_op,
-    cpfd.source_op_block
+    cpfd.source_op_block,
+    cpfd.op_type_id
   FROM current_accounts_delegations prev
   JOIN process_block_range_data_b cpfd ON prev.delegator = cpfd.delegator AND cpfd.op_type_id = _op_hardfork_hive
 ),
@@ -150,7 +151,8 @@ find_delegations_of_hf23_account_in_query AS (
     cp.delegatee,
     0 AS balance,  -- Force to zero: HF23 resets ALL delegations
     MAX(cpfd.source_op) as source_op,
-    MAX(cpfd.source_op_block) as source_op_block
+    MAX(cpfd.source_op_block) as source_op_block,
+    MAX(cpfd.op_type_id) as op_type_id
   FROM process_block_range_data_b cp
   JOIN process_block_range_data_b cpfd ON cp.delegator = cpfd.delegator AND cpfd.op_type_id = _op_hardfork_hive AND cp.source_op < cpfd.source_op
   WHERE
@@ -169,7 +171,8 @@ hf23_resets AS (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM join_prev_balance_to_hf23_accounts
 
   UNION ALL
@@ -180,7 +183,8 @@ hf23_resets AS (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM find_delegations_of_hf23_account_in_query
 ),
 ---------------------------------------------------------------------------------------
@@ -204,7 +208,8 @@ delegations_in_query AS MATERIALIZED (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM process_block_range_data_b
   WHERE op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation)
 
@@ -216,7 +221,8 @@ delegations_in_query AS MATERIALIZED (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM hf23_resets
 ),
 ---------------------------------------------------------------------------------------
@@ -261,7 +267,8 @@ get_prev_delegation AS (
     gb.delegatee,
     COALESCE(cad.balance, 0) as balance,
     0 AS source_op,       -- Synthetic record: not a real operation
-    0 AS source_op_block
+    0 AS source_op_block,
+    0::SMALLINT AS op_type_id
   FROM group_by_delegator_delegatee gb
   LEFT JOIN current_accounts_delegations cad ON cad.delegator = gb.delegator AND cad.delegatee = gb.delegatee
 ),
@@ -275,7 +282,8 @@ add_prev_delegation AS (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM delegations_in_query
 
   UNION ALL
@@ -285,7 +293,8 @@ add_prev_delegation AS (
     delegatee,
     balance,
     source_op,
-    source_op_block
+    source_op_block,
+    op_type_id
   FROM get_prev_delegation
 ),
 
@@ -326,6 +335,7 @@ delegation_delta AS MATERIALIZED (
     balance - LAG(balance, 1, 0) OVER w_asc AS balance_delta,
     source_op,
     source_op_block,
+    op_type_id,
     ROW_NUMBER() OVER w_desc AS rn  -- rn=1 is the LATEST operation (last operation wins)
   FROM add_prev_delegation
   WINDOW
@@ -440,7 +450,8 @@ prepare_newest_delegation_pairs AS MATERIALIZED (
     dd.delegatee,
     dd.balance,
     dd.source_op,
-    dd.source_op_block
+    dd.source_op_block,
+    dd.op_type_id
   FROM delegation_delta dd
   WHERE dd.rn = 1 AND dd.source_op > 0
 ),
@@ -456,18 +467,20 @@ prepare_newest_delegation_pairs AS MATERIALIZED (
 ---------------------------------------------------------------------------------------
 insert_current_delegations AS (
   INSERT INTO current_accounts_delegations AS cab
-    (delegator, delegatee, balance, source_op)
+    (delegator, delegatee, balance, source_op, op_type_id)
   SELECT
     delegator,
     delegatee,
     balance,
-    source_op
+    source_op,
+    op_type_id
   FROM prepare_newest_delegation_pairs
   WHERE balance > 0  -- Only active delegations
   ON CONFLICT ON CONSTRAINT pk_current_accounts_delegations
   DO UPDATE SET
       balance = EXCLUDED.balance,
-      source_op = EXCLUDED.source_op
+      source_op = EXCLUDED.source_op,
+      op_type_id = EXCLUDED.op_type_id
   RETURNING cab.delegator AS delegator
 ),
 ---------------------------------------------------------------------------------------

@@ -15,21 +15,24 @@
  * - Block number (which block the operation is in)
  * - Position within block
  *
- * The operation type ID is stored as a separate column (op_type_id) in
- * hafd.operations, not encoded in the operation ID.
+ * The operation type ID (op_type_id) is stored directly in each base table,
+ * populated during processing from the operations_view. This eliminates the
+ * need for JOINs to hafd.operations at query time.
  *
- * Extracting block numbers requires a HAF function. Getting the op_type_id
- * requires a JOIN to hafd.operations. By defining views, we compute these
- * values once and reuse them across many queries.
+ * Extracting block numbers still requires the HAF function
+ * hafd.operation_id_to_block_num(). By defining views, we compute this
+ * derived value once and reuse it across many queries.
  *
- * HAF Functions / Joins Used:
- * ---------------------------
+ * HAF Functions Used:
+ * -------------------
  * - hafd.operation_id_to_block_num(op_id): Extracts block number from operation ID
- * - JOIN hafd.operations: Gets op_type_id for the operation
  *
  * Derived Columns Added:
  * ----------------------
  * - source_op_block: Block number where the operation occurred
+ *
+ * Columns Exposed from Base Tables:
+ * ---------------------------------
  * - op_type_id: Numeric ID of the operation type (e.g., transfer, claim_reward_balance)
  *
  * Usage:
@@ -46,6 +49,8 @@
  * -----------------
  * These are simple views (not materialized), so the function calls happen
  * at query time. The HAF functions are optimized for this use case.
+ * Since op_type_id is stored in the base tables, no JOIN to hafd.operations
+ * is needed, which significantly improves query performance.
  *
  * @see db/btracker_app.sql for base table definitions
  */
@@ -55,7 +60,7 @@ SET ROLE btracker_owner;
 /**
  * current_account_balances_view
  * -----------------------------
- * View over current_account_balances with extracted block/type info.
+ * View over current_account_balances with extracted block info.
  *
  * Base table: current_account_balances
  * Purpose: Current liquid balances (HIVE, HBD, VESTS) for each account
@@ -77,14 +82,13 @@ CREATE OR REPLACE VIEW btracker_backend.current_account_balances_view AS
     t.balance_change_count,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM current_account_balances t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM current_account_balances t;
 
 /**
  * account_balance_history_view
  * ----------------------------
- * View over account_balance_history with extracted block/type info.
+ * View over account_balance_history with extracted block info.
  *
  * Base table: account_balance_history
  * Purpose: Complete history of all liquid balance changes
@@ -104,14 +108,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_balance_history_view AS
     t.balance_seq_no,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_balance_history t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_balance_history t;
 
 /**
  * account_savings_view
  * --------------------
- * View over account_savings with extracted block/type info.
+ * View over account_savings with extracted block info.
  *
  * Base table: account_savings
  * Purpose: Current savings balances (HIVE and HBD only, not VESTS)
@@ -128,14 +131,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_savings_view AS
     t.source_op,
     t.savings_withdraw_requests,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_savings t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_savings t;
 
 /**
  * account_savings_history_view
  * ----------------------------
- * View over account_savings_history with extracted block/type info.
+ * View over account_savings_history with extracted block info.
  *
  * Base table: account_savings_history
  * Purpose: Complete history of all savings balance changes
@@ -151,14 +153,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_savings_history_view AS
     t.balance_seq_no,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_savings_history t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_savings_history t;
 
 /**
  * account_rewards_view
  * --------------------
- * View over account_rewards with extracted block/type info.
+ * View over account_rewards with extracted block info.
  *
  * Base table: account_rewards
  * Purpose: Pending reward balances (unclaimed author/curation rewards)
@@ -173,14 +174,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_rewards_view AS
     t.balance,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_rewards t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_rewards t;
 
 /**
  * current_accounts_delegations_view
  * ----------------------------------
- * View over current_accounts_delegations with extracted block/type info.
+ * View over current_accounts_delegations with extracted block info.
  *
  * Base table: current_accounts_delegations
  * Purpose: Active vesting share delegations between accounts
@@ -196,14 +196,13 @@ CREATE OR REPLACE VIEW btracker_backend.current_accounts_delegations_view AS
     t.balance,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM current_accounts_delegations t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM current_accounts_delegations t;
 
 /**
  * recurrent_transfers_view
  * ------------------------
- * View over recurrent_transfers with extracted block/type info.
+ * View over recurrent_transfers with extracted block info.
  *
  * Base table: recurrent_transfers
  * Purpose: Active scheduled recurring transfers
@@ -230,14 +229,13 @@ CREATE OR REPLACE VIEW btracker_backend.recurrent_transfers_view AS
     t.memo,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM recurrent_transfers t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM recurrent_transfers t;
 
 /**
  * account_withdraws_view
  * ----------------------
- * View over account_withdraws with extracted block/type info.
+ * View over account_withdraws with extracted block info.
  *
  * Base table: account_withdraws
  * Purpose: Power-down (vesting withdrawal) state per account
@@ -259,14 +257,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_withdraws_view AS
     t.delayed_vests,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_withdraws t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_withdraws t;
 
 /**
  * account_routes_view
  * -------------------
- * View over account_routes with extracted block/type info.
+ * View over account_routes with extracted block info.
  *
  * Base table: account_routes
  * Purpose: Vesting withdrawal routing rules
@@ -282,14 +279,13 @@ CREATE OR REPLACE VIEW btracker_backend.account_routes_view AS
     t.percent,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM account_routes t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM account_routes t;
 
 /**
  * balance_history_by_month_view
  * -----------------------------
- * View over balance_history_by_month with extracted block/type info.
+ * View over balance_history_by_month with extracted block info.
  *
  * Base table: balance_history_by_month
  * Purpose: Monthly aggregated balance snapshots
@@ -314,14 +310,13 @@ CREATE OR REPLACE VIEW btracker_backend.balance_history_by_month_view AS
 
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM balance_history_by_month t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM balance_history_by_month t;
 
 /**
  * balance_history_by_day_view
  * ---------------------------
- * View over balance_history_by_day with extracted block/type info.
+ * View over balance_history_by_day with extracted block info.
  *
  * Base table: balance_history_by_day
  * Purpose: Daily aggregated balance snapshots
@@ -341,14 +336,13 @@ CREATE OR REPLACE VIEW btracker_backend.balance_history_by_day_view AS
 
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM balance_history_by_day t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM balance_history_by_day t;
 
 /**
  * saving_history_by_month_view
  * ----------------------------
- * View over saving_history_by_month with extracted block/type info.
+ * View over saving_history_by_month with extracted block info.
  *
  * Base table: balance_history_by_month (note: currently using same source)
  * Purpose: Monthly aggregated savings balance snapshots
@@ -368,14 +362,13 @@ CREATE OR REPLACE VIEW btracker_backend.saving_history_by_month_view AS
 
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM balance_history_by_month t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM balance_history_by_month t;
 
 /**
  * saving_history_by_day_view
  * --------------------------
- * View over saving_history_by_day with extracted block/type info.
+ * View over saving_history_by_day with extracted block info.
  *
  * Base table: balance_history_by_day (note: currently using same source)
  * Purpose: Daily aggregated savings balance snapshots
@@ -395,14 +388,13 @@ CREATE OR REPLACE VIEW btracker_backend.saving_history_by_day_view AS
 
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM balance_history_by_day t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM balance_history_by_day t;
 
 /**
  * current_rc_delegations_view
  * ---------------------------
- * View over current_rc_delegations with extracted block/type info.
+ * View over current_rc_delegations with extracted block info.
  *
  * Base table: current_rc_delegations
  * Purpose: Active RC (Resource Credit) delegations between accounts
@@ -420,9 +412,8 @@ CREATE OR REPLACE VIEW btracker_backend.current_rc_delegations_view AS
     t.max_rc,
     t.source_op,
     hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
-    ops.op_type_id
-  FROM current_rc_delegations t
-  JOIN hafd.operations ops ON ops.id = t.source_op;
+    t.op_type_id
+  FROM current_rc_delegations t;
 
 
 RESET ROLE;

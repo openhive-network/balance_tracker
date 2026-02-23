@@ -436,6 +436,7 @@ BEGIN
         ed.memo,
         ed.delete_transfer,
         ed.source_op,
+        ed.op_type_id,
         ed.rn_per_transfer_asc,
         ed.rn_per_transfer_desc
       FROM union_total_transfers ed
@@ -470,6 +471,14 @@ BEGIN
               next_cp.source_op
           END
         ) AS source_op,
+        (
+          CASE
+            WHEN next_cp.op_type_id = _op_recurrent_transfer AND next_cp.recurrence = prev.recurrence AND NOT prev.delete_transfer THEN
+              prev.op_type_id
+            ELSE
+              next_cp.op_type_id
+          END
+        ) AS op_type_id,
         next_cp.rn_per_transfer_asc,
         next_cp.rn_per_transfer_desc
       FROM calculated_transfers prev
@@ -517,7 +526,8 @@ BEGIN
         remaining_executions,
         recurrence,
         memo,
-        source_op
+        source_op,
+        op_type_id
       )
     SELECT
       from_account_id,
@@ -529,7 +539,8 @@ BEGIN
       remaining_executions,
       recurrence,
       memo,
-      source_op
+      source_op,
+      op_type_id
     FROM recursive_transfers
     ON CONFLICT ON CONSTRAINT pk_recurrent_transfers
     DO UPDATE SET
@@ -539,7 +550,8 @@ BEGIN
         remaining_executions = EXCLUDED.remaining_executions,
         recurrence = EXCLUDED.recurrence,
         memo = EXCLUDED.memo,
-        source_op = EXCLUDED.source_op
+        source_op = EXCLUDED.source_op,
+        op_type_id = EXCLUDED.op_type_id
     RETURNING rt.from_account AS from_account
   ),
 

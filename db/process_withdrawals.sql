@@ -74,7 +74,8 @@ process_block_range_data_b AS MATERIALIZED
     result.withdrawn,
     result.vesting_withdraw_rate,
     result.to_withdraw,
-    o.id AS source_op
+    o.id AS source_op,
+    o.op_type_id
   FROM ops_withdraw o
   CROSS JOIN LATERAL (
     SELECT (
@@ -104,6 +105,7 @@ group_by_account AS MATERIALIZED (
     vesting_withdraw_rate,
     to_withdraw,
     source_op,
+    op_type_id,
     ROW_NUMBER() OVER w_account_desc AS row_num
   FROM process_block_range_data_b
   WINDOW w_account_desc AS (PARTITION BY account_name ORDER BY source_op DESC)
@@ -126,7 +128,8 @@ join_latest_withdraw AS (
     gba.withdrawn,
     gba.vesting_withdraw_rate,
     gba.to_withdraw,
-    gba.source_op
+    gba.source_op,
+    gba.op_type_id
   FROM group_by_account gba
   JOIN account_ids_withdrawal ai ON ai.account_name = gba.account_name
   WHERE gba.row_num = 1
@@ -134,26 +137,28 @@ join_latest_withdraw AS (
 -- UPSERT pattern: INSERT new accounts, UPDATE existing with new withdrawal state.
 -- ON CONFLICT replaces all withdrawal fields - new withdraw_vesting resets the entire state.
 INSERT INTO account_withdraws
-  (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
+  (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op, op_type_id)
 SELECT
   jlw.account_id,
   jlw.vesting_withdraw_rate,
   jlw.to_withdraw,
   jlw.withdrawn,
-  jlw.source_op
+  jlw.source_op,
+  jlw.op_type_id
 FROM join_latest_withdraw jlw
 ON CONFLICT ON CONSTRAINT pk_account_withdraws
 DO UPDATE SET
   vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
   to_withdraw = EXCLUDED.to_withdraw,
   withdrawn = EXCLUDED.withdrawn,
-  source_op = EXCLUDED.source_op;
+  source_op = EXCLUDED.source_op,
+  op_type_id = EXCLUDED.op_type_id;
 
 ------------------------------------------------------------------------------
 -- SECTION 2: WITHDRAWAL ROUTES (set_withdraw_vesting_route_operation)
 ------------------------------------------------------------------------------
 WITH ops_routes AS MATERIALIZED (
-  SELECT ov.body, ov.id
+  SELECT ov.body, ov.id, ov.op_type_id
   FROM operations_view ov
   WHERE
     ov.op_type_id = _op_set_withdraw_vesting_route AND
@@ -164,7 +169,8 @@ process_block_range_data_b AS (
     result.from_account,
     result.to_account,
     result.percent,
-    o.id AS source_op
+    o.id AS source_op,
+    o.op_type_id
   FROM ops_routes o
   CROSS JOIN LATERAL (
     SELECT (btracker_backend.process_set_withdraw_vesting_route_operation(o.body)).*
@@ -178,6 +184,7 @@ group_by_account AS MATERIALIZED (
     to_account,
     percent,
     source_op,
+    op_type_id,
     ROW_NUMBER() OVER w_accounts_desc AS row_num
   FROM process_block_range_data_b
   WINDOW w_accounts_desc AS (PARTITION BY from_account, to_account ORDER BY source_op DESC)
@@ -198,7 +205,8 @@ join_latest_withdraw_routes AS (
     ai_from.account_id AS from_account,
     ai_to.account_id AS to_account,
     gba.percent,
-    gba.source_op
+    gba.source_op,
+    gba.op_type_id
   FROM group_by_account gba
   JOIN account_ids_routes ai_from ON ai_from.account_name = gba.from_account
   JOIN account_ids_routes ai_to ON ai_to.account_name = gba.to_account
@@ -214,7 +222,8 @@ join_prev_route AS (
     cp.to_account,
     cp.percent,
     cr.percent AS prev_percent,
-    cp.source_op
+    cp.source_op,
+    cp.op_type_id
   FROM join_latest_withdraw_routes cp
   LEFT JOIN account_routes cr ON cr.account = cp.from_account AND cr.to_account = cp.to_account
 ),
@@ -241,7 +250,8 @@ add_routes AS MATERIALIZED (
           0   -- NOOP: tried to delete non-existent route
       END
     ) AS withdraw_routes,
-    source_op
+    source_op,
+    op_type_id
   FROM join_prev_route
 ),
 sum_routes AS (
@@ -256,18 +266,20 @@ sum_routes AS (
 insert_routes AS (
   -- UPSERT active routes (percent != 0). Percent=0 means delete, handled separately.
   INSERT INTO account_routes
-    (account, to_account, percent, source_op)
+    (account, to_account, percent, source_op, op_type_id)
   SELECT
     ar.from_account,
     ar.to_account,
     ar.percent,
-    ar.source_op
+    ar.source_op,
+    ar.op_type_id
   FROM add_routes ar
   WHERE ar.percent != 0
   ON CONFLICT ON CONSTRAINT pk_account_routes
   DO UPDATE SET
     percent = EXCLUDED.percent,
-    source_op = EXCLUDED.source_op
+    source_op = EXCLUDED.source_op,
+    op_type_id = EXCLUDED.op_type_id
   RETURNING account
 ),
 delete_routes AS (
