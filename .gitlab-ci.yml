@@ -952,6 +952,7 @@ test_python_api_wheel:
   before_script:
   - *early_exit_check
   - !reference [.configuration_template, before_script]
+  - !reference [.update_deps_for_tests, script]
   - poetry -C "${PYPROJECT_DIR}" install --no-root
   script:
   - pip install --no-deps "${DIST_DIR}"/*.whl
