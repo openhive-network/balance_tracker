@@ -104,7 +104,7 @@ export GIT_LAST_COMMIT_DATE
 
 # Resolve API version from git tags for OpenAPI spec injection
 git fetch --tags --quiet 2>/dev/null || true
-API_VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo dev)"
+API_VERSION="$(git describe --tags 2>/dev/null || echo 0.0.0-dev)"
 export API_VERSION
 
 # Build main image via docker-bake (handles tagging: short SHA + latest on develop + version on tags)
@@ -118,12 +118,8 @@ if [[ "${CI_COMMIT_BRANCH:-}" == "${CI_DEFAULT_BRANCH:-develop}" ]]; then
   REWRITER_TAGS="$REWRITER_TAGS --tag $REGISTRY/postgrest-rewriter:latest"
 fi
 
-# Determine rewriter target and tag with version on protected tags
-REWRITER_TARGET="without_tag"
-TAG_BUILD_ARGS=""
+# Tag with version on protected tags
 if [[ -n "${CI_COMMIT_TAG:-}" ]]; then
-  REWRITER_TARGET="with_tag"
-  TAG_BUILD_ARGS="--build-arg GIT_COMMIT_TAG=$CI_COMMIT_TAG"
   REWRITER_TAGS="$REWRITER_TAGS --tag $REGISTRY/postgrest-rewriter:$CI_COMMIT_TAG"
 fi
 
@@ -136,8 +132,7 @@ docker buildx build \
     --build-arg GIT_LAST_LOG_MESSAGE="$GIT_LAST_LOG_MESSAGE" \
     --build-arg GIT_LAST_COMMITTER="$GIT_LAST_COMMITTER" \
     --build-arg GIT_LAST_COMMIT_DATE="$GIT_LAST_COMMIT_DATE" \
-    --target=$REWRITER_TARGET \
-    $TAG_BUILD_ARGS \
+    --build-arg API_VERSION="$API_VERSION" \
     $REWRITER_TAGS \
     --push \
     --file Dockerfile.rewriter .
