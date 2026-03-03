@@ -27,7 +27,7 @@ POSTGRES_URL=${POSTGRES_URL:-""}
 BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
 SWAGGER_URL=${SWAGGER_URL:-"{btracker-host}"}
 
-IS_FORKING=${IS_FORKING:-"true"}
+IS_FORKING=${IS_FORKING:-"false"}
 
 
 while [ $# -gt 0 ]; do

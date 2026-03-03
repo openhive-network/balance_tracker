@@ -478,6 +478,42 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
+  ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
+  -- Register app indexes with HAF for drop/restore lifecycle.
+  -- Indexes are dropped during massive sync (no reads) and restored at LIVE transition.
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, balance_seq_no)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, balance_seq_no)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op))');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op))');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON ' || __schema_name || '.current_account_balances(nai, balance DESC)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON ' || __schema_name || '.account_savings(nai, balance DESC)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON ' || __schema_name || '.current_accounts_delegations(delegatee)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON ' || __schema_name || '.current_rc_delegations(delegatee)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON ' || __schema_name || '.recurrent_transfers(to_account)');
+
+  -- Drop app indexes for massive sync (will be restored at LIVE transition)
+  PERFORM hive.app_save_and_drop_indexes(__schema_name);
+
+  -- Drop PK constraints on large tables before switching to UNLOGGED
+  ALTER TABLE balance_history_by_day DROP CONSTRAINT IF EXISTS pk_balance_history_by_day;
+  ALTER TABLE balance_history_by_month DROP CONSTRAINT IF EXISTS pk_balance_history_by_month;
+  ALTER TABLE account_rewards DROP CONSTRAINT IF EXISTS pk_account_rewards;
+
+  -- Set large append-only tables to UNLOGGED to skip WAL during massive sync.
+  -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
+  ALTER TABLE account_balance_history SET UNLOGGED;
+  ALTER TABLE balance_history_by_day SET UNLOGGED;
+  ALTER TABLE balance_history_by_month SET UNLOGGED;
+  ALTER TABLE account_rewards SET UNLOGGED;
 
 END
 $$;
@@ -565,6 +601,39 @@ END
 $$;
 
 -- ============================================================================
+-- OPERATIONS PRE-FETCH
+-- ============================================================================
+-- Materializes operations_view into a temp table once per batch to avoid
+-- redundant view scans across the 11 process_* functions.
+
+/**
+ * btracker_prefetch_operations()
+ * ------------------------------
+ * Pre-fetch all operations for a block range into a temporary table.
+ * Called once per batch before the 11 process_* functions, which then
+ * read from _btracker_ops_batch instead of scanning operations_view
+ * independently (eliminating 10+ redundant view traversals per batch).
+ *
+ * @param _from  First block number in range
+ * @param _to    Last block number in range
+ */
+CREATE OR REPLACE FUNCTION btracker_prefetch_operations(_from INT, _to INT)
+RETURNS VOID
+LANGUAGE plpgsql VOLATILE
+AS
+$$
+BEGIN
+  DROP TABLE IF EXISTS _btracker_ops_batch;
+  CREATE TEMP TABLE _btracker_ops_batch AS
+  SELECT id, block_num, trx_in_block, op_pos, op_type_id,
+         body_binary, body, custom_json_type_id
+  FROM operations_view
+  WHERE block_num BETWEEN _from AND _to;
+  ANALYZE _btracker_ops_batch;
+END
+$$;
+
+-- ============================================================================
 -- BLOCK PROCESSING FUNCTIONS
 -- ============================================================================
 -- These functions handle block processing dispatch and execution.
@@ -602,14 +671,21 @@ BEGIN
   END IF;
 
   IF NOT isIndexesCreated() THEN
-    -- create_btracker_indexes() performs DDL (ALTER TABLE SET STATISTICS) on
-    -- tables registered in the hafbe_bal context.  HAF's event trigger
-    -- hive.on_edit_registered_tables() verifies that CURRENT_USER matches the
-    -- context owner.  When called from the block-explorer processing loop the
-    -- session runs as hafbe_owner, so we must switch to btracker_owner first.
-    SET LOCAL ROLE btracker_owner;
-    PERFORM create_btracker_indexes();
-    RESET ROLE;
+    -- Transition from massive sync to LIVE:
+    -- 1. Switch tables back to LOGGED (WAL-safe for live operations)
+    ALTER TABLE account_balance_history SET LOGGED;
+    ALTER TABLE balance_history_by_day SET LOGGED;
+    ALTER TABLE balance_history_by_month SET LOGGED;
+    ALTER TABLE account_rewards SET LOGGED;
+    -- 2. Restore PK constraints on tables that had them dropped
+    ALTER TABLE balance_history_by_day ADD CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at);
+    ALTER TABLE balance_history_by_month ADD CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at);
+    ALTER TABLE account_rewards ADD CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai);
+    -- 3. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
+    PERFORM hive.app_context_set_forking(_context_name);
+    -- 4. Restore app indexes
+    PERFORM hive.app_restore_indexes(_context_name);
+    RAISE NOTICE 'btracker: LIVE transition complete (LOGGED + PKs + forking + indexes restored)';
   END IF;
   CALL btracker_single_processing(_block_range.first_block, _logs);
 END
@@ -657,6 +733,11 @@ DECLARE
   __hardfork_23_block INT := (SELECT block_num FROM hive.applied_hardforks_view WHERE hardfork_num = 23);
 BEGIN
   PERFORM set_config('synchronous_commit', 'OFF', false);
+
+  -- Pre-fetch all operations for this batch into a temp table.
+  -- The 11 process_* functions read from _btracker_ops_batch instead of
+  -- scanning operations_view independently (eliminates 10+ redundant scans).
+  PERFORM btracker_prefetch_operations(_from, _to);
 
   IF _logs THEN
     RAISE NOTICE 'Btracker is attempting to process a block range: <%, %>', _from, _to;
@@ -750,6 +831,9 @@ DECLARE
   __end_ts   timestamptz;
 BEGIN
   PERFORM set_config('synchronous_commit', 'ON', false);
+
+  -- Pre-fetch operations for this single block
+  PERFORM btracker_prefetch_operations(_block, _block);
 
   IF _logs THEN
     RAISE NOTICE 'Btracker processing block: %...', _block;
