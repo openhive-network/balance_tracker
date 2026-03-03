@@ -52,7 +52,7 @@ BEGIN
      * blocks in a single function call for efficient bulk sync.
      */
     SELECT ov.body, ov.op_type_id, ov.block_num
-    FROM operations_view ov
+    FROM _btracker_ops_batch ov
     WHERE
       ov.op_type_id IN (_op_transfer, _op_fill_recurrent_transfer, _op_escrow_transfer) AND
       ov.block_num BETWEEN _from AND _to

@@ -51,7 +51,7 @@ BEGIN
  */
 WITH ops AS MATERIALIZED (
   SELECT ov.body, ov.op_type_id, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _btracker_ops_batch ov
   WHERE
     ov.op_type_id IN (_op_transfer_to_savings, _op_transfer_from_savings, _op_cancel_transfer_from_savings, _op_fill_transfer_from_savings, _op_interest) AND
     ov.block_num BETWEEN _from AND _to
