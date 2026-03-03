@@ -48,6 +48,10 @@ variables:
   BTRACKER_MOCK_CACHE_TYPE: "haf_btracker_mock"   # HAF + balance_tracker + mock data
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
+  # uses registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:pypa_2_28-4
+  BUILDER_IMAGE_TAG: ":pypa_2_28-4"
+  BUILDER_IMAGE_PATH: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
+  PYTHON_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${BUILDER_IMAGE_TAG}"
   # Centralized test runner image with Docker, pytest, tavern, and all test dependencies
   HAF_APP_TEST_RUNNER_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-test-runner:2.2"
   # =============================================================================
