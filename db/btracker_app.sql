@@ -482,7 +482,14 @@ BEGIN
   -- Context is created as forking (required for state provider table registration),
   -- but we switch to non-forking now to avoid creating hive_rowid indexes
   -- during massive sync. Will switch back to forking at LIVE transition.
+  --
+  -- IMPORTANT: set_non_forking detaches/reattaches the context at the current
+  -- irreversible block, which would skip all block processing if HAF already has data.
+  -- We must detach and reset the position to 0 so processing starts from the beginning.
+  -- app_next_iteration() will auto-attach when processing begins.
   PERFORM hive.app_context_set_non_forking(__schema_name);
+  PERFORM hive.app_context_detach(__schema_name);
+  PERFORM hive.app_set_current_block_num(__schema_name, 0);
 
   ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
   -- Register app indexes with HAF for drop/restore lifecycle.
