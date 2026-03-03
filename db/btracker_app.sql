@@ -516,17 +516,12 @@ BEGIN
   -- Drop app indexes for massive sync (will be restored at LIVE transition)
   PERFORM hive.app_save_and_drop_indexes(__schema_name);
 
-  -- Drop PK constraints on large tables before switching to UNLOGGED
-  ALTER TABLE balance_history_by_day DROP CONSTRAINT IF EXISTS pk_balance_history_by_day;
-  ALTER TABLE balance_history_by_month DROP CONSTRAINT IF EXISTS pk_balance_history_by_month;
-  ALTER TABLE account_rewards DROP CONSTRAINT IF EXISTS pk_account_rewards;
-
-  -- Set large append-only tables to UNLOGGED to skip WAL during massive sync.
+  -- Set append-only tables (no ON CONFLICT upserts) to UNLOGGED to skip WAL.
+  -- Note: balance_history_by_day, balance_history_by_month, account_rewards use
+  -- ON CONFLICT ON CONSTRAINT pk_* during processing, so they must keep their PKs
+  -- and remain LOGGED.
   -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
   ALTER TABLE account_balance_history SET UNLOGGED;
-  ALTER TABLE balance_history_by_day SET UNLOGGED;
-  ALTER TABLE balance_history_by_month SET UNLOGGED;
-  ALTER TABLE account_rewards SET UNLOGGED;
 
 END
 $$;
@@ -656,9 +651,8 @@ $$;
  * Transition from massive sync to LIVE-ready state.
  * Reverses the optimizations applied during setup:
  *   1. Switch UNLOGGED tables back to LOGGED (WAL-safe)
- *   2. Restore PK constraints that were dropped for UNLOGGED switch
- *   3. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
- *   4. Restore app indexes (updates HAF tracking table)
+ *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
+ *   3. Restore app indexes (updates HAF tracking table)
  *
  * Called from btracker_process_blocks() at LIVE transition and from
  * CI startup script after bounded replay completes.
@@ -678,17 +672,10 @@ BEGIN
   END IF;
 
   ALTER TABLE account_balance_history SET LOGGED;
-  ALTER TABLE balance_history_by_day SET LOGGED;
-  ALTER TABLE balance_history_by_month SET LOGGED;
-  ALTER TABLE account_rewards SET LOGGED;
-
-  ALTER TABLE balance_history_by_day ADD CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at);
-  ALTER TABLE balance_history_by_month ADD CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at);
-  ALTER TABLE account_rewards ADD CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai);
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
-  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + PKs + forking + indexes restored)';
+  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + forking + indexes restored)';
 END
 $$;
 
