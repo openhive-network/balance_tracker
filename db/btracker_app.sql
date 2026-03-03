@@ -669,6 +669,7 @@ $$;
 CREATE OR REPLACE FUNCTION finalize_massive_sync(_context_name hive.context_name)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
+SECURITY DEFINER
 AS
 $$
 BEGIN
