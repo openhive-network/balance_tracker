@@ -72,7 +72,7 @@ END IF;
 ------------------------------------------------------------------------------
 WITH ops AS MATERIALIZED (
   SELECT ov.body, ov.id, ov.block_num
-  FROM operations_view ov
+  FROM _btracker_ops_batch ov
   WHERE
     ov.op_type_id = _op_custom_json AND
     ov.block_num BETWEEN _from AND _to AND
