@@ -647,6 +647,51 @@ END
 $$;
 
 -- ============================================================================
+-- MASSIVE SYNC FINALIZATION
+-- ============================================================================
+
+/**
+ * finalize_massive_sync()
+ * -----------------------
+ * Transition from massive sync to LIVE-ready state.
+ * Reverses the optimizations applied during setup:
+ *   1. Switch UNLOGGED tables back to LOGGED (WAL-safe)
+ *   2. Restore PK constraints that were dropped for UNLOGGED switch
+ *   3. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
+ *   4. Restore app indexes (updates HAF tracking table)
+ *
+ * Called from btracker_process_blocks() at LIVE transition and from
+ * CI startup script after bounded replay completes.
+ * Safe to call multiple times (idempotent via isIndexesCreated check).
+ *
+ * @param _context_name  HAF context name (typically schema name)
+ */
+CREATE OR REPLACE FUNCTION finalize_massive_sync(_context_name hive.context_name)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  IF isIndexesCreated() THEN
+    RETURN;  -- Already finalized
+  END IF;
+
+  ALTER TABLE account_balance_history SET LOGGED;
+  ALTER TABLE balance_history_by_day SET LOGGED;
+  ALTER TABLE balance_history_by_month SET LOGGED;
+  ALTER TABLE account_rewards SET LOGGED;
+
+  ALTER TABLE balance_history_by_day ADD CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at);
+  ALTER TABLE balance_history_by_month ADD CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at);
+  ALTER TABLE account_rewards ADD CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai);
+
+  PERFORM hive.app_context_set_forking(_context_name);
+  PERFORM hive.app_restore_indexes(_context_name);
+  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + PKs + forking + indexes restored)';
+END
+$$;
+
+-- ============================================================================
 -- BLOCK PROCESSING FUNCTIONS
 -- ============================================================================
 -- These functions handle block processing dispatch and execution.
@@ -660,7 +705,7 @@ $$;
  *
  * Behavior by stage:
  * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync
- * - LIVE: Creates indexes (once), then calls btracker_single_processing()
+ * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
  *
  * @param _context_name  HAF context name (typically schema name)
  * @param _block_range   Range of blocks to process (first_block, last_block)
@@ -683,23 +728,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT isIndexesCreated() THEN
-    -- Transition from massive sync to LIVE:
-    -- 1. Switch tables back to LOGGED (WAL-safe for live operations)
-    ALTER TABLE account_balance_history SET LOGGED;
-    ALTER TABLE balance_history_by_day SET LOGGED;
-    ALTER TABLE balance_history_by_month SET LOGGED;
-    ALTER TABLE account_rewards SET LOGGED;
-    -- 2. Restore PK constraints on tables that had them dropped
-    ALTER TABLE balance_history_by_day ADD CONSTRAINT pk_balance_history_by_day PRIMARY KEY (account, nai, updated_at);
-    ALTER TABLE balance_history_by_month ADD CONSTRAINT pk_balance_history_by_month PRIMARY KEY (account, nai, updated_at);
-    ALTER TABLE account_rewards ADD CONSTRAINT pk_account_rewards PRIMARY KEY (account, nai);
-    -- 3. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
-    PERFORM hive.app_context_set_forking(_context_name);
-    -- 4. Restore app indexes
-    PERFORM hive.app_restore_indexes(_context_name);
-    RAISE NOTICE 'btracker: LIVE transition complete (LOGGED + PKs + forking + indexes restored)';
-  END IF;
+  PERFORM finalize_massive_sync(_context_name);
   CALL btracker_single_processing(_block_range.first_block, _logs);
 END
 $$;
