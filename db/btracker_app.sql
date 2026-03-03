@@ -482,7 +482,7 @@ BEGIN
   -- Context is created as forking (required for state provider table registration),
   -- but we switch to non-forking now to avoid creating hive_rowid indexes
   -- during massive sync. Will switch back to forking at LIVE transition.
-  PERFORM hive.app_context_set_non_forking(_context_name);
+  PERFORM hive.app_context_set_non_forking(__schema_name);
 
   ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
   -- Register app indexes with HAF for drop/restore lifecycle.
