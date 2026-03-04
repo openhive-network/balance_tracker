@@ -478,51 +478,6 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
-  ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
-  -- Context is created as forking (required for state provider table registration),
-  -- but we switch to non-forking now to avoid creating hive_rowid indexes
-  -- during massive sync. Will switch back to forking at LIVE transition.
-  --
-  -- IMPORTANT: set_non_forking detaches/reattaches the context at the current
-  -- irreversible block, which would skip all block processing if HAF already has data.
-  -- We must detach and reset the position to 0 so processing starts from the beginning.
-  -- app_next_iteration() will auto-attach when processing begins.
-  PERFORM hive.app_context_set_non_forking(__schema_name);
-  PERFORM hive.app_context_detach(__schema_name);
-  PERFORM hive.app_set_current_block_num(__schema_name, 0);
-
-  ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
-  -- Register app indexes with HAF for drop/restore lifecycle.
-  -- Indexes are dropped during massive sync (no reads) and restored at LIVE transition.
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, balance_seq_no)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, balance_seq_no)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op))');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op))');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON ' || __schema_name || '.current_account_balances(nai, balance DESC)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON ' || __schema_name || '.account_savings(nai, balance DESC)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON ' || __schema_name || '.current_accounts_delegations(delegatee)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON ' || __schema_name || '.current_rc_delegations(delegatee)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON ' || __schema_name || '.recurrent_transfers(to_account)');
-
-  -- Drop app indexes for massive sync (will be restored at LIVE transition)
-  PERFORM hive.app_save_and_drop_indexes(__schema_name);
-
-  -- Set append-only tables (no ON CONFLICT upserts) to UNLOGGED to skip WAL.
-  -- Note: balance_history_by_day, balance_history_by_month, account_rewards use
-  -- ON CONFLICT ON CONSTRAINT pk_* during processing, so they must keep their PKs
-  -- and remain LOGGED.
-  -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
-  ALTER TABLE account_balance_history SET UNLOGGED;
-
 END
 $$;
 
@@ -671,11 +626,8 @@ BEGIN
     RETURN;  -- Already finalized
   END IF;
 
-  ALTER TABLE account_balance_history SET LOGGED;
-
-  PERFORM hive.app_context_set_forking(_context_name);
-  PERFORM hive.app_restore_indexes(_context_name);
-  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + forking + indexes restored)';
+  PERFORM create_btracker_indexes();
+  RAISE NOTICE 'btracker: massive sync finalized (indexes created)';
 END
 $$;
 
