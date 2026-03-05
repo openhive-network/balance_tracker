@@ -65,7 +65,7 @@ BEGIN
          *     Reduces or completes the pending conversion
          */
         SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body
-        FROM _btracker_ops_batch ov
+        FROM operations_view ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_convert, _op_fillconv)
     ),
