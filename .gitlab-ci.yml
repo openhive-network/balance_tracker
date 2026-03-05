@@ -416,11 +416,18 @@ sync:
     fi
 
     echo "Stopping PostgreSQL with pg_ctl (smart mode, 60s timeout)..."
-    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
-        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60' 2>&1; then
-      echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
-      docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
-        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30' 2>&1 || true
+    PG_CTL=$(docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
+        bash -c 'find /usr/lib/postgresql -name pg_ctl -type f 2>/dev/null | head -1' 2>/dev/null | tr -d '\r\n')
+    echo "Found pg_ctl at: ${PG_CTL:-not found}"
+    if [[ -n "$PG_CTL" ]]; then
+      if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
+          "$PG_CTL" stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60 2>&1; then
+        echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
+        docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
+          "$PG_CTL" stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30 2>&1 || true
+      fi
+    else
+      echo "WARNING: pg_ctl not found, relying on docker compose down for shutdown"
     fi
 
     docker compose "${COMPOSE_OPTIONS[@]}" logs "$HAF_CONTAINER" > haf.log || true
@@ -597,11 +604,18 @@ sync_with_mock_data:
     # 2. A shutdown checkpoint is created
     # 3. All required PostgreSQL directories remain intact
     echo "Stopping PostgreSQL with pg_ctl (smart mode, 60s timeout)..."
-    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
-        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60' 2>&1; then
-      echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
-      docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
-        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30' 2>&1 || true
+    PG_CTL=$(docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
+        bash -c 'find /usr/lib/postgresql -name pg_ctl -type f 2>/dev/null | head -1' 2>/dev/null | tr -d '\r\n')
+    echo "Found pg_ctl at: ${PG_CTL:-not found}"
+    if [[ -n "$PG_CTL" ]]; then
+      if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
+          "$PG_CTL" stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60 2>&1; then
+        echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
+        docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres haf \
+          "$PG_CTL" stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30 2>&1 || true
+      fi
+    else
+      echo "WARNING: pg_ctl not found, relying on docker compose down for shutdown"
     fi
 
     # Collect logs before stopping containers
