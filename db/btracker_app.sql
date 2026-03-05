@@ -95,7 +95,7 @@ BEGIN
   PERFORM hive.app_create_context(
      _name =>__schema_name,
      _schema => __schema_name,
-     _is_forking => TRUE,
+     _is_forking => current_setting('custom.is_forking')::BOOLEAN,
      _stages => synchronization_stages
   );
 
@@ -478,18 +478,16 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
-  ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
-  -- Context is created as forking (required for state provider table registration),
-  -- but we switch to non-forking now to avoid creating hive_rowid indexes
-  -- during massive sync. Will switch back to forking at LIVE transition.
-  --
-  -- IMPORTANT: set_non_forking detaches/reattaches the context at the current
-  -- irreversible block, which would skip all block processing if HAF already has data.
-  -- We must detach and reset the position to 0 so processing starts from the beginning.
-  -- app_next_iteration() will auto-attach when processing begins.
-  PERFORM hive.app_context_set_non_forking(__schema_name);
-  PERFORM hive.app_context_detach(__schema_name);
-  PERFORM hive.app_set_current_block_num(__schema_name, 0);
+  ------------- ENSURE NON-FORKING FOR MASSIVE SYNC ----------------
+  -- Switch to non-forking only if context was created as forking.
+  -- Non-forking avoids hive_rowid indexes during massive sync.
+  -- set_non_forking reattaches at the irreversible block, so we must
+  -- detach and reset position to 0 afterward.
+  IF (SELECT hc.is_forking FROM hafd.contexts hc WHERE hc.name = __schema_name) THEN
+    PERFORM hive.app_context_set_non_forking(__schema_name);
+    PERFORM hive.app_context_detach(__schema_name);
+    PERFORM hive.app_set_current_block_num(__schema_name, 0);
+  END IF;
 
   ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
   -- Register app indexes with HAF for drop/restore lifecycle.
