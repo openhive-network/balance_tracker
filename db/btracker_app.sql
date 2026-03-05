@@ -95,7 +95,7 @@ BEGIN
   PERFORM hive.app_create_context(
      _name =>__schema_name,
      _schema => __schema_name,
-     _is_forking => current_setting('custom.is_forking')::BOOLEAN,
+     _is_forking => TRUE,
      _stages => synchronization_stages
   );
 
