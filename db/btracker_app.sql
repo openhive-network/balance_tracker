@@ -478,48 +478,6 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
-  ------------- ENSURE NON-FORKING FOR MASSIVE SYNC ----------------
-  -- Switch to non-forking only if context was created as forking.
-  -- Non-forking avoids hive_rowid indexes during massive sync.
-  -- set_non_forking reattaches at the irreversible block, so we must
-  -- detach and reset position to 0 afterward.
-  IF (SELECT hc.is_forking FROM hafd.contexts hc WHERE hc.name = __schema_name) THEN
-    PERFORM hive.app_context_set_non_forking(__schema_name);
-    PERFORM hive.app_context_detach(__schema_name);
-    PERFORM hive.app_set_current_block_num(__schema_name, 0);
-  END IF;
-
-  ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
-  -- Register app indexes with HAF for drop/restore lifecycle.
-  -- Indexes are dropped during massive sync (no reads) and restored at LIVE transition.
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, balance_seq_no)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, balance_seq_no)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op))');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op))');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON ' || __schema_name || '.current_account_balances(nai, balance DESC)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_account_savings_nai_balance_idx ON ' || __schema_name || '.account_savings(nai, balance DESC)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_current_accounts_delegations_delegatee_idx ON ' || __schema_name || '.current_accounts_delegations(delegatee)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON ' || __schema_name || '.current_rc_delegations(delegatee)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON ' || __schema_name || '.recurrent_transfers(to_account)');
-
-  -- Drop app indexes for massive sync (will be restored at LIVE transition)
-  PERFORM hive.app_save_and_drop_indexes(__schema_name);
-
-  -- Set append-only tables (no ON CONFLICT upserts) to UNLOGGED to skip WAL.
-  -- Note: balance_history_by_day, balance_history_by_month, account_rewards use
-  -- ON CONFLICT ON CONSTRAINT pk_* during processing, so they must keep their PKs
-  -- and remain LOGGED.
-  -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
-  ALTER TABLE account_balance_history SET UNLOGGED;
 
 END
 $$;
@@ -607,77 +565,6 @@ END
 $$;
 
 -- ============================================================================
--- OPERATIONS PRE-FETCH
--- ============================================================================
--- Materializes operations_view into a temp table once per batch to avoid
--- redundant view scans across the 11 process_* functions.
-
-/**
- * btracker_prefetch_operations()
- * ------------------------------
- * Pre-fetch all operations for a block range into a temporary table.
- * Called once per batch before the 11 process_* functions, which then
- * read from _btracker_ops_batch instead of scanning operations_view
- * independently (eliminating 10+ redundant view traversals per batch).
- *
- * @param _from  First block number in range
- * @param _to    Last block number in range
- */
-CREATE OR REPLACE FUNCTION btracker_prefetch_operations(_from INT, _to INT)
-RETURNS VOID
-LANGUAGE plpgsql VOLATILE
-AS
-$$
-BEGIN
-  DROP TABLE IF EXISTS _btracker_ops_batch;
-  CREATE TEMP TABLE _btracker_ops_batch AS
-  SELECT id, block_num, trx_in_block, op_pos, op_type_id,
-         body_binary, body, custom_json_type_id
-  FROM operations_view
-  WHERE block_num BETWEEN _from AND _to;
-  ANALYZE _btracker_ops_batch;
-END
-$$;
-
--- ============================================================================
--- MASSIVE SYNC FINALIZATION
--- ============================================================================
-
-/**
- * finalize_massive_sync()
- * -----------------------
- * Transition from massive sync to LIVE-ready state.
- * Reverses the optimizations applied during setup:
- *   1. Switch UNLOGGED tables back to LOGGED (WAL-safe)
- *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
- *   3. Restore app indexes (updates HAF tracking table)
- *
- * Called from btracker_process_blocks() at LIVE transition and from
- * CI startup script after bounded replay completes.
- * Safe to call multiple times (idempotent via isIndexesCreated check).
- *
- * @param _context_name  HAF context name (typically schema name)
- */
-CREATE OR REPLACE FUNCTION finalize_massive_sync(_context_name hive.context_name)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-SECURITY DEFINER
-AS
-$$
-BEGIN
-  IF isIndexesCreated() THEN
-    RETURN;  -- Already finalized
-  END IF;
-
-  ALTER TABLE account_balance_history SET LOGGED;
-
-  PERFORM hive.app_context_set_forking(_context_name);
-  PERFORM hive.app_restore_indexes(_context_name);
-  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + forking + indexes restored)';
-END
-$$;
-
--- ============================================================================
 -- BLOCK PROCESSING FUNCTIONS
 -- ============================================================================
 -- These functions handle block processing dispatch and execution.
@@ -691,7 +578,7 @@ $$;
  *
  * Behavior by stage:
  * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync
- * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
+ * - LIVE: Creates indexes (once), then calls btracker_single_processing()
  *
  * @param _context_name  HAF context name (typically schema name)
  * @param _block_range   Range of blocks to process (first_block, last_block)
@@ -714,7 +601,16 @@ BEGIN
     RETURN;
   END IF;
 
-  PERFORM finalize_massive_sync(_context_name);
+  IF NOT isIndexesCreated() THEN
+    -- create_btracker_indexes() performs DDL (ALTER TABLE SET STATISTICS) on
+    -- tables registered in the hafbe_bal context.  HAF's event trigger
+    -- hive.on_edit_registered_tables() verifies that CURRENT_USER matches the
+    -- context owner.  When called from the block-explorer processing loop the
+    -- session runs as hafbe_owner, so we must switch to btracker_owner first.
+    SET LOCAL ROLE btracker_owner;
+    PERFORM create_btracker_indexes();
+    RESET ROLE;
+  END IF;
   CALL btracker_single_processing(_block_range.first_block, _logs);
 END
 $$;
@@ -758,14 +654,9 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
-  __hardfork_23_block INT := (SELECT block_num FROM hive.applied_hardforks_view WHERE hardfork_num = 23);
+  __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
 BEGIN
   PERFORM set_config('synchronous_commit', 'OFF', false);
-
-  -- Pre-fetch all operations for this batch into a temp table.
-  -- The 11 process_* functions read from _btracker_ops_batch instead of
-  -- scanning operations_view independently (eliminates 10+ redundant scans).
-  PERFORM btracker_prefetch_operations(_from, _to);
 
   IF _logs THEN
     RAISE NOTICE 'Btracker is attempting to process a block range: <%, %>', _from, _to;
@@ -859,9 +750,6 @@ DECLARE
   __end_ts   timestamptz;
 BEGIN
   PERFORM set_config('synchronous_commit', 'ON', false);
-
-  -- Pre-fetch operations for this single block
-  PERFORM btracker_prefetch_operations(_block, _block);
 
   IF _logs THEN
     RAISE NOTICE 'Btracker processing block: %...', _block;

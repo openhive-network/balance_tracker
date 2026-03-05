@@ -62,7 +62,7 @@ BEGIN
      *   - failed_recurrent_transfer: System failed to execute (e.g., insufficient funds)
      */
     SELECT ov.body, ov.op_type_id, ov.id
-    FROM _btracker_ops_batch ov
+    FROM operations_view ov
     WHERE
       ov.op_type_id IN (_op_recurrent_transfer, _op_fill_recurrent_transfer, _op_failed_recurrent_transfer) AND
       ov.block_num BETWEEN _from AND _to

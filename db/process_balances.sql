@@ -82,8 +82,8 @@ ops_in_range AS MATERIALIZED
     ho.id AS source_op,
     ho.block_num AS source_op_block,
     ho.body_binary
-  FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
-  JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
+  FROM operations_view ho --- APP specific view must be used, to correctly handle reversible part of the data.
+  JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
   CROSS JOIN hive.get_impacted_balances(
     ho.body_binary,
     ho.block_num > ah.block_num
