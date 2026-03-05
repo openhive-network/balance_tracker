@@ -402,8 +402,37 @@ sync:
     EOSQL
     echo -e "\e[0Ksection_end:$(date +%s):indexes\r\e[0K"
 
-  # Shutdown and save cache
-  - !reference [.haf_app_sync_shutdown, script]
+  # Shutdown (inline override of .haf_app_sync_shutdown to use PATH-based pg_ctl for PG18 compat)
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):shutdown[collapsed=true]\r\e[0KStopping containers..."
+    pushd docker
+    IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
+    HAF_CONTAINER="${HAF_CONTAINER_NAME:-haf}"
+
+    echo "Requesting PostgreSQL checkpoint..."
+    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T "$HAF_CONTAINER" psql -U haf_admin -d haf_block_log -c "CHECKPOINT;" 2>&1; then
+      echo "WARNING: Checkpoint request failed - PostgreSQL may be unhealthy"
+      echo "Proceeding with pg_ctl stop which will attempt clean shutdown..."
+    fi
+
+    echo "Stopping PostgreSQL with pg_ctl (smart mode, 60s timeout)..."
+    if ! docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
+        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m smart -t 60' 2>&1; then
+      echo "WARNING: pg_ctl smart stop failed, trying fast mode..."
+      docker compose "${COMPOSE_OPTIONS[@]}" exec -T --user postgres "$HAF_CONTAINER" \
+        bash -c 'pg_ctl stop -D /home/hived/datadir/haf_db_store/pgdata -m fast -t 30' 2>&1 || true
+    fi
+
+    docker compose "${COMPOSE_OPTIONS[@]}" logs "$HAF_CONTAINER" > haf.log || true
+    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-setup > backend-setup.log || true
+    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-block-processing > backend-block-processing.log || true
+    docker compose "${COMPOSE_OPTIONS[@]}" logs backend-postgrest > backend-postgrest.log || true
+
+    timeout 120 docker compose "${COMPOSE_OPTIONS[@]}" down --timeout "${COMPOSE_DOWN_TIMEOUT:-60}"
+    popd
+
+    tar -czvf docker/container-logs.tar.gz $(pwd)/docker/*.log
+    echo -e "\e[0Ksection_end:$(date +%s):shutdown\r\e[0K"
   - !reference [.haf_app_sync_save_cache_conditional, script]
   after_script: !reference [.haf_app_sync_cleanup, after_script]
   artifacts: !reference [.haf_app_sync_artifacts, artifacts]
