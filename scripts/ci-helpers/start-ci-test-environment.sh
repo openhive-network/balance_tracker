@@ -80,6 +80,13 @@ IFS=" " read -ra COMPOSE_OPTIONS <<< "$COMPOSE_OPTIONS_STRING"
 
 echo "Docker Compose options: ${COMPOSE_OPTIONS[*]}"
 docker compose "${COMPOSE_OPTIONS[@]}" config | tee docker-compose-config.yml.log
-timeout -s INT -k 1m 15m docker compose "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull
+if ! timeout -s INT -k 1m 15m docker compose "${COMPOSE_OPTIONS[@]}" up --detach --quiet-pull; then
+  echo "=== Docker Compose startup FAILED - dumping container logs ==="
+  for svc in $(docker compose "${COMPOSE_OPTIONS[@]}" config --services 2>/dev/null); do
+    echo "--- Logs for $svc ---"
+    docker compose "${COMPOSE_OPTIONS[@]}" logs "$svc" 2>&1 | tail -100
+  done
+  exit 1
+fi
 
 popd
