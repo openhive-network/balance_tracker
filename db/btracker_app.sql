@@ -478,6 +478,16 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
+  ------------- ENSURE NON-FORKING STATE FOR CONTEXT GROUP SYNC ----------------
+  -- When used in a context group (e.g. hafbe_app + hafbe_bal in block explorer),
+  -- all contexts must have matching state (events_id, is_forking, etc).
+  -- set_non_forking reattaches the context (resetting events_id to 0), then we
+  -- detach and reset current_block_num so processing starts from the beginning.
+  IF (SELECT hc.is_forking FROM hafd.contexts hc WHERE hc.name = __schema_name) THEN
+    PERFORM hive.app_context_set_non_forking(__schema_name);
+  END IF;
+  PERFORM hive.app_context_detach(__schema_name);
+  PERFORM hive.app_set_current_block_num(__schema_name, 0);
 
 END
 $$;
