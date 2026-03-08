@@ -478,6 +478,14 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
+  ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
+  -- Must match hafbe_app.sql's post-creation sequence so that
+  -- hafbe_app and hafbe_bal are synchronized (same events_id,
+  -- is_attached, is_forking). Without this, app_check_contexts_synchronized
+  -- fails when hafbe_app.main() calls app_next_iteration on both contexts.
+  PERFORM hive.app_context_set_non_forking(__schema_name);
+  PERFORM hive.app_context_detach(__schema_name);
+  PERFORM hive.app_set_current_block_num(__schema_name, 0);
 
 END
 $$;
