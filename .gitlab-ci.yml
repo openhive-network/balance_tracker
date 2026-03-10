@@ -388,15 +388,16 @@ sync:
       echo -e "\e[0Ksection_end:$(date +%s):wait\r\e[0K"
     fi
 
-    # Create indexes after sync (before cache save).
+    # Finalize massive sync after replay (before cache save).
     # In CI the MASSIVE_PROCESSING stage never transitions to LIVE, so
-    # create_btracker_indexes() is not called during block processing.
-    # Creating them here bakes them into the cache for all downstream jobs.
-    echo -e "\e[0Ksection_start:$(date +%s):indexes[collapsed=true]\r\e[0KCreating indexes and running ANALYZE..."
+    # finalize_massive_sync() is not called during block processing.
+    # This sets tables LOGGED, switches to forking, restores indexes,
+    # and bakes them into the cache for all downstream jobs.
+    echo -e "\e[0Ksection_start:$(date +%s):indexes[collapsed=true]\r\e[0KFinalizing massive sync (LOGGED + forking + indexes)..."
     psql "$POSTGRES_ACCESS" <<'EOSQL'
     SET search_path TO btracker_app, public;
     SET ROLE btracker_owner;
-    SELECT create_btracker_indexes();
+    SELECT finalize_massive_sync('btracker_app');
     RESET ROLE;
     ANALYZE;
     EOSQL

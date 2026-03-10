@@ -100,8 +100,8 @@ run_tests() {
 
   postgres_access="${postgres_url:-postgresql://$postgres_user@$postgres_host:$postgres_port/haf_block_log}"
 
-  echo "Ensuring performance test indexes exist..."
-  psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "SET ROLE btracker_owner; SELECT ${btracker_schema}.create_btracker_indexes();"
+  echo "Ensuring massive sync is finalized (LOGGED + forking + indexes)..."
+  psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "SET ROLE btracker_owner; SELECT ${btracker_schema}.finalize_massive_sync('${btracker_schema}');"
 
   test_summary_report_path="${test_result_path%jtl}xml"
 
