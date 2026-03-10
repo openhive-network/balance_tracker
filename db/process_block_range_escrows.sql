@@ -67,7 +67,7 @@ BEGIN
      *   - escrow_dispute: Party raises dispute after escrow is active
      */
     SELECT ov.id AS op_id, ov.op_type_id, ov.body
-    FROM operations_view ov
+    FROM _btracker_ops_batch ov
     WHERE
       ov.block_num BETWEEN _from AND _to AND
       ov.op_type_id IN (__op_transfer, __op_release, __op_approved, __op_rejected, __op_dispute)
