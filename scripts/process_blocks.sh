@@ -2,7 +2,6 @@
 
 set -e
 set -o pipefail
-trap 'trap - TERM INT; kill 0' TERM INT
 
 
 print_help () {
@@ -73,7 +72,7 @@ process_blocks() {
     local n_blocks="${1:-null}"
     log_file="btracker_sync.log"
     date -uIseconds > /tmp/block_processing_startup_time.txt
-    run_with_reconnect.sh -- psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);" 2>&1 | tee -i $log_file
+    exec run_with_reconnect.sh -- psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);"
 }
 
 process_blocks "$PROCESS_BLOCK_LIMIT"
