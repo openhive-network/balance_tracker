@@ -2,7 +2,7 @@
 
 set -e
 set -o pipefail
-trap 'kill 0' TERM INT
+trap 'trap - TERM INT; kill 0' TERM INT
 
 
 print_help () {
