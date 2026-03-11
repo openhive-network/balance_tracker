@@ -1,5 +1,5 @@
 # syntax=registry.gitlab.syncad.com/hive/common-ci-configuration/dockerfile:1.5
-ARG PSQL_CLIENT_VERSION=14-1
+ARG PSQL_CLIENT_VERSION=14-2
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation
