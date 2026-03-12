@@ -14,7 +14,7 @@ Core balance tracking for HIVE, HBD, and VESTS tokens.
 |----------|---------|----------|
 | `process_block_range_balances(_from, _to)` | Main processor - extracts and updates all balances | `db/process_balances.sql` |
 | `hive.get_balance_impacting_operations()` | Returns list of operation types that affect balances | HAF core |
-| `hive.get_impacted_balances(body_binary, post_hf1)` | Parses operation and returns balance deltas | HAF core |
+| `hive.get_impacted_balances(hafd._operation_from_jsonb(body), post_hf1)` | Parses operation and returns balance deltas | HAF core |
 
 ## Tables Updated
 
@@ -106,7 +106,7 @@ Operations like `escrow_rejected_operation` can produce multiple balance changes
 ```sql
 JOIN hafd.applied_hardforks ah ON ah.hardfork_num = 1
 CROSS JOIN hive.get_impacted_balances(
-  ho.body_binary,
+  hafd._operation_from_jsonb(ho.body),
   ho.block_num > ah.block_num  -- boolean: past HF1?
 )
 ```
