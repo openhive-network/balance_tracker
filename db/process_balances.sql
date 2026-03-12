@@ -80,12 +80,11 @@ ops_in_range AS MATERIALIZED
     get_impacted_balances.asset_symbol_nai AS nai,
     get_impacted_balances.amount AS balance,
     ho.id AS source_op,
-    ho.block_num AS source_op_block,
-    ho.body_binary
+    ho.block_num AS source_op_block
   FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
   JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
   CROSS JOIN hive.get_impacted_balances(
-    ho.body_binary,
+    hafd._operation_from_jsonb(ho.body),
     ho.block_num > ah.block_num
   ) AS get_impacted_balances
   WHERE
