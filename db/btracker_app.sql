@@ -84,7 +84,10 @@ BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
   __context_table:=__context_table || __schema_name;
 
-  v_is_forking := current_setting('custom.is_forking')::BOOLEAN;
+  v_is_forking := current_setting('custom.is_forking', true)::BOOLEAN;
+  IF v_is_forking IS NULL THEN
+    v_is_forking := TRUE;
+  END IF;
 
   synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
 
