@@ -79,9 +79,12 @@ DO $$
   DECLARE __schema_name VARCHAR;
   DECLARE __context_table VARCHAR:='hive.';
   synchronization_stages hive.application_stages;
+  v_is_forking BOOLEAN;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
   __context_table:=__context_table || __schema_name;
+
+  v_is_forking := current_setting('custom.is_forking')::BOOLEAN;
 
   synchronization_stages := ARRAY[hive.stage( 'MASSIVE_PROCESSING', 101, 10000, '20 seconds' ), hive.live_stage()]::hive.application_stages;
 
@@ -95,7 +98,7 @@ BEGIN
   PERFORM hive.app_create_context(
      _name =>__schema_name,
      _schema => __schema_name,
-     _is_forking => TRUE,
+     _is_forking => v_is_forking,
      _stages => synchronization_stages
   );
 
