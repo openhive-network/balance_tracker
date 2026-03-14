@@ -5,7 +5,6 @@ services:
     entrypoint: /home/haf_admin/docker_entrypoint.sh
     command: $${HAF_COMMAND}
     environment:
-      HIVED_UID:
       # Mock data workflow only needs PostgreSQL, not hived. Use --skip-hived to keep container alive.
       HAF_COMMAND: --skip-hived
       DATADIR: /home/hived/datadir
