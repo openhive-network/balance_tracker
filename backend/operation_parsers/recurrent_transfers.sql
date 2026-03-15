@@ -47,7 +47,7 @@ DECLARE
   __pair_id INT;
 BEGIN
   __pair_id := (
-    SELECT (outer_elem->>'pair_id')::INT
+    SELECT (outer_elem->'value'->>'pair_id')::INT
     FROM jsonb_array_elements(__extensions) AS outer_elem
     LIMIT 1
   );
