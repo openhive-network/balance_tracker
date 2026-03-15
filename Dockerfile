@@ -4,6 +4,9 @@ FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_
 
 FROM psql as version-calculcation
 ARG API_VERSION="0.0.0-dev"
+USER root
+RUN addgroup -S users 2>/dev/null || true && adduser -D -u 1000 -G users hived 2>/dev/null || true
+USER hived
 
 COPY --chown=hived:users . /home/hived/src
 WORKDIR /home/hived/src
@@ -38,6 +41,8 @@ USER root
 
 RUN <<EOF
   set -e
+  addgroup -S users 2>/dev/null || true
+  adduser -D -u 1000 -G users hived 2>/dev/null || true
   mkdir /app
   chown hived /app
 EOF
