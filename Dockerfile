@@ -5,8 +5,8 @@ FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_
 FROM psql as version-calculcation
 ARG API_VERSION="0.0.0-dev"
 
-COPY --chown=haf_admin:users . /home/haf_admin/src
-WORKDIR /home/haf_admin/src
+COPY --chown=hived:users . /home/hived/src
+WORKDIR /home/hived/src
 RUN scripts/generate_version_sql.sh $(pwd)
 RUN sed -i 's|"version": "[^"]*"|"version": "'"$API_VERSION"'"|' endpoints/endpoint_schema.sql \
     && sed -i 's|^  version: .*|  version: '"$API_VERSION"'|' endpoints/endpoint_schema.sql
@@ -39,20 +39,20 @@ USER root
 RUN <<EOF
   set -e
   mkdir /app
-  chown haf_admin /app
+  chown hived /app
 EOF
 
-USER haf_admin
+USER hived
 
 COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
 COPY db /app/db
 COPY backend /app/backend
-COPY --from=version-calculcation /home/haf_admin/src/endpoints /app/endpoints
+COPY --from=version-calculcation /home/hived/src/endpoints /app/endpoints
 COPY tests/mocks /app/tests/mocks
 COPY docker/scripts/block-processing-healthcheck.sh /app/block-processing-healthcheck.sh
 COPY docker/scripts/docker_entrypoint.sh /app/docker_entrypoint.sh
-COPY --from=version-calculcation --chown=haf_admin:users /home/haf_admin/src/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
+COPY --from=version-calculcation --chown=hived:users /home/hived/src/scripts/set_version_in_sql.pgsql /app/scripts/set_version_in_sql.pgsql
 
 ENTRYPOINT ["/app/docker_entrypoint.sh"]
