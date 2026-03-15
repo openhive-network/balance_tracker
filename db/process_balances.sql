@@ -41,7 +41,7 @@ BEGIN
  */
 WITH balance_impacting_ops AS MATERIALIZED
 (
-  SELECT ot.id
+  SELECT ot.id, replace(ot.name, 'hive::protocol::', '') AS type_name
   FROM hafd.operation_types ot
   WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
 ),
@@ -82,13 +82,13 @@ ops_in_range AS MATERIALIZED
     ho.id AS source_op,
     ho.block_num AS source_op_block
   FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
+  JOIN balance_impacting_ops bio ON bio.id = ho.op_type_id
   JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
   CROSS JOIN hive.get_impacted_balances(
-    hafd._operation_from_jsonb(ho.body),
+    hafd._operation_from_jsonb(jsonb_build_object('type', bio.type_name, 'value', ho.body_value)),
     ho.block_num > ah.block_num
   ) AS get_impacted_balances
   WHERE
-    ho.op_type_id IN (SELECT id FROM balance_impacting_ops) AND
     ho.block_num BETWEEN _from AND _to
 ),
 

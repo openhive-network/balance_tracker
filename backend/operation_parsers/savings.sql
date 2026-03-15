@@ -35,10 +35,10 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'amount');
 BEGIN
   RETURN (
-    (_operation_body -> 'value' ->> 'to')::TEXT,  -- recipient of savings deposit
+    (_operation_body ->> 'to')::TEXT,  -- recipient of savings deposit
     __amount.amount,                               -- positive: increases balance
     __amount.asset_symbol_nai,
     0,                                             -- 0 = no pending request change
@@ -56,14 +56,14 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'amount');
 BEGIN
   RETURN (
-    (_operation_body -> 'value' ->> 'from')::TEXT,  -- account withdrawing
+    (_operation_body ->> 'from')::TEXT,  -- account withdrawing
     - __amount.amount,                               -- negative: decreases savings balance
     __amount.asset_symbol_nai,
     1,                                               -- 1 = new pending request created
-    (_operation_body -> 'value' ->> 'request_id')::BIGINT
+    (_operation_body ->> 'request_id')::BIGINT
   )::btracker_backend.impacted_savings_return;
 
 END
@@ -77,14 +77,14 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'amount');
 BEGIN
   RETURN (
-    (_operation_body -> 'value' ->> 'from')::TEXT,  -- original requester
+    (_operation_body ->> 'from')::TEXT,  -- original requester
     0,                                               -- no balance change (already deducted)
     __amount.asset_symbol_nai,
     -1,                                              -- -1 = pending request completed
-    (_operation_body -> 'value' ->> 'request_id')::BIGINT
+    (_operation_body ->> 'request_id')::BIGINT
   )::btracker_backend.impacted_savings_return;
 
 END
@@ -98,10 +98,10 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'interest');
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'interest');
 BEGIN
   RETURN (
-    (_operation_body -> 'value' ->> 'owner')::TEXT,  -- account receiving interest
+    (_operation_body ->> 'owner')::TEXT,  -- account receiving interest
     __amount.amount,                                  -- positive: increases savings balance
     __amount.asset_symbol_nai,
     0,                                                -- no pending request change
@@ -120,11 +120,11 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'from')::TEXT,  -- account cancelling
+    ((_operation_body)->>'from')::TEXT,  -- account cancelling
     NULL,                                          -- balance restored separately
     NULL,
     -1,                                            -- -1 = pending request removed
-    ((_operation_body)->'value'->>'request_id')::BIGINT
+    ((_operation_body)->>'request_id')::BIGINT
   )::btracker_backend.impacted_savings_return;
 
 END

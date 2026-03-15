@@ -35,7 +35,7 @@ BEGIN
   -- Find all accounts affected by HF23 at the specific block
   WITH hardfork_hive_operation AS MATERIALIZED (
     SELECT
-      (SELECT av.id FROM accounts_view av WHERE av.name = (ov.body)->'value'->>'account') AS account_id
+      (SELECT av.id FROM accounts_view av WHERE av.name = ov.body_value->>'account') AS account_id
     FROM operations_view ov
     WHERE ov.op_type_id = _op_hardfork_hive AND block_num = __hardfork_23_block
   ),

@@ -639,7 +639,7 @@ BEGIN
   DROP TABLE IF EXISTS _btracker_ops_batch;
   CREATE TEMP TABLE _btracker_ops_batch AS
   SELECT id, block_num, trx_in_block, op_pos, op_type_id,
-         body_value, body, custom_json_type_id
+         body_value, custom_json_type_id
   FROM operations_view
   WHERE block_num BETWEEN _from AND _to;
   ANALYZE _btracker_ops_batch;

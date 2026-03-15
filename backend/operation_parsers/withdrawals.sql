@@ -54,10 +54,10 @@ $$
 DECLARE
   _pre_hf1  INT := btracker_backend.vests_precision_multiplier(_is_hf01);  -- pre-HF1 precision adjustment
   _rate     INT := btracker_backend.withdrawal_rate_weeks(_is_hf16);       -- 104 weeks pre-HF16, 13 after
-  _withdraw BIGINT := GREATEST(((_operation_body)->'value'->'vesting_shares'->>'amount')::BIGINT, 0);
+  _withdraw BIGINT := GREATEST(((_operation_body)-> 'vesting_shares'->>'amount')::BIGINT, 0);
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'account')::TEXT,
+    ((_operation_body)->>'account')::TEXT,
     0,                                        -- resets withdrawn counter
     ((_withdraw * _pre_hf1) / _rate)::BIGINT, -- weekly withdrawal rate
     (_withdraw * _pre_hf1)::BIGINT            -- total to withdraw
@@ -77,8 +77,8 @@ DECLARE
   _pre_hf1 INT := btracker_backend.vests_precision_multiplier(_is_hf01);
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'from_account')::TEXT,
-    (((_operation_body)->'value'->'withdrawn'->>'amount')::BIGINT * _pre_hf1)  -- cumulative withdrawn
+    ((_operation_body)->>'from_account')::TEXT,
+    (((_operation_body)-> 'withdrawn'->>'amount')::BIGINT * _pre_hf1)  -- cumulative withdrawn
   )::btracker_backend.impacted_fill_withdraw_return;
 
 END
@@ -94,9 +94,9 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'from_account')::TEXT,  -- power-down source
-    ((_operation_body)->'value'->>'to_account')::TEXT,    -- route destination
-    ((_operation_body)->'value'->>'percent')::INT         -- percentage (0-10000)
+    ((_operation_body)->>'from_account')::TEXT,  -- power-down source
+    ((_operation_body)->>'to_account')::TEXT,    -- route destination
+    ((_operation_body)->>'percent')::INT         -- percentage (0-10000)
   )::btracker_backend.impacted_withdraw_routes_return;
 
 END
@@ -111,7 +111,7 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'account')::TEXT,
+    ((_operation_body)->>'account')::TEXT,
     0,  -- reset withdrawn counter
     0,  -- reset withdrawal rate
     0   -- reset total to withdraw

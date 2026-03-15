@@ -32,18 +32,18 @@ AS
 $$
 BEGIN
   -- Check if deposited asset is VESTS (precision 6) indicating routed withdrawal
-  IF ((_operation_body)->'value'->'deposited'->>'precision')::INT = 6 THEN
+  IF ((_operation_body)-> 'deposited'->>'precision')::INT = 6 THEN
     RETURN (
-      ((_operation_body)->'value'->>'from_account')::TEXT,
-      - ((_operation_body)->'value'->'withdrawn'->>'amount')::BIGINT,  -- negative: reduces delayed_vests
-      ((_operation_body)->'value'->>'to_account')::TEXT,
-      ((_operation_body)->'value'->'deposited'->>'amount')::BIGINT     -- positive: adds to recipient
+      ((_operation_body)->>'from_account')::TEXT,
+      - ((_operation_body)-> 'withdrawn'->>'amount')::BIGINT,  -- negative: reduces delayed_vests
+      ((_operation_body)->>'to_account')::TEXT,
+      ((_operation_body)-> 'deposited'->>'amount')::BIGINT     -- positive: adds to recipient
     )::btracker_backend.impacted_delays_return;
   ELSE
     -- Non-VESTS deposit (HIVE): only track withdrawn amount
     RETURN (
-      ((_operation_body)->'value'->>'from_account')::TEXT,
-      - ((_operation_body)->'value'->'withdrawn'->>'amount')::BIGINT,
+      ((_operation_body)->>'from_account')::TEXT,
+      - ((_operation_body)-> 'withdrawn'->>'amount')::BIGINT,
       NULL,
       NULL
     )::btracker_backend.impacted_delays_return;
@@ -60,8 +60,8 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'to_account')::TEXT,
-    ((_operation_body)->'value'->'vesting_shares_received'->>'amount')::BIGINT,  -- positive: adds delayed_vests
+    ((_operation_body)->>'to_account')::TEXT,
+    ((_operation_body)-> 'vesting_shares_received'->>'amount')::BIGINT,  -- positive: adds delayed_vests
     NULL,
     NULL
   )::btracker_backend.impacted_delays_return;
@@ -77,8 +77,8 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'voter')::TEXT,
-    - ((_operation_body)->'value'->'votes')::BIGINT,  -- negative: reduces delayed_vests as votes mature
+    ((_operation_body)->>'voter')::TEXT,
+    - ((_operation_body)-> 'votes')::BIGINT,  -- negative: reduces delayed_vests as votes mature
     NULL,
     NULL
   )::btracker_backend.impacted_delays_return;

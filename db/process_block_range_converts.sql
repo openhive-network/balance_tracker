@@ -64,7 +64,7 @@ BEGIN
          *     Example: {"owner":"alice","requestid":1,"amount_in":{"amount":"1000","nai":"@@000000013"}}
          *     Reduces or completes the pending conversion
          */
-        SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body
+        SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body_value AS body
         FROM _btracker_ops_batch ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_convert, _op_fillconv)

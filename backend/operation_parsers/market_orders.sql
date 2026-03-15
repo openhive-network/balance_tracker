@@ -33,11 +33,11 @@ $$
 DECLARE
   _asset btracker_backend.asset;
 BEGIN
-  _asset := btracker_backend.parse_amount_object(_body -> 'value' -> 'amount_to_sell');
+  _asset := btracker_backend.parse_amount_object(_body -> 'amount_to_sell');
 
   RETURN (
-    _body -> 'value' ->> 'owner',    -- order creator
-    _body -> 'value' ->> 'orderid',  -- user-specified order ID
+    _body ->> 'owner',    -- order creator
+    _body ->> 'orderid',  -- user-specified order ID
     _asset.asset_symbol_nai,         -- asset being sold (HIVE or HBD)
     _asset.amount                    -- amount locked in order
   )::btracker_backend.limit_order_event;
@@ -54,8 +54,8 @@ AS
 $$
 BEGIN
   RETURN (
-    COALESCE(_body -> 'value' ->> 'seller', _body -> 'value' ->> 'owner'),  -- order owner
-    _body -> 'value' ->> 'orderid',  -- order to cancel
+    COALESCE(_body ->> 'seller', _body ->> 'owner'),  -- order owner
+    _body ->> 'orderid',  -- order to cancel
     NULL,                             -- NAI not needed (full removal)
     NULL                              -- amount not needed (full removal)
   )::btracker_backend.limit_order_event;
@@ -74,24 +74,24 @@ DECLARE
   _asset btracker_backend.asset;
 BEGIN
   -- Open order side (existing order in the book)
-  IF _body -> 'value' ->> 'open_owner' IS NOT NULL THEN
-    _asset := btracker_backend.parse_amount_object(_body -> 'value' -> 'open_pays');
+  IF _body ->> 'open_owner' IS NOT NULL THEN
+    _asset := btracker_backend.parse_amount_object(_body -> 'open_pays');
 
     RETURN NEXT (
-      _body -> 'value' ->> 'open_owner',
-      _body -> 'value' ->> 'open_orderid',
+      _body ->> 'open_owner',
+      _body ->> 'open_orderid',
       _asset.asset_symbol_nai,
       _asset.amount             -- amount filled from this order
     )::btracker_backend.limit_order_event;
   END IF;
 
   -- Current order side (taker order that matched)
-  IF _body -> 'value' ->> 'current_owner' IS NOT NULL THEN
-    _asset := btracker_backend.parse_amount_object(_body -> 'value' -> 'current_pays');
+  IF _body ->> 'current_owner' IS NOT NULL THEN
+    _asset := btracker_backend.parse_amount_object(_body -> 'current_pays');
 
     RETURN NEXT (
-      _body -> 'value' ->> 'current_owner',
-      _body -> 'value' ->> 'current_orderid',
+      _body ->> 'current_owner',
+      _body ->> 'current_orderid',
       _asset.asset_symbol_nai,
       _asset.amount             -- amount filled from this order
     )::btracker_backend.limit_order_event;
