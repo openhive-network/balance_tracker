@@ -2,7 +2,7 @@ name: 'btracker'
 services:
   haf:
     image: ${HAF_REGISTRY:-registry.gitlab.syncad.com/hive/haf/instance}:${HAF_VERSION:-9ec94375}
-    entrypoint: /home/haf_admin/docker_entrypoint.sh
+    entrypoint: /home/hived/docker_entrypoint.sh
     command: $${HAF_COMMAND}
     environment:
       # Mock data workflow only needs PostgreSQL, not hived. Use --skip-hived to keep container alive.
