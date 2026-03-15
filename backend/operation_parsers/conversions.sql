@@ -34,11 +34,11 @@ DECLARE
   _asset  btracker_backend.asset;
   _result btracker_backend.convert_event;
 BEGIN
-  _asset := btracker_backend.parse_amount_object(_body -> 'value' -> 'amount');
+  _asset := btracker_backend.parse_amount_object(_body -> 'amount');
 
   _result := (
-    _body->'value'->>'owner',      -- account converting
-    _body->'value'->>'requestid',  -- unique request identifier
+    _body->>'owner',      -- account converting
+    _body->>'requestid',  -- unique request identifier
     _asset.asset_symbol_nai,       -- input asset (HBD or HIVE)
     _asset.amount                  -- amount being converted
   );
@@ -59,11 +59,11 @@ DECLARE
   _asset  btracker_backend.asset;
   _result btracker_backend.convert_event;
 BEGIN
-  _asset := btracker_backend.parse_amount_object(_body -> 'value' -> 'amount_in');
+  _asset := btracker_backend.parse_amount_object(_body -> 'amount_in');
 
   _result := (
-    _body->'value'->>'owner',      -- account receiving conversion
-    _body->'value'->>'requestid',  -- matches original request
+    _body->>'owner',      -- account receiving conversion
+    _body->>'requestid',  -- matches original request
     _asset.asset_symbol_nai,       -- input asset that was converted
     _asset.amount                  -- amount filled (subtract from pending)
   );

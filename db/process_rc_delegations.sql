@@ -71,12 +71,12 @@ END IF;
 -- operation body has id='rc' to identify RC delegation operations.
 ------------------------------------------------------------------------------
 WITH ops AS MATERIALIZED (
-  SELECT ov.body, ov.id, ov.block_num
+  SELECT ov.body_value AS body, ov.id, ov.block_num
   FROM _btracker_ops_batch ov
   WHERE
     ov.op_type_id = _op_custom_json AND
     ov.block_num BETWEEN _from AND _to AND
-    (ov.body->'value'->>'id') = 'rc'
+    (ov.body_value->>'id') = 'rc'
 ),
 ------------------------------------------------------------------------------
 -- STEP 2: Parse RC delegation operations using C++ parser
@@ -96,7 +96,7 @@ parsed_rc_delegations AS MATERIALIZED (
     o.id AS source_op,
     o.block_num AS source_op_block
   FROM ops o
-  CROSS JOIN LATERAL hive.parse_rc_delegation((o.body->'value'->>'json')::text) AS parsed
+  CROSS JOIN LATERAL hive.parse_rc_delegation((o.body->>'json')::text) AS parsed
   WHERE parsed.from_account IS NOT NULL
 ),
 ------------------------------------------------------------------------------

@@ -61,7 +61,7 @@ BEGIN
      *   - fill_recurrent_transfer: System executes a scheduled transfer successfully
      *   - failed_recurrent_transfer: System failed to execute (e.g., insufficient funds)
      */
-    SELECT ov.body, ov.op_type_id, ov.id
+    SELECT ov.body_value AS body, ov.op_type_id, ov.id
     FROM _btracker_ops_batch ov
     WHERE
       ov.op_type_id IN (_op_recurrent_transfer, _op_fill_recurrent_transfer, _op_failed_recurrent_transfer) AND

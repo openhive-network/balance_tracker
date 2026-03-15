@@ -50,7 +50,7 @@ BEGIN
  *   - interest: HBD interest payment credited to savings
  */
 WITH ops AS MATERIALIZED (
-  SELECT ov.body, ov.op_type_id, ov.id, ov.block_num
+  SELECT ov.body_value AS body, ov.op_type_id, ov.id, ov.block_num
   FROM _btracker_ops_batch ov
   WHERE
     ov.op_type_id IN (_op_transfer_to_savings, _op_transfer_from_savings, _op_cancel_transfer_from_savings, _op_fill_transfer_from_savings, _op_interest) AND
@@ -134,7 +134,7 @@ filter_interest_ops AS
   ) AS result
   WHERE
     ov.op_type_id IN (_op_transfer_to_savings, _op_transfer_from_savings, _op_cancel_transfer_from_savings, _op_fill_transfer_from_savings) OR
-    (ov.op_type_id = _op_interest AND (ov.body->'value'->>'is_saved_into_hbd_balance')::BOOLEAN = false)
+    (ov.op_type_id = _op_interest AND (ov.body->>'is_saved_into_hbd_balance')::BOOLEAN = false)
 ),
 
 ---------------------------------------------------------------------------------------

@@ -31,9 +31,9 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'delegator')::TEXT,
-    ((_operation_body)->'value'->>'delegatee')::TEXT,
-    ((_operation_body)->'value'->'vesting_shares'->>'amount')::BIGINT  -- absolute amount, not delta
+    ((_operation_body)->>'delegator')::TEXT,
+    ((_operation_body)->>'delegatee')::TEXT,
+    ((_operation_body)-> 'vesting_shares'->>'amount')::BIGINT  -- absolute amount, not delta
   )::btracker_backend.impacted_delegations_return;
 
 END
@@ -48,9 +48,9 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'creator')::TEXT,       -- delegator (account creator)
-    ((_operation_body)->'value'->>'new_account_name')::TEXT,  -- delegatee (new account)
-    ((_operation_body)->'value'->'delegation'->>'amount')::BIGINT
+    ((_operation_body)->>'creator')::TEXT,       -- delegator (account creator)
+    ((_operation_body)->>'new_account_name')::TEXT,  -- delegatee (new account)
+    ((_operation_body)-> 'delegation'->>'amount')::BIGINT
   )::btracker_backend.impacted_delegations_return;
 
 END
@@ -65,9 +65,9 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'account')::TEXT,  -- delegator receiving vests back
+    ((_operation_body)->>'account')::TEXT,  -- delegator receiving vests back
     NULL,                                             -- no delegatee (vests returning)
-    - ((_operation_body)->'value'->'vesting_shares'->>'amount')::BIGINT  -- negative: reduces delegated amount
+    - ((_operation_body)-> 'vesting_shares'->>'amount')::BIGINT  -- negative: reduces delegated amount
   )::btracker_backend.impacted_delegations_return;
 
 END
@@ -82,7 +82,7 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'account')::TEXT,  -- affected account
+    ((_operation_body)->>'account')::TEXT,  -- affected account
     NULL,                                             -- all delegations cleared
     0                                                 -- zero out delegated vests
   )::btracker_backend.impacted_delegations_return;

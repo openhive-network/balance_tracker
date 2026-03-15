@@ -42,8 +42,8 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'author')::TEXT,      -- post author
-    ((_operation_body)->'value'->>'author_rewards')::BIGINT,  -- HIVE amount
+    ((_operation_body)->>'author')::TEXT,      -- post author
+    ((_operation_body)->>'author_rewards')::BIGINT,  -- HIVE amount
     TRUE                                                 -- payout_must_be_claimed
   )::btracker_backend.impacted_info_rewards_return;
 
@@ -59,9 +59,9 @@ AS
 $$
 BEGIN
   RETURN (
-    ((_operation_body)->'value'->>'curator')::TEXT,     -- voter who earned curation
-    ((_operation_body)->'value'->'reward'->>'amount')::BIGINT,  -- VESTS amount
-    ((_operation_body)->'value'->>'payout_must_be_claimed')::BOOLEAN  -- false if auto-vested
+    ((_operation_body)->>'curator')::TEXT,     -- voter who earned curation
+    ((_operation_body)-> 'reward'->>'amount')::BIGINT,  -- VESTS amount
+    ((_operation_body)->>'payout_must_be_claimed')::BOOLEAN  -- false if auto-vested
   )::btracker_backend.impacted_info_rewards_return;
 
 END
@@ -81,10 +81,10 @@ BEGIN
 RETURN (
   WITH author_reward_operation AS (
     SELECT
-      ((_operation_body)->'value'->>'author')::TEXT AS account_name,
-      ((_operation_body)->'value'->'hbd_payout'->>'amount')::BIGINT AS hbd_payout,     -- HBD portion
-      ((_operation_body)->'value'->'hive_payout'->>'amount')::BIGINT AS hive_payout,   -- HIVE portion (if any)
-      ((_operation_body)->'value'->'vesting_payout'->>'amount')::BIGINT AS vesting_payout  -- VESTS (HP) portion
+      ((_operation_body)->>'author')::TEXT AS account_name,
+      ((_operation_body)-> 'hbd_payout'->>'amount')::BIGINT AS hbd_payout,     -- HBD portion
+      ((_operation_body)-> 'hive_payout'->>'amount')::BIGINT AS hive_payout,   -- HIVE portion (if any)
+      ((_operation_body)-> 'vesting_payout'->>'amount')::BIGINT AS vesting_payout  -- VESTS (HP) portion
   )
   SELECT
     (
@@ -113,10 +113,10 @@ BEGIN
 RETURN (
   WITH benefactor_reward_operation AS (
     SELECT
-      ((_operation_body)->'value'->>'benefactor')::TEXT AS account_name,  -- beneficiary account
-      ((_operation_body)->'value'->'hbd_payout'->>'amount')::BIGINT AS hbd_payout,
-      ((_operation_body)->'value'->'hive_payout'->>'amount')::BIGINT AS hive_payout,
-      ((_operation_body)->'value'->'vesting_payout'->>'amount')::BIGINT AS vesting_payout
+      ((_operation_body)->>'benefactor')::TEXT AS account_name,  -- beneficiary account
+      ((_operation_body)-> 'hbd_payout'->>'amount')::BIGINT AS hbd_payout,
+      ((_operation_body)-> 'hive_payout'->>'amount')::BIGINT AS hive_payout,
+      ((_operation_body)-> 'vesting_payout'->>'amount')::BIGINT AS vesting_payout
   )
   SELECT
     (
@@ -142,10 +142,10 @@ BEGIN
 RETURN (
   WITH author_claim_reward_operation AS (
     SELECT
-      ((_operation_body)->'value'->>'account')::TEXT AS account_name,
-      - ((_operation_body)->'value'->'reward_hbd'->>'amount')::BIGINT AS claim_hbd,    -- negative: reduces pending
-      - ((_operation_body)->'value'->'reward_hive'->>'amount')::BIGINT AS claim_hive,
-      - ((_operation_body)->'value'->'reward_vests'->>'amount')::BIGINT AS claim_vests
+      ((_operation_body)->>'account')::TEXT AS account_name,
+      - ((_operation_body)-> 'reward_hbd'->>'amount')::BIGINT AS claim_hbd,    -- negative: reduces pending
+      - ((_operation_body)-> 'reward_hive'->>'amount')::BIGINT AS claim_hive,
+      - ((_operation_body)-> 'reward_vests'->>'amount')::BIGINT AS claim_vests
   )
   SELECT
     (

@@ -62,7 +62,7 @@ BEGIN
 --
 -- Example: Processing blocks 1-1000 in one call vs 1000 separate calls.
 WITH ops AS MATERIALIZED (
-  SELECT ov.body, ov.op_type_id, ov.id AS source_op, ov.block_num AS source_op_block
+  SELECT ov.body_value AS body, ov.op_type_id, ov.id AS source_op, ov.block_num AS source_op_block
   FROM _btracker_ops_batch ov
   WHERE
     ov.op_type_id = ANY(ARRAY[_op_claim_reward_balance, _op_author_reward, _op_curation_reward, _op_comment_reward, _op_comment_benefactor_reward]) AND
@@ -156,7 +156,7 @@ get_impacted_bal AS MATERIALIZED (
     -- Author/benefactor rewards only tracked if they go to pending balance
     (
       fio.op_type_id IN (_op_author_reward, _op_comment_benefactor_reward) AND
-      (fio.body->'value'->>'payout_must_be_claimed')::BOOLEAN = true
+      (fio.body->>'payout_must_be_claimed')::BOOLEAN = true
     )
 ),
 

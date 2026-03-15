@@ -40,15 +40,15 @@ IMMUTABLE
 AS
 $BODY$
 DECLARE
-  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'hive_amount');
-  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'hbd_amount' );
+  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'hive_amount');
+  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'hbd_amount' );
 
   __result   btracker_backend.escrow_transfer_type;
 BEGIN
 
   __result := (
-    __body -> 'value' ->> 'from',     -- escrow creator
-    __body -> 'value' ->> 'escrow_id', -- unique ID per account
+    __body ->> 'from',     -- escrow creator
+    __body ->> 'escrow_id', -- unique ID per account
     __hive_amt.asset_symbol_nai,
     __hive_amt.amount,                 -- HIVE locked in escrow
     __hbd_amt.asset_symbol_nai,
@@ -68,15 +68,15 @@ IMMUTABLE
 AS
 $BODY$
 DECLARE
-  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'hive_amount');
-  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'hbd_amount' );
+  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'hive_amount');
+  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'hbd_amount' );
 
   __result   btracker_backend.escrow_transfer_type;
 BEGIN
 
   __result := (
-    __body -> 'value' ->> 'from',     -- escrow owner
-    __body -> 'value' ->> 'escrow_id',
+    __body ->> 'from',     -- escrow owner
+    __body ->> 'escrow_id',
     __hive_amt.asset_symbol_nai,
     - __hive_amt.amount,               -- negative: reduces escrow HIVE balance
     __hbd_amt.asset_symbol_nai,
@@ -105,12 +105,12 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $$
 DECLARE
-  __fee    btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'value' -> 'fee');
+  __fee    btracker_backend.asset := btracker_backend.parse_amount_object(__body -> 'fee');
   __result btracker_backend.escrow_fee_type;
 BEGIN
   __result := (
-    __body -> 'value' ->> 'from',     -- escrow owner
-    __body -> 'value' ->> 'escrow_id',
+    __body ->> 'from',     -- escrow owner
+    __body ->> 'escrow_id',
     __fee.asset_symbol_nai,           -- fee asset type
     __fee.amount                      -- fee amount for agent
   );
@@ -138,8 +138,8 @@ DECLARE
   __result btracker_backend.escrow_rejects_and_approved_type;
 BEGIN
   __result := (
-    __body -> 'value' ->> 'from',     -- escrow owner
-    __body -> 'value' ->> 'escrow_id' -- escrow to delete
+    __body ->> 'from',     -- escrow owner
+    __body ->> 'escrow_id' -- escrow to delete
   );
 
   RETURN __result;
@@ -159,8 +159,8 @@ DECLARE
   __result btracker_backend.escrow_rejects_and_approved_type;
 BEGIN
   __result := (
-    __body -> 'value' ->> 'from',     -- escrow owner
-    __body -> 'value' ->> 'escrow_id' -- escrow being approved
+    __body ->> 'from',     -- escrow owner
+    __body ->> 'escrow_id' -- escrow being approved
   );
 
   RETURN __result;

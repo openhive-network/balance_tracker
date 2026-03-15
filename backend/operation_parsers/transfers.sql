@@ -29,7 +29,7 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'amount');
+  __amount btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'amount');
 BEGIN
   RETURN QUERY (
     SELECT
@@ -49,8 +49,8 @@ LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'hive_amount');
-  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'value' -> 'hbd_amount');
+  __hive_amt btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'hive_amount');
+  __hbd_amt  btracker_backend.asset := btracker_backend.parse_amount_object(_operation_body -> 'hbd_amount');
 BEGIN
   RETURN QUERY (
     SELECT

@@ -66,7 +66,7 @@ BEGIN
      *   - escrow_rejected: Agent/receiver rejects before approval deadline
      *   - escrow_dispute: Party raises dispute after escrow is active
      */
-    SELECT ov.id AS op_id, ov.op_type_id, ov.body
+    SELECT ov.id AS op_id, ov.op_type_id, ov.body_value AS body
     FROM _btracker_ops_batch ov
     WHERE
       ov.block_num BETWEEN _from AND _to AND
@@ -79,7 +79,7 @@ BEGIN
    * We extract the 'from' field which identifies the escrow creator/owner.
    */
   all_account_names AS (
-    SELECT DISTINCT (o.body->'value'->>'from')::TEXT AS account_name
+    SELECT DISTINCT (o.body->>'from')::TEXT AS account_name
     FROM ops_in_range o
   ),
   account_ids AS MATERIALIZED (
@@ -229,9 +229,9 @@ BEGIN
     SELECT
       o.op_id,
       ai.account_id AS from_id,
-      (o.body->'value'->>'escrow_id')::BIGINT AS escrow_id
+      (o.body->>'escrow_id')::BIGINT AS escrow_id
     FROM ops_in_range o
-    JOIN account_ids ai ON ai.account_name = (o.body->'value'->>'from')::TEXT
+    JOIN account_ids ai ON ai.account_name = (o.body->>'from')::TEXT
     WHERE o.op_type_id = __op_dispute
   ),
   --------------------- UNIQUE DISPUTES ---------------------

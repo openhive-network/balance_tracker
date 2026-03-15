@@ -47,7 +47,7 @@ DECLARE
   __pair_id INT;
 BEGIN
   __pair_id := (
-    SELECT (outer_elem->'value'->>'pair_id')::INT
+    SELECT (outer_elem->>'pair_id')::INT
     FROM jsonb_array_elements(__extensions) AS outer_elem
     LIMIT 1
   );
@@ -84,8 +84,8 @@ LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
 DECLARE
-  __amount       btracker_backend.asset := btracker_backend.parse_amount_object(__operation_body -> 'value' -> 'amount');
-  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
+  __amount       btracker_backend.asset := btracker_backend.parse_amount_object(__operation_body -> 'amount');
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)-> 'extensions');
   __del_transfer BOOLEAN := FALSE;  -- mark transfer for deletion if amount is 0
   __con_failures INT     := 0;      -- new/updated transfer starts with 0 failures
 
@@ -97,15 +97,15 @@ BEGIN
   END IF;
 
   __return := (
-    __operation_body -> 'value' ->> 'from',       -- from_account
-    __operation_body -> 'value' ->> 'to',         -- to_account
+    __operation_body ->> 'from',       -- from_account
+    __operation_body ->> 'to',         -- to_account
     __pair_id,                                    -- transfer_id
     __amount.asset_symbol_nai,                    -- nai
     __amount.amount,                              -- amount
     __con_failures,                               -- consecutive_failures
-    __operation_body -> 'value' ->> 'executions', -- remaining_executions
-    __operation_body -> 'value' ->> 'recurrence', -- recurrence
-    __operation_body -> 'value' ->> 'memo',       -- memo
+    __operation_body ->> 'executions', -- remaining_executions
+    __operation_body ->> 'recurrence', -- recurrence
+    __operation_body ->> 'memo',       -- memo
     __del_transfer                                -- delete_transfer
   );
 
@@ -139,8 +139,8 @@ LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
 DECLARE
-  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
-  __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)-> 'extensions');
+  __rem_exec     INT     := (__operation_body->>'remaining_executions')::INT;
   __del_transfer BOOLEAN := FALSE;  -- mark for deletion when all executions complete
   __con_failures INT     := 0;      -- successful fill resets failure counter
 
@@ -152,8 +152,8 @@ BEGIN
   END IF;
 
   __return := (
-    __operation_body -> 'value' ->> 'from', -- from_account
-    __operation_body -> 'value' ->> 'to',   -- to_account
+    __operation_body ->> 'from', -- from_account
+    __operation_body ->> 'to',   -- to_account
     __pair_id,                              -- transfer_id
     NULL,                                   -- nai         not included in fill operation
     NULL,                                   -- amount      not included in fill operation
@@ -215,11 +215,11 @@ LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
 DECLARE
-  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)->'value'->'extensions');
-  __rem_exec     INT     := (__operation_body->'value'->>'remaining_executions')::INT;
-  __deleted      BOOLEAN := (__operation_body->'value'->>'deleted')::BOOLEAN;  -- true after 10 failures
+  __pair_id      INT     := btracker_backend.extract_pair_id((__operation_body)-> 'extensions');
+  __rem_exec     INT     := (__operation_body->>'remaining_executions')::INT;
+  __deleted      BOOLEAN := (__operation_body->>'deleted')::BOOLEAN;  -- true after 10 failures
   __del_transfer BOOLEAN := FALSE;  -- mark for deletion on 10 failures or explicit delete
-  __con_failures INT     := (__operation_body->'value'->>'consecutive_failures')::INT;
+  __con_failures INT     := (__operation_body->>'consecutive_failures')::INT;
 
   __return btracker_backend.recurrent_transfer_return;
 BEGIN
@@ -229,8 +229,8 @@ BEGIN
   END IF;
 
   __return := (
-    __operation_body -> 'value' ->> 'from',       -- from_account
-    __operation_body -> 'value' ->> 'to',         -- to_account
+    __operation_body ->> 'from',       -- from_account
+    __operation_body ->> 'to',         -- to_account
     __pair_id,                                    -- transfer_id
     NULL,                                         -- nai         not included in fail operation
     NULL,                                         -- amount      not included in fail operation
