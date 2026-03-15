@@ -5,7 +5,7 @@ set -e
 # Setup a trap to kill potentially pending healthcheck SQL query at script exit
 trap 'trap - SIGINT SIGTERM && kill -- -$$' SIGINT SIGTERM
 
-INSTANCE_READY=$(psql --dbname "haf_block_log" --quiet --tuples-only --command="SELECT hive.is_instance_ready()::VARCHAR;")
+INSTANCE_READY=$(psql -U haf_admin --dbname "haf_block_log" --quiet --tuples-only --command="SELECT hive.is_instance_ready()::VARCHAR;")
 
 if [[ "$INSTANCE_READY" == " true" ]]; then
     echo "HAF instance ready!"
