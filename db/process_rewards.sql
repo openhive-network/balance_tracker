@@ -636,7 +636,7 @@ recursive_vests AS (
               -- prev_hive_vests = accumulated NAI 38 from previous block ranges
               -- prev_vests = accumulated VESTS from previous block ranges
               -- reward_vests is NEGATIVE for claims
-              - ROUND((cp.prev_hive_vests) * (- cp.reward_vests) / cp.prev_vests, 3)
+              - COALESCE(ROUND((cp.prev_hive_vests) * (- cp.reward_vests) / NULLIF(cp.prev_vests, 0), 3), 0)
           ELSE
               -- Reward: use the pre-calculated NAI 38 value
               cp.reward_vest_balance
@@ -664,7 +664,7 @@ recursive_vests AS (
               -- prev.reward_vest_balance = NAI 38 change from previous row
               -- prev.prev_hive_vests = NAI 38 accumulated before previous row
               -- Sum these to get total accumulated NAI 38 at time of this claim
-              - ROUND((prev.reward_vest_balance + prev.prev_hive_vests) * (- next_cp.reward_vests) / next_cp.prev_vests, 3)
+              - COALESCE(ROUND((prev.reward_vest_balance + prev.prev_hive_vests) * (- next_cp.reward_vests) / NULLIF(next_cp.prev_vests, 0), 3), 0)
           ELSE
               -- Reward: use the pre-calculated NAI 38 value
               next_cp.reward_vest_balance
