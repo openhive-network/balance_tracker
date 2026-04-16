@@ -79,15 +79,15 @@ include:
 - project: 'hive/common-ci-configuration'
   ref: develop
   file:
-    - '/templates/base.gitlab-ci.yml'
-    - '/templates/docker_image_jobs.gitlab-ci.yml'
-    - '/templates/haf_data_preparation.gitlab-ci.yml'
-    - '/templates/cache_cleanup.gitlab-ci.yml'
-    - '/templates/python_projects.gitlab-ci.yml'
-    - '/templates/npm_projects.gitlab-ci.yml'
-    - '/templates/test_jobs.gitlab-ci.yml'
-    - '/templates/haf_app_testing.gitlab-ci.yml'
-    - '/templates/source_change_detection.gitlab-ci.yml'
+  - '/templates/base.gitlab-ci.yml'
+  - '/templates/docker_image_jobs.gitlab-ci.yml'
+  - '/templates/haf_data_preparation.gitlab-ci.yml'
+  - '/templates/cache_cleanup.gitlab-ci.yml'
+  - '/templates/python_projects.gitlab-ci.yml'
+  - '/templates/npm_projects.gitlab-ci.yml'
+  - '/templates/test_jobs.gitlab-ci.yml'
+  - '/templates/haf_app_testing.gitlab-ci.yml'
+  - '/templates/source_change_detection.gitlab-ci.yml'
 
 # =============================================================================
 # Early exit for doc-only changes
@@ -97,22 +97,22 @@ include:
 # Note: QUICK_TEST=true overrides AUTO_SKIP - user explicitly wants tests to run.
 .early_exit_for_docs_only:
   script: &early_exit_check
-    - |
-      if [[ "${QUICK_TEST:-false}" == "true" ]]; then
-        echo "=== QUICK_TEST mode: running tests with cached data ==="
-      elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]]; then
-        echo "=== Skipping (docs/tests/gui only change) ==="
-        echo "Only documentation, tests, or GUI files changed."
-        echo "No work needed - exiting with success."
-        exit 0
-      fi
+  - |
+    if [[ "${QUICK_TEST:-false}" == "true" ]]; then
+      echo "=== QUICK_TEST mode: running tests with cached data ==="
+    elif [[ "${AUTO_SKIP_SYNC:-false}" == "true" ]]; then
+      echo "=== Skipping (docs/tests/gui only change) ==="
+      echo "Only documentation, tests, or GUI files changed."
+      echo "No work needed - exiting with success."
+      exit 0
+    fi
 
 # Use common-ci-configuration template for git corruption cleanup
 # Handles corrupt submodules and orphaned submodule directories
 default:
   hooks:
     pre_get_sources_script:
-      - !reference [.pre_get_sources_with_submodules, pre_get_sources_script]
+    - !reference [.pre_get_sources_with_submodules, pre_get_sources_script]
 
 # =============================================================================
 # Change Detection - Auto-skip sync when only tests/docs/gui change
@@ -132,7 +132,7 @@ find_haf_image:
   extends: .find_haf_image
   stage: detect
   variables:
-    UPSTREAM_BRANCH: "feature/body-value-migration"
+    UPSTREAM_BRANCH: "1.28.6-rc13"
     HAF_PATTERNS_REF: "feature/body-value-migration"
 
 # =============================================================================
@@ -166,7 +166,7 @@ verify_poetry_lock_stability_api_package:
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 verify_poetry_lock_stability_api_generation:
   stage: lint
@@ -174,7 +174,7 @@ verify_poetry_lock_stability_api_generation:
   variables:
     PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/api_generation"
   tags:
-    - public-runner-docker
+  - public-runner-docker
 
 # Note: prepare_haf_image job removed - find_haf_image now provides
 # HAF_IMAGE_NAME and HAF_COMMIT aliases directly (common-ci-configuration !285)
@@ -241,9 +241,9 @@ prepare_haf_data:
     CONFIG_INI_SOURCE: "/tmp/config_5M.ini"
     # HAF_IMAGE_NAME and HAF_COMMIT are now provided directly by find_haf_image
   before_script:
-    - curl -fsSL "${COMMON_CI_URL}/haf-app-tools/config/config_5M.ini" -o /tmp/config_5M.ini
+  - curl -fsSL "${COMMON_CI_URL}/haf-app-tools/config/config_5M.ini" -o /tmp/config_5M.ini
     # Log the mapped variables
-    - echo "Using HAF image:${HAF_IMAGE_NAME} (commit:${HAF_COMMIT})"
+  - echo "Using HAF image:${HAF_IMAGE_NAME} (commit:${HAF_COMMIT})"
   tags:
   - public-runner-docker
   - data-cache-storage
@@ -698,8 +698,8 @@ sync_with_mock_data:
 
 .test-with-docker-compose:
   extends:
-    - .docker_image_builder_job_template
-    - .haf_app_dind_test_variables
+  - .docker_image_builder_job_template
+  - .haf_app_dind_test_variables
   stage: test
   image: "${HAF_APP_TEST_RUNNER_IMAGE}"
   variables:
@@ -713,44 +713,44 @@ sync_with_mock_data:
     HAF_APP_ROLE_PREFIX: "btracker"
   timeout: 30 minutes
   before_script:
-    - *early_exit_check
-    - !reference [.docker_image_builder_job_template, before_script]
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-    - !reference [.haf_app_dind_extract_cache, script]
-    - !reference [.haf_app_dind_compose_startup, script]
-    - !reference [.haf_app_dind_wait_for_services, script]
+  - *early_exit_check
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  - !reference [.haf_app_dind_extract_cache, script]
+  - !reference [.haf_app_dind_compose_startup, script]
+  - !reference [.haf_app_dind_wait_for_services, script]
   after_script: !reference [.haf_app_dind_compose_teardown, after_script]
   artifacts:
     when: always
     paths:
-      - docker/container-logs.tar.gz
+    - docker/container-logs.tar.gz
     expire_in: 1 week
   tags:
-    - public-runner-docker
-    - data-cache-storage
-    - fast
+  - public-runner-docker
+  - data-cache-storage
+  - fast
 
 # Standard needs for test jobs using sync cache
 .test-needs-sync: &test-needs-sync
   needs:
-    - job: detect_changes
-      artifacts: true
-      optional: true
-    - job: sync
-      artifacts: true
-    - job: docker-setup-docker-image-build
-      artifacts: true
-    - job: find_haf_image
-      artifacts: true
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: sync
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: find_haf_image
+    artifacts: true
 
 # Template for Tavern-based tests (uses centralized common-ci template)
 .test-with-docker-compose-tavern:
   extends:
-    - .docker_image_builder_job_template
-    - .haf_app_dind_tavern_tests
+  - .docker_image_builder_job_template
+  - .haf_app_dind_tavern_tests
   image: "${HAF_APP_TEST_RUNNER_IMAGE}"
   variables:
     # DinD variables for Docker-in-Docker
@@ -766,27 +766,27 @@ sync_with_mock_data:
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mainnet
     PYTEST_WORKERS: "16"
   before_script:
-    - *early_exit_check
+  - *early_exit_check
     # Fetch tests_api submodule (not needed by other test jobs)
-    - |
-      curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}/scripts/fetch-submodules.sh" -o /tmp/fetch-submodules.sh
-      chmod +x /tmp/fetch-submodules.sh
-      /tmp/fetch-submodules.sh tests_api
-    - !reference [.docker_image_builder_job_template, before_script]
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-      echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
-    - !reference [.haf_app_dind_tavern_tests, before_script]
-    - |
-      # Install tests_api into docker/venv where common-ci installed pytest/tavern
-      # (common-ci's tavern_install_deps creates venv in docker/ due to compose_startup cd)
-      . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
-      pip install -e "${CI_PROJECT_DIR}/tests_api"
+  - |
+    curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}/scripts/fetch-submodules.sh" -o /tmp/fetch-submodules.sh
+    chmod +x /tmp/fetch-submodules.sh
+    /tmp/fetch-submodules.sh tests_api
+  - !reference [.docker_image_builder_job_template, before_script]
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):login[collapsed=true]\r\e[0KLogging to Docker registry..."
+    docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    echo -e "\e[0Ksection_end:$(date +%s):login\r\e[0K"
+  - !reference [.haf_app_dind_tavern_tests, before_script]
+  - |
+    # Install tests_api into docker/venv where common-ci installed pytest/tavern
+    # (common-ci's tavern_install_deps creates venv in docker/ due to compose_startup cd)
+    . "${CI_PROJECT_DIR}/docker/venv/bin/activate"
+    pip install -e "${CI_PROJECT_DIR}/tests_api"
   tags:
-    - public-runner-docker
-    - data-cache-storage
-    - fast
+  - public-runner-docker
+  - data-cache-storage
+  - fast
 
 # =============================================================================
 # Test Jobs
@@ -796,51 +796,51 @@ regression-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync
   script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
-      cd "${CI_PROJECT_DIR}/tests/regression"
-      ./run_test.sh --host=docker
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+    cd "${CI_PROJECT_DIR}/tests/regression"
+    ./run_test.sh --host=docker
+    echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
     paths:
-      - tests/regression/regression_test.log
-      - docker/container-logs.tar.gz
+    - tests/regression/regression_test.log
+    - docker/container-logs.tar.gz
     when: always
 
 setup-scripts-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync
   script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
-      cd "${CI_PROJECT_DIR}/tests/functional"
-      ./test_scripts.sh --host=docker
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+    cd "${CI_PROJECT_DIR}/tests/functional"
+    ./test_scripts.sh --host=docker
+    echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
 
 performance-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync
   tags:
-    - public-runner-docker
-    - data-cache-storage
-    - fast
+  - public-runner-docker
+  - data-cache-storage
+  - fast
   script:
-    - |
-      echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
-      cd "${CI_PROJECT_DIR}"
-      # In DinD, services are available at 'docker' host
-      timeout -k 1m 10m ./scripts/ci-helpers/run_performance_tests.sh --backend-host=docker --postgres-host=docker
-      tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
-      cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
-      m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
-      echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+    cd "${CI_PROJECT_DIR}"
+    # In DinD, services are available at 'docker' host
+    timeout -k 1m 10m ./scripts/ci-helpers/run_performance_tests.sh --backend-host=docker --postgres-host=docker
+    tar -czvf tests/performance/results.tar.gz $(pwd)/tests/performance/*result.*
+    cat jmeter.log | python3 docker/ci/parse-jmeter-output.py
+    m2u --input $(pwd)/tests/performance/result.xml --output $(pwd)/tests/performance/junit-result.xml
+    echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
   artifacts:
     when: always
     paths:
-      - docker/container-logs.tar.gz
-      - tests/performance/result_report/
-      - tests/performance/results.tar.gz
-      - jmeter.log
+    - docker/container-logs.tar.gz
+    - tests/performance/result_report/
+    - tests/performance/results.tar.gz
+    - jmeter.log
     reports:
       junit: tests/performance/junit-result.xml
 
@@ -848,55 +848,55 @@ pattern-test:
   extends: .test-with-docker-compose-tavern
   <<: *test-needs-sync
   script:
-    - |
-      cd "${CI_PROJECT_DIR}"
-      . docker/venv/bin/activate
-      PGACCESS="postgresql://haf_admin@docker:5432/haf_block_log"
+  - |
+    cd "${CI_PROJECT_DIR}"
+    . docker/venv/bin/activate
+    PGACCESS="postgresql://haf_admin@docker:5432/haf_block_log"
 
-      # Indexes are created during sync (baked into cache).
-      # Refresh planner stats after cache restore.
-      echo -e "\e[0Ksection_start:$(date +%s):analyze[collapsed=true]\r\e[0KRunning ANALYZE..."
-      psql "$PGACCESS" -c "ANALYZE;"
-      echo -e "\e[0Ksection_end:$(date +%s):analyze\r\e[0K"
+    # Indexes are created during sync (baked into cache).
+    # Refresh planner stats after cache restore.
+    echo -e "\e[0Ksection_start:$(date +%s):analyze[collapsed=true]\r\e[0KRunning ANALYZE..."
+    psql "$PGACCESS" -c "ANALYZE;"
+    echo -e "\e[0Ksection_end:$(date +%s):analyze\r\e[0K"
 
-      # Diagnostic: run the slowest query (VESTS balance history for blocktrades)
-      # with auto_explain to capture nested PL/pgSQL query plans in haf.log artifact
-      echo -e "\e[0Ksection_start:$(date +%s):explain[collapsed=true]\r\e[0KRunning EXPLAIN diagnostic..."
-      psql "$PGACCESS" <<'EOSQL' || echo "EXPLAIN diagnostic failed (non-fatal)"
-      LOAD 'auto_explain';
-      SET auto_explain.log_min_duration = 0;
-      SET auto_explain.log_analyze = true;
-      SET auto_explain.log_buffers = true;
-      SET auto_explain.log_nested_statements = true;
-      SET auto_explain.log_level = 'notice';
-      SET search_path TO btracker_endpoints, btracker_app, btracker_backend, public;
-      SET ROLE btracker_user;
-      SET statement_timeout = '60s';
-      \timing on
-      SELECT * FROM btracker_endpoints.get_balance_history(
-        "account-name" => 'blocktrades',
-        "coin-type" => 'VESTS',
-        "page-size" => 20
-      );
-      EOSQL
-      echo -e "\e[0Ksection_end:$(date +%s):explain\r\e[0K"
+    # Diagnostic: run the slowest query (VESTS balance history for blocktrades)
+    # with auto_explain to capture nested PL/pgSQL query plans in haf.log artifact
+    echo -e "\e[0Ksection_start:$(date +%s):explain[collapsed=true]\r\e[0KRunning EXPLAIN diagnostic..."
+    psql "$PGACCESS" <<'EOSQL' || echo "EXPLAIN diagnostic failed (non-fatal)"
+    LOAD 'auto_explain';
+    SET auto_explain.log_min_duration = 0;
+    SET auto_explain.log_analyze = true;
+    SET auto_explain.log_buffers = true;
+    SET auto_explain.log_nested_statements = true;
+    SET auto_explain.log_level = 'notice';
+    SET search_path TO btracker_endpoints, btracker_app, btracker_backend, public;
+    SET ROLE btracker_user;
+    SET statement_timeout = '60s';
+    \timing on
+    SELECT * FROM btracker_endpoints.get_balance_history(
+      "account-name" => 'blocktrades',
+      "coin-type" => 'VESTS',
+      "page-size" => 20
+    );
+    EOSQL
+    echo -e "\e[0Ksection_end:$(date +%s):explain\r\e[0K"
 
-      # In DinD, PostgREST is available at 'docker' host
-      # Run from project root so pattern file paths resolve correctly
-      BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
+    # In DinD, PostgREST is available at 'docker' host
+    # Run from project root so pattern file paths resolve correctly
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS:-$PYTEST_NUMBER_OF_PROCESSES} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
 
 pattern-test-with-mock-data:
   extends: .test-with-docker-compose-tavern
   needs:
-    - job: detect_changes
-      artifacts: true
-      optional: true
-    - job: sync_with_mock_data
-      artifacts: true
-    - job: docker-setup-docker-image-build
-      artifacts: true
-    - job: find_haf_image
-      artifacts: true
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: sync_with_mock_data
+    artifacts: true
+  - job: docker-setup-docker-image-build
+    artifacts: true
+  - job: find_haf_image
+    artifacts: true
   variables:
     # Use mock cache type instead of regular sync cache
     APP_SYNC_CACHE_TYPE: "${BTRACKER_MOCK_CACHE_TYPE}"
@@ -904,12 +904,12 @@ pattern-test-with-mock-data:
     JUNIT_REPORT: $CI_PROJECT_DIR/tests/tavern/patterns-mock/report.xml
     TAVERN_DIR: $CI_PROJECT_DIR/tests/tavern/patterns-mock
   script:
-    - |
-      cd "${CI_PROJECT_DIR}"
-      . docker/venv/bin/activate
-      # In DinD, PostgREST is available at 'docker' host
-      # Run from project root so pattern file paths resolve correctly
-      BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
+  - |
+    cd "${CI_PROJECT_DIR}"
+    . docker/venv/bin/activate
+    # In DinD, PostgREST is available at 'docker' host
+    # Run from project root so pattern file paths resolve correctly
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
 
 python_api_client_test:
   extends: .project_develop_configuration_template
@@ -999,19 +999,21 @@ deploy-wax-spec-dev-package:
     SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
     NPM_PACKAGE_SCOPE: "@hiveio"
   before_script:
-    - *early_exit_check
-    - git config --global --add safe.directory '*'
-    - . "${NVM_DIR}/nvm.sh"
-    - nvm use "${NODEJS_VERSION}"
-    - cd "${SOURCE_DIR}"
-    - pnpm --recursive install --frozen-lockfile
+  - *early_exit_check
+  - git config --global --add safe.directory '*'
+  - . "${NVM_DIR}/nvm.sh"
+  - nvm use "${NODEJS_VERSION}"
+  - cd "${SOURCE_DIR}"
+  - pnpm --recursive install --frozen-lockfile
     # Find the tgz file - filename includes version number so we can't hardcode it
-    - export PACKAGE_TGZ_PATH=$(find "${CI_PROJECT_DIR}/build" -name "*.tgz" | head -1)
-    - echo "Found package at ${PACKAGE_TGZ_PATH}"
-    - echo -e "\e[0Ksection_start:$(date +%s):package_tgz_unpack[collapsed=true]\r\e[0KAttempting to unpack ${PACKAGE_TGZ_PATH}"
-    - cd "${CI_PROJECT_DIR}"
-    - tar -xf "${PACKAGE_TGZ_PATH}" -C "${SOURCE_DIR}" --strip-components=1
-    - echo -e "\e[0Ksection_end:$(date +%s):package_tgz_unpack\r\e[0K"
+  - export PACKAGE_TGZ_PATH=$(find "${CI_PROJECT_DIR}/build" -name "*.tgz" | head
+    -1)
+  - echo "Found package at ${PACKAGE_TGZ_PATH}"
+  - echo -e "\e[0Ksection_start:$(date +%s):package_tgz_unpack[collapsed=true]\r\e[0KAttempting
+    to unpack ${PACKAGE_TGZ_PATH}"
+  - cd "${CI_PROJECT_DIR}"
+  - tar -xf "${PACKAGE_TGZ_PATH}" -C "${SOURCE_DIR}" --strip-components=1
+  - echo -e "\e[0Ksection_end:$(date +%s):package_tgz_unpack\r\e[0K"
   needs:
   - job: detect_changes
     artifacts: true
@@ -1031,18 +1033,20 @@ deploy-wax-spec-production-public-npm:
     # job's runner which don't exist on this runner
     SOURCE_DIR: "${CI_PROJECT_DIR}/build/generated"
   before_script:
-    - git config --global --add safe.directory '*'
-    - . "${NVM_DIR}/nvm.sh"
-    - nvm use "${NODEJS_VERSION}"
-    - cd "${SOURCE_DIR}"
-    - pnpm --recursive install --frozen-lockfile
+  - git config --global --add safe.directory '*'
+  - . "${NVM_DIR}/nvm.sh"
+  - nvm use "${NODEJS_VERSION}"
+  - cd "${SOURCE_DIR}"
+  - pnpm --recursive install --frozen-lockfile
     # Find the tgz file - filename includes version number so we can't hardcode it
-    - export PACKAGE_TGZ_PATH=$(find "${CI_PROJECT_DIR}/build" -name "*.tgz" | head -1)
-    - echo "Found package at ${PACKAGE_TGZ_PATH}"
-    - echo -e "\e[0Ksection_start:$(date +%s):package_tgz_unpack[collapsed=true]\r\e[0KAttempting to unpack ${PACKAGE_TGZ_PATH}"
-    - cd "${CI_PROJECT_DIR}"
-    - tar -xf "${PACKAGE_TGZ_PATH}" -C "${SOURCE_DIR}" --strip-components=1
-    - echo -e "\e[0Ksection_end:$(date +%s):package_tgz_unpack\r\e[0K"
+  - export PACKAGE_TGZ_PATH=$(find "${CI_PROJECT_DIR}/build" -name "*.tgz" | head
+    -1)
+  - echo "Found package at ${PACKAGE_TGZ_PATH}"
+  - echo -e "\e[0Ksection_start:$(date +%s):package_tgz_unpack[collapsed=true]\r\e[0KAttempting
+    to unpack ${PACKAGE_TGZ_PATH}"
+  - cd "${CI_PROJECT_DIR}"
+  - tar -xf "${PACKAGE_TGZ_PATH}" -C "${SOURCE_DIR}" --strip-components=1
+  - echo -e "\e[0Ksection_end:$(date +%s):package_tgz_unpack\r\e[0K"
   needs:
   - job: generate-wax-spec
     artifacts: true
