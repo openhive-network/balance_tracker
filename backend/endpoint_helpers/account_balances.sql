@@ -145,8 +145,8 @@ BEGIN
     -- These funds have left savings but not yet arrived in liquid balance
     savings_pivot AS (
       SELECT
-        COALESCE(SUM(tsi.balance) FILTER (WHERE tsi.nai = _nai_hbd), 0)::BIGINT AS savings_pending_amount_hbd,
-        COALESCE(SUM(tsi.balance) FILTER (WHERE tsi.nai = _nai_hive), 0)::BIGINT AS savings_pending_amount_hive
+        COALESCE(-SUM(tsi.balance) FILTER (WHERE tsi.nai = _nai_hbd), 0)::BIGINT AS savings_pending_amount_hbd,
+        COALESCE(-SUM(tsi.balance) FILTER (WHERE tsi.nai = _nai_hive), 0)::BIGINT AS savings_pending_amount_hive
       FROM transfer_saving_id tsi
       WHERE tsi.account = _account_id
     ),
