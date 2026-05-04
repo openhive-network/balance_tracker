@@ -1,10 +1,26 @@
 [
   {
     "date": "2017-01-01T00:00:00",
-    "total_transfer_amount": "38838711792",
-    "average_transfer_amount": "806937",
-    "maximum_transfer_amount": "222105144",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000013",
+      "amount": "38838711792",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000013",
+      "amount": "806937",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000013",
+      "amount": "222105144",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000013",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 48131,
     "last_block_num": 4999997
   }

@@ -9,17 +9,17 @@ btracker_backend.transfer_stats:
       format: date-time
       description: the time transfers were included in the blockchain
     total_transfer_amount:
-      type: string
-      description: sum of a amount of transfered tokens in the period
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: sum of transferred tokens in the period (with NAI and precision)
     average_transfer_amount:
-      type: string
-      description: average amount of transfered tokens in the period
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: average amount of transferred tokens in the period (with NAI and precision)
     maximum_transfer_amount:
-      type: string
-      description: maximum amount of transfered tokens in the period
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: maximum amount of transferred tokens in the period (with NAI and precision)
     minimum_transfer_amount:
-      type: string
-      description: minimum amount of transfered tokens in the period
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: minimum amount of transferred tokens in the period (with NAI and precision)
     transfer_count:
       type: integer
       description: number of transfers in the period
@@ -31,10 +31,10 @@ btracker_backend.transfer_stats:
 DROP TYPE IF EXISTS btracker_backend.transfer_stats CASCADE;
 CREATE TYPE btracker_backend.transfer_stats AS (
     "date" TIMESTAMP,
-    "total_transfer_amount" TEXT,
-    "average_transfer_amount" TEXT,
-    "maximum_transfer_amount" TEXT,
-    "minimum_transfer_amount" TEXT,
+    "total_transfer_amount" btracker_backend.amount,
+    "average_transfer_amount" btracker_backend.amount,
+    "maximum_transfer_amount" btracker_backend.amount,
+    "minimum_transfer_amount" btracker_backend.amount,
     "transfer_count" INT,
     "last_block_num" INT
 );

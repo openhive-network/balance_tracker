@@ -102,10 +102,10 @@ SET ROLE btracker_owner;
             example: [
               {
                 "date": "2017-01-01T00:00:00",
-                "total_transfer_amount": "69611921266",
-                "average_transfer_amount": "1302405",
-                "maximum_transfer_amount": "18000000",
-                "minimum_transfer_amount": "1",
+                "total_transfer_amount": {"nai": "@@000000013", "amount": "69611921266", "precision": 3},
+                "average_transfer_amount": {"nai": "@@000000013", "amount": "1302405", "precision": 3},
+                "maximum_transfer_amount": {"nai": "@@000000013", "amount": "18000000", "precision": 3},
+                "minimum_transfer_amount": {"nai": "@@000000013", "amount": "1", "precision": 3},
                 "transfer_count": 54665,
                 "last_block_num": 5000000
               }
@@ -214,15 +214,17 @@ BEGIN
 
   ---------------------------------------------------------------------------
   -- RETURN STREAMING RESULTS FROM BACKEND
-  -- All amounts cast to TEXT for JSON bigint safety
+  -- Amounts wrapped via create_amount_object so the response carries
+  -- {nai, amount, precision} (matches other endpoints; lets clients scale
+  -- raw satoshi values by 10^precision)
   ---------------------------------------------------------------------------
   RETURN QUERY
   SELECT
     ah.updated_at,
-    ah.sum_transfer_amount::TEXT,
-    ah.avg_transfer_amount::TEXT,
-    ah.max_transfer_amount::TEXT,
-    ah.min_transfer_amount::TEXT,
+    btracker_backend.create_amount_object(_coin_type, ah.sum_transfer_amount),
+    btracker_backend.create_amount_object(_coin_type, ah.avg_transfer_amount),
+    btracker_backend.create_amount_object(_coin_type, ah.max_transfer_amount),
+    btracker_backend.create_amount_object(_coin_type, ah.min_transfer_amount),
     ah.transfer_count,
     ah.last_block_num
   FROM btracker_backend.get_transfer_aggregation(

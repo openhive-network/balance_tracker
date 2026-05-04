@@ -1,1585 +1,4401 @@
 [
   {
     "date": "2016-09-16T00:00:00",
-    "total_transfer_amount": "148209279",
-    "average_transfer_amount": "692566",
-    "maximum_transfer_amount": "29827284",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "148209279",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "692566",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "29827284",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 214,
     "last_block_num": 4999990
   },
   {
     "date": "2016-09-15T00:00:00",
-    "total_transfer_amount": "115237584",
-    "average_transfer_amount": "423667",
-    "maximum_transfer_amount": "16412725",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "115237584",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "423667",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16412725",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 272,
     "last_block_num": 4975658
   },
   {
     "date": "2016-09-14T00:00:00",
-    "total_transfer_amount": "125791836",
-    "average_transfer_amount": "476484",
-    "maximum_transfer_amount": "14164305",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "125791836",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "476484",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14164305",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 264,
     "last_block_num": 4947835
   },
   {
     "date": "2016-09-13T00:00:00",
-    "total_transfer_amount": "120555259",
-    "average_transfer_amount": "443217",
-    "maximum_transfer_amount": "10300330",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "120555259",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "443217",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10300330",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 272,
     "last_block_num": 4918950
   },
   {
     "date": "2016-09-12T00:00:00",
-    "total_transfer_amount": "86960001",
-    "average_transfer_amount": "561032",
-    "maximum_transfer_amount": "31000606",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "86960001",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "561032",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "31000606",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 155,
     "last_block_num": 4890223
   },
   {
     "date": "2016-09-11T00:00:00",
-    "total_transfer_amount": "99630704",
-    "average_transfer_amount": "524372",
-    "maximum_transfer_amount": "29999990",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "99630704",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "524372",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "29999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 190,
     "last_block_num": 4861450
   },
   {
     "date": "2016-09-10T00:00:00",
-    "total_transfer_amount": "111009821",
-    "average_transfer_amount": "324590",
-    "maximum_transfer_amount": "16271000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "111009821",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "324590",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16271000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 342,
     "last_block_num": 4832788
   },
   {
     "date": "2016-09-09T00:00:00",
-    "total_transfer_amount": "139401587",
-    "average_transfer_amount": "393789",
-    "maximum_transfer_amount": "20215000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "139401587",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "393789",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20215000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 354,
     "last_block_num": 4804322
   },
   {
     "date": "2016-09-08T00:00:00",
-    "total_transfer_amount": "87265930",
-    "average_transfer_amount": "319655",
-    "maximum_transfer_amount": "30844097",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "87265930",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "319655",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "30844097",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 273,
     "last_block_num": 4775541
   },
   {
     "date": "2016-09-07T00:00:00",
-    "total_transfer_amount": "382915348",
-    "average_transfer_amount": "1636390",
-    "maximum_transfer_amount": "200000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "382915348",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1636390",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 234,
     "last_block_num": 4747005
   },
   {
     "date": "2016-09-06T00:00:00",
-    "total_transfer_amount": "81129900",
-    "average_transfer_amount": "367103",
-    "maximum_transfer_amount": "10460745",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "81129900",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "367103",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10460745",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 221,
     "last_block_num": 4718246
   },
   {
     "date": "2016-09-05T00:00:00",
-    "total_transfer_amount": "50395875",
-    "average_transfer_amount": "320992",
-    "maximum_transfer_amount": "7674408",
-    "minimum_transfer_amount": "5",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50395875",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "320992",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7674408",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5",
+      "precision": 3
+    },
     "transfer_count": 157,
     "last_block_num": 4689325
   },
   {
     "date": "2016-09-04T00:00:00",
-    "total_transfer_amount": "76214581",
-    "average_transfer_amount": "317560",
-    "maximum_transfer_amount": "10068618",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "76214581",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "317560",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10068618",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 240,
     "last_block_num": 4660531
   },
   {
     "date": "2016-09-03T00:00:00",
-    "total_transfer_amount": "140216760",
-    "average_transfer_amount": "312983",
-    "maximum_transfer_amount": "23975971",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "140216760",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "312983",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23975971",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 448,
     "last_block_num": 4632034
   },
   {
     "date": "2016-09-02T00:00:00",
-    "total_transfer_amount": "157154825",
-    "average_transfer_amount": "541913",
-    "maximum_transfer_amount": "21000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "157154825",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "541913",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "21000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 290,
     "last_block_num": 4603331
   },
   {
     "date": "2016-09-01T00:00:00",
-    "total_transfer_amount": "60216959",
-    "average_transfer_amount": "200723",
-    "maximum_transfer_amount": "4396000",
-    "minimum_transfer_amount": "15",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "60216959",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200723",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4396000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15",
+      "precision": 3
+    },
     "transfer_count": 300,
     "last_block_num": 4574141
   },
   {
     "date": "2016-08-31T00:00:00",
-    "total_transfer_amount": "114781438",
-    "average_transfer_amount": "327012",
-    "maximum_transfer_amount": "11270918",
-    "minimum_transfer_amount": "2",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "114781438",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "327012",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11270918",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2",
+      "precision": 3
+    },
     "transfer_count": 351,
     "last_block_num": 4545250
   },
   {
     "date": "2016-08-30T00:00:00",
-    "total_transfer_amount": "158821573",
-    "average_transfer_amount": "422397",
-    "maximum_transfer_amount": "20977000",
-    "minimum_transfer_amount": "40",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "158821573",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "422397",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20977000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "40",
+      "precision": 3
+    },
     "transfer_count": 376,
     "last_block_num": 4517196
   },
   {
     "date": "2016-08-29T00:00:00",
-    "total_transfer_amount": "66733887",
-    "average_transfer_amount": "240049",
-    "maximum_transfer_amount": "8274343",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "66733887",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "240049",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8274343",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 278,
     "last_block_num": 4488393
   },
   {
     "date": "2016-08-28T00:00:00",
-    "total_transfer_amount": "112687245",
-    "average_transfer_amount": "278240",
-    "maximum_transfer_amount": "6099421",
-    "minimum_transfer_amount": "50",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "112687245",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "278240",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6099421",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50",
+      "precision": 3
+    },
     "transfer_count": 405,
     "last_block_num": 4459709
   },
   {
     "date": "2016-08-27T00:00:00",
-    "total_transfer_amount": "156795272",
-    "average_transfer_amount": "409387",
-    "maximum_transfer_amount": "20000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "156795272",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "409387",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 383,
     "last_block_num": 4431015
   },
   {
     "date": "2016-08-26T00:00:00",
-    "total_transfer_amount": "149565140",
-    "average_transfer_amount": "336858",
-    "maximum_transfer_amount": "18000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "149565140",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "336858",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 444,
     "last_block_num": 4402512
   },
   {
     "date": "2016-08-25T00:00:00",
-    "total_transfer_amount": "129640924",
-    "average_transfer_amount": "324914",
-    "maximum_transfer_amount": "23012028",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "129640924",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "324914",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23012028",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 399,
     "last_block_num": 4374265
   },
   {
     "date": "2016-08-24T00:00:00",
-    "total_transfer_amount": "113700973",
-    "average_transfer_amount": "239875",
-    "maximum_transfer_amount": "10793646",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "113700973",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "239875",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10793646",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 474,
     "last_block_num": 4345446
   },
   {
     "date": "2016-08-23T00:00:00",
-    "total_transfer_amount": "129364492",
-    "average_transfer_amount": "477359",
-    "maximum_transfer_amount": "20269990",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "129364492",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "477359",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20269990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 271,
     "last_block_num": 4316953
   },
   {
     "date": "2016-08-22T00:00:00",
-    "total_transfer_amount": "67273146",
-    "average_transfer_amount": "210228",
-    "maximum_transfer_amount": "7161178",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "67273146",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "210228",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7161178",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 320,
     "last_block_num": 4288426
   },
   {
     "date": "2016-08-21T00:00:00",
-    "total_transfer_amount": "76751316",
-    "average_transfer_amount": "255837",
-    "maximum_transfer_amount": "6500000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "76751316",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "255837",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 300,
     "last_block_num": 4260028
   },
   {
     "date": "2016-08-20T00:00:00",
-    "total_transfer_amount": "103736719",
-    "average_transfer_amount": "302439",
-    "maximum_transfer_amount": "12000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "103736719",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "302439",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 343,
     "last_block_num": 4231125
   },
   {
     "date": "2016-08-19T00:00:00",
-    "total_transfer_amount": "95832697",
-    "average_transfer_amount": "285216",
-    "maximum_transfer_amount": "20849738",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "95832697",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "285216",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20849738",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 336,
     "last_block_num": 4202724
   },
   {
     "date": "2016-08-18T00:00:00",
-    "total_transfer_amount": "450362051",
-    "average_transfer_amount": "909822",
-    "maximum_transfer_amount": "200000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "450362051",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "909822",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 495,
     "last_block_num": 4174333
   },
   {
     "date": "2016-08-17T00:00:00",
-    "total_transfer_amount": "122638621",
-    "average_transfer_amount": "281281",
-    "maximum_transfer_amount": "10980127",
-    "minimum_transfer_amount": "6",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "122638621",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "281281",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10980127",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6",
+      "precision": 3
+    },
     "transfer_count": 436,
     "last_block_num": 4145359
   },
   {
     "date": "2016-08-16T00:00:00",
-    "total_transfer_amount": "68075324",
-    "average_transfer_amount": "287237",
-    "maximum_transfer_amount": "6000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "68075324",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "287237",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 237,
     "last_block_num": 4116648
   },
   {
     "date": "2016-08-15T00:00:00",
-    "total_transfer_amount": "61941705",
-    "average_transfer_amount": "320941",
-    "maximum_transfer_amount": "6999990",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "61941705",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "320941",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 193,
     "last_block_num": 4088358
   },
   {
     "date": "2016-08-14T00:00:00",
-    "total_transfer_amount": "95225882",
-    "average_transfer_amount": "242305",
-    "maximum_transfer_amount": "6352140",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "95225882",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "242305",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6352140",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 393,
     "last_block_num": 4059703
   },
   {
     "date": "2016-08-13T00:00:00",
-    "total_transfer_amount": "143359595",
-    "average_transfer_amount": "359297",
-    "maximum_transfer_amount": "18000393",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "143359595",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "359297",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18000393",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 399,
     "last_block_num": 4031061
   },
   {
     "date": "2016-08-12T00:00:00",
-    "total_transfer_amount": "281388931",
-    "average_transfer_amount": "666798",
-    "maximum_transfer_amount": "100000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "281388931",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "666798",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 422,
     "last_block_num": 4002230
   },
   {
     "date": "2016-08-11T00:00:00",
-    "total_transfer_amount": "164313407",
-    "average_transfer_amount": "390293",
-    "maximum_transfer_amount": "100000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "164313407",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "390293",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 421,
     "last_block_num": 3973712
   },
   {
     "date": "2016-08-10T00:00:00",
-    "total_transfer_amount": "114779399",
-    "average_transfer_amount": "302848",
-    "maximum_transfer_amount": "8917478",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "114779399",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "302848",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8917478",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 379,
     "last_block_num": 3945036
   },
   {
     "date": "2016-08-09T00:00:00",
-    "total_transfer_amount": "98180514",
-    "average_transfer_amount": "344493",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "98180514",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "344493",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 285,
     "last_block_num": 3916450
   },
   {
     "date": "2016-08-08T00:00:00",
-    "total_transfer_amount": "84362721",
-    "average_transfer_amount": "268671",
-    "maximum_transfer_amount": "6000000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "84362721",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "268671",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 314,
     "last_block_num": 3887711
   },
   {
     "date": "2016-08-07T00:00:00",
-    "total_transfer_amount": "109704432",
-    "average_transfer_amount": "307295",
-    "maximum_transfer_amount": "30000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "109704432",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "307295",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "30000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 357,
     "last_block_num": 3859016
   },
   {
     "date": "2016-08-06T00:00:00",
-    "total_transfer_amount": "86172178",
-    "average_transfer_amount": "271836",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "86172178",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "271836",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 317,
     "last_block_num": 3830408
   },
   {
     "date": "2016-08-05T00:00:00",
-    "total_transfer_amount": "71061735",
-    "average_transfer_amount": "220005",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "71061735",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "220005",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 323,
     "last_block_num": 3801773
   },
   {
     "date": "2016-08-04T00:00:00",
-    "total_transfer_amount": "94215722",
-    "average_transfer_amount": "244716",
-    "maximum_transfer_amount": "20125464",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "94215722",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "244716",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20125464",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 385,
     "last_block_num": 3773268
   },
   {
     "date": "2016-08-03T00:00:00",
-    "total_transfer_amount": "314876639",
-    "average_transfer_amount": "628496",
-    "maximum_transfer_amount": "150000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "314876639",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "628496",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 501,
     "last_block_num": 3744615
   },
   {
     "date": "2016-08-02T00:00:00",
-    "total_transfer_amount": "67971976",
-    "average_transfer_amount": "211750",
-    "maximum_transfer_amount": "4629490",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "67971976",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "211750",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4629490",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 321,
     "last_block_num": 3715577
   },
   {
     "date": "2016-08-01T00:00:00",
-    "total_transfer_amount": "54455131",
-    "average_transfer_amount": "211887",
-    "maximum_transfer_amount": "10041145",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "54455131",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "211887",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10041145",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 257,
     "last_block_num": 3687017
   },
   {
     "date": "2016-07-31T00:00:00",
-    "total_transfer_amount": "100011245",
-    "average_transfer_amount": "224744",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100011245",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "224744",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 445,
     "last_block_num": 3658385
   },
   {
     "date": "2016-07-30T00:00:00",
-    "total_transfer_amount": "166928468",
-    "average_transfer_amount": "351428",
-    "maximum_transfer_amount": "7399990",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "166928468",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "351428",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7399990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 475,
     "last_block_num": 3629874
   },
   {
     "date": "2016-07-29T00:00:00",
-    "total_transfer_amount": "209586439",
-    "average_transfer_amount": "575786",
-    "maximum_transfer_amount": "19111941",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "209586439",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "575786",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "19111941",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 364,
     "last_block_num": 3601219
   },
   {
     "date": "2016-07-28T00:00:00",
-    "total_transfer_amount": "152043139",
-    "average_transfer_amount": "312845",
-    "maximum_transfer_amount": "18000000",
-    "minimum_transfer_amount": "4",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "152043139",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "312845",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4",
+      "precision": 3
+    },
     "transfer_count": 486,
     "last_block_num": 3572770
   },
   {
     "date": "2016-07-27T00:00:00",
-    "total_transfer_amount": "623711707",
-    "average_transfer_amount": "1392213",
-    "maximum_transfer_amount": "42407526",
-    "minimum_transfer_amount": "4",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "623711707",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1392213",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "42407526",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4",
+      "precision": 3
+    },
     "transfer_count": 448,
     "last_block_num": 3544228
   },
   {
     "date": "2016-07-26T00:00:00",
-    "total_transfer_amount": "697605908",
-    "average_transfer_amount": "1282363",
-    "maximum_transfer_amount": "20000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "697605908",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1282363",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 544,
     "last_block_num": 3515619
   },
   {
     "date": "2016-07-25T00:00:00",
-    "total_transfer_amount": "280783618",
-    "average_transfer_amount": "850859",
-    "maximum_transfer_amount": "12476181",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "280783618",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "850859",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12476181",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 330,
     "last_block_num": 3487213
   },
   {
     "date": "2016-07-24T00:00:00",
-    "total_transfer_amount": "415742267",
-    "average_transfer_amount": "764232",
-    "maximum_transfer_amount": "30000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "415742267",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "764232",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "30000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 544,
     "last_block_num": 3458667
   },
   {
     "date": "2016-07-23T00:00:00",
-    "total_transfer_amount": "299009914",
-    "average_transfer_amount": "418195",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "299009914",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "418195",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 715,
     "last_block_num": 3430249
   },
   {
     "date": "2016-07-22T00:00:00",
-    "total_transfer_amount": "352440950",
-    "average_transfer_amount": "499208",
-    "maximum_transfer_amount": "14000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "352440950",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "499208",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 706,
     "last_block_num": 3401731
   },
   {
     "date": "2016-07-21T00:00:00",
-    "total_transfer_amount": "485382799",
-    "average_transfer_amount": "489790",
-    "maximum_transfer_amount": "150000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "485382799",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "489790",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 991,
     "last_block_num": 3373299
   },
   {
     "date": "2016-07-20T00:00:00",
-    "total_transfer_amount": "524182863",
-    "average_transfer_amount": "422387",
-    "maximum_transfer_amount": "30000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "524182863",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "422387",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "30000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 1241,
     "last_block_num": 3344836
   },
   {
     "date": "2016-07-19T00:00:00",
-    "total_transfer_amount": "130432575",
-    "average_transfer_amount": "217387",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "130432575",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "217387",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 600,
     "last_block_num": 3316106
   },
   {
     "date": "2016-07-18T00:00:00",
-    "total_transfer_amount": "57459050",
-    "average_transfer_amount": "474868",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "3",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "57459050",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "474868",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3",
+      "precision": 3
+    },
     "transfer_count": 121,
     "last_block_num": 3287546
   },
   {
     "date": "2016-07-17T00:00:00",
-    "total_transfer_amount": "157856340",
-    "average_transfer_amount": "876979",
-    "maximum_transfer_amount": "5376890",
-    "minimum_transfer_amount": "3",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "157856340",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "876979",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5376890",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3",
+      "precision": 3
+    },
     "transfer_count": 180,
     "last_block_num": 3259120
   },
   {
     "date": "2016-07-16T00:00:00",
-    "total_transfer_amount": "363090557",
-    "average_transfer_amount": "1134657",
-    "maximum_transfer_amount": "50977000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "363090557",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1134657",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50977000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 320,
     "last_block_num": 3230833
   },
   {
     "date": "2016-07-15T00:00:00",
-    "total_transfer_amount": "5799666290",
-    "average_transfer_amount": "3425674",
-    "maximum_transfer_amount": "200000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5799666290",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3425674",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 1693,
     "last_block_num": 3203672
   },
   {
     "date": "2016-07-14T00:00:00",
-    "total_transfer_amount": "1480538427",
-    "average_transfer_amount": "1355804",
-    "maximum_transfer_amount": "35000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1480538427",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1355804",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "35000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 1092,
     "last_block_num": 3175228
   },
   {
     "date": "2016-07-13T00:00:00",
-    "total_transfer_amount": "1294548276",
-    "average_transfer_amount": "1672542",
-    "maximum_transfer_amount": "200000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1294548276",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1672542",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 774,
     "last_block_num": 3146565
   },
   {
     "date": "2016-07-12T00:00:00",
-    "total_transfer_amount": "682263388",
-    "average_transfer_amount": "1911101",
-    "maximum_transfer_amount": "50294213",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "682263388",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1911101",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50294213",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 357,
     "last_block_num": 3117788
   },
   {
     "date": "2016-07-11T00:00:00",
-    "total_transfer_amount": "1111565641",
-    "average_transfer_amount": "2141744",
-    "maximum_transfer_amount": "40000000",
-    "minimum_transfer_amount": "50",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1111565641",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2141744",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "40000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50",
+      "precision": 3
+    },
     "transfer_count": 519,
     "last_block_num": 3088986
   },
   {
     "date": "2016-07-10T00:00:00",
-    "total_transfer_amount": "1243626129",
-    "average_transfer_amount": "2532843",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "13",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1243626129",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2532843",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13",
+      "precision": 3
+    },
     "transfer_count": 491,
     "last_block_num": 3060461
   },
   {
     "date": "2016-07-09T00:00:00",
-    "total_transfer_amount": "1665550231",
-    "average_transfer_amount": "2901655",
-    "maximum_transfer_amount": "200000000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1665550231",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2901655",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "200000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 574,
     "last_block_num": 3031685
   },
   {
     "date": "2016-07-08T00:00:00",
-    "total_transfer_amount": "241369574",
-    "average_transfer_amount": "1489935",
-    "maximum_transfer_amount": "20000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "241369574",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1489935",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 162,
     "last_block_num": 3003063
   },
   {
     "date": "2016-07-07T00:00:00",
-    "total_transfer_amount": "175637137",
-    "average_transfer_amount": "878185",
-    "maximum_transfer_amount": "15348175",
-    "minimum_transfer_amount": "305",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "175637137",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "878185",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15348175",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "305",
+      "precision": 3
+    },
     "transfer_count": 200,
     "last_block_num": 2974352
   },
   {
     "date": "2016-07-06T00:00:00",
-    "total_transfer_amount": "635913657",
-    "average_transfer_amount": "2971559",
-    "maximum_transfer_amount": "130000000",
-    "minimum_transfer_amount": "18",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "635913657",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2971559",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "130000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18",
+      "precision": 3
+    },
     "transfer_count": 214,
     "last_block_num": 2944878
   },
   {
     "date": "2016-07-05T00:00:00",
-    "total_transfer_amount": "469023990",
-    "average_transfer_amount": "220095",
-    "maximum_transfer_amount": "14525000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "469023990",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "220095",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14525000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 2131,
     "last_block_num": 2917263
   },
   {
     "date": "2016-07-04T00:00:00",
-    "total_transfer_amount": "86622892",
-    "average_transfer_amount": "1007242",
-    "maximum_transfer_amount": "39000000",
-    "minimum_transfer_amount": "500",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "86622892",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1007242",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "39000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "500",
+      "precision": 3
+    },
     "transfer_count": 86,
     "last_block_num": 2888871
   },
   {
     "date": "2016-07-03T00:00:00",
-    "total_transfer_amount": "23887831",
-    "average_transfer_amount": "322808",
-    "maximum_transfer_amount": "5055629",
-    "minimum_transfer_amount": "21",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23887831",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "322808",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5055629",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "21",
+      "precision": 3
+    },
     "transfer_count": 74,
     "last_block_num": 2860013
   },
   {
     "date": "2016-07-02T00:00:00",
-    "total_transfer_amount": "60547963",
-    "average_transfer_amount": "393168",
-    "maximum_transfer_amount": "10671220",
-    "minimum_transfer_amount": "126",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "60547963",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "393168",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10671220",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "126",
+      "precision": 3
+    },
     "transfer_count": 154,
     "last_block_num": 2831129
   },
   {
     "date": "2016-07-01T00:00:00",
-    "total_transfer_amount": "11640233",
-    "average_transfer_amount": "554296",
-    "maximum_transfer_amount": "1642897",
-    "minimum_transfer_amount": "243",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11640233",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "554296",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1642897",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "243",
+      "precision": 3
+    },
     "transfer_count": 21,
     "last_block_num": 2801832
   },
   {
     "date": "2016-06-30T00:00:00",
-    "total_transfer_amount": "11692450",
-    "average_transfer_amount": "224854",
-    "maximum_transfer_amount": "2447521",
-    "minimum_transfer_amount": "191",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11692450",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "224854",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2447521",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "191",
+      "precision": 3
+    },
     "transfer_count": 52,
     "last_block_num": 2770865
   },
   {
     "date": "2016-06-29T00:00:00",
-    "total_transfer_amount": "23251483",
-    "average_transfer_amount": "322937",
-    "maximum_transfer_amount": "4700000",
-    "minimum_transfer_amount": "189",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23251483",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "322937",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4700000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "189",
+      "precision": 3
+    },
     "transfer_count": 72,
     "last_block_num": 2744710
   },
   {
     "date": "2016-06-28T00:00:00",
-    "total_transfer_amount": "17535252",
-    "average_transfer_amount": "501007",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "178",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "17535252",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "501007",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "178",
+      "precision": 3
+    },
     "transfer_count": 35,
     "last_block_num": 2716100
   },
   {
     "date": "2016-06-27T00:00:00",
-    "total_transfer_amount": "16944852",
-    "average_transfer_amount": "308088",
-    "maximum_transfer_amount": "4071753",
-    "minimum_transfer_amount": "296",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16944852",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "308088",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4071753",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "296",
+      "precision": 3
+    },
     "transfer_count": 55,
     "last_block_num": 2688313
   },
   {
     "date": "2016-06-26T00:00:00",
-    "total_transfer_amount": "16166073",
-    "average_transfer_amount": "898115",
-    "maximum_transfer_amount": "4710978",
-    "minimum_transfer_amount": "262",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16166073",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "898115",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4710978",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "262",
+      "precision": 3
+    },
     "transfer_count": 18,
     "last_block_num": 2659622
   },
   {
     "date": "2016-06-25T00:00:00",
-    "total_transfer_amount": "23875758",
-    "average_transfer_amount": "243630",
-    "maximum_transfer_amount": "7500000",
-    "minimum_transfer_amount": "13",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23875758",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "243630",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13",
+      "precision": 3
+    },
     "transfer_count": 98,
     "last_block_num": 2630388
   },
   {
     "date": "2016-06-24T00:00:00",
-    "total_transfer_amount": "33893865",
-    "average_transfer_amount": "968396",
-    "maximum_transfer_amount": "9823735",
-    "minimum_transfer_amount": "2234",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "33893865",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "968396",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9823735",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2234",
+      "precision": 3
+    },
     "transfer_count": 35,
     "last_block_num": 2600502
   },
   {
     "date": "2016-06-23T00:00:00",
-    "total_transfer_amount": "366238735",
-    "average_transfer_amount": "4818930",
-    "maximum_transfer_amount": "138000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "366238735",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4818930",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "138000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 76,
     "last_block_num": 2572176
   },
   {
     "date": "2016-06-22T00:00:00",
-    "total_transfer_amount": "295213368",
-    "average_transfer_amount": "1521718",
-    "maximum_transfer_amount": "100000000",
-    "minimum_transfer_amount": "400",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "295213368",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1521718",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "400",
+      "precision": 3
+    },
     "transfer_count": 194,
     "last_block_num": 2544310
   },
   {
     "date": "2016-06-21T00:00:00",
-    "total_transfer_amount": "30263102",
-    "average_transfer_amount": "1120855",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "1920",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "30263102",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1120855",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1920",
+      "precision": 3
+    },
     "transfer_count": 27,
     "last_block_num": 2514432
   },
   {
     "date": "2016-06-20T00:00:00",
-    "total_transfer_amount": "14064096",
-    "average_transfer_amount": "669718",
-    "maximum_transfer_amount": "4366531",
-    "minimum_transfer_amount": "221",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14064096",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "669718",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4366531",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "221",
+      "precision": 3
+    },
     "transfer_count": 21,
     "last_block_num": 2487108
   },
   {
     "date": "2016-06-19T00:00:00",
-    "total_transfer_amount": "18819564",
-    "average_transfer_amount": "1254637",
-    "maximum_transfer_amount": "5865067",
-    "minimum_transfer_amount": "123",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18819564",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1254637",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5865067",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "123",
+      "precision": 3
+    },
     "transfer_count": 15,
     "last_block_num": 2455951
   },
   {
     "date": "2016-06-18T00:00:00",
-    "total_transfer_amount": "41899341",
-    "average_transfer_amount": "686874",
-    "maximum_transfer_amount": "11000000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "41899341",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "686874",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 61,
     "last_block_num": 2429753
   },
   {
     "date": "2016-06-17T00:00:00",
-    "total_transfer_amount": "20792226",
-    "average_transfer_amount": "670716",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "990",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20792226",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "670716",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "990",
+      "precision": 3
+    },
     "transfer_count": 31,
     "last_block_num": 2399700
   },
   {
     "date": "2016-06-16T00:00:00",
-    "total_transfer_amount": "18907065",
-    "average_transfer_amount": "1181691",
-    "maximum_transfer_amount": "6503909",
-    "minimum_transfer_amount": "500",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18907065",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1181691",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6503909",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "500",
+      "precision": 3
+    },
     "transfer_count": 16,
     "last_block_num": 2368603
   },
   {
     "date": "2016-06-15T00:00:00",
-    "total_transfer_amount": "13501109",
-    "average_transfer_amount": "562546",
-    "maximum_transfer_amount": "3603223",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13501109",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "562546",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3603223",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 24,
     "last_block_num": 2344064
   },
   {
     "date": "2016-06-14T00:00:00",
-    "total_transfer_amount": "15212550",
-    "average_transfer_amount": "1690283",
-    "maximum_transfer_amount": "12000000",
-    "minimum_transfer_amount": "5000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15212550",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1690283",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000",
+      "precision": 3
+    },
     "transfer_count": 9,
     "last_block_num": 2311482
   },
   {
     "date": "2016-06-13T00:00:00",
-    "total_transfer_amount": "23964644",
-    "average_transfer_amount": "958585",
-    "maximum_transfer_amount": "4000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23964644",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "958585",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 25,
     "last_block_num": 2286163
   },
   {
     "date": "2016-06-12T00:00:00",
-    "total_transfer_amount": "14217529",
-    "average_transfer_amount": "1093656",
-    "maximum_transfer_amount": "4000000",
-    "minimum_transfer_amount": "31848",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14217529",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1093656",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "31848",
+      "precision": 3
+    },
     "transfer_count": 13,
     "last_block_num": 2254987
   },
   {
     "date": "2016-06-11T00:00:00",
-    "total_transfer_amount": "35600777",
-    "average_transfer_amount": "671712",
-    "maximum_transfer_amount": "6457504",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "35600777",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "671712",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6457504",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 53,
     "last_block_num": 2228763
   },
   {
     "date": "2016-06-10T00:00:00",
-    "total_transfer_amount": "16769688",
-    "average_transfer_amount": "644988",
-    "maximum_transfer_amount": "8500000",
-    "minimum_transfer_amount": "90",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16769688",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "644988",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "90",
+      "precision": 3
+    },
     "transfer_count": 26,
     "last_block_num": 2196780
   },
   {
     "date": "2016-06-09T00:00:00",
-    "total_transfer_amount": "29955472",
-    "average_transfer_amount": "665677",
-    "maximum_transfer_amount": "11288562",
-    "minimum_transfer_amount": "1413",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "29955472",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "665677",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11288562",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1413",
+      "precision": 3
+    },
     "transfer_count": 45,
     "last_block_num": 2171331
   },
   {
     "date": "2016-06-08T00:00:00",
-    "total_transfer_amount": "7822577",
-    "average_transfer_amount": "325940",
-    "maximum_transfer_amount": "2000000",
-    "minimum_transfer_amount": "5000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7822577",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "325940",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000",
+      "precision": 3
+    },
     "transfer_count": 24,
     "last_block_num": 2143126
   },
   {
     "date": "2016-06-07T00:00:00",
-    "total_transfer_amount": "9979698",
-    "average_transfer_amount": "110885",
-    "maximum_transfer_amount": "3390000",
-    "minimum_transfer_amount": "90",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9979698",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "110885",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3390000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "90",
+      "precision": 3
+    },
     "transfer_count": 90,
     "last_block_num": 2113132
   },
   {
     "date": "2016-06-06T00:00:00",
-    "total_transfer_amount": "12204453",
-    "average_transfer_amount": "119651",
-    "maximum_transfer_amount": "2341000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12204453",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "119651",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2341000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 102,
     "last_block_num": 2085906
   },
   {
     "date": "2016-06-05T00:00:00",
-    "total_transfer_amount": "12137687",
-    "average_transfer_amount": "220685",
-    "maximum_transfer_amount": "3000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12137687",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "220685",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 55,
     "last_block_num": 2057250
   },
   {
     "date": "2016-06-04T00:00:00",
-    "total_transfer_amount": "43653013",
-    "average_transfer_amount": "507593",
-    "maximum_transfer_amount": "15837000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "43653013",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "507593",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15837000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 86,
     "last_block_num": 2028709
   },
   {
     "date": "2016-06-03T00:00:00",
-    "total_transfer_amount": "20680215",
-    "average_transfer_amount": "738579",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "3000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20680215",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "738579",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3000",
+      "precision": 3
+    },
     "transfer_count": 28,
     "last_block_num": 1998792
   },
   {
     "date": "2016-06-02T00:00:00",
-    "total_transfer_amount": "20249456",
-    "average_transfer_amount": "595572",
-    "maximum_transfer_amount": "10278695",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20249456",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "595572",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10278695",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 34,
     "last_block_num": 1965668
   },
   {
     "date": "2016-06-01T00:00:00",
-    "total_transfer_amount": "32626283",
-    "average_transfer_amount": "97683",
-    "maximum_transfer_amount": "4000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "32626283",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "97683",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 334,
     "last_block_num": 1942528
   },
   {
     "date": "2016-05-31T00:00:00",
-    "total_transfer_amount": "9987834",
-    "average_transfer_amount": "475611",
-    "maximum_transfer_amount": "3272000",
-    "minimum_transfer_amount": "2990",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9987834",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "475611",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3272000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2990",
+      "precision": 3
+    },
     "transfer_count": 21,
     "last_block_num": 1913056
   },
   {
     "date": "2016-05-30T00:00:00",
-    "total_transfer_amount": "15301686",
-    "average_transfer_amount": "728651",
-    "maximum_transfer_amount": "4450000",
-    "minimum_transfer_amount": "50",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15301686",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "728651",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4450000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50",
+      "precision": 3
+    },
     "transfer_count": 21,
     "last_block_num": 1884867
   },
   {
     "date": "2016-05-29T00:00:00",
-    "total_transfer_amount": "2291288",
-    "average_transfer_amount": "229128",
-    "maximum_transfer_amount": "1084724",
-    "minimum_transfer_amount": "1252",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2291288",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "229128",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1084724",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1252",
+      "precision": 3
+    },
     "transfer_count": 10,
     "last_block_num": 1856293
   },
   {
     "date": "2016-05-28T00:00:00",
-    "total_transfer_amount": "26975826",
-    "average_transfer_amount": "369531",
-    "maximum_transfer_amount": "4479000",
-    "minimum_transfer_amount": "90",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "26975826",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "369531",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4479000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "90",
+      "precision": 3
+    },
     "transfer_count": 73,
     "last_block_num": 1827646
   },
   {
     "date": "2016-05-27T00:00:00",
-    "total_transfer_amount": "36466200",
-    "average_transfer_amount": "499536",
-    "maximum_transfer_amount": "6000000",
-    "minimum_transfer_amount": "16",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "36466200",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "499536",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16",
+      "precision": 3
+    },
     "transfer_count": 73,
     "last_block_num": 1797107
   },
   {
     "date": "2016-05-26T00:00:00",
-    "total_transfer_amount": "4543410",
-    "average_transfer_amount": "113585",
-    "maximum_transfer_amount": "900000",
-    "minimum_transfer_amount": "80",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4543410",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "113585",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "900000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "80",
+      "precision": 3
+    },
     "transfer_count": 40,
     "last_block_num": 1768712
   },
   {
     "date": "2016-05-25T00:00:00",
-    "total_transfer_amount": "28779193",
-    "average_transfer_amount": "327036",
-    "maximum_transfer_amount": "2500000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "28779193",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "327036",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 88,
     "last_block_num": 1738650
   },
   {
     "date": "2016-05-24T00:00:00",
-    "total_transfer_amount": "18692749",
-    "average_transfer_amount": "890130",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "990",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "18692749",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "890130",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "990",
+      "precision": 3
+    },
     "transfer_count": 21,
     "last_block_num": 1710545
   },
   {
     "date": "2016-05-23T00:00:00",
-    "total_transfer_amount": "21607610",
-    "average_transfer_amount": "675237",
-    "maximum_transfer_amount": "6000000",
-    "minimum_transfer_amount": "4000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "21607610",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "675237",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4000",
+      "precision": 3
+    },
     "transfer_count": 32,
     "last_block_num": 1683702
   },
   {
     "date": "2016-05-22T00:00:00",
-    "total_transfer_amount": "29977841",
-    "average_transfer_amount": "1362629",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "8",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "29977841",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1362629",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8",
+      "precision": 3
+    },
     "transfer_count": 22,
     "last_block_num": 1653202
   },
   {
     "date": "2016-05-21T00:00:00",
-    "total_transfer_amount": "23226172",
-    "average_transfer_amount": "527867",
-    "maximum_transfer_amount": "6233852",
-    "minimum_transfer_amount": "7",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23226172",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "527867",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6233852",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7",
+      "precision": 3
+    },
     "transfer_count": 44,
     "last_block_num": 1626506
   },
   {
     "date": "2016-05-20T00:00:00",
-    "total_transfer_amount": "5149034",
-    "average_transfer_amount": "87271",
-    "maximum_transfer_amount": "1251320",
-    "minimum_transfer_amount": "2",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5149034",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "87271",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1251320",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2",
+      "precision": 3
+    },
     "transfer_count": 59,
     "last_block_num": 1595934
   },
   {
     "date": "2016-05-19T00:00:00",
-    "total_transfer_amount": "3105346",
-    "average_transfer_amount": "258778",
-    "maximum_transfer_amount": "1999990",
-    "minimum_transfer_amount": "990",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3105346",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "258778",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "990",
+      "precision": 3
+    },
     "transfer_count": 12,
     "last_block_num": 1556806
   },
   {
     "date": "2016-05-18T00:00:00",
-    "total_transfer_amount": "2440022",
-    "average_transfer_amount": "152501",
-    "maximum_transfer_amount": "620588",
-    "minimum_transfer_amount": "170",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2440022",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "152501",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "620588",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "170",
+      "precision": 3
+    },
     "transfer_count": 16,
     "last_block_num": 1540067
   },
   {
     "date": "2016-05-17T00:00:00",
-    "total_transfer_amount": "3036114",
-    "average_transfer_amount": "189757",
-    "maximum_transfer_amount": "1997000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3036114",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "189757",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1997000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 16,
     "last_block_num": 1511319
   },
   {
     "date": "2016-05-16T00:00:00",
-    "total_transfer_amount": "12788668",
-    "average_transfer_amount": "673087",
-    "maximum_transfer_amount": "5946000",
-    "minimum_transfer_amount": "920",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12788668",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "673087",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5946000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "920",
+      "precision": 3
+    },
     "transfer_count": 19,
     "last_block_num": 1482804
   },
   {
     "date": "2016-05-15T00:00:00",
-    "total_transfer_amount": "71800",
-    "average_transfer_amount": "23933",
-    "maximum_transfer_amount": "50000",
-    "minimum_transfer_amount": "1800",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "71800",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "23933",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1800",
+      "precision": 3
+    },
     "transfer_count": 3,
     "last_block_num": 1444568
   },
   {
     "date": "2016-05-14T00:00:00",
-    "total_transfer_amount": "26803302",
-    "average_transfer_amount": "638173",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "100",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "26803302",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "638173",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100",
+      "precision": 3
+    },
     "transfer_count": 42,
     "last_block_num": 1425242
   },
   {
     "date": "2016-05-13T00:00:00",
-    "total_transfer_amount": "2451026",
-    "average_transfer_amount": "144178",
-    "maximum_transfer_amount": "1253833",
-    "minimum_transfer_amount": "36",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2451026",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "144178",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1253833",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "36",
+      "precision": 3
+    },
     "transfer_count": 17,
     "last_block_num": 1396928
   },
   {
     "date": "2016-05-12T00:00:00",
-    "total_transfer_amount": "12616188",
-    "average_transfer_amount": "485238",
-    "maximum_transfer_amount": "2930990",
-    "minimum_transfer_amount": "20",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12616188",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "485238",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2930990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20",
+      "precision": 3
+    },
     "transfer_count": 26,
     "last_block_num": 1367602
   },
   {
     "date": "2016-05-11T00:00:00",
-    "total_transfer_amount": "16832170",
-    "average_transfer_amount": "601148",
-    "maximum_transfer_amount": "3000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16832170",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "601148",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 28,
     "last_block_num": 1338743
   },
   {
     "date": "2016-05-10T00:00:00",
-    "total_transfer_amount": "13682229",
-    "average_transfer_amount": "369789",
-    "maximum_transfer_amount": "5499990",
-    "minimum_transfer_amount": "147",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13682229",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "369789",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5499990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "147",
+      "precision": 3
+    },
     "transfer_count": 37,
     "last_block_num": 1310059
   },
   {
     "date": "2016-05-09T00:00:00",
-    "total_transfer_amount": "14313037",
-    "average_transfer_amount": "386838",
-    "maximum_transfer_amount": "3000000",
-    "minimum_transfer_amount": "970",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14313037",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "386838",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "970",
+      "precision": 3
+    },
     "transfer_count": 37,
     "last_block_num": 1281980
   },
   {
     "date": "2016-05-08T00:00:00",
-    "total_transfer_amount": "9751069",
-    "average_transfer_amount": "336243",
-    "maximum_transfer_amount": "2000000",
-    "minimum_transfer_amount": "998",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9751069",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "336243",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "998",
+      "precision": 3
+    },
     "transfer_count": 29,
     "last_block_num": 1253232
   },
   {
     "date": "2016-05-07T00:00:00",
-    "total_transfer_amount": "64699699",
-    "average_transfer_amount": "2396285",
-    "maximum_transfer_amount": "12999990",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "64699699",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2396285",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 27,
     "last_block_num": 1222758
   },
   {
     "date": "2016-05-06T00:00:00",
-    "total_transfer_amount": "102157487",
-    "average_transfer_amount": "4086299",
-    "maximum_transfer_amount": "50000000",
-    "minimum_transfer_amount": "990",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "102157487",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4086299",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "990",
+      "precision": 3
+    },
     "transfer_count": 25,
     "last_block_num": 1195336
   },
   {
     "date": "2016-05-05T00:00:00",
-    "total_transfer_amount": "10407884",
-    "average_transfer_amount": "247806",
-    "maximum_transfer_amount": "2999990",
-    "minimum_transfer_amount": "11",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10407884",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "247806",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11",
+      "precision": 3
+    },
     "transfer_count": 42,
     "last_block_num": 1162735
   },
   {
     "date": "2016-05-04T00:00:00",
-    "total_transfer_amount": "21063356",
-    "average_transfer_amount": "153747",
-    "maximum_transfer_amount": "5893000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "21063356",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "153747",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5893000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 137,
     "last_block_num": 1138002
   },
   {
     "date": "2016-05-03T00:00:00",
-    "total_transfer_amount": "28407816",
-    "average_transfer_amount": "334209",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "28407816",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "334209",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 85,
     "last_block_num": 1109272
   },
   {
     "date": "2016-05-02T00:00:00",
-    "total_transfer_amount": "15561688",
-    "average_transfer_amount": "707349",
-    "maximum_transfer_amount": "2687541",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15561688",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "707349",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2687541",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 22,
     "last_block_num": 1080502
   },
   {
     "date": "2016-05-01T00:00:00",
-    "total_transfer_amount": "7554084",
-    "average_transfer_amount": "343367",
-    "maximum_transfer_amount": "2999990",
-    "minimum_transfer_amount": "710",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7554084",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "343367",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2999990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "710",
+      "precision": 3
+    },
     "transfer_count": 22,
     "last_block_num": 1049529
   },
   {
     "date": "2016-04-30T00:00:00",
-    "total_transfer_amount": "14378477",
-    "average_transfer_amount": "575139",
-    "maximum_transfer_amount": "4779990",
-    "minimum_transfer_amount": "100",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14378477",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "575139",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4779990",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "100",
+      "precision": 3
+    },
     "transfer_count": 25,
     "last_block_num": 1021088
   },
   {
     "date": "2016-04-29T00:00:00",
-    "total_transfer_amount": "13529797",
-    "average_transfer_amount": "322138",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13529797",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "322138",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 42,
     "last_block_num": 991259
   },
   {
     "date": "2016-04-28T00:00:00",
-    "total_transfer_amount": "13198196",
-    "average_transfer_amount": "412443",
-    "maximum_transfer_amount": "2530040",
-    "minimum_transfer_amount": "90",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13198196",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "412443",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2530040",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "90",
+      "precision": 3
+    },
     "transfer_count": 32,
     "last_block_num": 964753
   },
   {
     "date": "2016-04-27T00:00:00",
-    "total_transfer_amount": "54310459",
-    "average_transfer_amount": "1508623",
-    "maximum_transfer_amount": "20000000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "54310459",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1508623",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 36,
     "last_block_num": 934289
   },
   {
     "date": "2016-04-26T00:00:00",
-    "total_transfer_amount": "63417799",
-    "average_transfer_amount": "571331",
-    "maximum_transfer_amount": "27062730",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "63417799",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "571331",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "27062730",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 111,
     "last_block_num": 912403
   },
   {
     "date": "2016-04-25T00:00:00",
-    "total_transfer_amount": "66372565",
-    "average_transfer_amount": "78269",
-    "maximum_transfer_amount": "16880000",
-    "minimum_transfer_amount": "150",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "66372565",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "78269",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16880000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150",
+      "precision": 3
+    },
     "transfer_count": 848,
     "last_block_num": 884307
   },
   {
     "date": "2016-04-24T00:00:00",
-    "total_transfer_amount": "60978197",
-    "average_transfer_amount": "40490",
-    "maximum_transfer_amount": "3000000",
-    "minimum_transfer_amount": "150",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "60978197",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "40490",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150",
+      "precision": 3
+    },
     "transfer_count": 1506,
     "last_block_num": 856472
   },
   {
     "date": "2016-04-23T00:00:00",
-    "total_transfer_amount": "127173507",
-    "average_transfer_amount": "56875",
-    "maximum_transfer_amount": "11000000",
-    "minimum_transfer_amount": "150",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "127173507",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "56875",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150",
+      "precision": 3
+    },
     "transfer_count": 2236,
     "last_block_num": 828134
   },
   {
     "date": "2016-04-22T00:00:00",
-    "total_transfer_amount": "64892327",
-    "average_transfer_amount": "27946",
-    "maximum_transfer_amount": "2999900",
-    "minimum_transfer_amount": "150",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "64892327",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "27946",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2999900",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "150",
+      "precision": 3
+    },
     "transfer_count": 2322,
     "last_block_num": 800044
   },
   {
     "date": "2016-04-21T00:00:00",
-    "total_transfer_amount": "85181697",
-    "average_transfer_amount": "40142",
-    "maximum_transfer_amount": "10000000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "85181697",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "40142",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 2122,
     "last_block_num": 772070
   },
   {
     "date": "2016-04-20T00:00:00",
-    "total_transfer_amount": "73340485",
-    "average_transfer_amount": "28175",
-    "maximum_transfer_amount": "5840103",
-    "minimum_transfer_amount": "50",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "73340485",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "28175",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5840103",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "50",
+      "precision": 3
+    },
     "transfer_count": 2603,
     "last_block_num": 744052
   },
   {
     "date": "2016-04-19T00:00:00",
-    "total_transfer_amount": "64877677",
-    "average_transfer_amount": "44528",
-    "maximum_transfer_amount": "5000000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "64877677",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "44528",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 1457,
     "last_block_num": 715519
   },
   {
     "date": "2016-04-18T00:00:00",
-    "total_transfer_amount": "87903465",
-    "average_transfer_amount": "60166",
-    "maximum_transfer_amount": "6534000",
-    "minimum_transfer_amount": "1",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "87903465",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "60166",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "6534000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1",
+      "precision": 3
+    },
     "transfer_count": 1461,
     "last_block_num": 687991
   },
   {
     "date": "2016-04-17T00:00:00",
-    "total_transfer_amount": "25808161",
-    "average_transfer_amount": "10921",
-    "maximum_transfer_amount": "845000",
-    "minimum_transfer_amount": "925",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "25808161",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10921",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "845000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "925",
+      "precision": 3
+    },
     "transfer_count": 2363,
     "last_block_num": 659621
   },
   {
     "date": "2016-04-16T00:00:00",
-    "total_transfer_amount": "22725223",
-    "average_transfer_amount": "8364",
-    "maximum_transfer_amount": "939000",
-    "minimum_transfer_amount": "10",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "22725223",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8364",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "939000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10",
+      "precision": 3
+    },
     "transfer_count": 2717,
     "last_block_num": 631622
   },
   {
     "date": "2016-04-15T00:00:00",
-    "total_transfer_amount": "35574500",
-    "average_transfer_amount": "13505",
-    "maximum_transfer_amount": "2500000",
-    "minimum_transfer_amount": "925",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "35574500",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13505",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "925",
+      "precision": 3
+    },
     "transfer_count": 2634,
     "last_block_num": 603063
   },
   {
     "date": "2016-04-14T00:00:00",
-    "total_transfer_amount": "29993566",
-    "average_transfer_amount": "10051",
-    "maximum_transfer_amount": "2078000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "29993566",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10051",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2078000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 2984,
     "last_block_num": 574653
   },
   {
     "date": "2016-04-13T00:00:00",
-    "total_transfer_amount": "10151450",
-    "average_transfer_amount": "5544",
-    "maximum_transfer_amount": "255000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10151450",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5544",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "255000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 1831,
     "last_block_num": 546303
   },
   {
     "date": "2016-04-12T00:00:00",
-    "total_transfer_amount": "22648740",
-    "average_transfer_amount": "8998",
-    "maximum_transfer_amount": "726000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "22648740",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8998",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "726000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 2517,
     "last_block_num": 517968
   },
   {
     "date": "2016-04-11T00:00:00",
-    "total_transfer_amount": "9416180",
-    "average_transfer_amount": "4333",
-    "maximum_transfer_amount": "610000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9416180",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4333",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "610000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 2173,
     "last_block_num": 489373
   },
   {
     "date": "2016-04-10T00:00:00",
-    "total_transfer_amount": "36384915",
-    "average_transfer_amount": "16028",
-    "maximum_transfer_amount": "871000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "36384915",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16028",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "871000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 2270,
     "last_block_num": 463200
   },
   {
     "date": "2016-04-09T00:00:00",
-    "total_transfer_amount": "27967885",
-    "average_transfer_amount": "15836",
-    "maximum_transfer_amount": "4000000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "27967885",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "15836",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4000000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 1766,
     "last_block_num": 433376
   },
   {
     "date": "2016-04-08T00:00:00",
-    "total_transfer_amount": "17978730",
-    "average_transfer_amount": "12017",
-    "maximum_transfer_amount": "553000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "17978730",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "12017",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "553000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 1496,
     "last_block_num": 406334
   },
   {
     "date": "2016-04-07T00:00:00",
-    "total_transfer_amount": "11902190",
-    "average_transfer_amount": "4128",
-    "maximum_transfer_amount": "483000",
-    "minimum_transfer_amount": "75",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "11902190",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "4128",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "483000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "75",
+      "precision": 3
+    },
     "transfer_count": 2883,
     "last_block_num": 379108
   },
   {
     "date": "2016-04-06T00:00:00",
-    "total_transfer_amount": "17480610",
-    "average_transfer_amount": "16648",
-    "maximum_transfer_amount": "1202000",
-    "minimum_transfer_amount": "185",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "17480610",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "16648",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1202000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "185",
+      "precision": 3
+    },
     "transfer_count": 1050,
     "last_block_num": 351282
   },
   {
     "date": "2016-04-05T00:00:00",
-    "total_transfer_amount": "9880050",
-    "average_transfer_amount": "66757",
-    "maximum_transfer_amount": "805000",
-    "minimum_transfer_amount": "950",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "9880050",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "66757",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "805000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "950",
+      "precision": 3
+    },
     "transfer_count": 148,
     "last_block_num": 323035
   },
   {
     "date": "2016-04-04T00:00:00",
-    "total_transfer_amount": "5202000",
-    "average_transfer_amount": "113086",
-    "maximum_transfer_amount": "564000",
-    "minimum_transfer_amount": "5000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5202000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "113086",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "564000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "5000",
+      "precision": 3
+    },
     "transfer_count": 46,
     "last_block_num": 293945
   },
   {
     "date": "2016-04-03T00:00:00",
-    "total_transfer_amount": "26671000",
-    "average_transfer_amount": "683871",
-    "maximum_transfer_amount": "3072000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "26671000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "683871",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "3072000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 39,
     "last_block_num": 264951
   },
   {
     "date": "2016-04-02T00:00:00",
-    "total_transfer_amount": "14543000",
-    "average_transfer_amount": "196527",
-    "maximum_transfer_amount": "561000",
-    "minimum_transfer_amount": "10000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "14543000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "196527",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "561000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000",
+      "precision": 3
+    },
     "transfer_count": 74,
     "last_block_num": 235555
   },
   {
     "date": "2016-04-01T00:00:00",
-    "total_transfer_amount": "276139000",
-    "average_transfer_amount": "2282140",
-    "maximum_transfer_amount": "7500000",
-    "minimum_transfer_amount": "20000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "276139000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2282140",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "7500000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "20000",
+      "precision": 3
+    },
     "transfer_count": 121,
     "last_block_num": 207676
   },
   {
     "date": "2016-03-31T00:00:00",
-    "total_transfer_amount": "492000",
-    "average_transfer_amount": "32800",
-    "maximum_transfer_amount": "83000",
-    "minimum_transfer_amount": "10000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "492000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "32800",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "83000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000",
+      "precision": 3
+    },
     "transfer_count": 15,
     "last_block_num": 173625
   },
   {
     "date": "2016-03-30T00:00:00",
-    "total_transfer_amount": "696000",
-    "average_transfer_amount": "46400",
-    "maximum_transfer_amount": "107000",
-    "minimum_transfer_amount": "8000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "696000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "46400",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "107000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "8000",
+      "precision": 3
+    },
     "transfer_count": 15,
     "last_block_num": 145298
   },
   {
     "date": "2016-03-29T00:00:00",
-    "total_transfer_amount": "926000",
-    "average_transfer_amount": "57875",
-    "maximum_transfer_amount": "168000",
-    "minimum_transfer_amount": "13000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "926000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "57875",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "168000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "13000",
+      "precision": 3
+    },
     "transfer_count": 16,
     "last_block_num": 122668
   },
   {
     "date": "2016-03-28T00:00:00",
-    "total_transfer_amount": "2320000",
-    "average_transfer_amount": "193333",
-    "maximum_transfer_amount": "1376000",
-    "minimum_transfer_amount": "10000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "2320000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "193333",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1376000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "10000",
+      "precision": 3
+    },
     "transfer_count": 12,
     "last_block_num": 85400
   },
   {
     "date": "2016-03-27T00:00:00",
-    "total_transfer_amount": "535000",
-    "average_transfer_amount": "178333",
-    "maximum_transfer_amount": "533000",
-    "minimum_transfer_amount": "1000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "535000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "178333",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "533000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1000",
+      "precision": 3
+    },
     "transfer_count": 3,
     "last_block_num": 61959
   },
   {
     "date": "2016-03-26T00:00:00",
-    "total_transfer_amount": "1658000",
-    "average_transfer_amount": "552666",
-    "maximum_transfer_amount": "833000",
-    "minimum_transfer_amount": "40000",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "1658000",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "552666",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "833000",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "40000",
+      "precision": 3
+    },
     "transfer_count": 3,
     "last_block_num": 28316
   },
   {
     "date": "2016-03-25T00:00:00",
-    "total_transfer_amount": "0",
-    "average_transfer_amount": "0",
-    "maximum_transfer_amount": "0",
-    "minimum_transfer_amount": "0",
+    "total_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "0",
+      "precision": 3
+    },
+    "average_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "0",
+      "precision": 3
+    },
+    "maximum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "0",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "nai": "@@000000021",
+      "amount": "0",
+      "precision": 3
+    },
     "transfer_count": 0,
     "last_block_num": 9318
   }
