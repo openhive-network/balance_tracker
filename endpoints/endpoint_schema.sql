@@ -329,10 +329,11 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "unique operation identifier with an encoded block number and operation type id"
+            "description": "unique operation identifier with an encoded block number and operation position"
           },
           "op_type_id": {
             "type": "integer",
+            "x-sql-datatype": "SMALLINT",
             "description": "operation type identifier"
           },
           "balance": {
@@ -387,7 +388,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "unique operation identifier with an encoded block number and operation type id"
+            "description": "unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -408,7 +409,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "unique operation identifier with an encoded block number and operation type id"
+            "description": "unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -448,7 +449,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "unique operation identifier with an encoded block number and operation type id"
+            "description": "unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -469,7 +470,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "unique operation identifier with an encoded block number and operation type id"
+            "description": "unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -548,7 +549,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "Unique operation identifier with an encoded block number and operation type id"
+            "description": "Unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -594,7 +595,7 @@ declare
           },
           "operation_id": {
             "type": "string",
-            "description": "Unique operation identifier with an encoded block number and operation type id"
+            "description": "Unique operation identifier with an encoded block number and operation position"
           },
           "block_num": {
             "type": "integer",
@@ -1299,10 +1300,26 @@ declare
                 "example": [
                   {
                     "date": "2017-01-01T00:00:00",
-                    "total_transfer_amount": {"nai": "@@000000013", "amount": "69611921266", "precision": 3},
-                    "average_transfer_amount": {"nai": "@@000000013", "amount": "1302405", "precision": 3},
-                    "maximum_transfer_amount": {"nai": "@@000000013", "amount": "18000000", "precision": 3},
-                    "minimum_transfer_amount": {"nai": "@@000000013", "amount": "1", "precision": 3},
+                    "total_transfer_amount": {
+                      "nai": "@@000000013",
+                      "amount": "69611921266",
+                      "precision": 3
+                    },
+                    "average_transfer_amount": {
+                      "nai": "@@000000013",
+                      "amount": "1302405",
+                      "precision": 3
+                    },
+                    "maximum_transfer_amount": {
+                      "nai": "@@000000013",
+                      "amount": "18000000",
+                      "precision": 3
+                    },
+                    "minimum_transfer_amount": {
+                      "nai": "@@000000013",
+                      "amount": "1",
+                      "precision": 3
+                    },
                     "transfer_count": 54665,
                     "last_block_num": 5000000
                   }
