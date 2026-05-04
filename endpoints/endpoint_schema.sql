@@ -630,20 +630,20 @@ declare
             "description": "the time transfers were included in the blockchain"
           },
           "total_transfer_amount": {
-            "type": "string",
-            "description": "sum of a amount of transfered tokens in the period"
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "sum of transferred tokens in the period (with NAI and precision)"
           },
           "average_transfer_amount": {
-            "type": "string",
-            "description": "average amount of transfered tokens in the period"
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "average amount of transferred tokens in the period (with NAI and precision)"
           },
           "maximum_transfer_amount": {
-            "type": "string",
-            "description": "maximum amount of transfered tokens in the period"
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "maximum amount of transferred tokens in the period (with NAI and precision)"
           },
           "minimum_transfer_amount": {
-            "type": "string",
-            "description": "minimum amount of transfered tokens in the period"
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "minimum amount of transferred tokens in the period (with NAI and precision)"
           },
           "transfer_count": {
             "type": "integer",
@@ -1299,10 +1299,10 @@ declare
                 "example": [
                   {
                     "date": "2017-01-01T00:00:00",
-                    "total_transfer_amount": "69611921266",
-                    "average_transfer_amount": "1302405",
-                    "maximum_transfer_amount": "18000000",
-                    "minimum_transfer_amount": "1",
+                    "total_transfer_amount": {"nai": "@@000000013", "amount": "69611921266", "precision": 3},
+                    "average_transfer_amount": {"nai": "@@000000013", "amount": "1302405", "precision": 3},
+                    "maximum_transfer_amount": {"nai": "@@000000013", "amount": "18000000", "precision": 3},
+                    "minimum_transfer_amount": {"nai": "@@000000013", "amount": "1", "precision": 3},
                     "transfer_count": 54665,
                     "last_block_num": 5000000
                   }
