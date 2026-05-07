@@ -968,6 +968,44 @@
             "current_hbd_supply": "2413762387",
             "dhf_interval_ledger": 0,
             "created_at": "2016-09-15T19:50:00"
+          },
+          {
+            "block_num": 90000052,
+            "hash": "004c4b741cedf6e7fc8fed131af9d341049b1817",
+            "prev": "004c4b730bded5d6eb7edc0209e8c230f38a0706",
+            "producer_account": "wackou",
+            "transaction_merkle_root": "3333333333333333333333333333333333333333",
+            "extensions": [],
+            "witness_signature": "1f9f0708cb396ef0fff02448667538e70f3b1b57006880edfb79acc288fefe5d35571b156cfee3e4880a9a9f99ec8f603c51069084790840661197a952e1852ed",
+            "signing_key": "STM8Ccpba7mCjLUqyBZSzghLMuBXqJSUyXPnmfhUekBGnBmPfNdeN",
+            "hbd_interest_rate": 1000,
+            "total_vesting_fund_hive": "149191754203",
+            "total_vesting_shares": "448145031019400626",
+            "total_reward_fund_hive": "66094627",
+            "virtual_supply": "161255195726",
+            "current_supply": "157465929813",
+            "current_hbd_supply": "2413762387",
+            "dhf_interval_ledger": 0,
+            "created_at": "2016-09-15T19:50:03"
+          },
+          {
+            "block_num": 90000053,
+            "hash": "004c4b752dfe07f80d90fe242b0ae45215ac2928",
+            "prev": "004c4b741cedf6e7fc8fed131af9d341049b1817",
+            "producer_account": "wackou",
+            "transaction_merkle_root": "4444444444444444444444444444444444444444",
+            "extensions": [],
+            "witness_signature": "1fb01819dc4a7f0100013559778649f8204c2c68117991fe0c8abdd3990f0f6e46682c267d0ff4f5991bababaa0d90714d6217a958a191517722a8a063f2963fe",
+            "signing_key": "STM8Ccpba7mCjLUqyBZSzghLMuBXqJSUyXPnmfhUekBGnBmPfNdeN",
+            "hbd_interest_rate": 1000,
+            "total_vesting_fund_hive": "149191754203",
+            "total_vesting_shares": "448145031019400626",
+            "total_reward_fund_hive": "66096627",
+            "virtual_supply": "161255225726",
+            "current_supply": "157465959813",
+            "current_hbd_supply": "2413762387",
+            "dhf_interval_ledger": 0,
+            "created_at": "2016-09-15T19:50:06"
           }
         ]
       }

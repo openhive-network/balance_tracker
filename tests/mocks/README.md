@@ -28,7 +28,10 @@ tests/mocks/
     ├── rewards/              # Rewards operations test data
     ├── recurrent_transfers/  # Recurrent transfer test data
     ├── delegations/          # Vesting delegation test data
+    ├── rc_delegations/       # RC delegation test data (HF26)
     ├── delays/               # Delayed voting (HF24) test data
+    ├── savings_pending/      # Pending savings withdrawal regression data
+    ├── multi_balance_ops/    # Multi-balance operation regression data
     └── escrow/               # Escrow operations test data
 ```
 

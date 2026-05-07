@@ -6,6 +6,12 @@ This fixture provides mock block headers for the test block range.
 
 Mock blocks use block numbers >= 90000000 to avoid conflicts with real blockchain data. The actual range is determined dynamically from the inserted fixture data.
 
+The current fixture range is `90000001` through `90000053`.
+
+The latest blocks are used by:
+- `90000050` and `90000051` - `multi_balance_ops`
+- `90000052` and `90000053` - `savings_pending`
+
 ## Purpose
 
 The mock blocks provide:

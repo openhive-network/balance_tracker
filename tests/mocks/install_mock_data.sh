@@ -39,6 +39,8 @@
 #       ├── delegations/         # Vesting delegation test data
 #       ├── rc_delegations/      # RC delegation test data (HF26)
 #       ├── delays/              # Delayed voting (HF24) test data
+#       ├── savings_pending/     # Pending savings withdrawal regression data
+#       ├── multi_balance_ops/   # Multi-balance operation regression data
 #       └── escrow/              # Escrow operations test data
 #
 # BLOCK RANGE:
@@ -176,6 +178,7 @@ RC_DELEGATIONS_DATA=$(cat "$FIXTURES_DIR/rc_delegations/data.json")
 DELAYS_DATA=$(cat "$FIXTURES_DIR/delays/data.json")
 ESCROW_DATA=$(cat "$FIXTURES_DIR/escrow/data.json")
 MULTI_BALANCE_DATA=$(cat "$FIXTURES_DIR/multi_balance_ops/data.json")
+SAVINGS_PENDING_DATA=$(cat "$FIXTURES_DIR/savings_pending/data.json")
 
 # Step 3: Insert mock blocks
 echo "Step 3: Inserting mock block headers..."
@@ -188,6 +191,10 @@ echo "Step 4: Inserting mock operations..."
 echo "  - Savings operations..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$SAVINGS_DATA')"
+
+echo "  - Savings pending operations..."
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
+    -c "SELECT btracker_backend.insert_mock_operations('$SAVINGS_PENDING_DATA')"
 
 echo "  - Rewards operations..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
