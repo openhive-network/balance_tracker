@@ -406,6 +406,101 @@ BEGIN
   );
   PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __schema_name );
 
+  ------------- VESTING (POWER-UP / POWER-DOWN) STATISTICS ----------------
+  -- Aggregates per-day and per-month counts/amounts of:
+  --   power_up:        transfer_to_vesting_operation (HIVE flowing in)
+  --   power_down_init: withdraw_vesting_operation (excluding amount=0 cancels)
+  --   power_down_fill: fill_vesting_withdraw_operation (weekly tranches)
+  -- HIVE columns store satoshi (×1000); VESTS columns NUMERIC for safety
+  -- (sum-of-day VESTS routinely overflows BIGINT; total VESTS supply ~10^14 satoshi).
+  -- The "fill_hive" column excludes routed-to-VESTS fills (deposited NAI 37) since
+  -- those don't generate any HIVE; "fill_vests" includes them.
+  CREATE TABLE IF NOT EXISTS vesting_stats_by_month
+  (
+    updated_at            TIMESTAMP NOT NULL, -- Period end time (month bucket)
+    power_up_count        INT       NOT NULL DEFAULT 0,
+    power_up_hive         BIGINT    NOT NULL DEFAULT 0, -- satoshi (HIVE × 1000)
+    power_down_init_count INT       NOT NULL DEFAULT 0,
+    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
+    power_down_fill_count INT       NOT NULL DEFAULT 0,
+    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0, -- includes routed-to-VESTS
+    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0, -- excludes routed-to-VESTS
+    last_block_num        INT       NOT NULL,
+
+    CONSTRAINT pk_vesting_stats_by_month PRIMARY KEY (updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'vesting_stats_by_month', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS vesting_stats_by_day
+  (
+    updated_at            TIMESTAMP NOT NULL, -- Period end time (day bucket)
+    power_up_count        INT       NOT NULL DEFAULT 0,
+    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
+    power_down_init_count INT       NOT NULL DEFAULT 0,
+    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_count INT       NOT NULL DEFAULT 0,
+    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
+    last_block_num        INT       NOT NULL,
+
+    CONSTRAINT pk_vesting_stats_by_day PRIMARY KEY (updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'vesting_stats_by_day', __schema_name );
+
+  -- Per-account vesting event history (one row per impacted account per op).
+  -- Mirrors account_balance_history: append-only, no PK during massive sync,
+  -- composite indexes built post-sync. Backs /accounts/{name}/vesting-history.
+  CREATE TABLE IF NOT EXISTS account_vesting_history
+  (
+    account        INT      NOT NULL, -- impacted account id (from or to)
+    vesting_seq_no INT      NOT NULL, -- per (account), monotonic across all kinds (filter='all' pagination)
+    kind_seq_no    INT      NOT NULL, -- per (account, kind), monotonic (filter=specific pagination)
+    kind           SMALLINT NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill
+    hive_amount    BIGINT   NOT NULL DEFAULT 0, -- HIVE satoshi (×1000), 0 when n/a
+    vests_amount   NUMERIC  NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1), 0 when n/a
+    source_op      BIGINT   NOT NULL  -- hafd.operations.id; block_num via hafd.operation_id_to_block_num
+  );
+  PERFORM hive.app_register_table( __schema_name, 'account_vesting_history', __schema_name );
+
+  -- Per-account vesting stats aggregated daily / monthly. Same shape as the
+  -- global vesting_stats_by_day/_month but with `account` as part of the PK,
+  -- so each (account, day|month) pair gets its own row. Backs
+  -- /accounts/{name}/vesting-stats. Yearly granularity is rolled up on the
+  -- fly from the monthly table at query time.
+  CREATE TABLE IF NOT EXISTS account_vesting_by_month
+  (
+    account               INT       NOT NULL,
+    updated_at            TIMESTAMP NOT NULL,
+    power_up_count        INT       NOT NULL DEFAULT 0,
+    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
+    power_down_init_count INT       NOT NULL DEFAULT 0,
+    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_count INT       NOT NULL DEFAULT 0,
+    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
+    last_block_num        INT       NOT NULL,
+
+    CONSTRAINT pk_account_vesting_by_month PRIMARY KEY (account, updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'account_vesting_by_month', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS account_vesting_by_day
+  (
+    account               INT       NOT NULL,
+    updated_at            TIMESTAMP NOT NULL,
+    power_up_count        INT       NOT NULL DEFAULT 0,
+    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
+    power_down_init_count INT       NOT NULL DEFAULT 0,
+    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_count INT       NOT NULL DEFAULT 0,
+    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
+    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
+    last_block_num        INT       NOT NULL,
+
+    CONSTRAINT pk_account_vesting_by_day PRIMARY KEY (account, updated_at)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'account_vesting_by_day', __schema_name );
+
   ------------- CONVERTS STATE ----------------
   CREATE TABLE IF NOT EXISTS convert_state
   (
@@ -517,6 +612,14 @@ BEGIN
     'CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON ' || __schema_name || '.current_rc_delegations(delegatee)');
   PERFORM hive.app_register_index_dependency(__schema_name,
     'CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON ' || __schema_name || '.recurrent_transfers(to_account)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_vesting_history_account_seq_no ON ' || __schema_name || '.account_vesting_history(account, vesting_seq_no)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_vesting_history_kind_seq_no ON ' || __schema_name || '.account_vesting_history(account, kind, kind_seq_no)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_vesting_history_block_num ON ' || __schema_name || '.account_vesting_history(account, hafd.operation_id_to_block_num(source_op))');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_account_vesting_history_kind_block_num ON ' || __schema_name || '.account_vesting_history(account, kind, hafd.operation_id_to_block_num(source_op))');
 
   -- Drop app indexes for massive sync (will be restored at LIVE transition)
   PERFORM hive.app_save_and_drop_indexes(__schema_name);
@@ -527,6 +630,7 @@ BEGIN
   -- and remain LOGGED.
   -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
   ALTER TABLE account_balance_history SET UNLOGGED;
+  ALTER TABLE account_vesting_history SET UNLOGGED;
 
 END
 $$;
@@ -677,6 +781,7 @@ BEGIN
   END IF;
 
   ALTER TABLE account_balance_history SET LOGGED;
+  ALTER TABLE account_vesting_history SET LOGGED;
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
@@ -718,6 +823,7 @@ BEGIN
   IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
     PERFORM hive.app_request_table_vacuum(_context_name, 'account_balance_history', interval '10 minutes');
+    PERFORM hive.app_request_table_vacuum(_context_name, 'account_vesting_history', interval '10 minutes');
     RETURN;
   END IF;
 
@@ -796,6 +902,8 @@ BEGIN
     PERFORM process_block_range_rc_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
+    PERFORM process_vesting_stats(_from, __hardfork_23_block);
+    PERFORM process_account_vesting_stats(_from, __hardfork_23_block);
     PERFORM process_block_range_converts(_from,        __hardfork_23_block);
     PERFORM process_block_range_orders(_from,        __hardfork_23_block);
     PERFORM process_block_range_escrows(_from,        __hardfork_23_block);
@@ -814,6 +922,8 @@ BEGIN
       PERFORM process_block_range_rc_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
+      PERFORM process_vesting_stats(__hardfork_23_block + 1, _to);
+      PERFORM process_account_vesting_stats(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_converts(__hardfork_23_block+1, _to);
       PERFORM process_block_range_orders(__hardfork_23_block+1, _to);
       PERFORM process_block_range_escrows(__hardfork_23_block+1, _to);
@@ -829,6 +939,8 @@ BEGIN
     PERFORM process_block_range_rc_delegations(_from, _to);
     PERFORM process_block_range_recurrent_transfers(_from, _to);
     PERFORM process_transfer_stats(_from, _to);
+    PERFORM process_vesting_stats(_from, _to);
+    PERFORM process_account_vesting_stats(_from, _to);
     PERFORM process_block_range_converts(_from, _to);
     PERFORM process_block_range_orders(_from, _to);
     PERFORM process_block_range_escrows(_from, _to);
@@ -883,6 +995,8 @@ BEGIN
   PERFORM process_block_range_rc_delegations(_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
   PERFORM process_transfer_stats(_block, _block);
+  PERFORM process_vesting_stats(_block, _block);
+  PERFORM process_account_vesting_stats(_block, _block);
   PERFORM process_block_range_converts(_block, _block);
   PERFORM process_block_range_orders(_block, _block);
   PERFORM process_block_range_escrows(_block, _block);
@@ -1041,6 +1155,14 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op));
   -- Savings history: block range filtering (function-based index on source_op)
   CREATE INDEX IF NOT EXISTS idx_account_savings_history_account_block_num_idx ON account_savings_history(account, nai, hafd.operation_id_to_block_num(source_op));
+  -- Vesting history: filter='all' windowed pagination by (account, vesting_seq_no)
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_vesting_history_account_seq_no ON account_vesting_history(account, vesting_seq_no);
+  -- Vesting history: filter=specific windowed pagination by (account, kind, kind_seq_no)
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_vesting_history_kind_seq_no ON account_vesting_history(account, kind, kind_seq_no);
+  -- Vesting history: block range -> seq_no conversion for filter='all'
+  CREATE INDEX IF NOT EXISTS idx_account_vesting_history_block_num ON account_vesting_history(account, hafd.operation_id_to_block_num(source_op));
+  -- Vesting history: block range -> seq_no conversion for filter=specific
+  CREATE INDEX IF NOT EXISTS idx_account_vesting_history_kind_block_num ON account_vesting_history(account, kind, hafd.operation_id_to_block_num(source_op));
 
   -- Increase planner statistics for account column (default 100 → 1000).
   -- With millions of accounts, 100 MCV entries may miss high-activity accounts
@@ -1048,8 +1170,10 @@ BEGIN
   -- estimates and choose Seq Scan over Index Scan.
   ALTER TABLE account_balance_history ALTER COLUMN account SET STATISTICS 1000;
   ALTER TABLE account_savings_history ALTER COLUMN account SET STATISTICS 1000;
+  ALTER TABLE account_vesting_history ALTER COLUMN account SET STATISTICS 1000;
   ANALYZE account_balance_history(account);
   ANALYZE account_savings_history(account);
+  ANALYZE account_vesting_history(account);
   -- Top holders: order by balance descending
   CREATE INDEX IF NOT EXISTS idx_account_balance_nai_balance_idx ON current_account_balances(nai, balance DESC);
   -- Top savings holders: order by savings balance descending

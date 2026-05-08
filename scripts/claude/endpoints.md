@@ -28,6 +28,7 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 | **Balances** | [endpoints/balances.md](endpoints/balances.md) | Account balances, history, aggregation, top holders |
 | **Delegations** | [endpoints/delegations.md](endpoints/delegations.md) | Delegation pairs (incoming/outgoing) |
 | **Transfers** | [endpoints/transfers.md](endpoints/transfers.md) | Transfer statistics, recurrent transfers |
+| **Vesting** | [endpoints/vesting.md](endpoints/vesting.md) | Power-up / power-down history & statistics |
 | **Utility** | [endpoints/utility.md](endpoints/utility.md) | Version, sync status, TVL |
 
 ## Endpoint Summary
@@ -41,6 +42,9 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 | `/accounts/{name}/recurrent-transfers` | GET | Scheduled transfers |
 | `/top-holders` | GET | Leaderboard by asset |
 | `/transfer-statistics` | GET | Network transfer volume |
+| `/vesting-stats` | GET | Network power-up / power-down volume |
+| `/accounts/{name}/vesting-history` | GET | Per-account power-up / power-down events |
+| `/accounts/{name}/vesting-stats` | GET | Per-account power-up / power-down aggregates |
 | `/version` | GET | Git commit hash |
 | `/last-synced-block` | GET | Sync status |
 | `/total-value-locked` | GET | TVL metrics |

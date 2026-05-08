@@ -564,6 +564,152 @@ END
 $$;
 
 /**
+ * vesting_history_range()
+ * -----------------------
+ * Find the seq_no range for vesting history within a block range, returning
+ * (count, from_seq, to_seq) so the endpoint can do windowed pagination
+ * (WHERE seq_no BETWEEN ...) instead of OFFSET-based scans. Mirror of
+ * bh_balance() but for account_vesting_history.
+ *
+ * Two modes by _kind:
+ *   * NULL  -> filter='all'; seq is `vesting_seq_no` (per-account global)
+ *   * 1/2/3 -> filter=power_up|power_down_init|power_down_fill;
+ *             seq is `kind_seq_no` (per-(account, kind))
+ *
+ * Each mode uses the appropriate composite index:
+ *   * filter='all':       (account, vesting_seq_no) for ordering,
+ *                         (account, block_num)      for block→seq conversion
+ *   * filter=specific:    (account, kind, kind_seq_no) for ordering,
+ *                         (account, kind, block_num)   for block→seq conversion
+ *
+ * @param _account_id  Account ID
+ * @param _kind        NULL = all kinds, 1=power_up, 2=power_down_init, 3=power_down_fill
+ * @param _from        Lower block bound (NULL = earliest)
+ * @param _to          Upper block bound (NULL = latest)
+ * @returns            balance_history_range_return (count, from_seq, to_seq)
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.vesting_history_range(
+    _account_id INT,
+    _kind       SMALLINT,
+    _from       INT,
+    _to         INT
+)
+RETURNS btracker_backend.balance_history_range_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql' STABLE
+SET JIT = OFF
+AS
+$$
+DECLARE
+  __from_seq INT;
+  __to_seq   INT;
+BEGIN
+  IF _to IS NULL THEN
+    -- Open upper bound: largest seq for this (account[, kind])
+    IF _kind IS NULL THEN
+      __to_seq := (
+        SELECT avh.vesting_seq_no
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id
+        ORDER BY avh.vesting_seq_no DESC LIMIT 1
+      );
+    ELSE
+      __to_seq := (
+        SELECT avh.kind_seq_no
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id AND avh.kind = _kind
+        ORDER BY avh.kind_seq_no DESC LIMIT 1
+      );
+    END IF;
+  ELSE
+    -- Bounded upper: find latest block <= _to with rows, then MAX seq within.
+    IF _kind IS NULL THEN
+      __to_seq := (
+        WITH last_block AS (
+          SELECT hafd.operation_id_to_block_num(avh.source_op) AS block_num
+          FROM account_vesting_history avh
+          WHERE avh.account = _account_id
+            AND hafd.operation_id_to_block_num(avh.source_op) <= _to
+          ORDER BY hafd.operation_id_to_block_num(avh.source_op) DESC LIMIT 1
+        )
+        SELECT MAX(avh.vesting_seq_no)
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id
+          AND hafd.operation_id_to_block_num(avh.source_op) = (SELECT block_num FROM last_block)
+      );
+    ELSE
+      __to_seq := (
+        WITH last_block AS (
+          SELECT hafd.operation_id_to_block_num(avh.source_op) AS block_num
+          FROM account_vesting_history avh
+          WHERE avh.account = _account_id AND avh.kind = _kind
+            AND hafd.operation_id_to_block_num(avh.source_op) <= _to
+          ORDER BY hafd.operation_id_to_block_num(avh.source_op) DESC LIMIT 1
+        )
+        SELECT MAX(avh.kind_seq_no)
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id AND avh.kind = _kind
+          AND hafd.operation_id_to_block_num(avh.source_op) = (SELECT block_num FROM last_block)
+      );
+    END IF;
+  END IF;
+
+  IF _from IS NULL THEN
+    IF _kind IS NULL THEN
+      __from_seq := (
+        SELECT avh.vesting_seq_no
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id
+        ORDER BY avh.vesting_seq_no ASC LIMIT 1
+      );
+    ELSE
+      __from_seq := (
+        SELECT avh.kind_seq_no
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id AND avh.kind = _kind
+        ORDER BY avh.kind_seq_no ASC LIMIT 1
+      );
+    END IF;
+  ELSE
+    IF _kind IS NULL THEN
+      __from_seq := (
+        WITH first_block AS (
+          SELECT hafd.operation_id_to_block_num(avh.source_op) AS block_num
+          FROM account_vesting_history avh
+          WHERE avh.account = _account_id
+            AND hafd.operation_id_to_block_num(avh.source_op) >= _from
+          ORDER BY hafd.operation_id_to_block_num(avh.source_op) ASC LIMIT 1
+        )
+        SELECT MIN(avh.vesting_seq_no)
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id
+          AND hafd.operation_id_to_block_num(avh.source_op) = (SELECT block_num FROM first_block)
+      );
+    ELSE
+      __from_seq := (
+        WITH first_block AS (
+          SELECT hafd.operation_id_to_block_num(avh.source_op) AS block_num
+          FROM account_vesting_history avh
+          WHERE avh.account = _account_id AND avh.kind = _kind
+            AND hafd.operation_id_to_block_num(avh.source_op) >= _from
+          ORDER BY hafd.operation_id_to_block_num(avh.source_op) ASC LIMIT 1
+        )
+        SELECT MIN(avh.kind_seq_no)
+        FROM account_vesting_history avh
+        WHERE avh.account = _account_id AND avh.kind = _kind
+          AND hafd.operation_id_to_block_num(avh.source_op) = (SELECT block_num FROM first_block)
+      );
+    END IF;
+  END IF;
+
+  RETURN (
+    COALESCE((__to_seq - __from_seq + 1), 0),
+    COALESCE(__from_seq, 0),
+    COALESCE(__to_seq, 0)
+  )::btracker_backend.balance_history_range_return;
+END
+$$;
+
+/**
  * aggregated_history_paging_return
  * ---------------------------------
  * Return type for aggregated history paging function.

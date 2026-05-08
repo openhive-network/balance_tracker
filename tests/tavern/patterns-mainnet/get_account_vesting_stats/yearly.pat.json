@@ -1,0 +1,29 @@
+[
+    {
+        "date": "2017-01-01T00:00:00",
+        "power_up_hive": {
+            "nai": "@@000000021",
+            "amount": "971409917",
+            "precision": 3
+        },
+        "last_block_num": 4998632,
+        "power_up_count": 4307,
+        "power_down_fill_hive": {
+            "nai": "@@000000021",
+            "amount": "218575652",
+            "precision": 3
+        },
+        "power_down_fill_count": 14,
+        "power_down_fill_vests": {
+            "nai": "@@000000037",
+            "amount": "804048182205290",
+            "precision": 6
+        },
+        "power_down_init_count": 1,
+        "power_down_init_vests": {
+            "nai": "@@000000037",
+            "amount": "8362101094935031",
+            "precision": 6
+        }
+    }
+]

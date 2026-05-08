@@ -37,6 +37,8 @@ HAFBE (hafbe_app.sql)
 | `process_block_range_converts` | `db/process_block_range_converts.sql` | convert, fill_convert_request | `convert_state` |
 | `process_block_range_escrows` | `db/process_block_range_escrows.sql` | escrow_transfer, escrow_release, escrow_approved, escrow_rejected, escrow_dispute | `escrow_state`, `escrow_fees` |
 | `process_transfer_stats` | `db/process_transfer_stats.sql` | transfer, fill_recurrent_transfer, escrow_transfer | `transfer_stats_by_hour/day/month` |
+| `process_vesting_stats` | `db/process_vesting_stats.sql` | transfer_to_vesting, withdraw_vesting (excl. cancels), fill_vesting_withdraw | `vesting_stats_by_day/month` (global) |
+| `process_account_vesting_stats` | `db/process_account_vesting_stats.sql` | same 3 vesting ops (excl. cancels), fanned out to impacted accounts | `account_vesting_history`, `account_vesting_by_day/month` |
 
 ## Operations Reference
 
@@ -160,6 +162,7 @@ Each processing area has its own detailed documentation:
 | **Converts** | [converts.md](processing/converts.md) | HBD→HIVE 3.5-day conversion |
 | **Escrows** | [escrows.md](processing/escrows.md) | Multi-party approval flow |
 | **Transfer Stats** | [transfer_stats.md](processing/transfer_stats.md) | GROUPING SETS aggregation |
+| **Vesting Stats** | [vesting_stats.md](processing/vesting_stats.md) | Power-up / power-down aggregation (day + month) |
 
 ## Common Patterns
 
