@@ -1,0 +1,125 @@
+{
+    "total_pages": 216,
+    "total_operations": 4307,
+    "operations_result": [
+        {
+            "block_num": 4998632,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T18:35:09",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "172434",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21468960964739074"
+        },
+        {
+            "block_num": 4998371,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T18:21:03",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "5509",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21467839978274820"
+        },
+        {
+            "block_num": 4997818,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T17:51:57",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "2073",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21465464861360128"
+        },
+        {
+            "block_num": 4997788,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T17:50:24",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "292",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21465336012341248"
+        },
+        {
+            "block_num": 4997665,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T17:43:57",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "386",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21464807731363840"
+        },
+        {
+            "block_num": 4997495,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T17:35:03",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "221",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21464077586923520"
+        },
+        {
+            "block_num": 4997368,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T17:28:27",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "946",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21463532126076930"
+        }
+    ]
+}

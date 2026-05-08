@@ -1,0 +1,23 @@
+{
+    "total_pages": 1,
+    "total_operations": 1,
+    "operations_result": [
+        {
+            "block_num": 2924785,
+            "direction": "power_down_init",
+            "timestamp": "2016-07-05T06:17:00",
+            "op_type_id": 4,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "0",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "8362101094935031",
+                "precision": 6
+            },
+            "operation_id": "12561855922831361"
+        }
+    ]
+}

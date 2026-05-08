@@ -19,6 +19,7 @@ Balance Tracker extracts and indexes balance-related data from the Hive blockcha
 | **Market Orders** | Open limit orders on internal market |
 | **Escrows** | Multi-party escrow agreements |
 | **Transfer Stats** | Aggregated transfer volumes (hour/day/month) |
+| **Vesting Stats** | Aggregated power-up / power-down volumes (day/month) |
 
 ## Directory Structure
 
@@ -171,6 +172,9 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `account_savings_history` - Every savings change
 - `balance_history_by_day/month` - Aggregated snapshots
 - `transfer_stats_by_hour/day/month` - Volume statistics
+- `vesting_stats_by_day/month` - Power-up / power-down statistics (global)
+- `account_vesting_history` - Per-account vesting event history (per-impacted-account, with seq_no)
+- `account_vesting_by_day/month` - Per-account vesting aggregates
 
 ## Common SQL Patterns
 

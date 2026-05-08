@@ -662,6 +662,118 @@ declare
           "$ref": "#/components/schemas/btracker_backend.transfer_stats"
         }
       },
+      "btracker_backend.vesting_filter": {
+        "type": "string",
+        "enum": [
+          "all",
+          "power_up",
+          "power_down_init",
+          "power_down_fill"
+        ]
+      },
+      "btracker_backend.vesting_stats": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "end of the time bucket (day, month or year)"
+          },
+          "power_up_count": {
+            "type": "integer",
+            "description": "number of transfer_to_vesting operations in the period"
+          },
+          "power_up_hive": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "total HIVE moved into VESTS via transfer_to_vesting (HIVE NAI/precision)"
+          },
+          "power_down_init_count": {
+            "type": "integer",
+            "description": "number of withdraw_vesting operations (cancellations excluded)"
+          },
+          "power_down_init_vests": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "total VESTS scheduled for withdrawal via withdraw_vesting (VESTS NAI/precision)"
+          },
+          "power_down_fill_count": {
+            "type": "integer",
+            "description": "number of fill_vesting_withdraw operations (weekly tranches)"
+          },
+          "power_down_fill_vests": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "total VESTS withdrawn (includes routed-to-VESTS) (VESTS NAI/precision)"
+          },
+          "power_down_fill_hive": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "realised HIVE delivered by fill_vesting_withdraw (excludes routed-to-VESTS) (HIVE NAI/precision)"
+          },
+          "last_block_num": {
+            "type": "integer",
+            "description": "last block number contributing to the period"
+          }
+        }
+      },
+      "btracker_backend.array_of_vesting_stats": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.vesting_stats"
+        }
+      },
+      "btracker_backend.vesting_history_event": {
+        "type": "object",
+        "properties": {
+          "block_num": {
+            "type": "integer",
+            "description": "block number where the operation was included"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with encoded block number and position"
+          },
+          "op_type_id": {
+            "type": "integer",
+            "x-sql-datatype": "SMALLINT",
+            "description": "operation type identifier"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/btracker_backend.vesting_filter",
+            "description": "which kind of vesting flow this row represents (power_up, power_down_init, power_down_fill)"
+          },
+          "amount_hive": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "HIVE component (power_up amount, fill deposited if HIVE); zero-amount HIVE object when not applicable"
+          },
+          "amount_vests": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "VESTS component (power_down_init total, power_down_fill withdrawn); zero-amount VESTS object when not applicable"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "block timestamp"
+          }
+        }
+      },
+      "btracker_backend.vesting_history": {
+        "type": "object",
+        "properties": {
+          "total_operations": {
+            "type": "integer",
+            "description": "Total number of vesting operations matching the filter"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "operations_result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.vesting_history_event"
+            },
+            "description": "List of vesting events for the requested page"
+          }
+        }
+      },
       "btracker_backend.ranked_holder": {
         "type": "object",
         "properties": {
@@ -1156,6 +1268,201 @@ declare
         }
       }
     },
+    "/accounts/{account-name}/vesting-history": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Per-account power-up / power-down event history",
+        "description": "Paginated list of vesting events for an account. Three event kinds are\nsurfaced via the `direction` field on each row:\n\n* `power_up` \u2014 `transfer_to_vesting`\n\n* `power_down_init` \u2014 `withdraw_vesting` (cancellations excluded)\n\n* `power_down_fill` \u2014 `fill_vesting_withdraw`\n\nThe `filter` query parameter narrows the result to one kind, or `all`.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_vesting_history(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/vesting-history?filter=power_down_fill&page-size=50''`\n",
+        "operationId": "btracker_endpoints.get_account_vesting_history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.vesting_filter",
+              "default": "all"
+            },
+            "description": "Restrict to one event kind (or `all`):\n\n* all\n\n* power_up\n\n* power_down_init\n\n* power_down_fill\n"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": null
+            },
+            "description": "Return page on `page` number, default null due to reversed order of pages,\nthe first page is the oldest,\nexample: first call returns the newest page and total_pages is 100 - the newest page is number 100, next 99 etc.\n"
+          },
+          {
+            "in": "query",
+            "name": "page-size",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "Items per page (max 1000)"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Lower limit of the block range (block-number or YYYY-MM-DD HH:MI:SS)."
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Upper limit of the block range (block-number or YYYY-MM-DD HH:MI:SS)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated vesting event history.\n\n* Returns `btracker_backend.vesting_history`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.vesting_history"
+                },
+                "example": {
+                  "total_operations": 47,
+                  "total_pages": 1,
+                  "operations_result": [
+                    {
+                      "block_num": 4999990,
+                      "operation_id": "21474797825294908",
+                      "op_type_id": 64,
+                      "direction": "power_down_fill",
+                      "amount_hive": {
+                        "nai": "@@000000021",
+                        "amount": "412345",
+                        "precision": 3
+                      },
+                      "amount_vests": {
+                        "nai": "@@000000037",
+                        "amount": "1234567890",
+                        "precision": 6
+                      },
+                      "timestamp": "2016-09-15T19:46:57"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/vesting-stats": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Per-account aggregated power-up / power-down statistics",
+        "description": "Vesting (power-up / power-down) activity for one account, aggregated\nper day, month or year. Same response shape as `/vesting-stats`,\ncomputed on the fly from the account''s operation stream.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_vesting_stats(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/vesting-stats?granularity=monthly''`\n",
+        "operationId": "btracker_endpoints.get_account_vesting_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.granularity",
+              "default": "daily"
+            },
+            "description": "granularity types:\n\n* daily\n\n* monthly\n\n* yearly\n"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Lower limit of the block range (block-number or YYYY-MM-DD HH:MI:SS)."
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Upper limit of the block range (block-number or YYYY-MM-DD HH:MI:SS)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-account aggregated vesting statistics.\n\n* Returns array of `btracker_backend.vesting_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_vesting_stats"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
     "/top-holders": {
       "get": {
         "tags": [
@@ -1329,6 +1636,102 @@ declare
           },
           "404": {
             "description": "No transfer statistics found for the given parameters"
+          }
+        }
+      }
+    },
+    "/vesting-stats": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Aggregated power-up / power-down statistics",
+        "description": "History of vesting (power-up / power-down) activity per day, month or year.\n\nTracks three counts and amounts:\n\n* `power_up`: HIVE moved into VESTS via `transfer_to_vesting`\n\n* `power_down_init`: VESTS scheduled for withdrawal via `withdraw_vesting`\n  (cancellations excluded)\n\n* `power_down_fill`: VESTS / HIVE realised by `fill_vesting_withdraw`\n  (weekly tranches; HIVE excludes routed-to-VESTS portions)\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_vesting_stats(''daily'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/vesting-stats?granularity=monthly''`\n",
+        "operationId": "btracker_endpoints.get_vesting_stats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.granularity",
+              "default": "daily"
+            },
+            "description": "granularity types:\n\n* daily\n\n* monthly\n\n* yearly\n"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Lower limit of the block range, can be represented either by a block-number (integer) or a timestamp (in the format YYYY-MM-DD HH:MI:SS).\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Upper limit of the block range, accepts either a block-number (integer) or a timestamp (YYYY-MM-DD HH:MI:SS).\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated vesting statistics\n\n* Returns array of `btracker_backend.vesting_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_vesting_stats"
+                },
+                "example": [
+                  {
+                    "date": "2016-09-16T00:00:00",
+                    "power_up_count": 12,
+                    "power_up_hive": {
+                      "nai": "@@000000021",
+                      "amount": "1500000",
+                      "precision": 3
+                    },
+                    "power_down_init_count": 4,
+                    "power_down_init_vests": {
+                      "nai": "@@000000037",
+                      "amount": "9876543210000",
+                      "precision": 6
+                    },
+                    "power_down_fill_count": 80,
+                    "power_down_fill_vests": {
+                      "nai": "@@000000037",
+                      "amount": "1234567890",
+                      "precision": 6
+                    },
+                    "power_down_fill_hive": {
+                      "nai": "@@000000021",
+                      "amount": "412345",
+                      "precision": 3
+                    },
+                    "last_block_num": 4999990
+                  }
+                ]
+              }
+            }
+          },
+          "404": {
+            "description": "No vesting statistics found for the given parameters"
           }
         }
       }

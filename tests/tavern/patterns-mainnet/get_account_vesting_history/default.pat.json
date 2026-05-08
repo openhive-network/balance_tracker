@@ -1,0 +1,40 @@
+{
+    "total_pages": 217,
+    "total_operations": 4322,
+    "operations_result": [
+        {
+            "block_num": 4998632,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T18:35:09",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "172434",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21468960964739074"
+        },
+        {
+            "block_num": 4998371,
+            "direction": "power_up",
+            "timestamp": "2016-09-15T18:21:03",
+            "op_type_id": 3,
+            "amount_hive": {
+                "nai": "@@000000021",
+                "amount": "5509",
+                "precision": 3
+            },
+            "amount_vests": {
+                "nai": "@@000000037",
+                "amount": "0",
+                "precision": 6
+            },
+            "operation_id": "21467839978274820"
+        }
+    ]
+}

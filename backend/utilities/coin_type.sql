@@ -111,4 +111,18 @@ BEGIN
 END
 $$;
 
+-- NUMERIC overload for VESTS aggregations whose sums may exceed BIGINT range.
+-- Otherwise behaves identically to the BIGINT version.
+CREATE OR REPLACE FUNCTION btracker_backend.create_amount_object(IN __nai INT, IN __amount NUMERIC)
+RETURNS btracker_backend.amount
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN (a.nai_string, __amount::TEXT, a.asset_precision)::btracker_backend.amount
+  FROM asset_table a
+  WHERE a.asset_symbol_nai = __nai;
+END
+$$;
+
 RESET ROLE;
