@@ -111,7 +111,7 @@ BEGIN
     ORDER BY
       (CASE WHEN _order_is = 'desc' THEN ab.balance_seq_no ELSE NULL END) DESC,
       (CASE WHEN _order_is = 'asc'  THEN ab.balance_seq_no ELSE NULL END) ASC
-    -- +1 extra row: needed for LAG() to compute prev_balance for the first result row
+    -- +1  extra row: needed for LAG() to compute prev_balance for the first result row
     LIMIT _calculate_pages.limit_filter + 1
   ),
   --------------------------
