@@ -1059,6 +1059,10 @@ $$
 DECLARE
   _blocks_range hive.blocks_range := (0,0);
 BEGIN
+  -- Block until any active balance_tracker installer releases its exclusive
+  -- lock; held by this session until main() returns.
+  PERFORM hive.acquire_app_block_processor_locks(ARRAY['balance_tracker']);
+
   IF _maxBlockLimit != NULL THEN
     RAISE NOTICE 'Max block limit is specified as: %', _maxBlockLimit;
   END IF;

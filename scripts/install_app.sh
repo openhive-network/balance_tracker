@@ -2,6 +2,9 @@
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit 1; pwd -P )"
 
+# Capture original args for the install-lock re-exec below.
+ORIGINAL_ARGS=("$@")
+
 print_help () {
     cat <<EOF
 Usage: $0 [OPTION[=VALUE]]...
@@ -72,6 +75,26 @@ while [ $# -gt 0 ]; do
 done
 
 POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/haf_block_log?application_name=btracker_install"}
+
+# Re-exec under the install-lock wrapper if not already running under it.
+# Holds an exclusive advisory lock for the lifetime of this script; if a
+# block-processor is holding the shared lock the wrapper logs the holder and
+# exits 0 without running the install.
+#
+# This same script installs both the standalone balance tracker (schema
+# btracker_app) and the block explorer's embedded instance (schema
+# hafbe_bal). They must take DIFFERENT locks so they don't block each other,
+# and each must match the block-processor that drives its context:
+# btracker_app.main drives btracker_app -> 'balance_tracker';
+# hafbe_app.main drives hafbe_bal       -> 'haf_block_explorer'.
+if [[ -z "${HAF_INSTALL_LOCK_HELD:-}" ]]; then
+  case "${BTRACKER_SCHEMA}" in
+    hafbe_bal) APP_LOCK_NAME=haf_block_explorer ;;
+    *)         APP_LOCK_NAME=balance_tracker ;;
+  esac
+  export HAF_INSTALL_LOCK_HELD=1
+  exec python3 /usr/local/bin/install_with_app_lock.py "$APP_LOCK_NAME" "$POSTGRES_ACCESS" "$0" "${ORIGINAL_ARGS[@]}"
+fi
 
 echo "Installing app..."
 
