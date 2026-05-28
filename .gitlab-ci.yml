@@ -61,7 +61,7 @@ variables:
   #   HAF_IMAGE_NAME, HAF_COMMIT (convenience aliases)
   # =============================================================================
   # Hive submodule commit (inside HAF) - for fetching scripts from hive repo
-  HIVE_SCRIPTS_REF: "611a1726bcbc0f9689fa2c3fb5392795bf2a630f"
+  HIVE_SCRIPTS_REF: "10ac0ce94f7591b6ad80db1a23d046c9d57b6559"
   # Enable CI-specific PostgreSQL config with reduced memory for HAF service containers
   HAF_CI_MODE: "1"
   # Cache manager configuration (from common-ci-configuration)
@@ -132,8 +132,8 @@ find_haf_image:
   extends: .find_haf_image
   stage: detect
   variables:
-    UPSTREAM_BRANCH: "1.28.6-rc14"
-    HAF_PATTERNS_REF: "feature/body-value-migration"
+    UPSTREAM_BRANCH: "1.28.6"
+    HAF_PATTERNS_REF: "1.28.6"
 
 # =============================================================================
 # LINT JOBS - Using common-ci-configuration templates
