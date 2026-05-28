@@ -103,10 +103,23 @@ BEGIN
          * Resolve account names to numeric IDs (owner_id).
          * order_state uses integer IDs as foreign keys for storage efficiency
          * and faster joins compared to text-based account names.
+         *
+         * WHY SCALAR SUBQUERY (not `WHERE name IN (account_names)`): account_names
+         * is derived from the CTE chain, so the planner can't estimate its size and
+         * plans the `IN` against accounts_view as a hash semi-join that seq-scans the
+         * whole 2.6M-row accounts table. Driving from account_names with a correlated
+         * scalar subquery forces a per-row index lookup on the accounts name index.
+         * The outer WHERE account_id IS NOT NULL drops names that fail to resolve,
+         * matching the old IN semantics. See issue #53.
          */
-        SELECT av.name AS account_name, av.id AS account_id
-        FROM accounts_view av
-        WHERE av.name IN (SELECT owner FROM account_names)
+        SELECT account_name, account_id
+        FROM (
+            SELECT
+                an.owner AS account_name,
+                (SELECT av.id FROM accounts_view av WHERE av.name = an.owner) AS account_id
+            FROM account_names an
+        ) resolved
+        WHERE account_id IS NOT NULL
     ),
     events AS MATERIALIZED (
         /*
