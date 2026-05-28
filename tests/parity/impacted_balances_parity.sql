@@ -148,8 +148,10 @@ BEGIN
   END LOOP;
 
   -- The five overloads below are intentionally empty in forward_impacted.cpp (the real
-  -- balance movement is recorded by a paired virtual operation). Confirm the SQL port
-  -- has no stray branch for them: any body must yield zero rows.
+  -- balance movement is recorded by a paired virtual operation). They are asserted
+  -- SQL-side only (not diffed against the C function): a no-op/empty body would fail the
+  -- strict ::hafd.operation cast, so correctness here rests on the C++ overloads being
+  -- verifiably empty rather than on a runtime diff. Any body must yield zero rows.
   FOR r IN
     SELECT t AS type_name FROM unnest(ARRAY[
       'clear_null_account_balance_operation',
