@@ -57,7 +57,14 @@ echo "Test 2. Reinstall app..."
 ./install_app.sh --postgres-host="$POSTGRES_HOST"
 echo "Reinstall completed successfully"
 
-echo "Test 3. Uninstall app..."
+echo "Test 3. impacted_balances SQL-vs-C parity..."
+# Asserts btracker_backend.get_impacted_balances (SQL/JSONB) matches the HAF C function
+# hive.get_impacted_balances over curated fixtures. ON_ERROR_STOP makes a RAISE in the
+# test exit non-zero, failing this job (script runs under `set -e`).
+psql "postgresql://haf_admin@$POSTGRES_HOST:5432/haf_block_log" -v ON_ERROR_STOP=on -f "$script_dir/../tests/parity/impacted_balances_parity.sql"
+echo "Parity test completed successfully"
+
+echo "Test 4. Uninstall app..."
 ./uninstall_app.sh --host="$POSTGRES_HOST"
 echo "Uninstall app completed successfully"
 

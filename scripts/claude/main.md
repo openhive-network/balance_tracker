@@ -114,7 +114,7 @@ Balance Tracker uses HAF for:
 - **Table registration**: `hive.app_register_table()` for reversible data
 - **Block iteration**: `hive.app_next_iteration()` provides block ranges
 - **Operation access**: `hive.operations_view` for blockchain operations
-- **Balance extraction**: `hive.get_impacted_balances()` for balance deltas
+- **Balance extraction**: `btracker_backend.get_impacted_balances()` — a SQL/JSONB port of HAF's C function `hive.get_impacted_balances()`, kept in sync via `tests/parity/impacted_balances_parity.sql` (see `backend/operation_parsers/impacted_balances.sql`)
 
 ## HAFBE Integration
 
