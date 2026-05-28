@@ -51,18 +51,22 @@ WITH balance_impacting_ops AS MATERIALIZED
  * CTE: ops_in_range
  * ===================================================================================
  * WHY MATERIALIZED: This is the foundation for all subsequent calculations.
- * Materializing prevents repeated execution of the expensive CROSS JOIN LATERAL
- * with hive.get_impacted_balances(). This function parses binary operation data
- * and extracts balance impacts - calling it multiple times would be catastrophic
- * for performance.
+ * Materializing prevents repeated execution of the CROSS JOIN LATERAL with
+ * btracker_backend.get_impacted_balances(), which walks the operation's JSONB body
+ * to extract balance impacts.
  *
  * DATA FLOW:
  *   1. Filter operations_view to only balance-impacting ops in our block range
- *   2. For each operation, call get_impacted_balances() to extract:
+ *   2. For each operation, call btracker_backend.get_impacted_balances() to extract:
  *      - account_name: The account whose balance changed
  *      - asset_symbol_nai: The asset type (HIVE=21, HBD=13, VESTS=37)
  *      - amount: The DELTA (change), can be positive or negative
  *   3. Convert account_name to account_id via accounts_view lookup
+ *
+ * NOTE: get_impacted_balances() is a pure SQL/JSONB reimplementation of the HAF C
+ * function hive.get_impacted_balances(). It reads ho.body_value directly instead of
+ * deserializing the operation into a C variant, which removes a ~15-30x per-block
+ * cost in LIVE processing (issue #53). See backend/operation_parsers/impacted_balances.sql.
  *
  * EDGE CASE - Hardfork handling:
  *   The ho.block_num > ah.block_num check (where ah.hardfork_num = 1) passes a
@@ -84,8 +88,9 @@ ops_in_range AS MATERIALIZED
   FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
   JOIN balance_impacting_ops bio ON bio.id = ho.op_type_id
   JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
-  CROSS JOIN hive.get_impacted_balances(
-    hafd._operation_from_jsonb(jsonb_build_object('type', bio.type_name, 'value', ho.body_value)),
+  CROSS JOIN LATERAL btracker_backend.get_impacted_balances(
+    bio.type_name,
+    ho.body_value,
     ho.block_num > ah.block_num
   ) AS get_impacted_balances
   WHERE
