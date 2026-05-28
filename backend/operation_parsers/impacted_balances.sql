@@ -21,6 +21,11 @@
  * Asset fields are {"amount","precision","nai"} objects parsed by parse_amount_object.
  * Zero-amount rows are dropped, matching the C++ emplace_back guard.
  *
+ * The payout_must_be_claimed and is_saved_into_hbd_balance flags are always serialized
+ * by HAF, so the ::BOOLEAN guards below never see a NULL. If a key were ever absent the
+ * cast would yield NULL and drop the row; that only matches the C++ visitor (which reads
+ * an always-present bool field) under this always-present invariant.
+ *
  * This must stay byte-for-byte equivalent to the C++ visitor. The op set is exactly
  * hive.get_balance_impacting_operations(); operations whose C++ overload is empty
  * (clear_null_account_balance, escrow_approve, transfer_to_vesting,
@@ -36,7 +41,9 @@ CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_balances(
     _is_hf01 BOOLEAN
 )
 RETURNS SETOF hive.impacted_balances_return
-LANGUAGE 'plpgsql' STABLE
+-- IMMUTABLE: pure function of its arguments, no table reads; parse_amount_object (its
+-- only callee) is likewise IMMUTABLE, so the planner may fold/cache calls.
+LANGUAGE 'plpgsql' IMMUTABLE
 AS
 $$
 BEGIN
