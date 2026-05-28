@@ -500,6 +500,25 @@ find_accounts_using_claim AS (
 ),
 
 -- ============================================================================
+-- CTE: claim_account_ids
+-- ============================================================================
+-- PURPOSE: Resolve claiming account names to ids via a correlated scalar
+-- subquery, NOT a join to accounts_view.
+--
+-- WHY SCALAR SUBQUERY: find_accounts_using_claim is a handful of rows derived
+-- from the deep CTE chain, so the planner can't estimate its size and assumes
+-- it is large. A `JOIN accounts_view` then gets planned as a hash join that
+-- seq-scans the whole 2.6M-row accounts table. A correlated scalar subquery is
+-- executed as a per-row SubPlan that always uses the accounts name index,
+-- regardless of the (mis-)estimated outer cardinality. See issue #53.
+claim_account_ids AS (
+  SELECT
+    fa.account_name,
+    (SELECT av.id FROM accounts_view av WHERE av.name = fa.account_name) AS account_id
+  FROM find_accounts_using_claim fa
+),
+
+-- ============================================================================
 -- CTE: prepare_prev_balances
 -- ============================================================================
 -- PURPOSE: Fetch previous VESTS (NAI 37) and VESTS-as-HIVE (NAI 38) balances
@@ -508,16 +527,18 @@ find_accounts_using_claim AS (
 -- WHY NEEDED: When calculating how much NAI 38 to reduce during a claim,
 -- we need to know the ACCUMULATED balance including previous block ranges.
 -- The recursive CTE only handles operations WITHIN this block range.
+--
+-- Drives from the (small) resolved claim ids and index-looks-up account_rewards
+-- by its PK (account, nai), instead of scanning all ~1M nai 37/38 rows. See #53.
 prepare_prev_balances AS (
   SELECT
-    fa.account_name,
-    ar.account AS account_id,
+    cai.account_name,
+    cai.account_id,
     ar.nai,
     ar.balance
-  FROM account_rewards ar
-  JOIN accounts_view av ON av.id = ar.account
-  JOIN find_accounts_using_claim fa ON fa.account_name = av.name
-  WHERE ar.nai IN (_nai_vests_as_hive, _nai_vests)
+  FROM claim_account_ids cai
+  JOIN account_rewards ar ON ar.account = cai.account_id
+                         AND ar.nai IN (_nai_vests_as_hive, _nai_vests)
 ),
 
 -- ============================================================================
@@ -727,15 +748,26 @@ all_account_names AS (
 -- ============================================================================
 -- CTE: account_ids
 -- ============================================================================
--- PURPOSE: Batch lookup of account IDs from names.
+-- PURPOSE: Look up account IDs for every name we are about to upsert.
 --
--- OPTIMIZATION: Converting names to IDs in a single batch query is much faster
--- than looking up each account individually during INSERT. The accounts_view
--- has an index on name, so this IN clause is efficient.
+-- WHY SCALAR SUBQUERY (not `WHERE name IN (all_account_names)`): all_account_names
+-- is derived from the deep CTE chain, so the planner can't estimate its size and
+-- plans the `IN` against accounts_view as a hash semi-join that seq-scans the
+-- whole 2.6M-row accounts table. Driving from all_account_names with a correlated
+-- scalar subquery forces a per-row index lookup on the accounts name index. The
+-- outer WHERE account_id IS NOT NULL drops names that fail to resolve, matching
+-- the old `WHERE name IN (...)` semantics. See issue #53.
 account_ids AS (
-  SELECT av.name AS account_name, av.id AS account_id
-  FROM accounts_view av
-  WHERE av.name IN (SELECT account_name FROM all_account_names)
+  SELECT account_name, account_id
+  FROM (
+    SELECT
+      an.account_name,
+      (SELECT av.id FROM accounts_view av WHERE av.name = an.account_name) AS account_id
+    FROM all_account_names an
+  ) resolved
+  -- Drop names that don't resolve, matching the old `WHERE name IN (...)`
+  -- semantics (account is NOT NULL in account_rewards / account_info_rewards).
+  WHERE account_id IS NOT NULL
 ),
 
 -- ============================================================================
