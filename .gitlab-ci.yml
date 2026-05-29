@@ -132,12 +132,8 @@ find_haf_image:
   extends: .find_haf_image
   stage: detect
   variables:
-    UPSTREAM_BRANCH: "1.28.6"
-    HAF_PATTERNS_REF: "1.28.6"
-    # The 1.28.6 release publishes only a version-tagged image (hive/haf:1.28.6);
-    # the per-commit hive/haf:<sha> images find_haf_image normally resolves are not
-    # in the registry. Pin directly to the release image tag to skip the SHA lookup.
-    UPSTREAM_OVERRIDE_TAG: "1.28.6"
+    UPSTREAM_BRANCH: "develop"
+    HAF_PATTERNS_REF: "develop"
 
 # =============================================================================
 # LINT JOBS - Using common-ci-configuration templates
