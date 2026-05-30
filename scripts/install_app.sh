@@ -89,15 +89,18 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POS
 # and each must match the block-processor that drives its context:
 # btracker_app.main drives btracker_app -> 'balance_tracker';
 # hafbe_app.main drives hafbe_bal       -> 'haf_block_explorer'.
-if [[ -z "${HAF_INSTALL_LOCK_HELD:-}" ]] \
-    && command -v python3 >/dev/null 2>&1 \
-    && [[ -f /usr/local/bin/install_with_app_lock.py ]]; then
-  case "${BTRACKER_SCHEMA}" in
-    hafbe_bal) APP_LOCK_NAME=haf_block_explorer ;;
-    *)         APP_LOCK_NAME=balance_tracker ;;
-  esac
-  export HAF_INSTALL_LOCK_HELD=1
-  exec python3 /usr/local/bin/install_with_app_lock.py "$APP_LOCK_NAME" "$POSTGRES_ACCESS" "$0" "${ORIGINAL_ARGS[@]}"
+if [[ -z "${HAF_INSTALL_LOCK_HELD:-}" ]]; then
+  if command -v python3 >/dev/null 2>&1 && [[ -f /usr/local/bin/install_with_app_lock.py ]]; then
+    case "${BTRACKER_SCHEMA}" in
+      hafbe_bal) APP_LOCK_NAME=haf_block_explorer ;;
+      *)         APP_LOCK_NAME=balance_tracker ;;
+    esac
+    export HAF_INSTALL_LOCK_HELD=1
+    exec python3 /usr/local/bin/install_with_app_lock.py "$APP_LOCK_NAME" "$POSTGRES_ACCESS" "$0" "${ORIGINAL_ARGS[@]}"
+  else
+    echo "WARNING: install_with_app_lock.py wrapper not found; running install without HAF advisory lock (expected in CI test setups, not in production install images)." >&2
+    export HAF_INSTALL_LOCK_HELD=1
+  fi
 fi
 
 echo "Installing app..."
