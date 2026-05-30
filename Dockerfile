@@ -2,7 +2,7 @@
 # Pinned to the c-c-c develop SHA tag that introduces python3 + py3-psycopg2
 # + /usr/local/bin/install_with_app_lock.py (the wrapper used by install_app.sh).
 # Bump when c-c-c publishes a new semver tag that includes the wrapper.
-ARG PSQL_CLIENT_VERSION=5057f1b6f8f1c37d5b6e39015746bd526805cb76
+ARG PSQL_CLIENT_VERSION=b80b52472f5bf6a685c95f74b9837cc1adbf7ddc
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation
