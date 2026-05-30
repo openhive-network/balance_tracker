@@ -1,5 +1,8 @@
 # syntax=registry.gitlab.syncad.com/hive/common-ci-configuration/dockerfile:1.5
-ARG PSQL_CLIENT_VERSION=14-2
+# Pinned to the c-c-c develop SHA tag that introduces python3 + py3-psycopg2
+# + /usr/local/bin/install_with_app_lock.py (the wrapper used by install_app.sh).
+# Bump when c-c-c publishes a new semver tag that includes the wrapper.
+ARG PSQL_CLIENT_VERSION=5057f1b6f8f1c37d5b6e39015746bd526805cb76
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation
