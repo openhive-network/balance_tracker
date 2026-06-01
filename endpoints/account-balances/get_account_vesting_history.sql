@@ -122,14 +122,14 @@ SET ROLE btracker_owner;
 DROP FUNCTION IF EXISTS btracker_endpoints.get_account_vesting_history;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_vesting_history(
     "account-name" TEXT,
-    "filter"       btracker_backend.vesting_filter = 'all',
-    "page"         INT = NULL,
-    "page-size"    INT = 100,
-    "direction"    btracker_backend.sort_direction = 'desc',
-    "from-block"   TEXT = NULL,
-    "to-block"     TEXT = NULL
+    "filter" btracker_backend.vesting_filter = 'all',
+    "page" INT = NULL,
+    "page-size" INT = 100,
+    "direction" btracker_backend.sort_direction = 'desc',
+    "from-block" TEXT = NULL,
+    "to-block" TEXT = NULL
 )
-RETURNS btracker_backend.vesting_history
+RETURNS btracker_backend.vesting_history 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql' STABLE
 SET jit = OFF

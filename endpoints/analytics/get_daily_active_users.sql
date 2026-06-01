@@ -98,12 +98,12 @@ SET ROLE btracker_owner;
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_daily_active_users;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_daily_active_users(
-    "from-date"       DATE = NULL,
-    "to-date"         DATE = NULL,
-    "granularity"     btracker_backend.granularity_dau = 'day',
+    "from-date" DATE = NULL,
+    "to-date" DATE = NULL,
+    "granularity" btracker_backend.granularity_dau = 'day',
     "operation_types" TEXT = 'all'
 )
-RETURNS JSONB
+RETURNS JSONB 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
 STABLE

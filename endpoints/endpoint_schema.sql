@@ -1772,7 +1772,7 @@ declare
         "parameters": [
           {
             "in": "query",
-            "name": "from",
+            "name": "from-date",
             "required": false,
             "schema": {
               "type": "string",
@@ -1784,7 +1784,7 @@ declare
           },
           {
             "in": "query",
-            "name": "to",
+            "name": "to-date",
             "required": false,
             "schema": {
               "type": "string",
