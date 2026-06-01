@@ -16,8 +16,8 @@
           content-type: application/json
           accept: application/json
         json:
-          from: "2016-09-10"
-          to: "2016-09-14"
+          from-date: "2016-09-10"
+          to-date: "2016-09-14"
           granularity: "day"
           operation_types: "vote,transfer"
       response:

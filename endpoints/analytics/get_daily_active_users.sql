@@ -18,7 +18,7 @@ SET ROLE btracker_owner;
     operationId: btracker_endpoints.get_daily_active_users
     parameters:
       - in: query
-        name: from
+        name: from-date
         required: false
         schema:
           type: string
@@ -29,7 +29,7 @@ SET ROLE btracker_owner;
           Inclusive start date `YYYY-MM-DD`. Week/month granularities return
           the containing whole week/month bucket.
       - in: query
-        name: to
+        name: to-date
         required: false
         schema:
           type: string
@@ -98,8 +98,8 @@ SET ROLE btracker_owner;
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_daily_active_users;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_daily_active_users(
-    "from"            DATE = NULL,
-    "to"              DATE = NULL,
+    "from-date"       DATE = NULL,
+    "to-date"         DATE = NULL,
     "granularity"     btracker_backend.granularity_dau = 'day',
     "operation_types" TEXT = 'all'
 )
@@ -119,7 +119,7 @@ PURPOSE:
   configured operation classes. Backs network-activity dashboards.
 
 PARAMETERS:
-  - from / to: inclusive date range. Both default to today / 30 days ago.
+  - from-date / to-date: inclusive date range. Default to 30 days ago / today.
   - granularity: 'day' | 'week' | 'month'.
   - operation_types: comma-separated dau_op_class values (or 'all').
 
@@ -137,8 +137,8 @@ CACHING:
 ================================================================================
 */
 DECLARE
-  _to_date   DATE := COALESCE("to",   (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::DATE);
-  _from_date DATE := COALESCE("from", _to_date - 30);
+  _to_date   DATE := COALESCE("to-date",   (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::DATE);
+  _from_date DATE := COALESCE("from-date", _to_date - 30);
   _today     DATE := (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::DATE;
   _op_classes btracker_backend.dau_op_class[];
 BEGIN
