@@ -210,23 +210,32 @@ BEGIN
   __t3 := clock_timestamp();
 
   -- =========================================================================
-  -- Stage D: join actors with block dates and resolve account IDs via inline
-  -- scalar subquery (matches process_balances:ops_in_range pattern).
-  -- Reads only stable-OID temp tables + hive.accounts_view -> plan caches.
+  -- Stage D: resolve account IDs, then join actors with block dates.
+  -- The accounts_view lookup is the single most expensive stage (per-batch
+  -- timing showed ~36% of total). The same actor (e.g. a voting bot) recurs
+  -- thousands of times per batch, so resolving the DISTINCT name set ONCE and
+  -- hash-joining back is far cheaper than one index probe per actor row.
+  -- name_ids is MATERIALIZED so the correlated scalar subquery runs exactly
+  -- once per distinct name. Reads only stable-OID temp tables +
+  -- hive.accounts_view -> plan still caches across batches.
   -- =========================================================================
   INSERT INTO _dau_resolved (by_day, by_week, by_month, op_class, account, op_weight, block_num)
-  SELECT by_day, by_week, by_month, op_class, account, op_weight, block_num
-  FROM (
+  WITH name_ids AS MATERIALIZED (
     SELECT
-      bd.by_day, bd.by_week, bd.by_month,
-      a.op_class,
-      (SELECT av.id FROM hive.accounts_view av WHERE av.name = a.actor_name) AS account,
-      a.op_weight,
-      a.block_num
-    FROM _dau_actors a
-    JOIN _dau_block_dates bd ON bd.block_num = a.block_num
-  ) resolved
-  WHERE account IS NOT NULL;
+      da.actor_name,
+      (SELECT av.id FROM hive.accounts_view av WHERE av.name = da.actor_name) AS account
+    FROM (SELECT DISTINCT actor_name FROM _dau_actors) da
+  )
+  SELECT
+    bd.by_day, bd.by_week, bd.by_month,
+    a.op_class,
+    ni.account,
+    a.op_weight,
+    a.block_num
+  FROM _dau_actors a
+  JOIN name_ids ni       ON ni.actor_name = a.actor_name
+  JOIN _dau_block_dates bd ON bd.block_num = a.block_num
+  WHERE ni.account IS NOT NULL;
   GET DIAGNOSTICS __resolved_rows = ROW_COUNT;
   __t4 := clock_timestamp();
 
