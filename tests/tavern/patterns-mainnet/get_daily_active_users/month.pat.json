@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "active_accounts": 2519,
+      "date": "2016-06-01T00:00:00",
+      "operations": 118855
+    },
+    {
+      "active_accounts": 19694,
+      "date": "2016-07-01T00:00:00",
+      "operations": 2053203
+    },
+    {
+      "active_accounts": 27997,
+      "date": "2016-08-01T00:00:00",
+      "operations": 2985410
+    },
+    {
+      "active_accounts": 14018,
+      "date": "2016-09-01T00:00:00",
+      "operations": 1092867
+    }
+  ],
+  "granularity": "month"
+}

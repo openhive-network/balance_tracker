@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "active_accounts": 9517,
+      "date": "2016-08-29T00:00:00",
+      "operations": 541049
+    },
+    {
+      "active_accounts": 9316,
+      "date": "2016-09-05T00:00:00",
+      "operations": 526632
+    },
+    {
+      "active_accounts": 8062,
+      "date": "2016-09-12T00:00:00",
+      "operations": 278186
+    }
+  ],
+  "granularity": "week"
+}
