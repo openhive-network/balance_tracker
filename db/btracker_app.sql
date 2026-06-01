@@ -501,6 +501,51 @@ BEGIN
   );
   PERFORM hive.app_register_table( __schema_name, 'account_vesting_by_day', __schema_name );
 
+  ------------- DAILY ACTIVE USERS ----------------
+  -- Per (bucket, op_class, account) tally of how many ops that account
+  -- submitted. PK dedupes the account so COUNT(*) over a single op_class
+  -- gives exact distinct active accounts; SUM(operations_count) gives total
+  -- op volume. op_class=0 is an internal rollup for "all tracked classes".
+  -- op_class encoding (matches btracker_backend.dau_op_class, with all=0):
+  --   0=all, 1=post, 2=comment, 3=vote, 4=transfer, 5=custom_json
+  -- post vs comment is decided at processing time from comment_operation's
+  -- parent_author (empty -> post, non-empty -> comment).
+  CREATE TABLE IF NOT EXISTS active_users_by_day
+  (
+    bucket           TIMESTAMP NOT NULL, -- day boundary, date_trunc('day', created_at)
+    op_class         SMALLINT  NOT NULL, -- 0=all 1=post 2=comment 3=vote 4=transfer 5=custom_json
+    account          INT       NOT NULL, -- hive.accounts_view.id (actor / submitter)
+    operations_count INT       NOT NULL, -- number of ops by this account in this class on this day
+    last_block_num   INT       NOT NULL, -- highest block_num observed for this row
+
+    CONSTRAINT pk_active_users_by_day PRIMARY KEY (bucket, op_class, account)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'active_users_by_day', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS active_users_by_week
+  (
+    bucket           TIMESTAMP NOT NULL, -- ISO week boundary, date_trunc('week', created_at)
+    op_class         SMALLINT  NOT NULL, -- 0=all 1=post 2=comment 3=vote 4=transfer 5=custom_json
+    account          INT       NOT NULL, -- hive.accounts_view.id (actor / submitter)
+    operations_count INT       NOT NULL, -- number of ops by this account in this class on this week
+    last_block_num   INT       NOT NULL, -- highest block_num observed for this row
+
+    CONSTRAINT pk_active_users_by_week PRIMARY KEY (bucket, op_class, account)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'active_users_by_week', __schema_name );
+
+  CREATE TABLE IF NOT EXISTS active_users_by_month
+  (
+    bucket           TIMESTAMP NOT NULL, -- month boundary, date_trunc('month', created_at)
+    op_class         SMALLINT  NOT NULL, -- 0=all 1=post 2=comment 3=vote 4=transfer 5=custom_json
+    account          INT       NOT NULL, -- hive.accounts_view.id (actor / submitter)
+    operations_count INT       NOT NULL, -- number of ops by this account in this class on this month
+    last_block_num   INT       NOT NULL, -- highest block_num observed for this row
+
+    CONSTRAINT pk_active_users_by_month PRIMARY KEY (bucket, op_class, account)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'active_users_by_month', __schema_name );
+
   ------------- CONVERTS STATE ----------------
   CREATE TABLE IF NOT EXISTS convert_state
   (
@@ -620,6 +665,14 @@ BEGIN
     'CREATE INDEX IF NOT EXISTS idx_account_vesting_history_block_num ON ' || __schema_name || '.account_vesting_history(account, hafd.operation_id_to_block_num(source_op))');
   PERFORM hive.app_register_index_dependency(__schema_name,
     'CREATE INDEX IF NOT EXISTS idx_account_vesting_history_kind_block_num ON ' || __schema_name || '.account_vesting_history(account, kind, hafd.operation_id_to_block_num(source_op))');
+  -- DAU read-side: range scans by (op_class, bucket) for filtered queries.
+  -- PKs already cover unfiltered bucket-range scans.
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_active_users_by_day_op_class_bucket_account ON ' || __schema_name || '.active_users_by_day(op_class, bucket, account)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_active_users_by_week_op_class_bucket_account ON ' || __schema_name || '.active_users_by_week(op_class, bucket, account)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE INDEX IF NOT EXISTS idx_active_users_by_month_op_class_bucket_account ON ' || __schema_name || '.active_users_by_month(op_class, bucket, account)');
 
   -- Drop app indexes for massive sync (will be restored at LIVE transition)
   PERFORM hive.app_save_and_drop_indexes(__schema_name);
@@ -904,6 +957,7 @@ BEGIN
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
     PERFORM process_vesting_stats(_from, __hardfork_23_block);
     PERFORM process_account_vesting_stats(_from, __hardfork_23_block);
+    PERFORM process_active_users(_from, __hardfork_23_block);
     PERFORM process_block_range_converts(_from,        __hardfork_23_block);
     PERFORM process_block_range_orders(_from,        __hardfork_23_block);
     PERFORM process_block_range_escrows(_from,        __hardfork_23_block);
@@ -924,6 +978,7 @@ BEGIN
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
       PERFORM process_vesting_stats(__hardfork_23_block + 1, _to);
       PERFORM process_account_vesting_stats(__hardfork_23_block + 1, _to);
+      PERFORM process_active_users(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_converts(__hardfork_23_block+1, _to);
       PERFORM process_block_range_orders(__hardfork_23_block+1, _to);
       PERFORM process_block_range_escrows(__hardfork_23_block+1, _to);
@@ -941,6 +996,7 @@ BEGIN
     PERFORM process_transfer_stats(_from, _to);
     PERFORM process_vesting_stats(_from, _to);
     PERFORM process_account_vesting_stats(_from, _to);
+    PERFORM process_active_users(_from, _to);
     PERFORM process_block_range_converts(_from, _to);
     PERFORM process_block_range_orders(_from, _to);
     PERFORM process_block_range_escrows(_from, _to);
@@ -997,6 +1053,7 @@ BEGIN
   PERFORM process_transfer_stats(_block, _block);
   PERFORM process_vesting_stats(_block, _block);
   PERFORM process_account_vesting_stats(_block, _block);
+  PERFORM process_active_users(_block, _block);
   PERFORM process_block_range_converts(_block, _block);
   PERFORM process_block_range_orders(_block, _block);
   PERFORM process_block_range_escrows(_block, _block);
@@ -1140,6 +1197,10 @@ $$;
  * Recurrent Transfers:
  *   - idx_recurrent_transfers_to_account_idx
  *     Filter by to_account for incoming transfers
+ *
+ * Daily Active Users:
+ *   - idx_active_users_by_*_op_class_bucket_account
+ *     Filtered range scans for DAU/WAU/MAU operation class filters
  */
 CREATE OR REPLACE FUNCTION create_btracker_indexes()
 RETURNS VOID
@@ -1184,6 +1245,10 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_current_rc_delegations_delegatee ON current_rc_delegations(delegatee);
   -- Recurrent transfers: filter by recipient for incoming transfer queries
   CREATE INDEX IF NOT EXISTS idx_recurrent_transfers_to_account_idx ON recurrent_transfers(to_account);
+  -- Active users: filtered range scans by operation class and bucket.
+  CREATE INDEX IF NOT EXISTS idx_active_users_by_day_op_class_bucket_account ON active_users_by_day(op_class, bucket, account);
+  CREATE INDEX IF NOT EXISTS idx_active_users_by_week_op_class_bucket_account ON active_users_by_week(op_class, bucket, account);
+  CREATE INDEX IF NOT EXISTS idx_active_users_by_month_op_class_bucket_account ON active_users_by_month(op_class, bucket, account);
 END
 $$;
 

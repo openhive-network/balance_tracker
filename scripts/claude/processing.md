@@ -39,6 +39,7 @@ HAFBE (hafbe_app.sql)
 | `process_transfer_stats` | `db/process_transfer_stats.sql` | transfer, fill_recurrent_transfer, escrow_transfer | `transfer_stats_by_hour/day/month` |
 | `process_vesting_stats` | `db/process_vesting_stats.sql` | transfer_to_vesting, withdraw_vesting (excl. cancels), fill_vesting_withdraw | `vesting_stats_by_day/month` (global) |
 | `process_account_vesting_stats` | `db/process_account_vesting_stats.sql` | same 3 vesting ops (excl. cancels), fanned out to impacted accounts | `account_vesting_history`, `account_vesting_by_day/month` |
+| `process_active_users` | `db/process_active_users.sql` | vote, comment (post + comment), transfer, custom_json — actor extracted per-op | `active_users_by_day/week/month` |
 
 ## Operations Reference
 

@@ -1,0 +1,6 @@
+{
+  "code": "22023",
+  "details": null,
+  "hint": null,
+  "message": "Invalid operation_types: foobar. Allowed values are post, comment, vote, transfer, custom_json, all"
+}

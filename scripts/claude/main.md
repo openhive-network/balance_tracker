@@ -20,6 +20,7 @@ Balance Tracker extracts and indexes balance-related data from the Hive blockcha
 | **Escrows** | Multi-party escrow agreements |
 | **Transfer Stats** | Aggregated transfer volumes (hour/day/month) |
 | **Vesting Stats** | Aggregated power-up / power-down volumes (day/month) |
+| **Active Users** | Per-(bucket, op_class, account) submitter tally for DAU/WAU/MAU |
 
 ## Directory Structure
 
@@ -173,6 +174,7 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `balance_history_by_day/month` - Aggregated snapshots
 - `transfer_stats_by_hour/day/month` - Volume statistics
 - `vesting_stats_by_day/month` - Power-up / power-down statistics (global)
+- `active_users_by_day/week/month` - Per (bucket, op_class, account) submitter tally (DAU/WAU/MAU)
 - `account_vesting_history` - Per-account vesting event history (per-impacted-account, with seq_no)
 - `account_vesting_by_day/month` - Per-account vesting aggregates
 

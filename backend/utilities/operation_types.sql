@@ -288,4 +288,21 @@ BEGIN
 END;
 $$;
 
+-- Social operations used for Daily Active Users tracking
+CREATE OR REPLACE FUNCTION btracker_backend.op_vote()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::vote_operation');
+END;
+$$;
+
+-- Posts and comments share comment_operation; the post/comment distinction is
+-- made by inspecting `parent_author` on the body (empty = post, non-empty = comment).
+CREATE OR REPLACE FUNCTION btracker_backend.op_comment()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::comment_operation');
+END;
+$$;
+
 RESET ROLE;

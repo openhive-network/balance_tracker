@@ -19,6 +19,8 @@ tags:
     description: Informations about account balances
   - name: Transfers
     description: Information about transfers and their history
+  - name: Analytics
+    description: Network-level engagement metrics
   - name: Other
     description: General API information
 servers:
@@ -67,6 +69,10 @@ declare
       "description": "Information about transfers and their history"
     },
     {
+      "name": "Analytics",
+      "description": "Network-level engagement metrics"
+    },
+    {
       "name": "Other",
       "description": "General API information"
     }
@@ -93,6 +99,25 @@ declare
           "daily",
           "monthly",
           "yearly"
+        ]
+      },
+      "btracker_backend.granularity_dau": {
+        "type": "string",
+        "enum": [
+          "day",
+          "week",
+          "month"
+        ]
+      },
+      "btracker_backend.dau_op_class": {
+        "type": "string",
+        "enum": [
+          "post",
+          "comment",
+          "vote",
+          "transfer",
+          "custom_json",
+          "all"
         ]
       },
       "btracker_backend.nai_type": {
@@ -1732,6 +1757,108 @@ declare
           },
           "404": {
             "description": "No vesting statistics found for the given parameters"
+          }
+        }
+      }
+    },
+    "/daily-active-users": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Daily Active Users (DAU)",
+        "description": "Unique accounts that submitted at least one non-trivial operation in\neach period, plus the total operation count for the period.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_daily_active_users();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/daily-active-users?granularity=day&operation_types=vote,transfer''`\n",
+        "operationId": "btracker_endpoints.get_daily_active_users",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "x-sql-datatype": "DATE",
+              "format": "date",
+              "default": null
+            },
+            "description": "Inclusive start date `YYYY-MM-DD`. Week/month granularities return\nthe containing whole week/month bucket.\n"
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "x-sql-datatype": "DATE",
+              "format": "date",
+              "default": null
+            },
+            "description": "Inclusive end date `YYYY-MM-DD`. Defaults to today (UTC).\n"
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.granularity_dau",
+              "default": "day"
+            },
+            "description": "Bucket size:\n\n* `day`   \u2014 daily buckets\n* `week`  \u2014 ISO-week buckets (Monday-start)\n* `month` \u2014 calendar-month buckets\n"
+          },
+          {
+            "in": "query",
+            "name": "operation_types",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all"
+            },
+            "description": "Comma-separated list of operation classes to count.\nAllowed values: `post`, `comment`, `vote`, `transfer`, `custom_json`, `all`.\n\n`all` (the default) is equivalent to all five tracked classes \u2014 not\nevery Hive op. Unknown values raise an error.\n\nExample: `operation_types=vote,transfer`.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active user counts and operation counts per bucket.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "x-sql-datatype": "JSONB",
+                  "properties": {
+                    "granularity": {
+                      "$ref": "#/components/schemas/btracker_backend.granularity_dau"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "active_accounts": {
+                            "type": "integer"
+                          },
+                          "operations": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "granularity": "day",
+                  "data": [
+                    {
+                      "date": "2026-04-01T00:00:00",
+                      "active_accounts": 12450,
+                      "operations": 387200
+                    }
+                  ]
+                }
+              }
+            }
           }
         }
       }

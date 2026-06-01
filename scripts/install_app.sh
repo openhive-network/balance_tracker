@@ -123,6 +123,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/aggregated/transfer_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/aggregated/vesting_stats.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/aggregated/active_users.sql"
 
 # Vesting per-account helpers depend on vesting_stats_return type from aggregated/vesting_stats.sql.
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/vesting_history.sql"
@@ -146,6 +147,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_transfer_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_vesting_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_account_vesting_stats.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_active_users.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_block_range_escrows.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_block_range_converts.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_block_range_orders.sql"
@@ -161,11 +163,12 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_account_vesting_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/transfers/get_transfer_statistics.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/transfers/get_vesting_stats.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/analytics/get_daily_active_users.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_last_synced_block.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_version.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_total_value_locked.sql"
 
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/set_version_in_sql.pgsql"
+#psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/set_version_in_sql.pgsql"
 
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT USAGE ON SCHEMA ${BTRACKER_SCHEMA} to btracker_user;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT USAGE ON SCHEMA btracker_endpoints to btracker_user;"

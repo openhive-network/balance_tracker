@@ -1,0 +1,29 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+    - negative
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_daily_active_users"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          from: "2016-09-15"
+          to: "2016-09-10"
+          granularity: "day"
+          operation_types: "all"
+      response:
+        status_code: 400
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
+          extra_kwargs:
+            error_response: true
