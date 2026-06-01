@@ -6,6 +6,7 @@ SET ROLE btracker_owner;
  * Core operations: Extracts balance deltas from blockchain operations, computes running
  * balances, and updates current_account_balances, account_balance_history, and
  * aggregated history tables (by_day, by_month).
+ 
  */
 CREATE OR REPLACE FUNCTION process_block_range_balances(
     IN _from INT, IN _to INT
