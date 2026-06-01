@@ -677,13 +677,23 @@ BEGIN
   -- Drop app indexes for massive sync (will be restored at LIVE transition)
   PERFORM hive.app_save_and_drop_indexes(__schema_name);
 
-  -- Set append-only tables (no ON CONFLICT upserts) to UNLOGGED to skip WAL.
-  -- Note: balance_history_by_day, balance_history_by_month, account_rewards use
-  -- ON CONFLICT ON CONSTRAINT pk_* during processing, so they must keep their PKs
-  -- and remain LOGGED.
+  -- Set high-write tables to UNLOGGED during massive sync to skip WAL.
+  -- Restored to LOGGED in finalize_massive_sync().
   -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
+  --
+  -- The two history tables are append-only. The active_users_by_* tables DO use
+  -- ON CONFLICT ON CONSTRAINT pk_* upserts, but are included here anyway: they
+  -- track votes (the most frequent Hive op), so their per-batch upserts are the
+  -- single largest WAL source in the sync, and that WAL pressure also slows the
+  -- other processors. UNLOGGED keeps their PKs (ON CONFLICT still works) and only
+  -- forgoes crash durability, which massive sync does not rely on. Other upsert
+  -- tables (balance_history_by_*, transfer_stats_by_*, etc.) stay LOGGED because
+  -- their write volume is small enough that WAL is not a bottleneck.
   ALTER TABLE account_balance_history SET UNLOGGED;
   ALTER TABLE account_vesting_history SET UNLOGGED;
+  ALTER TABLE active_users_by_day     SET UNLOGGED;
+  ALTER TABLE active_users_by_week    SET UNLOGGED;
+  ALTER TABLE active_users_by_month   SET UNLOGGED;
 
 END
 $$;
@@ -835,6 +845,9 @@ BEGIN
 
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
+  ALTER TABLE active_users_by_day     SET LOGGED;
+  ALTER TABLE active_users_by_week    SET LOGGED;
+  ALTER TABLE active_users_by_month   SET LOGGED;
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
