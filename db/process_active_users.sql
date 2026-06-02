@@ -42,9 +42,10 @@ SET ROLE btracker_owner;
  *   aggregation, 3-way ON CONFLICT upserts — all keep cached plans across
  *   batches.
  *
- * Account-id resolution: inline correlated scalar subquery against
- * hive.accounts_view (matches process_balances:ops_in_range — per-row
- * Index Scan on the accounts name index, avoiding the !370 seq-scan trap).
+ * Account-id resolution: resolve the DISTINCT actor-name set once via a
+ * MATERIALIZED correlated scalar subquery against hive.accounts_view (per-name
+ * Index Scan on the accounts name index, avoiding the !370 seq-scan trap),
+ * then hash-join the ids back onto the full actor set.
  */
 CREATE OR REPLACE FUNCTION process_active_users(_from INT, _to INT)
 RETURNS VOID
@@ -57,31 +58,13 @@ DECLARE
   _op_comment     INT := btracker_backend.op_comment();
   _op_transfer    INT := btracker_backend.op_transfer();
   _op_custom_json INT := btracker_backend.op_custom_json();
-  __by_day_count    BIGINT;
-  __by_week_count   BIGINT;
-  __by_month_count  BIGINT;
-  __ops_rows        BIGINT;
-  __actors_rows     BIGINT;
-  __resolved_rows   BIGINT;
-  __aggregated_rows BIGINT;
-  __t0 timestamptz;
-  __t1 timestamptz;
-  __t2 timestamptz;
-  __t3 timestamptz;
-  __t4 timestamptz;
-  __t5 timestamptz;
-  __t6 timestamptz;
 BEGIN
-  __t0 := clock_timestamp();
-
   -- Fast path: if the batch has no DAU-relevant ops at all, skip entirely.
   IF NOT EXISTS (
     SELECT 1 FROM _btracker_ops_batch ov
     WHERE ov.op_type_id IN (_op_vote, _op_comment, _op_transfer, _op_custom_json)
       AND ov.block_num BETWEEN _from AND _to
   ) THEN
-    RAISE NOTICE 'process_active_users [%, %]: no relevant ops, skipped in % ms',
-      _from, _to, (extract(epoch FROM clock_timestamp() - __t0) * 1000)::INT;
     RETURN;
   END IF;
 
@@ -140,7 +123,6 @@ BEGIN
     date_trunc('month', bv.created_at)
   FROM hive.blocks_view bv
   WHERE bv.num BETWEEN _from AND _to;
-  __t1 := clock_timestamp();
 
   -- =========================================================================
   -- Stage B: copy DAU-relevant ops out of _btracker_ops_batch into a
@@ -153,8 +135,6 @@ BEGIN
   FROM _btracker_ops_batch ov
   WHERE ov.op_type_id IN (_op_vote, _op_comment, _op_transfer, _op_custom_json)
     AND ov.block_num BETWEEN _from AND _to;
-  GET DIAGNOSTICS __ops_rows = ROW_COUNT;
-  __t2 := clock_timestamp();
 
   -- =========================================================================
   -- Stage C: extract actors (CASE for vote/comment/transfer single-pass +
@@ -206,8 +186,6 @@ BEGIN
     WHERE o.op_type_id = _op_custom_json AND auth.name IS NOT NULL
   ) x
   WHERE x.actor_name IS NOT NULL;
-  GET DIAGNOSTICS __actors_rows = ROW_COUNT;
-  __t3 := clock_timestamp();
 
   -- =========================================================================
   -- Stage D: resolve account IDs, then join actors with block dates.
@@ -236,8 +214,6 @@ BEGIN
   JOIN name_ids ni       ON ni.actor_name = a.actor_name
   JOIN _dau_block_dates bd ON bd.block_num = a.block_num
   WHERE ni.account IS NOT NULL;
-  GET DIAGNOSTICS __resolved_rows = ROW_COUNT;
-  __t4 := clock_timestamp();
 
   -- =========================================================================
   -- Stage E: GROUPING SETS produces per-(bucket, op_class, account) rows AND
@@ -262,8 +238,6 @@ BEGIN
     (by_month, op_class, account),
     (by_month,           account)
   );
-  GET DIAGNOSTICS __aggregated_rows = ROW_COUNT;
-  __t5 := clock_timestamp();
 
   -- =========================================================================
   -- Stages F/G/H: upsert each grain. Plans cached. grp_level bitmask:
@@ -277,7 +251,6 @@ BEGIN
   ON CONFLICT ON CONSTRAINT pk_active_users_by_day DO UPDATE SET
     operations_count = au.operations_count + EXCLUDED.operations_count,
     last_block_num   = GREATEST(au.last_block_num, EXCLUDED.last_block_num);
-  GET DIAGNOSTICS __by_day_count = ROW_COUNT;
 
   INSERT INTO active_users_by_week AS au
     (bucket, op_class, account, operations_count, last_block_num)
@@ -287,7 +260,6 @@ BEGIN
   ON CONFLICT ON CONSTRAINT pk_active_users_by_week DO UPDATE SET
     operations_count = au.operations_count + EXCLUDED.operations_count,
     last_block_num   = GREATEST(au.last_block_num, EXCLUDED.last_block_num);
-  GET DIAGNOSTICS __by_week_count = ROW_COUNT;
 
   INSERT INTO active_users_by_month AS au
     (bucket, op_class, account, operations_count, last_block_num)
@@ -297,19 +269,6 @@ BEGIN
   ON CONFLICT ON CONSTRAINT pk_active_users_by_month DO UPDATE SET
     operations_count = au.operations_count + EXCLUDED.operations_count,
     last_block_num   = GREATEST(au.last_block_num, EXCLUDED.last_block_num);
-  GET DIAGNOSTICS __by_month_count = ROW_COUNT;
-  __t6 := clock_timestamp();
-
-  RAISE NOTICE 'process_active_users [%, %]: blocks=% ops=%/% actors=%/% resolved=%/% agg=%/% upsert=%/%/%/% total=% ms',
-    _from, _to,
-    (extract(epoch FROM __t1 - __t0) * 1000)::INT,
-    __ops_rows,        (extract(epoch FROM __t2 - __t1) * 1000)::INT,
-    __actors_rows,     (extract(epoch FROM __t3 - __t2) * 1000)::INT,
-    __resolved_rows,   (extract(epoch FROM __t4 - __t3) * 1000)::INT,
-    __aggregated_rows, (extract(epoch FROM __t5 - __t4) * 1000)::INT,
-    __by_day_count, __by_week_count, __by_month_count,
-    (extract(epoch FROM __t6 - __t5) * 1000)::INT,
-    (extract(epoch FROM __t6 - __t0) * 1000)::INT;
 END
 $$;
 

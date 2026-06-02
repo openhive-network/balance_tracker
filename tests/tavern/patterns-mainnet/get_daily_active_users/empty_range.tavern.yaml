@@ -1,0 +1,26 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_daily_active_users"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          from-date: "2015-12-01"
+          to-date: "2015-12-03"
+          granularity: "day"
+          operation_types: "all"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern

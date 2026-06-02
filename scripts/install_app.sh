@@ -168,7 +168,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_version.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_total_value_locked.sql"
 
-#psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/set_version_in_sql.pgsql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/set_version_in_sql.pgsql"
 
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT USAGE ON SCHEMA ${BTRACKER_SCHEMA} to btracker_user;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT USAGE ON SCHEMA btracker_endpoints to btracker_user;"

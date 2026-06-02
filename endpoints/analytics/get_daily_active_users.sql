@@ -132,8 +132,8 @@ RESPONSE SHAPE (per issue #48):
   { "granularity": "<granularity>", "data": [ {date, active_accounts, operations}, ... ] }
 
 CACHING:
-  - Fully historical range (to <= last full day): 1 year cache
-  - Otherwise: 2 second cache (today's bucket can still grow)
+  - Ranges ending before the current day/week/month bucket: 1 year cache
+  - Otherwise: 2 second cache (the current bucket can still grow)
 ================================================================================
 */
 DECLARE
@@ -148,7 +148,12 @@ BEGIN
 
   _op_classes := btracker_backend.parse_dau_op_classes("operation_types");
 
-  IF _to_date < _today THEN
+  -- Long-cache only when the requested range ends in a fully-elapsed bucket.
+  -- Compare at the granularity bucket, not the raw date: with granularity=month
+  -- and to-date=yesterday, the current month bucket is still accumulating ops,
+  -- so it must stay on the short cache. The granularity_dau labels
+  -- (day/week/month) are valid date_trunc fields.
+  IF date_trunc("granularity"::text, _to_date) < date_trunc("granularity"::text, _today) THEN
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
   ELSE
     PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);

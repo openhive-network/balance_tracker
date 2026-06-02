@@ -890,6 +890,12 @@ BEGIN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
     PERFORM hive.app_request_table_vacuum(_context_name, 'account_balance_history', interval '10 minutes');
     PERFORM hive.app_request_table_vacuum(_context_name, 'account_vesting_history', interval '10 minutes');
+    -- active_users_by_* are ON CONFLICT DO UPDATE tables: votes keep the same
+    -- (bucket, op_class, account) rows hot across many blocks, so each replay
+    -- batch leaves dead tuples. Vacuum them like the history tables.
+    PERFORM hive.app_request_table_vacuum(_context_name, 'active_users_by_day', interval '10 minutes');
+    PERFORM hive.app_request_table_vacuum(_context_name, 'active_users_by_week', interval '10 minutes');
+    PERFORM hive.app_request_table_vacuum(_context_name, 'active_users_by_month', interval '10 minutes');
     RETURN;
   END IF;
 

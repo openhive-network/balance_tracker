@@ -29,7 +29,7 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 | **Delegations** | [endpoints/delegations.md](endpoints/delegations.md) | Delegation pairs (incoming/outgoing) |
 | **Transfers** | [endpoints/transfers.md](endpoints/transfers.md) | Transfer statistics, recurrent transfers |
 | **Vesting** | [endpoints/vesting.md](endpoints/vesting.md) | Power-up / power-down history & statistics |
-| **Analytics** | (DAU only for now — see `endpoints/analytics/`) | Network-level engagement metrics |
+| **Analytics** | _(no separate doc yet; source in `endpoints/analytics/`)_ | Daily Active Users (DAU/WAU/MAU) |
 | **Utility** | [endpoints/utility.md](endpoints/utility.md) | Version, sync status, TVL |
 
 ## Endpoint Summary

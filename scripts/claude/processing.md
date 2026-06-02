@@ -19,7 +19,10 @@ HAFBE (hafbe_app.sql)
       ├─> process_block_range_orders()
       ├─> process_block_range_converts()
       ├─> process_block_range_escrows()
-      └─> process_transfer_stats()  # Volume aggregation
+      ├─> process_transfer_stats()  # Transfer volume aggregation
+      ├─> process_vesting_stats()   # Power-up/down volume (global)
+      ├─> process_account_vesting_stats()  # Per-account vesting aggregates
+      └─> process_active_users()    # DAU/WAU/MAU submitter tally
 ```
 
 ## Processing Functions Inventory
