@@ -403,6 +403,33 @@ sync:
     EOSQL
     echo -e "\e[0Ksection_end:$(date +%s):indexes\r\e[0K"
 
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):lock_skip_test[collapsed=true]\r\e[0KAssert advisory-lock skip path..."
+    # Regression test: force-recreate the install with the BP up; expect
+    # skip + exit 0, no wrapper-not-found warning. Catches: missing
+    # wrapper/python3 in install image, broken install_app.sh re-exec,
+    # missing PERFORM in main_loop.sql, helpers missing in haf.
+    pushd docker
+    IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
+    docker compose "${COMPOSE_OPTIONS[@]}" up -d --no-deps --force-recreate balance-tracker-install
+    cid=$(docker compose "${COMPOSE_OPTIONS[@]}" ps -q balance-tracker-install)
+    docker wait "$cid"
+    ec=$(docker inspect "$cid" --format '{{.State.ExitCode}}')
+    docker logs "$cid" > /tmp/lock_test_install.log 2>&1
+    cat /tmp/lock_test_install.log | tail -30
+    popd
+    if [ "$ec" != "0" ]; then echo "FAIL: install exited $ec (expected 0)"; exit 1; fi
+    if ! grep -qE "Skipping balance_tracker install.*lock held by" /tmp/lock_test_install.log; then
+      echo "FAIL: wrapper-skip log line not found - the lock did not engage"
+      exit 1
+    fi
+    if grep -q "WARNING: install_with_app_lock.py wrapper not found" /tmp/lock_test_install.log; then
+      echo "FAIL: install image silently degraded to wrapper-not-found path"
+      exit 1
+    fi
+    echo "PASS: install correctly hit the advisory-lock skip path"
+    echo -e "\e[0Ksection_end:$(date +%s):lock_skip_test\r\e[0K"
+
   # Shutdown (inline override of .haf_app_sync_shutdown to use PATH-based pg_ctl for PG18 compat)
   - |
     echo -e "\e[0Ksection_start:$(date +%s):shutdown[collapsed=true]\r\e[0KStopping containers..."
