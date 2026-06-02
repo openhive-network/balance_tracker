@@ -436,8 +436,7 @@ sync:
     ec=$(docker inspect "$cid" --format '{{.State.ExitCode}}')
     docker logs "$cid" > /tmp/lock_test_install.log 2>&1
     cat /tmp/lock_test_install.log | tail -30
-    kill $FAKE_BP_PID 2>/dev/null
-    wait $FAKE_BP_PID 2>/dev/null
+    set +e; kill $FAKE_BP_PID 2>/dev/null; wait $FAKE_BP_PID 2>/dev/null; set -e
     popd
     if [ "$ec" != "0" ]; then echo "FAIL: install exited $ec (expected 0)"; exit 1; fi
     if ! grep -qE "Skipping $APP install.*lock held by" /tmp/lock_test_install.log; then
