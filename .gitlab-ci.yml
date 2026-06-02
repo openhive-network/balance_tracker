@@ -408,7 +408,7 @@ sync:
     # Regression test for advisory-lock coordination. CI's BP processes to a
     # target block then exits, so we spawn a fake lock-holder for the test.
     APP=balance_tracker
-    INSTALL_SVC=balance-tracker-install
+    INSTALL_SVC=backend-setup
     pushd docker
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -d haf_block_log >/tmp/fake_bp.log 2>&1 <<EOSQL &
