@@ -8,6 +8,7 @@ btracker_backend.vesting_filter:
     - power_up
     - power_down_init
     - power_down_fill
+    - power_down_route_received
  */
 -- openapi-generated-code-begin
 DROP TYPE IF EXISTS btracker_backend.vesting_filter CASCADE;
@@ -15,7 +16,8 @@ CREATE TYPE btracker_backend.vesting_filter AS ENUM (
     'all',
     'power_up',
     'power_down_init',
-    'power_down_fill'
+    'power_down_fill',
+    'power_down_route_received'
 );
 -- openapi-generated-code-end
 
@@ -48,6 +50,15 @@ btracker_backend.vesting_stats:
     power_down_fill_hive:
       $ref: '#/components/schemas/btracker_backend.amount'
       description: realised HIVE delivered by fill_vesting_withdraw (excludes routed-to-VESTS) (HIVE NAI/precision)
+    power_down_route_received_count:
+      type: integer
+      description: number of fill_vesting_withdraw tranches received via a withdraw route from another account (to<>from). Per-account only; 0 in the global stats.
+    power_down_route_received_hive:
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: HIVE received from another account's routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only.
+    power_down_route_received_vests:
+      $ref: '#/components/schemas/btracker_backend.amount'
+      description: VESTS received from another account's routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only.
     last_block_num:
       type: integer
       description: last block number contributing to the period
@@ -63,6 +74,9 @@ CREATE TYPE btracker_backend.vesting_stats AS (
     "power_down_fill_count" INT,
     "power_down_fill_vests" btracker_backend.amount,
     "power_down_fill_hive" btracker_backend.amount,
+    "power_down_route_received_count" INT,
+    "power_down_route_received_hive" btracker_backend.amount,
+    "power_down_route_received_vests" btracker_backend.amount,
     "last_block_num" INT
 );
 -- openapi-generated-code-end
@@ -90,13 +104,17 @@ btracker_backend.vesting_history_event:
       description: operation type identifier
     direction:
       $ref: '#/components/schemas/btracker_backend.vesting_filter'
-      description: which kind of vesting flow this row represents (power_up, power_down_init, power_down_fill)
+      description: |
+        which kind of vesting flow this row represents: power_up, power_down_init,
+        power_down_fill (the account's own power-down), or power_down_route_received
+        (a fill routed to this account from another account's power-down, to<>from).
+        Note: power_down_fill and power_down_route_received share op_type_id 56 — branch on this field.
     amount_hive:
       $ref: '#/components/schemas/btracker_backend.amount'
-      description: HIVE component (power_up amount, fill deposited if HIVE); zero-amount HIVE object when not applicable
+      description: HIVE component (power_up amount; power_down_fill/route_received deposited if HIVE); zero-amount HIVE object when not applicable
     amount_vests:
       $ref: '#/components/schemas/btracker_backend.amount'
-      description: VESTS component (power_down_init total, power_down_fill withdrawn); zero-amount VESTS object when not applicable
+      description: VESTS component (power_down_init total; power_down_fill withdrawn; route_received deposited if VESTS); zero-amount VESTS object when not applicable
     timestamp:
       type: string
       format: date-time

@@ -121,6 +121,9 @@ BEGIN
     a.power_down_fill_count,
     btracker_backend.create_amount_object(_nai_vests, a.power_down_fill_vests),
     btracker_backend.create_amount_object(_nai_hive,  a.power_down_fill_hive),
+    a.power_down_route_received_count,
+    btracker_backend.create_amount_object(_nai_hive,  a.power_down_route_received_hive),
+    btracker_backend.create_amount_object(_nai_vests, a.power_down_route_received_vests),
     a.last_block_num
   FROM btracker_backend.get_account_vesting_aggregation(
     _account_id, "granularity", "direction", _block_range.first_block, _block_range.last_block

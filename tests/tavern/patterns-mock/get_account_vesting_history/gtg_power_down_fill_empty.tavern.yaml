@@ -1,0 +1,30 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # issue #54: a fill routed to gtg from blocktrades' power-down must NOT appear
+      # in gtg's power_down_fill (it belongs to power_down_route_received). With the
+      # mock range isolated via from-block, gtg has zero power_down_fill events.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "gtg"
+          filter: "power_down_fill"
+          from-block: "90000040"
+          page-size: 100
+          direction: "desc"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
