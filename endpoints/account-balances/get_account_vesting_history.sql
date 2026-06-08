@@ -7,14 +7,18 @@ SET ROLE btracker_owner;
       - Accounts
     summary: Per-account power-up / power-down event history
     description: |
-      Paginated list of vesting events for an account. Three event kinds are
+      Paginated list of vesting events for an account. Four event kinds are
       surfaced via the `direction` field on each row:
 
       * `power_up` — `transfer_to_vesting`
 
       * `power_down_init` — `withdraw_vesting` (cancellations excluded)
 
-      * `power_down_fill` — `fill_vesting_withdraw`
+      * `power_down_fill` — `fill_vesting_withdraw`, the account's OWN power-down
+
+      * `power_down_route_received` — `fill_vesting_withdraw` routed to this account from
+        another account's power-down (to_account<>from_account). Shares op_type_id 56 with
+        `power_down_fill`; the recipient gains the deposited asset (HIVE, or VESTS for auto_vest).
 
       The `filter` query parameter narrows the result to one kind, or `all`.
 
@@ -47,6 +51,8 @@ SET ROLE btracker_owner;
           * power_down_init
 
           * power_down_fill
+
+          * power_down_route_received
       - in: query
         name: page
         required: false

@@ -21,8 +21,19 @@ SET ROLE btracker_owner;
  *   - transfer_to_vesting        -> kind=1 (power_up); from + to are impacted
  *   - withdraw_vesting           -> kind=2 (power_down_init); account only;
  *                                   cancellations (vesting_shares.amount=0) excluded
- *   - fill_vesting_withdraw      -> kind=3 (power_down_fill);
- *                                   from_account + to_account are impacted
+ *   - fill_vesting_withdraw      -> from_account -> kind=3 (power_down_fill):
+ *                                     vests = withdrawn; hive = deposited HIVE ONLY for an
+ *                                     own power-down (to_account = from_account), so HIVE
+ *                                     routed away is NOT credited to the sender.
+ *                                   fill_vesting_withdraw -> to_account -> kind=4
+ *                                     (power_down_route_received), ONLY when routed
+ *                                     (to_account <> from_account): the recipient gains the
+ *                                     deposited asset — HIVE (auto_vest=false) or VESTS
+ *                                     (auto_vest=true). The recipient is NOT powering down,
+ *                                     so it is kept apart from power_down_fill (issue #54).
+ *
+ * Aggregates are stored TALL: one row per (account, kind, period) with generic
+ * op_count / hive_amount / vests_amount; the API pivots kinds into its wide shape.
  *
  * For each (impacted_account, op) pair, ONE history row + ONE contribution
  * to that account's daily and monthly aggregates is written.
@@ -89,7 +100,21 @@ BEGIN
           THEN ((o.body)->'withdrawn'->>'amount')::NUMERIC
                * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
         ELSE 0::NUMERIC
-      END) AS vests_amount
+      END) AS vests_amount,
+      -- fill_vesting_withdraw 'deposited' asset: precision 3 = HIVE, 6 = VESTS (auto_vest route).
+      (CASE
+        WHEN o.op_type_id = _op_fill_vesting_withdraw
+          THEN ((o.body)->'deposited'->>'precision')::INT
+        ELSE NULL::INT
+      END) AS deposited_precision,
+      -- deposited VESTS — only when the recipient is paid in VESTS (auto_vest=true route).
+      (CASE
+        WHEN o.op_type_id = _op_fill_vesting_withdraw
+         AND ((o.body)->'deposited'->>'precision')::INT = 6
+          THEN ((o.body)->'deposited'->>'amount')::NUMERIC
+               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
+        ELSE 0::NUMERIC
+      END) AS deposited_vests
     FROM ops o
     WHERE NOT (
       o.op_type_id = _op_withdraw_vesting
@@ -97,31 +122,56 @@ BEGIN
     )
   ),
   /* ====================================================================
-   * Fan-out: one row per (impacted_account, op).
-   * - kind=1 (transfer_to_vesting):   from + to
-   * - kind=2 (withdraw_vesting):      account only
-   * - kind=3 (fill_vesting_withdraw): from_account + to_account
-   * Deduplicated when from = to.
+   * Fan-out: one row per (impacted_account, op), each carrying the amounts
+   * that THAT account actually experienced (per issue #54). The emitted `kind`
+   * is the per-row EVENT kind (1/2/3/4), which becomes the history/aggregate kind.
+   *   - kind=1 (transfer_to_vesting):   from + to, each carries the power-up HIVE
+   *   - kind=2 (withdraw_vesting):      account only, carries power-down-init VESTS
+   *   - kind=3 (fill, from_account):    power_down_fill. vests = withdrawn;
+   *                                     hive = deposited HIVE only when NOT routed away
+   *                                     (to_account = from_account).
+   *   - kind=4 (fill, to_account):      power_down_route_received, ONLY when routed
+   *                                     (to_account <> from_account): recipient gains the
+   *                                     deposited asset (HIVE auto_vest=false / VESTS otherwise).
+   * The kind=1 self power-up (from = to) is collapsed by DISTINCT below.
    * ====================================================================
    */
   impacted_names AS MATERIALIZED (
-    SELECT p.source_op, p.block_num, p.kind, p.hive_amount, p.vests_amount, acc.name
+    -- kind 1: transfer_to_vesting -> from + to, each carries the power-up HIVE.
+    SELECT p.source_op, p.block_num, 1::SMALLINT AS kind,
+           p.hive_amount, 0::NUMERIC AS vests_amount, p.body->>'from' AS name
+    FROM parsed p WHERE p.kind = 1
+    UNION ALL
+    SELECT p.source_op, p.block_num, 1::SMALLINT,
+           p.hive_amount, 0::NUMERIC, p.body->>'to'
+    FROM parsed p WHERE p.kind = 1
+
+    -- kind 2: withdraw_vesting -> account only, carries the power-down-init VESTS.
+    UNION ALL
+    SELECT p.source_op, p.block_num, 2::SMALLINT,
+           0::BIGINT, p.vests_amount, p.body->>'account'
+    FROM parsed p WHERE p.kind = 2
+
+    -- kind 3: fill_vesting_withdraw FROM side -> own power-down (power_down_fill).
+    --   vests = withdrawn; hive = deposited HIVE only for an own power-down (to = from).
+    UNION ALL
+    SELECT p.source_op, p.block_num, 3::SMALLINT,
+           (CASE WHEN p.deposited_precision = 3
+                  AND (p.body->>'to_account') = (p.body->>'from_account')
+                 THEN p.hive_amount ELSE 0::BIGINT END),
+           p.vests_amount,
+           p.body->>'from_account'
+    FROM parsed p WHERE p.kind = 3
+
+    -- kind 4: fill_vesting_withdraw TO side -> power_down_route_received, ONLY when routed.
+    --   The recipient gains the deposited asset: HIVE (auto_vest=false) or VESTS (auto_vest=true).
+    UNION ALL
+    SELECT p.source_op, p.block_num, 4::SMALLINT,
+           (CASE WHEN p.deposited_precision = 3 THEN p.hive_amount     ELSE 0::BIGINT  END),
+           (CASE WHEN p.deposited_precision = 6 THEN p.deposited_vests ELSE 0::NUMERIC END),
+           p.body->>'to_account'
     FROM parsed p
-    CROSS JOIN LATERAL (
-      SELECT name FROM (
-        VALUES
-          (CASE p.kind
-            WHEN 1 THEN p.body->>'from'
-            WHEN 2 THEN p.body->>'account'
-            WHEN 3 THEN p.body->>'from_account'
-          END),
-          (CASE p.kind
-            WHEN 1 THEN p.body->>'to'
-            WHEN 3 THEN p.body->>'to_account'
-          END)
-      ) AS v(name)
-      WHERE name IS NOT NULL
-    ) acc
+    WHERE p.kind = 3 AND (p.body->>'to_account') <> (p.body->>'from_account')
   ),
   unique_impacted AS (
     SELECT DISTINCT source_op, block_num, kind, hive_amount, vests_amount, name
@@ -188,8 +238,10 @@ BEGIN
     RETURNING 1
   ),
   /* ====================================================================
-   * (2) + (3) account_vesting_by_day / _by_month — per-account
-   * aggregation via GROUPING SETS over (account, by_day) / (account, by_month).
+   * (2) + (3) account_vesting_by_day / _by_month — per-account TALL
+   * aggregation via GROUPING SETS over (account, kind, by_day) /
+   * (account, kind, by_month). One row per (account, kind, period) with
+   * generic op_count / hive_amount / vests_amount.
    * Source: impacted_with_ids (one row per impacted-account/op pair).
    * ====================================================================
    */
@@ -208,75 +260,48 @@ BEGIN
   account_aggregated AS MATERIALIZED (
     SELECT
       account,
+      kind,
       by_day,
       by_month,
       GROUPING(by_day, by_month) AS grp_level,
-      COUNT(*) FILTER (WHERE kind = 1)::INT                                     AS power_up_count,
-      COALESCE(SUM(hive_amount)  FILTER (WHERE kind = 1), 0)::BIGINT            AS power_up_hive,
-      COUNT(*) FILTER (WHERE kind = 2)::INT                                     AS power_down_init_count,
-      COALESCE(SUM(vests_amount) FILTER (WHERE kind = 2), 0)::NUMERIC           AS power_down_init_vests,
-      COUNT(*) FILTER (WHERE kind = 3)::INT                                     AS power_down_fill_count,
-      COALESCE(SUM(vests_amount) FILTER (WHERE kind = 3), 0)::NUMERIC           AS power_down_fill_vests,
-      COALESCE(SUM(hive_amount)  FILTER (WHERE kind = 3), 0)::BIGINT            AS power_down_fill_hive,
-      MAX(block_num)::INT                                                        AS last_block_num
+      COUNT(*)::INT                          AS op_count,
+      COALESCE(SUM(hive_amount),  0)::BIGINT  AS hive_amount,
+      COALESCE(SUM(vests_amount), 0)::NUMERIC AS vests_amount,
+      MAX(block_num)::INT                     AS last_block_num
     FROM join_blocks_date
     GROUP BY GROUPING SETS (
-      (account, by_day),
-      (account, by_month)
+      (account, kind, by_day),
+      (account, kind, by_month)
     )
   ),
   insert_account_by_day AS (
     INSERT INTO account_vesting_by_day AS avs (
-      account, updated_at,
-      power_up_count, power_up_hive,
-      power_down_init_count, power_down_init_vests,
-      power_down_fill_count, power_down_fill_vests, power_down_fill_hive,
-      last_block_num
+      account, kind, updated_at, op_count, hive_amount, vests_amount, last_block_num
     )
     SELECT
-      agg.account, agg.by_day,
-      agg.power_up_count, agg.power_up_hive,
-      agg.power_down_init_count, agg.power_down_init_vests,
-      agg.power_down_fill_count, agg.power_down_fill_vests, agg.power_down_fill_hive,
-      agg.last_block_num
+      agg.account, agg.kind, agg.by_day, agg.op_count, agg.hive_amount, agg.vests_amount, agg.last_block_num
     FROM account_aggregated agg
     WHERE agg.grp_level = 1
     ON CONFLICT ON CONSTRAINT pk_account_vesting_by_day DO UPDATE SET
-      power_up_count        = avs.power_up_count        + EXCLUDED.power_up_count,
-      power_up_hive         = avs.power_up_hive         + EXCLUDED.power_up_hive,
-      power_down_init_count = avs.power_down_init_count + EXCLUDED.power_down_init_count,
-      power_down_init_vests = avs.power_down_init_vests + EXCLUDED.power_down_init_vests,
-      power_down_fill_count = avs.power_down_fill_count + EXCLUDED.power_down_fill_count,
-      power_down_fill_vests = avs.power_down_fill_vests + EXCLUDED.power_down_fill_vests,
-      power_down_fill_hive  = avs.power_down_fill_hive  + EXCLUDED.power_down_fill_hive,
-      last_block_num        = EXCLUDED.last_block_num
+      op_count       = avs.op_count     + EXCLUDED.op_count,
+      hive_amount    = avs.hive_amount  + EXCLUDED.hive_amount,
+      vests_amount   = avs.vests_amount + EXCLUDED.vests_amount,
+      last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) AS is_new_entry
   ),
   insert_account_by_month AS (
     INSERT INTO account_vesting_by_month AS avs (
-      account, updated_at,
-      power_up_count, power_up_hive,
-      power_down_init_count, power_down_init_vests,
-      power_down_fill_count, power_down_fill_vests, power_down_fill_hive,
-      last_block_num
+      account, kind, updated_at, op_count, hive_amount, vests_amount, last_block_num
     )
     SELECT
-      agg.account, agg.by_month,
-      agg.power_up_count, agg.power_up_hive,
-      agg.power_down_init_count, agg.power_down_init_vests,
-      agg.power_down_fill_count, agg.power_down_fill_vests, agg.power_down_fill_hive,
-      agg.last_block_num
+      agg.account, agg.kind, agg.by_month, agg.op_count, agg.hive_amount, agg.vests_amount, agg.last_block_num
     FROM account_aggregated agg
     WHERE agg.grp_level = 2
     ON CONFLICT ON CONSTRAINT pk_account_vesting_by_month DO UPDATE SET
-      power_up_count        = avs.power_up_count        + EXCLUDED.power_up_count,
-      power_up_hive         = avs.power_up_hive         + EXCLUDED.power_up_hive,
-      power_down_init_count = avs.power_down_init_count + EXCLUDED.power_down_init_count,
-      power_down_init_vests = avs.power_down_init_vests + EXCLUDED.power_down_init_vests,
-      power_down_fill_count = avs.power_down_fill_count + EXCLUDED.power_down_fill_count,
-      power_down_fill_vests = avs.power_down_fill_vests + EXCLUDED.power_down_fill_vests,
-      power_down_fill_hive  = avs.power_down_fill_hive  + EXCLUDED.power_down_fill_hive,
-      last_block_num        = EXCLUDED.last_block_num
+      op_count       = avs.op_count     + EXCLUDED.op_count,
+      hive_amount    = avs.hive_amount  + EXCLUDED.hive_amount,
+      vests_amount   = avs.vests_amount + EXCLUDED.vests_amount,
+      last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) AS is_new_entry
   )
   SELECT

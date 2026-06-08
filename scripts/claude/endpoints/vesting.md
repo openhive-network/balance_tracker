@@ -21,7 +21,10 @@ Used by `vesting-history` to narrow results to one event kind:
 - `all` — every kind
 - `power_up` — `transfer_to_vesting` only
 - `power_down_init` — `withdraw_vesting` only (cancellations excluded)
-- `power_down_fill` — `fill_vesting_withdraw` only (weekly tranches)
+- `power_down_fill` — `fill_vesting_withdraw`, the account's OWN power-down
+- `power_down_route_received` — `fill_vesting_withdraw` routed to this account from
+  another account's power-down (`to_account <> from_account`). Shares `op_type_id` 56
+  with `power_down_fill`; branch on `direction`. (issue #54)
 
 ### Direction labels in event rows
 
@@ -35,10 +38,11 @@ All amounts use `btracker_backend.amount` ({`nai`, `amount`, `precision`}):
 - HIVE: NAI 21, precision 3
 - VESTS: NAI 37, precision 6
 
-In `vesting-history` rows, `amount_hive` / `amount_vests` are nullable —
-exactly one is populated for `power_up` / `power_down_init`, both are
-populated for `power_down_fill` (HIVE only when realised — routed-to-VESTS
-fills have `amount_hive=null`).
+In `vesting-history` rows, `amount_hive` / `amount_vests` carry what the account
+actually moved: `power_up` → HIVE; `power_down_init` → VESTS; `power_down_fill` (own
+power-down) → VESTS withdrawn + HIVE realised (HIVE 0 when routed away);
+`power_down_route_received` → the deposited asset received via a route (HIVE for
+auto_vest=false, VESTS for auto_vest=true). The non-applicable side is a zero-amount object.
 
 ## `GET /vesting-stats`
 
@@ -87,11 +91,17 @@ filtered at sync time, so they never appear anywhere.
 ## `GET /accounts/{name}/vesting-stats`
 
 Same response shape as `/vesting-stats` but scoped to one account.
-Reads from `account_vesting_by_day` / `account_vesting_by_month`
-(populated during sync by `process_account_vesting_stats`) — no on-the-fly
-scans. Yearly is rolled up from monthly via
-`btracker_backend.account_vesting_stats_by_year`. Gap-filled the same way
-as the global endpoint.
+Reads from the **tall** `account_vesting_by_day` / `account_vesting_by_month`
+(`(account, kind, period)` rows) populated during sync by
+`process_account_vesting_stats`, pivoting kinds into the wide response
+(`SUM(<col>) FILTER (WHERE kind = N)`) — no on-the-fly op scans. Yearly is rolled up from
+monthly via `btracker_backend.account_vesting_stats_by_year`. Gap-filled like the global
+endpoint.
+
+Beyond the power_up / power_down_init / power_down_fill columns, the per-account response
+adds `power_down_route_received_{count,hive,vests}` — fills routed to this account from
+someone else's power-down (issue #54). These are **0 in the global `/vesting-stats`**
+(no kind=4 globally), kept in the shared output type for a uniform shape.
 
 Parameters: `granularity`, `direction`, `from-block`, `to-block`.
 

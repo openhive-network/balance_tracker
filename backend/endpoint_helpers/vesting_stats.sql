@@ -72,6 +72,9 @@ BEGIN
             avs.power_down_fill_count,
             avs.power_down_fill_vests,
             avs.power_down_fill_hive,
+            avs.power_down_route_received_count,
+            avs.power_down_route_received_hive,
+            avs.power_down_route_received_vests,
             avs.last_block_num
           FROM btracker_backend.get_account_vesting_stats(
             _account_id, _granularity, __ah_range.from_timestamp, __ah_range.to_timestamp
@@ -87,6 +90,9 @@ BEGIN
             COALESCE(a.power_down_fill_count, 0)::INT     AS power_down_fill_count,
             COALESCE(a.power_down_fill_vests, 0)::NUMERIC AS power_down_fill_vests,
             COALESCE(a.power_down_fill_hive,  0)::BIGINT  AS power_down_fill_hive,
+            COALESCE(a.power_down_route_received_count, 0)::INT     AS power_down_route_received_count,
+            COALESCE(a.power_down_route_received_hive,  0)::BIGINT  AS power_down_route_received_hive,
+            COALESCE(a.power_down_route_received_vests, 0)::NUMERIC AS power_down_route_received_vests,
             a.last_block_num
           FROM date_series ds
           LEFT JOIN get_aggregation a ON ds.date = a.updated_at
@@ -101,6 +107,9 @@ BEGIN
             j.power_down_fill_count,
             j.power_down_fill_vests,
             j.power_down_fill_hive,
+            j.power_down_route_received_count,
+            j.power_down_route_received_hive,
+            j.power_down_route_received_vests,
             COALESCE(j.last_block_num, jl.last_block_num) AS last_block_num
           FROM joined j
           LEFT JOIN LATERAL (
@@ -120,6 +129,9 @@ BEGIN
           j.power_down_fill_count::INT,
           j.power_down_fill_vests::NUMERIC,
           j.power_down_fill_hive::BIGINT,
+          j.power_down_route_received_count::INT,
+          j.power_down_route_received_hive::BIGINT,
+          j.power_down_route_received_vests::NUMERIC,
           j.last_block_num::INT
         FROM join_missing_block j
         ORDER BY

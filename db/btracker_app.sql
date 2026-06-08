@@ -407,43 +407,43 @@ BEGIN
   PERFORM hive.app_register_table( __schema_name, 'transfer_stats_by_hour', __schema_name );
 
   ------------- VESTING (POWER-UP / POWER-DOWN) STATISTICS ----------------
-  -- Aggregates per-day and per-month counts/amounts of:
-  --   power_up:        transfer_to_vesting_operation (HIVE flowing in)
-  --   power_down_init: withdraw_vesting_operation (excluding amount=0 cancels)
-  --   power_down_fill: fill_vesting_withdraw_operation (weekly tranches)
-  -- HIVE columns store satoshi (×1000); VESTS columns NUMERIC for safety
-  -- (sum-of-day VESTS routinely overflows BIGINT; total VESTS supply ~10^14 satoshi).
-  -- The "fill_hive" column excludes routed-to-VESTS fills (deposited NAI 37) since
-  -- those don't generate any HIVE; "fill_vests" includes them.
+  -- Pre-aggregated vesting activity stored TALL: one row per (kind[, account], period)
+  -- instead of a column per kind. Adding a new event kind = new rows, no schema change.
+  -- The API reconstructs the wide per-period shape with a pivot
+  -- (SUM(<col>) FILTER (WHERE kind = N)) at read time.
+  --   kind 1 = power_up                  (transfer_to_vesting; HIVE moved into VESTS)
+  --   kind 2 = power_down_init           (withdraw_vesting; amount=0 cancellations excluded)
+  --   kind 3 = power_down_fill           (fill_vesting_withdraw, the account's OWN power-down)
+  --   kind 4 = power_down_route_received (routed fill received from another account, to<>from;
+  --                                       PER-ACCOUNT ONLY — never written to the global tables)
+  -- op_count    = number of ops in the bucket.
+  -- hive_amount = HIVE satoshi (×1000); vests_amount = VESTS satoshi (×1e6 post-HF1), NUMERIC
+  --   (sum-of-period VESTS routinely overflows BIGINT; total VESTS supply ~10^14 satoshi).
+  -- Per kind the amounts carry what THAT side actually moved (kind 3 hive = realised HIVE of an
+  -- own power-down; kind 4 hive/vests = the routed deposit the recipient received). See issue #54.
   CREATE TABLE IF NOT EXISTS vesting_stats_by_month
   (
-    updated_at            TIMESTAMP NOT NULL, -- Period end time (month bucket)
-    power_up_count        INT       NOT NULL DEFAULT 0,
-    power_up_hive         BIGINT    NOT NULL DEFAULT 0, -- satoshi (HIVE × 1000)
-    power_down_init_count INT       NOT NULL DEFAULT 0,
-    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
-    power_down_fill_count INT       NOT NULL DEFAULT 0,
-    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0, -- includes routed-to-VESTS
-    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0, -- excludes routed-to-VESTS
-    last_block_num        INT       NOT NULL,
+    kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill (global has no kind 4)
+    updated_at     TIMESTAMP NOT NULL, -- Period end time (month bucket)
+    op_count       INT       NOT NULL DEFAULT 0,
+    hive_amount    BIGINT    NOT NULL DEFAULT 0, -- HIVE satoshi (×1000)
+    vests_amount   NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
+    last_block_num INT       NOT NULL,
 
-    CONSTRAINT pk_vesting_stats_by_month PRIMARY KEY (updated_at)
+    CONSTRAINT pk_vesting_stats_by_month PRIMARY KEY (updated_at, kind)
   );
   PERFORM hive.app_register_table( __schema_name, 'vesting_stats_by_month', __schema_name );
 
   CREATE TABLE IF NOT EXISTS vesting_stats_by_day
   (
-    updated_at            TIMESTAMP NOT NULL, -- Period end time (day bucket)
-    power_up_count        INT       NOT NULL DEFAULT 0,
-    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
-    power_down_init_count INT       NOT NULL DEFAULT 0,
-    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_count INT       NOT NULL DEFAULT 0,
-    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
-    last_block_num        INT       NOT NULL,
+    kind           SMALLINT  NOT NULL,
+    updated_at     TIMESTAMP NOT NULL, -- Period end time (day bucket)
+    op_count       INT       NOT NULL DEFAULT 0,
+    hive_amount    BIGINT    NOT NULL DEFAULT 0,
+    vests_amount   NUMERIC   NOT NULL DEFAULT 0,
+    last_block_num INT       NOT NULL,
 
-    CONSTRAINT pk_vesting_stats_by_day PRIMARY KEY (updated_at)
+    CONSTRAINT pk_vesting_stats_by_day PRIMARY KEY (updated_at, kind)
   );
   PERFORM hive.app_register_table( __schema_name, 'vesting_stats_by_day', __schema_name );
 
@@ -455,49 +455,44 @@ BEGIN
     account        INT      NOT NULL, -- impacted account id (from or to)
     vesting_seq_no INT      NOT NULL, -- per (account), monotonic across all kinds (filter='all' pagination)
     kind_seq_no    INT      NOT NULL, -- per (account, kind), monotonic (filter=specific pagination)
-    kind           SMALLINT NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill
+    kind           SMALLINT NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill, 4=power_down_route_received
     hive_amount    BIGINT   NOT NULL DEFAULT 0, -- HIVE satoshi (×1000), 0 when n/a
     vests_amount   NUMERIC  NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1), 0 when n/a
     source_op      BIGINT   NOT NULL  -- hafd.operations.id; block_num via hafd.operation_id_to_block_num
   );
   PERFORM hive.app_register_table( __schema_name, 'account_vesting_history', __schema_name );
 
-  -- Per-account vesting stats aggregated daily / monthly. Same shape as the
-  -- global vesting_stats_by_day/_month but with `account` as part of the PK,
-  -- so each (account, day|month) pair gets its own row. Backs
-  -- /accounts/{name}/vesting-stats. Yearly granularity is rolled up on the
-  -- fly from the monthly table at query time.
+  -- Per-account vesting stats aggregated daily / monthly. Same TALL shape as the
+  -- global vesting_stats_by_day/_month but with `account` as part of the PK, so each
+  -- (account, kind, day|month) gets its own row. Backs /accounts/{name}/vesting-stats;
+  -- the endpoint pivots kinds into the wide response. Includes kind=4
+  -- (power_down_route_received). Yearly granularity is rolled up on the fly from the
+  -- monthly table at query time.
   CREATE TABLE IF NOT EXISTS account_vesting_by_month
   (
-    account               INT       NOT NULL,
-    updated_at            TIMESTAMP NOT NULL,
-    power_up_count        INT       NOT NULL DEFAULT 0,
-    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
-    power_down_init_count INT       NOT NULL DEFAULT 0,
-    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_count INT       NOT NULL DEFAULT 0,
-    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
-    last_block_num        INT       NOT NULL,
+    account        INT       NOT NULL,
+    kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill, 4=power_down_route_received
+    updated_at     TIMESTAMP NOT NULL,
+    op_count       INT       NOT NULL DEFAULT 0,
+    hive_amount    BIGINT    NOT NULL DEFAULT 0, -- HIVE satoshi (×1000)
+    vests_amount   NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
+    last_block_num INT       NOT NULL,
 
-    CONSTRAINT pk_account_vesting_by_month PRIMARY KEY (account, updated_at)
+    CONSTRAINT pk_account_vesting_by_month PRIMARY KEY (account, updated_at, kind)
   );
   PERFORM hive.app_register_table( __schema_name, 'account_vesting_by_month', __schema_name );
 
   CREATE TABLE IF NOT EXISTS account_vesting_by_day
   (
-    account               INT       NOT NULL,
-    updated_at            TIMESTAMP NOT NULL,
-    power_up_count        INT       NOT NULL DEFAULT 0,
-    power_up_hive         BIGINT    NOT NULL DEFAULT 0,
-    power_down_init_count INT       NOT NULL DEFAULT 0,
-    power_down_init_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_count INT       NOT NULL DEFAULT 0,
-    power_down_fill_vests NUMERIC   NOT NULL DEFAULT 0,
-    power_down_fill_hive  BIGINT    NOT NULL DEFAULT 0,
-    last_block_num        INT       NOT NULL,
+    account        INT       NOT NULL,
+    kind           SMALLINT  NOT NULL,
+    updated_at     TIMESTAMP NOT NULL,
+    op_count       INT       NOT NULL DEFAULT 0,
+    hive_amount    BIGINT    NOT NULL DEFAULT 0,
+    vests_amount   NUMERIC   NOT NULL DEFAULT 0,
+    last_block_num INT       NOT NULL,
 
-    CONSTRAINT pk_account_vesting_by_day PRIMARY KEY (account, updated_at)
+    CONSTRAINT pk_account_vesting_by_day PRIMARY KEY (account, updated_at, kind)
   );
   PERFORM hive.app_register_table( __schema_name, 'account_vesting_by_day', __schema_name );
 

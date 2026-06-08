@@ -17,6 +17,9 @@ CREATE TYPE btracker_backend.vesting_stats_return AS (
     power_down_fill_count INT,
     power_down_fill_vests NUMERIC,
     power_down_fill_hive  BIGINT,
+    power_down_route_received_count INT,
+    power_down_route_received_hive  BIGINT,
+    power_down_route_received_vests NUMERIC,
     last_block_num        INT
 );
 
@@ -35,32 +38,22 @@ AS
 $$
 BEGIN
   RETURN QUERY
-    WITH get_year AS (
-      SELECT
-        power_up_count,
-        power_up_hive,
-        power_down_init_count,
-        power_down_init_vests,
-        power_down_fill_count,
-        power_down_fill_vests,
-        power_down_fill_hive,
-        last_block_num,
-        DATE_TRUNC('year', updated_at) AS by_year
-      FROM vesting_stats_by_month
-      WHERE DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
-    )
     SELECT
-      by_year                                AS updated_at,
-      SUM(power_up_count)::INT               AS power_up_count,
-      SUM(power_up_hive)::BIGINT             AS power_up_hive,
-      SUM(power_down_init_count)::INT        AS power_down_init_count,
-      SUM(power_down_init_vests)::NUMERIC    AS power_down_init_vests,
-      SUM(power_down_fill_count)::INT        AS power_down_fill_count,
-      SUM(power_down_fill_vests)::NUMERIC    AS power_down_fill_vests,
-      SUM(power_down_fill_hive)::BIGINT      AS power_down_fill_hive,
-      MAX(last_block_num)::INT               AS last_block_num
-    FROM get_year
-    GROUP BY by_year;
+      DATE_TRUNC('year', vm.updated_at)                                    AS updated_at,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 1), 0)::INT     AS power_up_count,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 1), 0)::BIGINT  AS power_up_hive,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 2), 0)::INT     AS power_down_init_count,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 3), 0)::INT     AS power_down_fill_count,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 4), 0)::INT     AS power_down_route_received_count,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+      MAX(vm.last_block_num)::INT                                          AS last_block_num
+    FROM vesting_stats_by_month vm
+    WHERE DATE_TRUNC('year', vm.updated_at) BETWEEN _from AND _to
+    GROUP BY DATE_TRUNC('year', vm.updated_at);
 END
 $$;
 
@@ -80,33 +73,23 @@ AS
 $$
 BEGIN
   RETURN QUERY
-    WITH get_year AS (
-      SELECT
-        power_up_count,
-        power_up_hive,
-        power_down_init_count,
-        power_down_init_vests,
-        power_down_fill_count,
-        power_down_fill_vests,
-        power_down_fill_hive,
-        last_block_num,
-        DATE_TRUNC('year', updated_at) AS by_year
-      FROM account_vesting_by_month
-      WHERE account = _account_id
-        AND DATE_TRUNC('year', updated_at) BETWEEN _from AND _to
-    )
     SELECT
-      by_year                                AS updated_at,
-      SUM(power_up_count)::INT               AS power_up_count,
-      SUM(power_up_hive)::BIGINT             AS power_up_hive,
-      SUM(power_down_init_count)::INT        AS power_down_init_count,
-      SUM(power_down_init_vests)::NUMERIC    AS power_down_init_vests,
-      SUM(power_down_fill_count)::INT        AS power_down_fill_count,
-      SUM(power_down_fill_vests)::NUMERIC    AS power_down_fill_vests,
-      SUM(power_down_fill_hive)::BIGINT      AS power_down_fill_hive,
-      MAX(last_block_num)::INT               AS last_block_num
-    FROM get_year
-    GROUP BY by_year;
+      DATE_TRUNC('year', avm.updated_at)                                    AS updated_at,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 1), 0)::INT     AS power_up_count,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 1), 0)::BIGINT  AS power_up_hive,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 2), 0)::INT     AS power_down_init_count,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 3), 0)::INT     AS power_down_fill_count,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 4), 0)::INT     AS power_down_route_received_count,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+      MAX(avm.last_block_num)::INT                                          AS last_block_num
+    FROM account_vesting_by_month avm
+    WHERE avm.account = _account_id
+      AND DATE_TRUNC('year', avm.updated_at) BETWEEN _from AND _to
+    GROUP BY DATE_TRUNC('year', avm.updated_at);
 END
 $$;
 
@@ -130,33 +113,41 @@ BEGIN
     RETURN QUERY
       SELECT
         avd.updated_at,
-        avd.power_up_count,
-        avd.power_up_hive,
-        avd.power_down_init_count,
-        avd.power_down_init_vests,
-        avd.power_down_fill_count,
-        avd.power_down_fill_vests,
-        avd.power_down_fill_hive,
-        avd.last_block_num
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 1), 0)::INT     AS power_up_count,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 1), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 2), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 3), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 4), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        MAX(avd.last_block_num)::INT                                           AS last_block_num
       FROM account_vesting_by_day avd
       WHERE avd.account = _account_id
-        AND avd.updated_at BETWEEN _from AND _to;
+        AND avd.updated_at BETWEEN _from AND _to
+      GROUP BY avd.updated_at;
 
   ELSIF _granularity = 'monthly' THEN
     RETURN QUERY
       SELECT
         avm.updated_at,
-        avm.power_up_count,
-        avm.power_up_hive,
-        avm.power_down_init_count,
-        avm.power_down_init_vests,
-        avm.power_down_fill_count,
-        avm.power_down_fill_vests,
-        avm.power_down_fill_hive,
-        avm.last_block_num
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 1), 0)::INT     AS power_up_count,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 1), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 2), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 3), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 4), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        MAX(avm.last_block_num)::INT                                           AS last_block_num
       FROM account_vesting_by_month avm
       WHERE avm.account = _account_id
-        AND avm.updated_at BETWEEN _from AND _to;
+        AND avm.updated_at BETWEEN _from AND _to
+      GROUP BY avm.updated_at;
 
   ELSIF _granularity = 'yearly' THEN
     RETURN QUERY
@@ -187,31 +178,39 @@ BEGIN
     RETURN QUERY
       SELECT
         vd.updated_at,
-        vd.power_up_count,
-        vd.power_up_hive,
-        vd.power_down_init_count,
-        vd.power_down_init_vests,
-        vd.power_down_fill_count,
-        vd.power_down_fill_vests,
-        vd.power_down_fill_hive,
-        vd.last_block_num
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 1), 0)::INT     AS power_up_count,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 1), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 2), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 3), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 4), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        MAX(vd.last_block_num)::INT                                          AS last_block_num
       FROM vesting_stats_by_day vd
-      WHERE vd.updated_at BETWEEN _from AND _to;
+      WHERE vd.updated_at BETWEEN _from AND _to
+      GROUP BY vd.updated_at;
 
   ELSIF _granularity = 'monthly' THEN
     RETURN QUERY
       SELECT
         vm.updated_at,
-        vm.power_up_count,
-        vm.power_up_hive,
-        vm.power_down_init_count,
-        vm.power_down_init_vests,
-        vm.power_down_fill_count,
-        vm.power_down_fill_vests,
-        vm.power_down_fill_hive,
-        vm.last_block_num
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 1), 0)::INT     AS power_up_count,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 1), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 2), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 3), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 4), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        MAX(vm.last_block_num)::INT                                          AS last_block_num
       FROM vesting_stats_by_month vm
-      WHERE vm.updated_at BETWEEN _from AND _to;
+      WHERE vm.updated_at BETWEEN _from AND _to
+      GROUP BY vm.updated_at;
 
   ELSIF _granularity = 'yearly' THEN
     RETURN QUERY
@@ -289,6 +288,9 @@ BEGIN
             vs.power_down_fill_count,
             vs.power_down_fill_vests,
             vs.power_down_fill_hive,
+            vs.power_down_route_received_count,
+            vs.power_down_route_received_hive,
+            vs.power_down_route_received_vests,
             vs.last_block_num
           FROM btracker_backend.get_vesting_stats(
             _granularity, __ah_range.from_timestamp, __ah_range.to_timestamp
@@ -304,6 +306,9 @@ BEGIN
             COALESCE(vs.power_down_fill_count, 0)::INT     AS power_down_fill_count,
             COALESCE(vs.power_down_fill_vests, 0)::NUMERIC AS power_down_fill_vests,
             COALESCE(vs.power_down_fill_hive,  0)::BIGINT  AS power_down_fill_hive,
+            COALESCE(vs.power_down_route_received_count, 0)::INT     AS power_down_route_received_count,
+            COALESCE(vs.power_down_route_received_hive,  0)::BIGINT  AS power_down_route_received_hive,
+            COALESCE(vs.power_down_route_received_vests, 0)::NUMERIC AS power_down_route_received_vests,
             vs.last_block_num
           FROM date_series ds
           LEFT JOIN get_aggregation vs ON ds.date = vs.updated_at
@@ -318,6 +323,9 @@ BEGIN
             j.power_down_fill_count,
             j.power_down_fill_vests,
             j.power_down_fill_hive,
+            j.power_down_route_received_count,
+            j.power_down_route_received_hive,
+            j.power_down_route_received_vests,
             COALESCE(j.last_block_num, jl.last_block_num) AS last_block_num
           FROM joined j
           LEFT JOIN LATERAL (
@@ -337,6 +345,9 @@ BEGIN
           j.power_down_fill_count::INT,
           j.power_down_fill_vests::NUMERIC,
           j.power_down_fill_hive::BIGINT,
+          j.power_down_route_received_count::INT,
+          j.power_down_route_received_hive::BIGINT,
+          j.power_down_route_received_vests::NUMERIC,
           j.last_block_num::INT
         FROM join_missing_block j
         ORDER BY

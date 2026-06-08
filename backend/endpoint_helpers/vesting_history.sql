@@ -41,10 +41,11 @@ AS
 $$
 DECLARE
   _kind_filter    SMALLINT := CASE _filter
-                              WHEN 'all'             THEN NULL
-                              WHEN 'power_up'        THEN 1::SMALLINT
-                              WHEN 'power_down_init' THEN 2::SMALLINT
-                              WHEN 'power_down_fill' THEN 3::SMALLINT
+                              WHEN 'all'                       THEN NULL
+                              WHEN 'power_up'                  THEN 1::SMALLINT
+                              WHEN 'power_down_init'           THEN 2::SMALLINT
+                              WHEN 'power_down_fill'           THEN 3::SMALLINT
+                              WHEN 'power_down_route_received' THEN 4::SMALLINT
                             END;
   _nai_hive       INT := btracker_backend.nai_hive();
   _nai_vests      INT := btracker_backend.nai_vests();
@@ -90,11 +91,13 @@ BEGIN
         WHEN 1 THEN btracker_backend.op_transfer_to_vesting()
         WHEN 2 THEN btracker_backend.op_withdraw_vesting()
         WHEN 3 THEN btracker_backend.op_fill_vesting_withdraw()
+        WHEN 4 THEN btracker_backend.op_fill_vesting_withdraw()
       END)::SMALLINT,
       (CASE gp.kind
         WHEN 1 THEN 'power_up'
         WHEN 2 THEN 'power_down_init'
         WHEN 3 THEN 'power_down_fill'
+        WHEN 4 THEN 'power_down_route_received'
       END)::btracker_backend.vesting_filter,
       btracker_backend.create_amount_object(_nai_hive,  gp.hive_amount),
       btracker_backend.create_amount_object(_nai_vests, gp.vests_amount),
@@ -136,11 +139,13 @@ BEGIN
         WHEN 1 THEN btracker_backend.op_transfer_to_vesting()
         WHEN 2 THEN btracker_backend.op_withdraw_vesting()
         WHEN 3 THEN btracker_backend.op_fill_vesting_withdraw()
+        WHEN 4 THEN btracker_backend.op_fill_vesting_withdraw()
       END)::SMALLINT,
       (CASE gp.kind
         WHEN 1 THEN 'power_up'
         WHEN 2 THEN 'power_down_init'
         WHEN 3 THEN 'power_down_fill'
+        WHEN 4 THEN 'power_down_route_received'
       END)::btracker_backend.vesting_filter,
       btracker_backend.create_amount_object(_nai_hive,  gp.hive_amount),
       btracker_backend.create_amount_object(_nai_vests, gp.vests_amount),

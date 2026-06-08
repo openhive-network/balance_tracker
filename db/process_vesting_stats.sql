@@ -11,13 +11,14 @@ SET ROLE btracker_owner;
  * separate function (process_account_vesting_stats) to keep concerns
  * separate.
  *
- * Tracked operations:
- *   - transfer_to_vesting        -> power_up_count / power_up_hive
- *   - withdraw_vesting           -> power_down_init_count / power_down_init_vests
+ * Stored TALL: one row per (kind, period) with generic op_count / hive_amount /
+ * vests_amount, so the API pivots kinds into its wide shape at read time.
+ * Tracked operations (no per-account fan-out here, so NO kind=4):
+ *   - transfer_to_vesting        -> kind=1 (power_up):        op_count, hive=amount
+ *   - withdraw_vesting           -> kind=2 (power_down_init): op_count, vests=vesting_shares
  *                                   (excluding amount=0 cancellations)
- *   - fill_vesting_withdraw      -> power_down_fill_count / power_down_fill_vests
- *                                   (always, includes routed-to-VESTS)
- *                                   power_down_fill_hive only when deposited NAI=HIVE
+ *   - fill_vesting_withdraw      -> kind=3 (power_down_fill): op_count, vests=withdrawn,
+ *                                   hive=deposited only when deposited NAI=HIVE
  *
  * HF1 precision: pre-HF1 VESTS amounts are scaled by vests_precision_multiplier()
  * before aggregation, matching the treatment in process_withdrawals.
@@ -107,82 +108,55 @@ BEGIN
     JOIN hive.blocks_view bv ON bv.num = p.block_num
   ),
   /**
-   * GROUPING SETS over (by_day) and (by_month) — single-pass two-level
-   * aggregation. grp_level = GROUPING(by_day, by_month):
+   * GROUPING SETS over (kind, by_day) and (kind, by_month) — single-pass two-level
+   * aggregation, one output row per (kind, period). grp_level = GROUPING(by_day, by_month):
    *   1 (binary 01): by_day grouped, by_month NULL  -> daily row
    *   2 (binary 10): by_month grouped, by_day NULL  -> monthly row
    */
   aggregated_stats AS MATERIALIZED (
     SELECT
+      kind,
       by_day,
       by_month,
       GROUPING(by_day, by_month) AS grp_level,
-      COUNT(*) FILTER (WHERE kind = 1)::INT                                     AS power_up_count,
-      COALESCE(SUM(hive_amount)  FILTER (WHERE kind = 1), 0)::BIGINT            AS power_up_hive,
-      COUNT(*) FILTER (WHERE kind = 2)::INT                                     AS power_down_init_count,
-      COALESCE(SUM(vests_amount) FILTER (WHERE kind = 2), 0)::NUMERIC           AS power_down_init_vests,
-      COUNT(*) FILTER (WHERE kind = 3)::INT                                     AS power_down_fill_count,
-      COALESCE(SUM(vests_amount) FILTER (WHERE kind = 3), 0)::NUMERIC           AS power_down_fill_vests,
-      COALESCE(SUM(hive_amount)  FILTER (WHERE kind = 3), 0)::BIGINT            AS power_down_fill_hive,
-      MAX(block_num)::INT                                                        AS last_block_num
+      COUNT(*)::INT                          AS op_count,
+      COALESCE(SUM(hive_amount),  0)::BIGINT  AS hive_amount,
+      COALESCE(SUM(vests_amount), 0)::NUMERIC AS vests_amount,
+      MAX(block_num)::INT                     AS last_block_num
     FROM join_blocks_date
     GROUP BY GROUPING SETS (
-      (by_day),
-      (by_month)
+      (kind, by_day),
+      (kind, by_month)
     )
   ),
   insert_by_day AS (
     INSERT INTO vesting_stats_by_day AS vs (
-      updated_at,
-      power_up_count, power_up_hive,
-      power_down_init_count, power_down_init_vests,
-      power_down_fill_count, power_down_fill_vests, power_down_fill_hive,
-      last_block_num
+      kind, updated_at, op_count, hive_amount, vests_amount, last_block_num
     )
     SELECT
-      agg.by_day,
-      agg.power_up_count, agg.power_up_hive,
-      agg.power_down_init_count, agg.power_down_init_vests,
-      agg.power_down_fill_count, agg.power_down_fill_vests, agg.power_down_fill_hive,
-      agg.last_block_num
+      agg.kind, agg.by_day, agg.op_count, agg.hive_amount, agg.vests_amount, agg.last_block_num
     FROM aggregated_stats agg
     WHERE agg.grp_level = 1
     ON CONFLICT ON CONSTRAINT pk_vesting_stats_by_day DO UPDATE SET
-      power_up_count        = vs.power_up_count        + EXCLUDED.power_up_count,
-      power_up_hive         = vs.power_up_hive         + EXCLUDED.power_up_hive,
-      power_down_init_count = vs.power_down_init_count + EXCLUDED.power_down_init_count,
-      power_down_init_vests = vs.power_down_init_vests + EXCLUDED.power_down_init_vests,
-      power_down_fill_count = vs.power_down_fill_count + EXCLUDED.power_down_fill_count,
-      power_down_fill_vests = vs.power_down_fill_vests + EXCLUDED.power_down_fill_vests,
-      power_down_fill_hive  = vs.power_down_fill_hive  + EXCLUDED.power_down_fill_hive,
-      last_block_num        = EXCLUDED.last_block_num
+      op_count       = vs.op_count     + EXCLUDED.op_count,
+      hive_amount    = vs.hive_amount  + EXCLUDED.hive_amount,
+      vests_amount   = vs.vests_amount + EXCLUDED.vests_amount,
+      last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) AS is_new_entry
   ),
   insert_by_month AS (
     INSERT INTO vesting_stats_by_month AS vs (
-      updated_at,
-      power_up_count, power_up_hive,
-      power_down_init_count, power_down_init_vests,
-      power_down_fill_count, power_down_fill_vests, power_down_fill_hive,
-      last_block_num
+      kind, updated_at, op_count, hive_amount, vests_amount, last_block_num
     )
     SELECT
-      agg.by_month,
-      agg.power_up_count, agg.power_up_hive,
-      agg.power_down_init_count, agg.power_down_init_vests,
-      agg.power_down_fill_count, agg.power_down_fill_vests, agg.power_down_fill_hive,
-      agg.last_block_num
+      agg.kind, agg.by_month, agg.op_count, agg.hive_amount, agg.vests_amount, agg.last_block_num
     FROM aggregated_stats agg
     WHERE agg.grp_level = 2
     ON CONFLICT ON CONSTRAINT pk_vesting_stats_by_month DO UPDATE SET
-      power_up_count        = vs.power_up_count        + EXCLUDED.power_up_count,
-      power_up_hive         = vs.power_up_hive         + EXCLUDED.power_up_hive,
-      power_down_init_count = vs.power_down_init_count + EXCLUDED.power_down_init_count,
-      power_down_init_vests = vs.power_down_init_vests + EXCLUDED.power_down_init_vests,
-      power_down_fill_count = vs.power_down_fill_count + EXCLUDED.power_down_fill_count,
-      power_down_fill_vests = vs.power_down_fill_vests + EXCLUDED.power_down_fill_vests,
-      power_down_fill_hive  = vs.power_down_fill_hive  + EXCLUDED.power_down_fill_hive,
-      last_block_num        = EXCLUDED.last_block_num
+      op_count       = vs.op_count     + EXCLUDED.op_count,
+      hive_amount    = vs.hive_amount  + EXCLUDED.hive_amount,
+      vests_amount   = vs.vests_amount + EXCLUDED.vests_amount,
+      last_block_num = EXCLUDED.last_block_num
     RETURNING (xmax = 0) AS is_new_entry
   )
   SELECT
