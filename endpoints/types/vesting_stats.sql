@@ -55,10 +55,10 @@ btracker_backend.vesting_stats:
       description: number of fill_vesting_withdraw tranches received via a withdraw route from another account (to<>from). Per-account only; 0 in the global stats.
     power_down_route_received_hive:
       $ref: '#/components/schemas/btracker_backend.amount'
-      description: HIVE received from another account's routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only.
+      description: HIVE received from another account''s routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only.
     power_down_route_received_vests:
       $ref: '#/components/schemas/btracker_backend.amount'
-      description: VESTS received from another account's routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only.
+      description: VESTS received from another account''s routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only.
     last_block_num:
       type: integer
       description: last block number contributing to the period
@@ -106,8 +106,8 @@ btracker_backend.vesting_history_event:
       $ref: '#/components/schemas/btracker_backend.vesting_filter'
       description: |
         which kind of vesting flow this row represents: power_up, power_down_init,
-        power_down_fill (the account's own power-down), or power_down_route_received
-        (a fill routed to this account from another account's power-down, to<>from).
+        power_down_fill (the account''s own power-down), or power_down_route_received
+        (a fill routed to this account from another account''s power-down, to<>from).
         Note: power_down_fill and power_down_route_received share op_type_id 56 — branch on this field.
     amount_hive:
       $ref: '#/components/schemas/btracker_backend.amount'
