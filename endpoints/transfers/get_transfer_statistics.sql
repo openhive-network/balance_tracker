@@ -206,11 +206,7 @@ BEGIN
   -- Immutable historical data -> long cache (1 year)
   -- Live/recent data -> short cache (2 seconds)
   ---------------------------------------------------------------------------
-  IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
-  ELSE
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-  END IF;
+  PERFORM btracker_backend.set_history_cache_headers(_block_range.last_block);
 
   ---------------------------------------------------------------------------
   -- RETURN STREAMING RESULTS FROM BACKEND
