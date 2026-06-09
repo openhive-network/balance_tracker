@@ -102,15 +102,8 @@ BEGIN
         j.power_down_route_received_count,
         j.power_down_route_received_hive,
         j.power_down_route_received_vests,
-        COALESCE(j.last_block_num, jl.last_block_num) AS last_block_num
+        COALESCE(j.last_block_num, btracker_backend.block_at_or_before(j.date + __one_period)) AS last_block_num
       FROM joined j
-      LEFT JOIN LATERAL (
-        SELECT b.num AS last_block_num
-        FROM hive.blocks_view b
-        WHERE b.created_at <= j.date + __one_period
-        ORDER BY b.created_at DESC
-        LIMIT 1
-      ) jl ON j.last_block_num IS NULL
     )
     SELECT
       LEAST(j.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS updated_at,

@@ -230,8 +230,8 @@ BEGIN
           FROM date_series ds
           LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
         ),
-        -- join_missing_block: For periods with no transfers, find the nearest block
-        -- Uses LATERAL subquery to look up the last block before end of period
+        -- join_missing_block: for periods with no transfers, attribute the nearest block
+        -- at or before the period end via btracker_backend.block_at_or_before()
         join_missing_block AS (
           SELECT
             fb.date,
@@ -240,16 +240,8 @@ BEGIN
             fb.max_transfer_amount,
             fb.min_transfer_amount,
             fb.transfer_count,
-            COALESCE(fb.last_block_num, jl.last_block_num) AS last_block_num
+            COALESCE(fb.last_block_num, btracker_backend.block_at_or_before(fb.date + __one_period)) AS last_block_num
           FROM transfer_records fb
-          LEFT JOIN LATERAL (
-            SELECT
-              b.num AS last_block_num
-            FROM hive.blocks_view b
-            WHERE b.created_at <= fb.date + __one_period
-            ORDER BY b.created_at DESC
-            LIMIT 1
-          ) jl ON fb.last_block_num IS NULL
         )
         -- Final output: compute average, adjust timestamp to period end, apply sort direction
         -- LEAST prevents future timestamps from exceeding current time

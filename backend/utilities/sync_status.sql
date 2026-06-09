@@ -30,4 +30,22 @@ BEGIN
 END
 $$;
 
+-- Highest block whose timestamp is at or before _ts. Used by the gap-fill aggregations to
+-- attribute a block number to empty time buckets, replacing the repeated LATERAL lookup.
+CREATE OR REPLACE FUNCTION btracker_backend.block_at_or_before(_ts TIMESTAMP)
+RETURNS INT
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN (
+    SELECT b.num
+    FROM hive.blocks_view b
+    WHERE b.created_at <= _ts
+    ORDER BY b.created_at DESC
+    LIMIT 1
+  );
+END
+$$;
+
 RESET ROLE;
