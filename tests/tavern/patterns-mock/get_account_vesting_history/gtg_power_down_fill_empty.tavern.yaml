@@ -21,7 +21,7 @@
         json:
           account-name: "gtg"
           filter: "power_down_fill"
-          from-block: "90000040"
+          from-block: "90000054"
           page-size: 100
           direction: "desc"
       response:
