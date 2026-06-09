@@ -73,109 +73,32 @@ BEGIN
       ov.op_type_id IN (_op_transfer_to_vesting, _op_withdraw_vesting, _op_fill_vesting_withdraw) AND
       ov.block_num BETWEEN _from AND _to
   ),
-  parsed AS MATERIALIZED (
-    -- One row per op (cancellations filtered out).
+  /* ====================================================================
+   * One row per (impacted_account, op). ALL body extraction and the issue #54
+   * attribution (routed fills split into the sender's power_down_fill and the
+   * recipient's power_down_route_received) live in get_impacted_vesting; this
+   * function only fans the op out and aggregates. transfer_to_vesting emits
+   * from + to, collapsed to one when from = to by the DISTINCT below.
+   * ==================================================================== */
+  impacted AS MATERIALIZED (
     SELECT
       o.source_op,
       o.block_num,
-      o.body,
-      (CASE o.op_type_id
-        WHEN _op_transfer_to_vesting    THEN 1
-        WHEN _op_withdraw_vesting       THEN 2
-        WHEN _op_fill_vesting_withdraw  THEN 3
-      END)::SMALLINT AS kind,
-      (CASE
-        WHEN o.op_type_id = _op_transfer_to_vesting
-          THEN ((o.body)->'amount'->>'amount')::BIGINT
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-         AND ((o.body)->'deposited'->>'precision')::INT = 3
-          THEN ((o.body)->'deposited'->>'amount')::BIGINT
-        ELSE 0::BIGINT
-      END) AS hive_amount,
-      (CASE
-        WHEN o.op_type_id = _op_withdraw_vesting
-          THEN ((o.body)->'vesting_shares'->>'amount')::NUMERIC
-               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-          THEN ((o.body)->'withdrawn'->>'amount')::NUMERIC
-               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
-        ELSE 0::NUMERIC
-      END) AS vests_amount,
-      -- fill_vesting_withdraw 'deposited' asset: precision 3 = HIVE, 6 = VESTS (auto_vest route).
-      (CASE
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-          THEN ((o.body)->'deposited'->>'precision')::INT
-        ELSE NULL::INT
-      END) AS deposited_precision,
-      -- deposited VESTS — only when the recipient is paid in VESTS (auto_vest=true route).
-      (CASE
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-         AND ((o.body)->'deposited'->>'precision')::INT = 6
-          THEN ((o.body)->'deposited'->>'amount')::NUMERIC
-               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
-        ELSE 0::NUMERIC
-      END) AS deposited_vests
+      iv.kind,
+      iv.hive_amount,
+      iv.vests_amount,
+      iv.account_name AS name
     FROM ops o
-    WHERE NOT (
-      o.op_type_id = _op_withdraw_vesting
-      AND ((o.body)->'vesting_shares'->>'amount')::BIGINT = 0
-    )
-  ),
-  /* ====================================================================
-   * Fan-out: one row per (impacted_account, op), each carrying the amounts
-   * that THAT account actually experienced (per issue #54). The emitted `kind`
-   * is the per-row EVENT kind (1/2/3/4), which becomes the history/aggregate kind.
-   *   - kind=1 (transfer_to_vesting):   from + to, each carries the power-up HIVE
-   *   - kind=2 (withdraw_vesting):      account only, carries power-down-init VESTS
-   *   - kind=3 (fill, from_account):    power_down_fill. vests = withdrawn;
-   *                                     hive = deposited HIVE only when NOT routed away
-   *                                     (to_account = from_account).
-   *   - kind=4 (fill, to_account):      power_down_route_received, ONLY when routed
-   *                                     (to_account <> from_account): recipient gains the
-   *                                     deposited asset (HIVE auto_vest=false / VESTS otherwise).
-   * The kind=1 self power-up (from = to) is collapsed by DISTINCT below.
-   * ====================================================================
-   */
-  impacted_names AS MATERIALIZED (
-    -- kind 1: transfer_to_vesting -> from + to, each carries the power-up HIVE.
-    SELECT p.source_op, p.block_num, 1::SMALLINT AS kind,
-           p.hive_amount, 0::NUMERIC AS vests_amount, p.body->>'from' AS name
-    FROM parsed p WHERE p.kind = 1
-    UNION ALL
-    SELECT p.source_op, p.block_num, 1::SMALLINT,
-           p.hive_amount, 0::NUMERIC, p.body->>'to'
-    FROM parsed p WHERE p.kind = 1
-
-    -- kind 2: withdraw_vesting -> account only, carries the power-down-init VESTS.
-    UNION ALL
-    SELECT p.source_op, p.block_num, 2::SMALLINT,
-           0::BIGINT, p.vests_amount, p.body->>'account'
-    FROM parsed p WHERE p.kind = 2
-
-    -- kind 3: fill_vesting_withdraw FROM side -> own power-down (power_down_fill).
-    --   vests = withdrawn; hive = deposited HIVE only for an own power-down (to = from).
-    UNION ALL
-    SELECT p.source_op, p.block_num, 3::SMALLINT,
-           (CASE WHEN p.deposited_precision = 3
-                  AND (p.body->>'to_account') = (p.body->>'from_account')
-                 THEN p.hive_amount ELSE 0::BIGINT END),
-           p.vests_amount,
-           p.body->>'from_account'
-    FROM parsed p WHERE p.kind = 3
-
-    -- kind 4: fill_vesting_withdraw TO side -> power_down_route_received, ONLY when routed.
-    --   The recipient gains the deposited asset: HIVE (auto_vest=false) or VESTS (auto_vest=true).
-    UNION ALL
-    SELECT p.source_op, p.block_num, 4::SMALLINT,
-           (CASE WHEN p.deposited_precision = 3 THEN p.hive_amount     ELSE 0::BIGINT  END),
-           (CASE WHEN p.deposited_precision = 6 THEN p.deposited_vests ELSE 0::NUMERIC END),
-           p.body->>'to_account'
-    FROM parsed p
-    WHERE p.kind = 3 AND (p.body->>'to_account') <> (p.body->>'from_account')
+    JOIN hafd.operation_types ot ON ot.id = o.op_type_id
+    CROSS JOIN LATERAL btracker_backend.get_impacted_vesting(
+      replace(ot.name, 'hive::protocol::', ''),
+      o.body,
+      o.block_num > _hf_vests_precision_block
+    ) iv
   ),
   unique_impacted AS (
     SELECT DISTINCT source_op, block_num, kind, hive_amount, vests_amount, name
-    FROM impacted_names
+    FROM impacted
   ),
   account_id_lookup AS MATERIALIZED (
     SELECT av.name, av.id

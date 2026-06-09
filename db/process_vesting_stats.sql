@@ -64,37 +64,20 @@ BEGIN
       ov.block_num BETWEEN _from AND _to
   ),
   parsed AS MATERIALIZED (
-    -- One row per op (already filters cancellations). HIVE values are satoshi
-    -- (×1000); VESTS values are scaled by pre_hf1 multiplier.
+    -- One row per op via the vesting parser (body extraction + cancellation drop live
+    -- in get_vesting_op_stat). HIVE = satoshi (x1000); VESTS scaled by the pre-HF1 multiplier.
     SELECT
       o.block_num,
-      (CASE o.op_type_id
-        WHEN _op_transfer_to_vesting    THEN 1
-        WHEN _op_withdraw_vesting       THEN 2
-        WHEN _op_fill_vesting_withdraw  THEN 3
-      END)::SMALLINT AS kind,
-      (CASE
-        WHEN o.op_type_id = _op_transfer_to_vesting
-          THEN ((o.body)->'amount'->>'amount')::BIGINT
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-         AND ((o.body)->'deposited'->>'precision')::INT = 3
-          THEN ((o.body)->'deposited'->>'amount')::BIGINT
-        ELSE 0::BIGINT
-      END) AS hive_amount,
-      (CASE
-        WHEN o.op_type_id = _op_withdraw_vesting
-          THEN ((o.body)->'vesting_shares'->>'amount')::NUMERIC
-               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
-        WHEN o.op_type_id = _op_fill_vesting_withdraw
-          THEN ((o.body)->'withdrawn'->>'amount')::NUMERIC
-               * btracker_backend.vests_precision_multiplier(o.block_num > _hf_vests_precision_block)
-        ELSE 0::NUMERIC
-      END) AS vests_amount
+      s.kind,
+      s.hive_amount,
+      s.vests_amount
     FROM ops o
-    WHERE NOT (
-      o.op_type_id = _op_withdraw_vesting
-      AND ((o.body)->'vesting_shares'->>'amount')::BIGINT = 0
-    )
+    JOIN hafd.operation_types ot ON ot.id = o.op_type_id
+    CROSS JOIN LATERAL btracker_backend.get_vesting_op_stat(
+      replace(ot.name, 'hive::protocol::', ''),
+      o.body,
+      o.block_num > _hf_vests_precision_block
+    ) s
   ),
   join_blocks_date AS MATERIALIZED (
     SELECT
