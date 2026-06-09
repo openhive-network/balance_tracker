@@ -40,16 +40,16 @@ BEGIN
   RETURN QUERY
     SELECT
       DATE_TRUNC('year', vm.updated_at)                                    AS updated_at,
-      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 1), 0)::INT     AS power_up_count,
-      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 1), 0)::BIGINT  AS power_up_hive,
-      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 2), 0)::INT     AS power_down_init_count,
-      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 3), 0)::INT     AS power_down_fill_count,
-      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 4), 0)::INT     AS power_down_route_received_count,
-      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+      COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+      COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+      COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
       MAX(vm.last_block_num)::INT                                          AS last_block_num
     FROM vesting_stats_by_month vm
     WHERE DATE_TRUNC('year', vm.updated_at) BETWEEN _from AND _to
@@ -75,16 +75,16 @@ BEGIN
   RETURN QUERY
     SELECT
       DATE_TRUNC('year', avm.updated_at)                                    AS updated_at,
-      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 1), 0)::INT     AS power_up_count,
-      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 1), 0)::BIGINT  AS power_up_hive,
-      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 2), 0)::INT     AS power_down_init_count,
-      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 3), 0)::INT     AS power_down_fill_count,
-      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 4), 0)::INT     AS power_down_route_received_count,
-      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+      COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+      COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+      COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
       MAX(avm.last_block_num)::INT                                          AS last_block_num
     FROM account_vesting_by_month avm
     WHERE avm.account = _account_id
@@ -113,16 +113,16 @@ BEGIN
     RETURN QUERY
       SELECT
         avd.updated_at,
-        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 1), 0)::INT     AS power_up_count,
-        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 1), 0)::BIGINT  AS power_up_hive,
-        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 2), 0)::INT     AS power_down_init_count,
-        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 3), 0)::INT     AS power_down_fill_count,
-        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = 4), 0)::INT     AS power_down_route_received_count,
-        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(avd.op_count)     FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(avd.hive_amount)  FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(avd.vests_amount) FILTER (WHERE avd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
         MAX(avd.last_block_num)::INT                                           AS last_block_num
       FROM account_vesting_by_day avd
       WHERE avd.account = _account_id
@@ -133,16 +133,16 @@ BEGIN
     RETURN QUERY
       SELECT
         avm.updated_at,
-        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 1), 0)::INT     AS power_up_count,
-        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 1), 0)::BIGINT  AS power_up_hive,
-        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 2), 0)::INT     AS power_down_init_count,
-        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 3), 0)::INT     AS power_down_fill_count,
-        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = 4), 0)::INT     AS power_down_route_received_count,
-        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(avm.op_count)     FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(avm.hive_amount)  FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(avm.vests_amount) FILTER (WHERE avm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
         MAX(avm.last_block_num)::INT                                           AS last_block_num
       FROM account_vesting_by_month avm
       WHERE avm.account = _account_id
@@ -178,16 +178,16 @@ BEGIN
     RETURN QUERY
       SELECT
         vd.updated_at,
-        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 1), 0)::INT     AS power_up_count,
-        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 1), 0)::BIGINT  AS power_up_hive,
-        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 2), 0)::INT     AS power_down_init_count,
-        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 3), 0)::INT     AS power_down_fill_count,
-        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = 4), 0)::INT     AS power_down_route_received_count,
-        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(vd.op_count)     FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(vd.hive_amount)  FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(vd.vests_amount) FILTER (WHERE vd.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
         MAX(vd.last_block_num)::INT                                          AS last_block_num
       FROM vesting_stats_by_day vd
       WHERE vd.updated_at BETWEEN _from AND _to
@@ -197,16 +197,16 @@ BEGIN
     RETURN QUERY
       SELECT
         vm.updated_at,
-        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 1), 0)::INT     AS power_up_count,
-        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 1), 0)::BIGINT  AS power_up_hive,
-        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 2), 0)::INT     AS power_down_init_count,
-        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 2), 0)::NUMERIC AS power_down_init_vests,
-        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 3), 0)::INT     AS power_down_fill_count,
-        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 3), 0)::NUMERIC AS power_down_fill_vests,
-        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 3), 0)::BIGINT  AS power_down_fill_hive,
-        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = 4), 0)::INT     AS power_down_route_received_count,
-        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = 4), 0)::BIGINT  AS power_down_route_received_hive,
-        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = 4), 0)::NUMERIC AS power_down_route_received_vests,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_up()), 0)::INT     AS power_up_count,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_up()), 0)::BIGINT  AS power_up_hive,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::INT     AS power_down_init_count,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_init()), 0)::NUMERIC AS power_down_init_vests,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::INT     AS power_down_fill_count,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::NUMERIC AS power_down_fill_vests,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_fill()), 0)::BIGINT  AS power_down_fill_hive,
+        COALESCE(SUM(vm.op_count)     FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::INT     AS power_down_route_received_count,
+        COALESCE(SUM(vm.hive_amount)  FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::BIGINT  AS power_down_route_received_hive,
+        COALESCE(SUM(vm.vests_amount) FILTER (WHERE vm.kind = btracker_backend.vesting_kind_power_down_route_received()), 0)::NUMERIC AS power_down_route_received_vests,
         MAX(vm.last_block_num)::INT                                          AS last_block_num
       FROM vesting_stats_by_month vm
       WHERE vm.updated_at BETWEEN _from AND _to

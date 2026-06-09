@@ -288,4 +288,23 @@ BEGIN
 END;
 $$;
 
+-- ----------------------------------------------------------------------------
+-- Vesting event kinds
+-- Semantic names for the `kind` discriminator stored in the vesting history /
+-- stats tables, so the bare 1/2/3/4 literals never appear in processing,
+-- aggregation or endpoint code. Used by process_vesting_stats,
+-- process_account_vesting_stats, get_impacted_vesting and the vesting endpoints.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION btracker_backend.vesting_kind_power_up()
+RETURNS SMALLINT LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN RETURN 1::SMALLINT; END; $$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.vesting_kind_power_down_init()
+RETURNS SMALLINT LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN RETURN 2::SMALLINT; END; $$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.vesting_kind_power_down_fill()
+RETURNS SMALLINT LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN RETURN 3::SMALLINT; END; $$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.vesting_kind_power_down_route_received()
+RETURNS SMALLINT LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN RETURN 4::SMALLINT; END; $$;
+
 RESET ROLE;
