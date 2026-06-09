@@ -198,7 +198,7 @@ DATA FLOW:
   account_balance_history OR account_savings_history
     -> balance_history_range() [get sequence numbers in range]
     -> calculate_pages() [pagination math]
-    -> liquid_balance_history() OR savings_history() [fetch page]
+    -> balance_history() [fetch page; liquid or savings by balance-type]
     -> LAG() window function [compute prev_balance]
     -> operation_history composite return
 
@@ -256,15 +256,11 @@ BEGIN
   -- Irreversible blocks are immutable -> long cache (1 year)
   -- Reversible blocks may change -> short cache (2 seconds)
   ---------------------------------------------------------------------------
-  IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
-  ELSE
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-  END IF;
+  PERFORM btracker_backend.set_history_cache_headers(_block_range.last_block);
 
   ---------------------------------------------------------------------------
   -- DELEGATE TO BACKEND HELPER
-  -- Routes to liquid_balance_history() or savings_history() based on balance-type
+  -- Reads the requested page via balance_history() (liquid or savings, by balance-type)
   ---------------------------------------------------------------------------
   RETURN btracker_backend.balance_history(
     _account_id,
