@@ -6,8 +6,9 @@ land in the recipients' `power_down_fill`, only in the new `power_down_route_rec
 category, while `blocktrades` keeps the full withdrawn VESTS and only the HIVE it actually
 received (own fill).
 
-Blocks `90000040`-`90000043` (headers already in `fixtures/blocks/data.json`). Accounts
-`blocktrades` / `gtg` / `cvk` are part of the standard mock account set.
+Blocks `90000054`-`90000057` (headers added to `fixtures/blocks/data.json` — a fresh range
+above every other fixture so the routed ops never collide on `operation_id(block, op_pos)`).
+Accounts `blocktrades` / `gtg` / `cvk` are part of the standard mock account set.
 
 > op_type_ids: `4` = withdraw_vesting, `20` = set_withdraw_vesting_route, `56` =
 > fill_vesting_withdraw (Hive protocol enum = `hafd.operation_types.id`; `delegate_vesting_shares=40`
@@ -17,25 +18,25 @@ Blocks `90000040`-`90000043` (headers already in `fixtures/blocks/data.json`). A
 
 | block | op | from → to | withdrawn (VESTS) | deposited | auto_vest |
 |------:|----|-----------|-------------------|-----------|-----------|
-| 90000040 | withdraw_vesting | blocktrades | — (vesting_shares 300000000) | — | — |
-| 90000040 | set_withdraw_vesting_route | blocktrades → gtg | — | — | false |
-| 90000040 | set_withdraw_vesting_route | blocktrades → cvk | — | — | true |
-| 90000041 | fill_vesting_withdraw | blocktrades → gtg | 150000000 | 7000 HIVE (prec 3) | false |
-| 90000042 | fill_vesting_withdraw | blocktrades → cvk | 150000000 | 150000000 VESTS (prec 6) | true |
-| 90000043 | fill_vesting_withdraw | blocktrades → blocktrades | 200000000 | 9500 HIVE (prec 3) | — |
+| 90000054 | withdraw_vesting | blocktrades | — (vesting_shares 300000000) | — | — |
+| 90000054 | set_withdraw_vesting_route | blocktrades → gtg | — | — | false |
+| 90000054 | set_withdraw_vesting_route | blocktrades → cvk | — | — | true |
+| 90000055 | fill_vesting_withdraw | blocktrades → gtg | 150000000 | 7000 HIVE (prec 3) | false |
+| 90000056 | fill_vesting_withdraw | blocktrades → cvk | 150000000 | 150000000 VESTS (prec 6) | true |
+| 90000057 | fill_vesting_withdraw | blocktrades → blocktrades | 200000000 | 9500 HIVE (prec 3) | — |
 
 `set_withdraw_vesting_route` is not consumed by the vesting-stats processors (only
 transfer_to_vesting / withdraw_vesting / fill_vesting_withdraw are) — it is included for
 fidelity and must be ignored by the aggregation.
 
-## Expected per-account results (from-block 90000040) — the regression oracle
+## Expected per-account results (from-block 90000054) — the regression oracle
 
 `account_vesting_by_day`/`_month` (tall: one row per kind), surfaced wide by the endpoints:
 
 **blocktrades**
 - `power_down_init` (kind 2): op_count 1, vests 300000000, hive 0
 - `power_down_fill`  (kind 3): op_count **3**, vests **500000000** (150M+150M+200M), hive **9500**
-  (only the OWN fill at 90000043 contributes HIVE; the two routed fills contribute hive 0)
+  (only the OWN fill at 90000057 contributes HIVE; the two routed fills contribute hive 0)
 - `power_down_route_received` (kind 4): none
 
 **gtg** (routed recipient, auto_vest=false)
