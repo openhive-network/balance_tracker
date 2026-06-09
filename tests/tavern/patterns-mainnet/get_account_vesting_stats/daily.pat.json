@@ -1,29 +1,40 @@
 [
-    {
-        "date": "2016-09-16T00:00:00",
-        "power_up_hive": {
-            "nai": "@@000000021",
-            "amount": "1653943",
-            "precision": 3
-        },
-        "last_block_num": 4998632,
-        "power_up_count": 22,
-        "power_down_fill_hive": {
-            "nai": "@@000000021",
-            "amount": "0",
-            "precision": 3
-        },
-        "power_down_fill_count": 0,
-        "power_down_fill_vests": {
-            "nai": "@@000000037",
-            "amount": "0",
-            "precision": 6
-        },
-        "power_down_init_count": 0,
-        "power_down_init_vests": {
-            "nai": "@@000000037",
-            "amount": "0",
-            "precision": 6
-        }
+  {
+    "date": "2016-09-16T00:00:00",
+    "last_block_num": 4998632,
+    "power_down_fill_count": 0,
+    "power_down_fill_hive": {
+      "amount": "0",
+      "nai": "@@000000021",
+      "precision": 3
+    },
+    "power_down_fill_vests": {
+      "amount": "0",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_down_init_count": 0,
+    "power_down_init_vests": {
+      "amount": "0",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_down_route_received_count": 0,
+    "power_down_route_received_hive": {
+      "amount": "0",
+      "nai": "@@000000021",
+      "precision": 3
+    },
+    "power_down_route_received_vests": {
+      "amount": "0",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_up_count": 22,
+    "power_up_hive": {
+      "amount": "1653943",
+      "nai": "@@000000021",
+      "precision": 3
     }
+  }
 ]
