@@ -121,11 +121,7 @@ BEGIN
   END IF;
 
   -- Long cache for fully-irreversible ranges, short cache for live data.
-  IF _block_range.last_block <= hive.app_get_irreversible_block() AND _block_range.last_block IS NOT NULL THEN
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=31536000"}]', true);
-  ELSE
-    PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
-  END IF;
+  PERFORM btracker_backend.set_history_cache_headers(_block_range.last_block);
 
   RETURN QUERY
   SELECT
