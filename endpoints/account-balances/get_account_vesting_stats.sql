@@ -81,12 +81,12 @@ SET ROLE btracker_owner;
 DROP FUNCTION IF EXISTS btracker_endpoints.get_account_vesting_stats;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_vesting_stats(
     "account-name" TEXT,
-    "granularity"  btracker_backend.granularity = 'daily',
-    "direction"    btracker_backend.sort_direction = 'desc',
-    "from-block"   TEXT = NULL,
-    "to-block"     TEXT = NULL
+    "granularity" btracker_backend.granularity = 'daily',
+    "direction" btracker_backend.sort_direction = 'desc',
+    "from-block" TEXT = NULL,
+    "to-block" TEXT = NULL
 )
-RETURNS SETOF btracker_backend.vesting_stats
+RETURNS SETOF btracker_backend.vesting_stats 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql' STABLE
 SET jit = OFF

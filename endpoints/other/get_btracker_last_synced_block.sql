@@ -32,7 +32,7 @@ SET ROLE btracker_owner;
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_btracker_last_synced_block;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_btracker_last_synced_block()
-RETURNS INT
+RETURNS INT 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql' STABLE
 AS

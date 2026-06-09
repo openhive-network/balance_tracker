@@ -14,10 +14,10 @@ SET ROLE btracker_owner;
 
       * `power_down_init` — `withdraw_vesting` (cancellations excluded)
 
-      * `power_down_fill` — `fill_vesting_withdraw`, the account's OWN power-down
+      * `power_down_fill` — `fill_vesting_withdraw`, the account''s OWN power-down
 
       * `power_down_route_received` — `fill_vesting_withdraw` routed to this account from
-        another account's power-down (to_account<>from_account). Shares op_type_id 56 with
+        another account''s power-down (to_account<>from_account). Shares op_type_id 56 with
         `power_down_fill`; the recipient gains the deposited asset (HIVE, or VESTS for auto_vest).
 
       The `filter` query parameter narrows the result to one kind, or `all`.
@@ -128,14 +128,14 @@ SET ROLE btracker_owner;
 DROP FUNCTION IF EXISTS btracker_endpoints.get_account_vesting_history;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_vesting_history(
     "account-name" TEXT,
-    "filter"       btracker_backend.vesting_filter = 'all',
-    "page"         INT = NULL,
-    "page-size"    INT = 100,
-    "direction"    btracker_backend.sort_direction = 'desc',
-    "from-block"   TEXT = NULL,
-    "to-block"     TEXT = NULL
+    "filter" btracker_backend.vesting_filter = 'all',
+    "page" INT = NULL,
+    "page-size" INT = 100,
+    "direction" btracker_backend.sort_direction = 'desc',
+    "from-block" TEXT = NULL,
+    "to-block" TEXT = NULL
 )
-RETURNS btracker_backend.vesting_history
+RETURNS btracker_backend.vesting_history 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql' STABLE
 SET jit = OFF
