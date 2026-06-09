@@ -40,15 +40,7 @@ SET jit = OFF
 AS
 $$
 DECLARE
-  _kind_filter    SMALLINT := CASE _filter
-                              WHEN 'all'                       THEN NULL
-                              WHEN 'power_up'                  THEN btracker_backend.vesting_kind_power_up()
-                              WHEN 'power_down_init'           THEN btracker_backend.vesting_kind_power_down_init()
-                              WHEN 'power_down_fill'           THEN btracker_backend.vesting_kind_power_down_fill()
-                              WHEN 'power_down_route_received' THEN btracker_backend.vesting_kind_power_down_route_received()
-                            END;
-  _nai_hive       INT := btracker_backend.nai_hive();
-  _nai_vests      INT := btracker_backend.nai_vests();
+  _kind_filter    SMALLINT := btracker_backend.vesting_filter_to_kind(_filter);
   _vh_range       btracker_backend.balance_history_range_return;
   _calc           btracker_backend.calculate_pages_return;
   _result         btracker_backend.vesting_history_event[];
@@ -84,27 +76,12 @@ BEGIN
         (CASE WHEN _direction = 'asc'  THEN avh.vesting_seq_no ELSE NULL END) ASC
       LIMIT _calc.limit_filter
     )
-    SELECT array_agg(row(
-      gp.block_num,
-      gp.source_op::TEXT,
-      (CASE gp.kind
-        WHEN btracker_backend.vesting_kind_power_up()                  THEN btracker_backend.op_transfer_to_vesting()
-        WHEN btracker_backend.vesting_kind_power_down_init()           THEN btracker_backend.op_withdraw_vesting()
-        WHEN btracker_backend.vesting_kind_power_down_fill()           THEN btracker_backend.op_fill_vesting_withdraw()
-        WHEN btracker_backend.vesting_kind_power_down_route_received() THEN btracker_backend.op_fill_vesting_withdraw()
-      END)::SMALLINT,
-      (CASE gp.kind
-        WHEN btracker_backend.vesting_kind_power_up()                  THEN 'power_up'
-        WHEN btracker_backend.vesting_kind_power_down_init()           THEN 'power_down_init'
-        WHEN btracker_backend.vesting_kind_power_down_fill()           THEN 'power_down_fill'
-        WHEN btracker_backend.vesting_kind_power_down_route_received() THEN 'power_down_route_received'
-      END)::btracker_backend.vesting_filter,
-      btracker_backend.create_amount_object(_nai_hive,  gp.hive_amount),
-      btracker_backend.create_amount_object(_nai_vests, gp.vests_amount),
-      bv.created_at::TIMESTAMP
-    )::btracker_backend.vesting_history_event ORDER BY
-      (CASE WHEN _direction = 'desc' THEN gp.page_seq ELSE NULL END) DESC,
-      (CASE WHEN _direction = 'asc'  THEN gp.page_seq ELSE NULL END) ASC
+    SELECT array_agg(
+      btracker_backend.project_vesting_event(
+        gp.block_num, gp.source_op, gp.kind, gp.hive_amount, gp.vests_amount, bv.created_at
+      ) ORDER BY
+        (CASE WHEN _direction = 'desc' THEN gp.page_seq ELSE NULL END) DESC,
+        (CASE WHEN _direction = 'asc'  THEN gp.page_seq ELSE NULL END) ASC
     )
     INTO _result
     FROM gather_page gp
@@ -132,27 +109,12 @@ BEGIN
         (CASE WHEN _direction = 'asc'  THEN avh.kind_seq_no ELSE NULL END) ASC
       LIMIT _calc.limit_filter
     )
-    SELECT array_agg(row(
-      gp.block_num,
-      gp.source_op::TEXT,
-      (CASE gp.kind
-        WHEN btracker_backend.vesting_kind_power_up()                  THEN btracker_backend.op_transfer_to_vesting()
-        WHEN btracker_backend.vesting_kind_power_down_init()           THEN btracker_backend.op_withdraw_vesting()
-        WHEN btracker_backend.vesting_kind_power_down_fill()           THEN btracker_backend.op_fill_vesting_withdraw()
-        WHEN btracker_backend.vesting_kind_power_down_route_received() THEN btracker_backend.op_fill_vesting_withdraw()
-      END)::SMALLINT,
-      (CASE gp.kind
-        WHEN btracker_backend.vesting_kind_power_up()                  THEN 'power_up'
-        WHEN btracker_backend.vesting_kind_power_down_init()           THEN 'power_down_init'
-        WHEN btracker_backend.vesting_kind_power_down_fill()           THEN 'power_down_fill'
-        WHEN btracker_backend.vesting_kind_power_down_route_received() THEN 'power_down_route_received'
-      END)::btracker_backend.vesting_filter,
-      btracker_backend.create_amount_object(_nai_hive,  gp.hive_amount),
-      btracker_backend.create_amount_object(_nai_vests, gp.vests_amount),
-      bv.created_at::TIMESTAMP
-    )::btracker_backend.vesting_history_event ORDER BY
-      (CASE WHEN _direction = 'desc' THEN gp.page_seq ELSE NULL END) DESC,
-      (CASE WHEN _direction = 'asc'  THEN gp.page_seq ELSE NULL END) ASC
+    SELECT array_agg(
+      btracker_backend.project_vesting_event(
+        gp.block_num, gp.source_op, gp.kind, gp.hive_amount, gp.vests_amount, bv.created_at
+      ) ORDER BY
+        (CASE WHEN _direction = 'desc' THEN gp.page_seq ELSE NULL END) DESC,
+        (CASE WHEN _direction = 'asc'  THEN gp.page_seq ELSE NULL END) ASC
     )
     INTO _result
     FROM gather_page gp
