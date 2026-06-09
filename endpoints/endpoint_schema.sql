@@ -714,11 +714,11 @@ declare
           },
           "power_down_route_received_hive": {
             "$ref": "#/components/schemas/btracker_backend.amount",
-            "description": "HIVE received from another account's routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only."
+            "description": "HIVE received from another account''s routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only."
           },
           "power_down_route_received_vests": {
             "$ref": "#/components/schemas/btracker_backend.amount",
-            "description": "VESTS received from another account's routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only."
+            "description": "VESTS received from another account''s routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only."
           },
           "last_block_num": {
             "type": "integer",
@@ -750,7 +750,7 @@ declare
           },
           "direction": {
             "$ref": "#/components/schemas/btracker_backend.vesting_filter",
-            "description": "which kind of vesting flow this row represents: power_up, power_down_init, power_down_fill (the account's own power-down), or power_down_route_received (a fill routed to this account from another account's power-down, to<>from). power_down_fill and power_down_route_received share op_type_id 56 — branch on this field."
+            "description": "which kind of vesting flow this row represents: power_up, power_down_init, power_down_fill (the account''s own power-down), or power_down_route_received (a fill routed to this account from another account''s power-down, to<>from). power_down_fill and power_down_route_received share op_type_id 56 — branch on this field."
           },
           "amount_hive": {
             "$ref": "#/components/schemas/btracker_backend.amount",
@@ -1287,7 +1287,7 @@ declare
           "Accounts"
         ],
         "summary": "Per-account power-up / power-down event history",
-        "description": "Paginated list of vesting events for an account. Four event kinds are\nsurfaced via the `direction` field on each row:\n\n* `power_up` \u2014 `transfer_to_vesting`\n\n* `power_down_init` \u2014 `withdraw_vesting` (cancellations excluded)\n\n* `power_down_fill` \u2014 `fill_vesting_withdraw`, the account's OWN power-down\n\n* `power_down_route_received` \u2014 `fill_vesting_withdraw` routed to this account from another account's power-down (to_account<>from_account); shares op_type_id 56 with power_down_fill\n\nThe `filter` query parameter narrows the result to one kind, or `all`.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_vesting_history(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/vesting-history?filter=power_down_fill&page-size=50''`\n",
+        "description": "Paginated list of vesting events for an account. Four event kinds are\nsurfaced via the `direction` field on each row:\n\n* `power_up` \u2014 `transfer_to_vesting`\n\n* `power_down_init` \u2014 `withdraw_vesting` (cancellations excluded)\n\n* `power_down_fill` \u2014 `fill_vesting_withdraw`, the account''s OWN power-down\n\n* `power_down_route_received` \u2014 `fill_vesting_withdraw` routed to this account from another account''s power-down (to_account<>from_account); shares op_type_id 56 with power_down_fill\n\nThe `filter` query parameter narrows the result to one kind, or `all`.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_vesting_history(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/vesting-history?filter=power_down_fill&page-size=50''`\n",
         "operationId": "btracker_endpoints.get_account_vesting_history",
         "parameters": [
           {
