@@ -155,37 +155,27 @@ This function:
 5. Computes average dynamically as sum/count
 6. Fills in missing block numbers by looking up the nearest block
 
-Uses dynamic SQL (DO block with format()) to inject the HAF context schema name,
-which is required to get the current block number for range calculation.
+Reads the current synced block via btracker_backend.last_synced_block().
 */
-DO $$
+CREATE OR REPLACE FUNCTION btracker_backend.get_transfer_aggregation(
+    _nai INT,
+    _granularity_hourly btracker_backend.granularity_hourly,
+    _direction btracker_backend.sort_direction,
+    _from_block INT,
+    _to_block INT
+)
+RETURNS SETOF btracker_backend.transfer_history_return -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
 DECLARE
-  __schema_name VARCHAR;
+    __granularity TEXT;
+    __one_period INTERVAL;
+    -- Get the current block number from the HAF context for range validation
+    __btracker_current_block INT := btracker_backend.last_synced_block();
+    __ah_range btracker_backend.aggregated_history_paging_return;
 BEGIN
-  SHOW SEARCH_PATH INTO __schema_name;
-  EXECUTE format(
-
-  $BODY$
-
-    CREATE OR REPLACE FUNCTION btracker_backend.get_transfer_aggregation(
-        _nai INT,
-        _granularity_hourly btracker_backend.granularity_hourly,
-        _direction btracker_backend.sort_direction,
-        _from_block INT,
-        _to_block INT
-    )
-    RETURNS SETOF btracker_backend.transfer_history_return -- noqa: LT01, CP05
-    LANGUAGE 'plpgsql'
-    STABLE
-    AS
-    $pb$
-    DECLARE
-        __granularity TEXT;
-        __one_period INTERVAL;
-        -- Get the current block number from the HAF context for range validation
-        __btracker_current_block INT := (SELECT current_block_num FROM hafd.contexts WHERE name = '%s');
-        __ah_range btracker_backend.aggregated_history_paging_return;
-    BEGIN
       -- Convert enum granularity to PostgreSQL interval unit string
       __granularity := (
         CASE
@@ -276,10 +266,6 @@ BEGIN
           (CASE WHEN _direction = 'desc' THEN fb.date ELSE NULL END) DESC,
           (CASE WHEN _direction = 'asc' THEN fb.date ELSE NULL END) ASC
       );
-    END
-    $pb$;
-
-  $BODY$, __schema_name, __schema_name);
 END
 $$;
 
