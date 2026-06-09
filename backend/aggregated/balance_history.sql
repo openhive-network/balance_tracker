@@ -20,39 +20,29 @@ The RECURSIVE CTE pattern is essential here because:
 - We need row N to inherit from computed row N-1, not from source data
 - Each row's prev_balance depends on the computed balance of the previous row
 
-Uses dynamic SQL (DO block with format()) to inject the HAF context schema name,
-which is required to get the current block number for range calculation.
+Reads the current synced block via btracker_backend.last_synced_block().
 */
-DO $$
+CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_aggregation(
+    _account_id INT,
+    _coin_type INT,
+    _granularity btracker_backend.granularity,
+    _direction btracker_backend.sort_direction,
+    _from_block INT,
+    _to_block INT
+)
+RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+STABLE
+AS
+$$
 DECLARE
-  __schema_name VARCHAR;
+  __ah_range btracker_backend.aggregated_history_paging_return;
+  __granularity TEXT;
+  __one_period INTERVAL;
+
+  -- Get current block from HAF context for range validation
+  __btracker_current_block INT := btracker_backend.last_synced_block();
 BEGIN
-  SHOW SEARCH_PATH INTO __schema_name;
-  EXECUTE format(
-
-  $BODY$
-
-  CREATE OR REPLACE FUNCTION btracker_backend.get_balance_history_aggregation(
-      _account_id INT,
-      _coin_type INT,
-      _granularity btracker_backend.granularity,
-      _direction btracker_backend.sort_direction,
-      _from_block INT,
-      _to_block INT
-  )
-  RETURNS SETOF btracker_backend.aggregated_history -- noqa: LT01, CP05
-  LANGUAGE 'plpgsql'
-  STABLE
-  AS
-  $bp$
-  DECLARE
-    __ah_range btracker_backend.aggregated_history_paging_return;
-    __granularity TEXT;
-    __one_period INTERVAL;
-
-    -- Get current block from HAF context for range validation
-    __btracker_current_block INT := (SELECT current_block_num FROM hafd.contexts WHERE name = '%s');
-  BEGIN
     -- Convert enum granularity to PostgreSQL interval unit string
     __granularity := (
       CASE
@@ -224,10 +214,6 @@ BEGIN
         (CASE WHEN _direction = 'asc' THEN fb.date ELSE NULL END) ASC
     );
 
-  END
-  $bp$;
-
-  $BODY$, __schema_name, __schema_name);
 END
 $$;
 
