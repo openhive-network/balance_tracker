@@ -9,8 +9,9 @@
 
   stages:
     - name: test
-      # issue #54 (auto_vest=true): cvk vesting-stats over the routed-fill range.
-      # power_down_route_received carries VESTS (150000000); power_down_fill is zero.
+      # issue #54 (auto_vest=true): cvk only RECEIVED a routed fill (VESTS), so like gtg it
+      # has NO vesting-stats activity — all-zero buckets. The receipt is asserted in
+      # vesting-history; route recipients are excluded from power-down stats entirely.
       request:
         url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_stats"
         method: POST

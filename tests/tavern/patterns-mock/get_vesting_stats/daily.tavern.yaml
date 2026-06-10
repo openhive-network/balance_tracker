@@ -9,10 +9,10 @@
 
   stages:
     - name: test
-      # issue #54 (global): get_vesting_stats has no per-account fan-out and never emits
-      # kind=4, so power_down_route_received_* are always 0 here. The routed fills are still
-      # counted once under power_down_fill globally. Locks process_vesting_stats.sql (tall
-      # tables, kinds 1-3) over the routed-power-down fixture range.
+      # issue #54 (global): get_vesting_stats has no per-account fan-out — each fill is
+      # counted once under power_down_fill (count 3, vests 500000000, hive 16500 = 7000+9500).
+      # Locks process_vesting_stats.sql (tall tables, kinds 1-3) over the routed-power-down
+      # fixture range.
       request:
         url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_vesting_stats"
         method: POST

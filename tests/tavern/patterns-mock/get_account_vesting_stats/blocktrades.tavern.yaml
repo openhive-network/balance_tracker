@@ -9,10 +9,10 @@
 
   stages:
     - name: test
-      # issue #54: blocktrades vesting-stats over its own power-down range.
+      # issue #54: blocktrades (the sender) vesting-stats over its power-down range.
       # power_down_init from the withdraw_vesting; power_down_fill aggregates all three
-      # fills (count 3, vests 500000000) but hive only from the OWN fill (9500);
-      # power_down_route_received is zero (the sender receives nothing routed).
+      # fills (count 3, vests 500000000) but hive only from the OWN fill (9500) — the
+      # routed-away HIVE is not credited to the sender.
       request:
         url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_stats"
         method: POST

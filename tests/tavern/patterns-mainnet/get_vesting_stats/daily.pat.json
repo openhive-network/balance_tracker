@@ -19,17 +19,6 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
-      "nai": "@@000000037",
-      "precision": 6
-    },
     "power_up_count": 123,
     "power_up_hive": {
       "amount": "13622015",

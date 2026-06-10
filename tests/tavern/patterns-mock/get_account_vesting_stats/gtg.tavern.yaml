@@ -9,8 +9,9 @@
 
   stages:
     - name: test
-      # issue #54: gtg vesting-stats over the routed-fill range. power_down_route_received
-      # is populated (count 1, hive 7000); power_down_fill is zero (gtg never powered down).
+      # issue #54: gtg only RECEIVED a routed fill (it never powered down), so it has NO
+      # vesting-stats activity here — all-zero buckets. The receipt is asserted in
+      # vesting-history; route recipients are excluded from power-down stats entirely.
       request:
         url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_stats"
         method: POST
