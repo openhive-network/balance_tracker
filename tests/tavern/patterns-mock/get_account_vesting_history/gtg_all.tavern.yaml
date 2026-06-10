@@ -1,0 +1,30 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # issue #54: gtg's full vesting history (filter=all). The routed fill shows as a
+      # single power_down_route_received event (HIVE); there is NO power_down_fill row
+      # because gtg never powered down itself.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "gtg"
+          filter: "all"
+          from-block: "90000054"
+          page-size: 100
+          direction: "desc"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern

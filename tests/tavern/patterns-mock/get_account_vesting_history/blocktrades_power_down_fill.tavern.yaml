@@ -1,0 +1,31 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # issue #54: blocktrades is the from_account on all three fills. It keeps the full
+      # withdrawn VESTS on each, but only the OWN fill (to==from, block 90000057) contributes
+      # HIVE (9500); the two routed fills (to gtg / cvk) contribute hive=0 — the routed-away
+      # HIVE is NOT credited back to the sender.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "blocktrades"
+          filter: "power_down_fill"
+          from-block: "90000054"
+          page-size: 100
+          direction: "desc"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
