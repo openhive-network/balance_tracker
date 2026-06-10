@@ -29,6 +29,11 @@ Accounts `blocktrades` / `gtg` / `cvk` are part of the standard mock account set
 transfer_to_vesting / withdraw_vesting / fill_vesting_withdraw are) — it is included for
 fidelity and must be ignored by the aggregation.
 
+The fixture intentionally uses `blocktrades` (which carries a replayed mainnet withdraw
+state) as the sender: its synthetic withdraw + fills reset blocktrades' withdraw fields, and
+`get_account_balances/blocktrades` is regenerated as a consequence. This is expected — the
+sender was chosen deliberately rather than a fresh account.
+
 ## Expected per-account results (from-block 90000054) — the regression oracle
 
 `account_vesting_by_day`/`_month` (tall: one row per kind), surfaced wide by the endpoints:
@@ -49,6 +54,21 @@ fidelity and must be ignored by the aggregation.
 
 Before the fix, gtg and cvk each carried the full 150000000 VESTS under `power_down_fill`
 (and blocktrades' `power_down_fill_hive` was inflated by the routed-away HIVE).
+
+## Expected global results (get_vesting_stats)
+
+The global `vesting_stats_by_day`/`_month` aggregate every fill once under kind=3 (no
+per-account fan-out, no kind=4). For the three fills in this fixture:
+
+- `power_down_init` (kind 2): from the withdraw at 90000054 — op_count 1, vests 300000000
+- `power_down_fill` (kind 3): op_count **3**, vests **500000000** (150M+150M+200M),
+  hive **16500** (= 7000 routed-to-gtg + 9500 blocktrades' own fill)
+
+Note the routed-away 7000 HIVE appears in the GLOBAL aggregate (it is realised, network-wide
+HIVE) but in NO per-account aggregate by design — the sender (blocktrades) is credited only
+its own 9500 HIVE, and the recipient (gtg) gets the 7000 as history-only
+`power_down_route_received`, never a stats aggregate. The per-account stats deliberately do
+NOT sum to the global figure.
 
 ## Tavern coverage
 

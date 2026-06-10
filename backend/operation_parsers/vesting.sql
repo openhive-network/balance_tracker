@@ -93,7 +93,7 @@ BEGIN
     SELECT
       f.from_account::VARCHAR,
       btracker_backend.vesting_kind_power_down_fill(),
-      (CASE WHEN f.deposited_precision = 3 AND f.to_account = f.from_account
+      (CASE WHEN f.deposited_precision = btracker_backend.asset_precision_hive() AND f.to_account = f.from_account
             THEN f.deposited_amount ELSE 0::BIGINT END),
       (f.withdrawn_vests * _pre_hf1)
     FROM fill f
@@ -103,8 +103,8 @@ BEGIN
     SELECT
       f.to_account::VARCHAR,
       btracker_backend.vesting_kind_power_down_route_received(),
-      (CASE WHEN f.deposited_precision = 3 THEN f.deposited_amount ELSE 0::BIGINT END),
-      (CASE WHEN f.deposited_precision = 6 THEN f.deposited_amount::NUMERIC * _pre_hf1 ELSE 0::NUMERIC END)
+      (CASE WHEN f.deposited_precision = btracker_backend.asset_precision_hive() THEN f.deposited_amount ELSE 0::BIGINT END),
+      (CASE WHEN f.deposited_precision = btracker_backend.asset_precision_vests() THEN f.deposited_amount::NUMERIC * _pre_hf1 ELSE 0::NUMERIC END)
     FROM fill f
     WHERE f.to_account <> f.from_account;
   END IF;
@@ -144,7 +144,7 @@ BEGIN
     RETURN QUERY
       SELECT
         btracker_backend.vesting_kind_power_down_fill(),
-        (CASE WHEN (_body -> 'deposited' ->> 'precision')::INT = 3 -- HIVE
+        (CASE WHEN (_body -> 'deposited' ->> 'precision')::INT = btracker_backend.asset_precision_hive() -- HIVE
               THEN (_body -> 'deposited' ->> 'amount')::BIGINT ELSE 0::BIGINT END),
         ((_body -> 'withdrawn' ->> 'amount')::NUMERIC * _pre_hf1);
   END IF;

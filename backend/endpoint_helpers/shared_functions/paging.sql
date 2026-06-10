@@ -32,42 +32,6 @@
 SET ROLE btracker_owner;
 
 /**
- * total_pages()
- * -------------
- * Calculate the total number of pages needed to display a given number of items.
- *
- * This is a simple ceiling division: ceil(count / page_size)
- *
- * @param _ops_count  Total number of items to paginate
- * @param _page_size  Number of items per page
- * @returns           Total number of pages (minimum 1 if count > 0)
- *
- * Example:
- *   total_pages(25, 10) = 3  -- Pages: [10, 10, 5]
- *   total_pages(20, 10) = 2  -- Pages: [10, 10]
- *   total_pages(0, 10)  = 0  -- No pages needed
- */
-CREATE OR REPLACE FUNCTION btracker_backend.total_pages(
-    _ops_count INT,
-    _page_size INT
-)
-RETURNS INT -- noqa: LT01, CP05
-LANGUAGE 'plpgsql' IMMUTABLE
-AS
-$$
-BEGIN
-  RETURN (
-    CASE
-      WHEN (_ops_count % _page_size) = 0 THEN
-        _ops_count / _page_size
-      ELSE
-        (_ops_count / _page_size) + 1
-    END
-  );
-END
-$$;
-
-/**
  * calculate_pages_return
  * ----------------------
  * Return type for calculate_pages() function.

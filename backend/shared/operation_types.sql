@@ -266,20 +266,6 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION btracker_backend.op_collateralized_convert()
-RETURNS INT LANGUAGE plpgsql STABLE AS $$
-BEGIN
-  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::collateralized_convert_operation');
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION btracker_backend.op_fill_collateralized_convert_request()
-RETURNS INT LANGUAGE plpgsql STABLE AS $$
-BEGIN
-  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::fill_collateralized_convert_request_operation');
-END;
-$$;
-
 -- Custom JSON operations (used for RC delegations)
 CREATE OR REPLACE FUNCTION btracker_backend.op_custom_json()
 RETURNS INT LANGUAGE plpgsql STABLE AS $$

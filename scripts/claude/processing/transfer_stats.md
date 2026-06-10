@@ -13,8 +13,8 @@ Transfer volume aggregation by hour, day, and month.
 | Function | Purpose | Location |
 |----------|---------|----------|
 | `process_transfer_stats(_from, _to)` | Main stats processor | `db/process_transfer_stats.sql` |
-| `process_transfer(body)` | Parse transfer/recurrent transfer | `backend/transfers.sql` |
-| `process_escrow_transfer(body)` | Parse escrow transfer | `backend/escrow.sql` |
+| `process_transfer(body)` | Parse transfer/recurrent transfer | `backend/operation_parsers/transfers.sql` |
+| `process_escrow_transfer(body)` | Parse escrow transfer | `backend/operation_parsers/transfers.sql` |
 
 ## Tables Updated
 

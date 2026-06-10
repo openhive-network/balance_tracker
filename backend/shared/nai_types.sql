@@ -42,4 +42,20 @@ BEGIN
 END;
 $$;
 
+-- Decimal precision of a HIVE/HBD amount object (used to tell HIVE from VESTS by precision)
+CREATE OR REPLACE FUNCTION btracker_backend.asset_precision_hive()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN 3;
+END;
+$$;
+
+-- Decimal precision of a VESTS amount object (used to tell VESTS from HIVE by precision)
+CREATE OR REPLACE FUNCTION btracker_backend.asset_precision_vests()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN 6;
+END;
+$$;
+
 RESET ROLE;

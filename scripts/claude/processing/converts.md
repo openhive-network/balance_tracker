@@ -13,8 +13,8 @@ HBD→HIVE conversion request tracking with 3.5-day delay.
 | Function | Purpose | Location |
 |----------|---------|----------|
 | `process_block_range_converts(_from, _to, _report_step)` | Main converts processor | `db/process_block_range_converts.sql` |
-| `get_convert_request_event(body)` | Parse conversion initiation | `backend/convert_requests.sql` |
-| `get_fill_convert_event(body)` | Parse conversion completion | `backend/convert_requests.sql` |
+| `get_convert_request_event(body)` | Parse conversion initiation | `backend/operation_parsers/conversions.sql` |
+| `get_fill_convert_event(body)` | Parse conversion completion | `backend/operation_parsers/conversions.sql` |
 
 ## Tables Updated
 

@@ -52,8 +52,9 @@ requested range is represented.
 
 Parameters:
 - `granularity`: `daily | monthly | yearly` (default `daily`). Yearly
-  computed on-the-fly from monthly via
-  `btracker_backend.vesting_stats_by_year`.
+  granularity is rolled up on the fly from the monthly table inside
+  `btracker_backend.vesting_pivot` (`_trunc='year'`) — there is no
+  standalone `*_by_year` function or table.
 - `direction`: `asc | desc` (default `desc`)
 - `from-block` / `to-block`: integer or timestamp
 
@@ -95,24 +96,24 @@ Reads from the **tall** `account_vesting_by_day` / `account_vesting_by_month`
 (`(account, kind, period)` rows) populated during sync by
 `process_account_vesting_stats`, pivoting kinds into the wide response
 (`SUM(<col>) FILTER (WHERE kind = N)`) — no on-the-fly op scans. Yearly is rolled up from
-monthly via `btracker_backend.account_vesting_stats_by_year`. Gap-filled like the global
-endpoint.
+monthly on the fly inside `btracker_backend.vesting_pivot` (`_trunc='year'`). Gap-filled like
+the global endpoint.
 
-Beyond the power_up / power_down_init / power_down_fill columns, the per-account response
-adds `power_down_route_received_{count,hive,vests}` — fills routed to this account from
-someone else's power-down (issue #54). These are **0 in the global `/vesting-stats`**
-(no kind=4 globally), kept in the shared output type for a uniform shape.
+vesting-stats (global AND per-account) cover only power_up / power_down_init /
+power_down_fill. Routed receipts (kind=4 `power_down_route_received`) are history-only and do
+NOT appear in either stats endpoint — they surface only in `/vesting-history` (issue #54).
 
 Parameters: `granularity`, `direction`, `from-block`, `to-block`.
 
 ## Backend layer
 
 ```
-btracker_backend.get_vesting_aggregation()           -- /vesting-stats
+btracker_backend.get_vesting_aggregation()           -- /vesting-stats (gap-fill wrapper)
+btracker_backend.get_account_vesting_aggregation()   -- /accounts/{name}/vesting-stats (gap-fill wrapper)
 btracker_backend.get_account_vesting_history()       -- /accounts/{name}/vesting-history
-btracker_backend.get_account_vesting_aggregation()   -- /accounts/{name}/vesting-stats
-btracker_backend.vesting_stats_by_year()             -- monthly→yearly rollup helper
-btracker_backend.get_vesting_stats()                 -- table router (day|month|year)
+btracker_backend.get_vesting_stats()                 -- global table router (day|month|year)
+btracker_backend.get_account_vesting_stats()         -- per-account table router (day|month|year)
+btracker_backend.vesting_pivot()                     -- shared tall→wide pivot (incl. _trunc='year' yearly rollup)
 ```
 
 ## Related

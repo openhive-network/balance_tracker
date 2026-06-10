@@ -6,7 +6,7 @@ SET ROLE btracker_owner;
  * Dedicated read helpers for the global /vesting-stats endpoint. Both consume the
  * shared tall->wide engine btracker_backend.vesting_pivot()
  * (endpoint_helpers/shared_functions/vesting_pivot.sql). The per-account endpoint has
- * its own mirror pair in endpoint_helpers/get_account_vesting_stats/vesting_stats.sql.
+ * its own mirror pair in endpoint_helpers/get_account_vesting_stats/ (period_readers.sql + vesting_aggregation.sql).
  */
 
 /*

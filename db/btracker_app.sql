@@ -424,7 +424,7 @@ BEGIN
   CREATE TABLE IF NOT EXISTS vesting_stats_by_month
   (
     kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill (global has no kind 4)
-    updated_at     TIMESTAMP NOT NULL, -- Period end time (month bucket)
+    updated_at     TIMESTAMP NOT NULL, -- Period start (month bucket, date_trunc of created_at)
     op_count       INT       NOT NULL DEFAULT 0,
     hive_amount    BIGINT    NOT NULL DEFAULT 0, -- HIVE satoshi (×1000)
     vests_amount   NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
@@ -437,7 +437,7 @@ BEGIN
   CREATE TABLE IF NOT EXISTS vesting_stats_by_day
   (
     kind           SMALLINT  NOT NULL,
-    updated_at     TIMESTAMP NOT NULL, -- Period end time (day bucket)
+    updated_at     TIMESTAMP NOT NULL, -- Period start (day bucket, date_trunc of created_at)
     op_count       INT       NOT NULL DEFAULT 0,
     hive_amount    BIGINT    NOT NULL DEFAULT 0,
     vests_amount   NUMERIC   NOT NULL DEFAULT 0,
@@ -473,7 +473,7 @@ BEGIN
   (
     account        INT       NOT NULL,
     kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill (kind=4 route_received is history-only, excluded from these aggregates)
-    updated_at     TIMESTAMP NOT NULL,
+    updated_at     TIMESTAMP NOT NULL, -- Period start (month bucket, date_trunc of created_at)
     op_count       INT       NOT NULL DEFAULT 0,
     hive_amount    BIGINT    NOT NULL DEFAULT 0, -- HIVE satoshi (×1000)
     vests_amount   NUMERIC   NOT NULL DEFAULT 0, -- VESTS satoshi (×1e6 post-HF1)
@@ -487,7 +487,7 @@ BEGIN
   (
     account        INT       NOT NULL,
     kind           SMALLINT  NOT NULL,
-    updated_at     TIMESTAMP NOT NULL,
+    updated_at     TIMESTAMP NOT NULL, -- Period start (day bucket, date_trunc of created_at)
     op_count       INT       NOT NULL DEFAULT 0,
     hive_amount    BIGINT    NOT NULL DEFAULT 0,
     vests_amount   NUMERIC   NOT NULL DEFAULT 0,

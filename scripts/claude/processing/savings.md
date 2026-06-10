@@ -13,11 +13,11 @@ Savings account balance tracking with 3-day withdrawal delay.
 | Function | Purpose | Location |
 |----------|---------|----------|
 | `process_block_range_savings(_from, _to, _report_step)` | Main savings processor | `db/process_savings.sql` |
-| `process_transfer_to_savings_operation(body)` | Parse deposit operation | `backend/savings.sql` |
-| `process_transfer_from_savings_operation(body)` | Parse withdrawal request | `backend/savings.sql` |
-| `process_fill_transfer_from_savings_operation(body)` | Parse withdrawal completion | `backend/savings.sql` |
-| `process_cancel_transfer_from_savings_operation(body)` | Parse withdrawal cancellation | `backend/savings.sql` |
-| `process_interest_operation(body)` | Parse HBD interest payment | `backend/savings.sql` |
+| `process_transfer_to_savings_operation(body)` | Parse deposit operation | `backend/operation_parsers/savings.sql` |
+| `process_transfer_from_savings_operation(body)` | Parse withdrawal request | `backend/operation_parsers/savings.sql` |
+| `process_fill_transfer_from_savings_operation(body)` | Parse withdrawal completion | `backend/operation_parsers/savings.sql` |
+| `process_cancel_transfer_from_savings_operation(body)` | Parse withdrawal cancellation | `backend/operation_parsers/savings.sql` |
+| `process_interest_operation(body)` | Parse HBD interest payment | `backend/operation_parsers/savings.sql` |
 
 ## Tables Updated
 
