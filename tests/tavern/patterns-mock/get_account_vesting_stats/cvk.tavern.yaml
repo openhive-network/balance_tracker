@@ -1,0 +1,29 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # issue #54 (auto_vest=true): cvk vesting-stats over the routed-fill range.
+      # power_down_route_received carries VESTS (150000000); power_down_fill is zero.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_stats"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "cvk"
+          granularity: "daily"
+          direction: "desc"
+          from-block: "90000054"
+          to-block: "90000057"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
