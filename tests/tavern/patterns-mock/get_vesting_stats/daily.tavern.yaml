@@ -1,0 +1,30 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # issue #54 (global): get_vesting_stats has no per-account fan-out and never emits
+      # kind=4, so power_down_route_received_* are always 0 here. The routed fills are still
+      # counted once under power_down_fill globally. Locks process_vesting_stats.sql (tall
+      # tables, kinds 1-3) over the routed-power-down fixture range.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_vesting_stats"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          granularity: "daily"
+          direction: "desc"
+          from-block: "90000054"
+          to-block: "90000057"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
