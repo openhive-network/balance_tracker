@@ -113,7 +113,7 @@ SET ROLE btracker_owner;
                 {
                   "block_num": 4999990,
                   "operation_id": "21474797825294908",
-                  "op_type_id": 64,
+                  "op_type_id": 56,
                   "direction": "power_down_fill",
                   "amount_hive": {"nai": "@@000000021", "amount": "412345", "precision": 3},
                   "amount_vests": {"nai": "@@000000037", "amount": "1234567890", "precision": 6},

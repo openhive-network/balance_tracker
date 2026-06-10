@@ -30,7 +30,7 @@ at read time. Event kinds:
 | `transfer_to_vesting` → kind=1 (power_up) | Global: one `(1, period)` row, `op_count` += 1, `hive_amount` += amount. Per-account: history row + per-account aggregate for BOTH `from` and `to`. |
 | `withdraw_vesting` → kind=2 (power_down_init) | Global/per-account: `(2, …)` row, `op_count` += 1, `vests_amount` += scaled amount. Per-account: `account` only. Cancellations (`amount=0`) excluded. |
 | `fill_vesting_withdraw` → kind=3 (power_down_fill) — the account's OWN power-down | Global: `(3, period)`, `op_count` += 1, `vests_amount` += withdrawn, `hive_amount` += deposited (only when deposited NAI=21). Per-account: attributed to **`from_account` only** — `vests_amount` += withdrawn; `hive_amount` += deposited HIVE **only for an own power-down** (`to_account = from_account`), so HIVE routed away is not credited to the sender. |
-| `fill_vesting_withdraw` → kind=4 (power_down_route_received) — recipient of a routed fill | **Per-account only** (never global). Emitted for `to_account` **only when routed** (`to_account <> from_account`): `op_count` += 1; `hive_amount` += deposited (auto_vest=false) OR `vests_amount` += deposited (auto_vest=true). Keeps another account's withdrawal out of the recipient's power_down_fill (issue #54). |
+| `fill_vesting_withdraw` → kind=4 (power_down_route_received) — recipient of a routed fill | **History-only** — writes ONE `account_vesting_history` row for `to_account`, **only when routed** (`to_account <> from_account`): `hive_amount` = deposited (auto_vest=false) OR `vests_amount` = deposited (auto_vest=true). kind=4 contributes to **NO aggregate** — not the global `vesting_stats_by_*`, not the per-account `account_vesting_by_*` (a route recipient is not powering down). It is surfaced solely via `/vesting-history`. Keeps another account's withdrawal out of the recipient's power_down_fill (issue #54). |
 
 ## Tables Updated
 
@@ -131,15 +131,20 @@ rows by the shared tall→wide engine `backend/endpoint_helpers/shared_functions
 ```sql
 SUM(op_count)     FILTER (WHERE kind = 1) AS power_up_count,
 SUM(hive_amount)  FILTER (WHERE kind = 1) AS power_up_hive,
-... kinds 2, 3 ...
-SUM(op_count)     FILTER (WHERE kind = 4) AS power_down_route_received_count,
-SUM(hive_amount)  FILTER (WHERE kind = 4) AS power_down_route_received_hive,
-SUM(vests_amount) FILTER (WHERE kind = 4) AS power_down_route_received_vests
+SUM(op_count)     FILTER (WHERE kind = 2) AS power_down_init_count,
+SUM(vests_amount) FILTER (WHERE kind = 2) AS power_down_init_vests,
+SUM(op_count)     FILTER (WHERE kind = 3) AS power_down_fill_count,
+SUM(vests_amount) FILTER (WHERE kind = 3) AS power_down_fill_vests,
+SUM(hive_amount)  FILTER (WHERE kind = 3) AS power_down_fill_hive
 GROUP BY <period>
 ```
 
-Global rows have no kind=4, so `power_down_route_received_*` pivot to 0 (kept in the shared
-output type for a uniform response). Adding a future kind = new rows only, no schema change.
+kind=4 (`power_down_route_received`) is intentionally NOT aggregated and NOT present in
+`vesting_stats_return` — it is history-only, surfaced solely via `/vesting-history`. Both
+the global and per-account stats tables hold only kinds 1/2/3, so the pivot output type
+`vesting_stats_return` (`backend/endpoint_helpers/shared_functions/vesting_pivot.sql`) has
+exactly the power_up / power_down_init / power_down_fill columns above — no
+`power_down_route_received_*`. Adding a future stats kind = new rows + a new column here.
 
 ## GROUPING SETS
 

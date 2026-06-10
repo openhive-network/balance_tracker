@@ -29,8 +29,10 @@ btracker/
 │   ├── btracker_app.sql          # Main schema, entry point
 │   └── process_*.sql             # Balance processing (10 files)
 ├── backend/                      # SQL helpers (read + processing)
-│   ├── shared/                   # Domain primitives used by BOTH sides
-│   │                             #   (operation_types, nai_types, hardfork_constants, parse_amount_object)
+│   ├── shared/                   # Stateless domain primitives shared by the sync-time parsers
+│   │                             #   and, where relevant, the read endpoints. operation_types +
+│   │                             #   nai_types are dual-use; hardfork_constants + parse_amount_object
+│   │                             #   are processing-only.
 │   ├── endpoint_helpers/         # Read-side API helpers
 │   │   ├── shared_functions/     # Shared across endpoints (paging, views, validators, vesting_pivot, ...)
 │   │   └── get_<endpoint>/       # Per-endpoint helpers (one dir per API)

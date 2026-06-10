@@ -13,12 +13,12 @@ Power-down (vesting withdrawal) state tracking with routes and delayed voting.
 | Function | Purpose | Location |
 |----------|---------|----------|
 | `process_block_range_withdrawals(_from, _to, _report_step)` | Main withdrawals processor | `db/process_withdrawals.sql` |
-| `process_withdraw_vesting_operation(body, post_hf1, post_hf16)` | Parse withdrawal initiation | `backend/withdrawals.sql` |
-| `process_set_withdraw_vesting_route_operation(body)` | Parse route setup | `backend/withdrawals.sql` |
-| `process_fill_vesting_withdraw_operation_for_withdrawals(body, post_hf1)` | Parse weekly payout | `backend/withdrawals.sql` |
-| `process_reset_withdraw_hf23(body)` | Handle HF23 account reset | `backend/withdrawals.sql` |
-| `process_delayed_voting_operation(body)` | Parse delayed voting event | `backend/withdrawals.sql` |
-| `process_transfer_to_vesting_completed_operation(body)` | Parse power-up completion | `backend/withdrawals.sql` |
+| `process_withdraw_vesting_operation(body, post_hf1, post_hf16)` | Parse withdrawal initiation | `backend/operation_parsers/withdrawals.sql` |
+| `process_set_withdraw_vesting_route_operation(body)` | Parse route setup | `backend/operation_parsers/withdrawals.sql` |
+| `process_fill_vesting_withdraw_operation_for_withdrawals(body, post_hf1)` | Parse weekly payout | `backend/operation_parsers/withdrawals.sql` |
+| `process_reset_withdraw_hf23(body)` | Handle HF23 account reset | `backend/operation_parsers/withdrawals.sql` |
+| `process_delayed_voting_operation(body)` | Parse delayed voting event | `backend/operation_parsers/withdrawals.sql` |
+| `process_transfer_to_vesting_completed_operation(body)` | Parse power-up completion | `backend/operation_parsers/withdrawals.sql` |
 
 ## Tables Updated
 

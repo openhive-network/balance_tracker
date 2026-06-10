@@ -8,8 +8,9 @@ SET ROLE btracker_owner;
  *   3. account_vesting_by_month      (per-account monthly aggregation)
  *
  * Yearly granularity is rolled up on the fly from
- * account_vesting_by_month at query time (mirror of how
- * vesting_stats_by_year derives from the global vesting_stats_by_month).
+ * account_vesting_by_month at query time, inside btracker_backend.vesting_pivot
+ * (_trunc='year') — there is no standalone *_by_year function or table (the global
+ * vesting_stats_by_month is rolled up the same way).
  *
  * Global vesting stats (vesting_stats_by_day/_month) are populated by a
  * separate function (process_vesting_stats) — kept apart for single

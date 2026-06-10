@@ -1363,7 +1363,7 @@ declare
                     {
                       "block_num": 4999990,
                       "operation_id": "21474797825294908",
-                      "op_type_id": 64,
+                      "op_type_id": 56,
                       "direction": "power_down_fill",
                       "amount_hive": {
                         "nai": "@@000000021",

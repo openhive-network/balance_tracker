@@ -5,8 +5,8 @@ Per-account vesting event history.
 Called by: btracker_endpoints.get_account_vesting_history()
 
 Reads from account_vesting_history (populated during sync) using
-WINDOWED-by-seq_no scan (no OFFSET keyword), mirroring liquid_balance_history's
-pagination strategy:
+WINDOWED-by-seq_no scan (no OFFSET keyword), mirroring btracker_backend.balance_history's
+windowed seq_no scan (in get_balance_history/balance_history.sql):
 
   1. vesting_history_range(_account, _kind, _from_block, _to_block) converts
      the optional block-range filter into seq_no bounds (count, from_seq,
