@@ -1,5 +1,23 @@
 {
-    "total_operations": 0,
-    "total_pages": 0,
-    "operations_result": []
+  "operations_result": [
+    {
+      "amount_hive": {
+        "amount": "7000",
+        "nai": "@@000000021",
+        "precision": 3
+      },
+      "amount_vests": {
+        "amount": "0",
+        "nai": "@@000000037",
+        "precision": 6
+      },
+      "block_num": 90000055,
+      "direction": "power_down_route_received",
+      "op_type_id": 56,
+      "operation_id": "386547292863201281",
+      "timestamp": "2016-09-16T00:00:03"
+    }
+  ],
+  "total_operations": 1,
+  "total_pages": 1
 }

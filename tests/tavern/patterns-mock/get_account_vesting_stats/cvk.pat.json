@@ -1,1 +1,40 @@
-[]
+[
+  {
+    "date": "2016-09-17T00:00:00",
+    "last_block_num": 90000056,
+    "power_down_fill_count": 0,
+    "power_down_fill_hive": {
+      "amount": "0",
+      "nai": "@@000000021",
+      "precision": 3
+    },
+    "power_down_fill_vests": {
+      "amount": "0",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_down_init_count": 0,
+    "power_down_init_vests": {
+      "amount": "0",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_down_route_received_count": 1,
+    "power_down_route_received_hive": {
+      "amount": "0",
+      "nai": "@@000000021",
+      "precision": 3
+    },
+    "power_down_route_received_vests": {
+      "amount": "150000000",
+      "nai": "@@000000037",
+      "precision": 6
+    },
+    "power_up_count": 0,
+    "power_up_hive": {
+      "amount": "0",
+      "nai": "@@000000021",
+      "precision": 3
+    }
+  }
+]
