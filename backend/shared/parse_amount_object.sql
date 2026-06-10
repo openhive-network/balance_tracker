@@ -32,7 +32,7 @@
  * - hive.asset_symbol_from_nai_string(): Converts NAI string to symbol
  * - hive.decode_asset_symbol(): Extracts symbol info
  *
- * @see backend/utilities/nai_types.sql for NAI constants
+ * @see backend/shared/nai_types.sql for NAI constants
  */
 
 SET ROLE btracker_owner;

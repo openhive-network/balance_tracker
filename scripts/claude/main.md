@@ -28,12 +28,13 @@ btracker/
 ├── db/                           # Core SQL (tables, processing functions)
 │   ├── btracker_app.sql          # Main schema, entry point
 │   └── process_*.sql             # Balance processing (10 files)
-├── backend/                      # SQL helpers
-│   ├── aggregated/               # Balance aggregation functions
-│   ├── balance_history/          # History query routers
-│   ├── endpoint_helpers/         # API helper functions
-│   ├── operation_parsers/        # JSONB operation extractors
-│   └── utilities/                # Common utilities
+├── backend/                      # SQL helpers (read + processing)
+│   ├── shared/                   # Domain primitives used by BOTH sides
+│   │                             #   (operation_types, nai_types, hardfork_constants, parse_amount_object)
+│   ├── endpoint_helpers/         # Read-side API helpers
+│   │   ├── shared_functions/     # Shared across endpoints (paging, views, validators, vesting_pivot, ...)
+│   │   └── get_<endpoint>/       # Per-endpoint helpers (one dir per API)
+│   └── operation_parsers/        # Sync-time JSONB operation parsers
 ├── endpoints/                    # PostgREST API
 │   ├── account-balances/         # Balance query endpoints
 │   ├── transfers/                # Transfer analytics
