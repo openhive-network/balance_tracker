@@ -465,13 +465,14 @@ BEGIN
   -- Per-account vesting stats aggregated daily / monthly. Same TALL shape as the
   -- global vesting_stats_by_day/_month but with `account` as part of the PK, so each
   -- (account, kind, day|month) gets its own row. Backs /accounts/{name}/vesting-stats;
-  -- the endpoint pivots kinds into the wide response. Includes kind=4
-  -- (power_down_route_received). Yearly granularity is rolled up on the fly from the
-  -- monthly table at query time.
+  -- the endpoint pivots kinds into the wide response. Covers kinds 1-3 only; kind=4
+  -- (power_down_route_received) is history-only and intentionally excluded from these
+  -- aggregates (a route recipient is not powering down). Yearly granularity is rolled up
+  -- on the fly from the monthly table at query time.
   CREATE TABLE IF NOT EXISTS account_vesting_by_month
   (
     account        INT       NOT NULL,
-    kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill, 4=power_down_route_received
+    kind           SMALLINT  NOT NULL, -- 1=power_up, 2=power_down_init, 3=power_down_fill (kind=4 route_received is history-only, excluded from these aggregates)
     updated_at     TIMESTAMP NOT NULL,
     op_count       INT       NOT NULL DEFAULT 0,
     hive_amount    BIGINT    NOT NULL DEFAULT 0, -- HIVE satoshi (×1000)

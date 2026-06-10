@@ -14,10 +14,10 @@ SET ROLE btracker_owner;
  *   _trunc       NULL  => bucket by updated_at as stored (daily / monthly tables);
  *                'year' => roll the monthly table up to whole years
  *
- * The 11-column pivot list is written ONCE here. EXECUTE format() is used because the
+ * The 8-column pivot list is written ONCE here. EXECUTE format() is used because the
  * only thing that varies is the table identifier + two optional predicates — the same
  * dynamic-SQL style the gap-fill aggregation already uses. The kind discriminators come
- * from the btracker_backend.vesting_kind_*() constants (no bare 1/2/3/4 literals).
+ * from the btracker_backend.vesting_kind_*() constants (no bare 1/2/3 literals).
  */
 DROP TYPE IF EXISTS btracker_backend.vesting_stats_return CASCADE;
 CREATE TYPE btracker_backend.vesting_stats_return AS (
@@ -29,9 +29,6 @@ CREATE TYPE btracker_backend.vesting_stats_return AS (
     power_down_fill_count INT,
     power_down_fill_vests NUMERIC,
     power_down_fill_hive  BIGINT,
-    power_down_route_received_count INT,
-    power_down_route_received_hive  BIGINT,
-    power_down_route_received_vests NUMERIC,
     last_block_num        INT
 );
 
@@ -63,21 +60,17 @@ BEGIN
       COALESCE(SUM(v.op_count)     FILTER (WHERE v.kind = %4$s), 0)::INT     AS power_down_fill_count,
       COALESCE(SUM(v.vests_amount) FILTER (WHERE v.kind = %4$s), 0)::NUMERIC AS power_down_fill_vests,
       COALESCE(SUM(v.hive_amount)  FILTER (WHERE v.kind = %4$s), 0)::BIGINT  AS power_down_fill_hive,
-      COALESCE(SUM(v.op_count)     FILTER (WHERE v.kind = %5$s), 0)::INT     AS power_down_route_received_count,
-      COALESCE(SUM(v.hive_amount)  FILTER (WHERE v.kind = %5$s), 0)::BIGINT  AS power_down_route_received_hive,
-      COALESCE(SUM(v.vests_amount) FILTER (WHERE v.kind = %5$s), 0)::NUMERIC AS power_down_route_received_vests,
       MAX(v.last_block_num)::INT AS last_block_num
-    FROM %6$I v
-    WHERE %7$s %1$s BETWEEN $1 AND $2
+    FROM %5$I v
+    WHERE %6$s %1$s BETWEEN $1 AND $2
     GROUP BY %1$s
   $q$,
     _period,                                                   -- %1$s  period expr (also WHERE + GROUP BY)
     btracker_backend.vesting_kind_power_up(),                  -- %2$s
     btracker_backend.vesting_kind_power_down_init(),           -- %3$s
     btracker_backend.vesting_kind_power_down_fill(),           -- %4$s
-    btracker_backend.vesting_kind_power_down_route_received(), -- %5$s
-    _table,                                                    -- %6$I  whitelisted table identifier
-    _acct                                                      -- %7$s  optional account predicate
+    _table,                                                    -- %5$I  whitelisted table identifier
+    _acct                                                      -- %6$s  optional account predicate
   ) USING _from, _to;
 END
 $$;
