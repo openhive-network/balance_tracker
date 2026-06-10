@@ -4,6 +4,25 @@
       "balance": "29603375",
       "savings_balance": "6000"
     },
+    "date": "2016-09-17T00:00:00",
+    "max_balance": {
+      "balance": "29603375",
+      "savings_balance": "6000"
+    },
+    "min_balance": {
+      "balance": "29603375",
+      "savings_balance": "6000"
+    },
+    "prev_balance": {
+      "balance": "29593875",
+      "savings_balance": "6000"
+    }
+  },
+  {
+    "balance": {
+      "balance": "29593875",
+      "savings_balance": "6000"
+    },
     "date": "2016-09-16T00:00:00",
     "max_balance": {
       "balance": "32872416",
