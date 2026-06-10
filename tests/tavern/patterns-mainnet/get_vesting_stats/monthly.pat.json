@@ -19,17 +19,6 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
-      "nai": "@@000000037",
-      "precision": 6
-    },
     "power_up_count": 2637,
     "power_up_hive": {
       "amount": "600903506",
@@ -54,17 +43,6 @@
     "power_down_init_count": 2592,
     "power_down_init_vests": {
       "amount": "73525972287431091",
-      "nai": "@@000000037",
-      "precision": 6
-    },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
       "nai": "@@000000037",
       "precision": 6
     },
@@ -95,17 +73,6 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
-      "nai": "@@000000037",
-      "precision": 6
-    },
     "power_up_count": 7550,
     "power_up_hive": {
       "amount": "1379693254",
@@ -130,17 +97,6 @@
     "power_down_init_count": 371,
     "power_down_init_vests": {
       "amount": "296013258751295690",
-      "nai": "@@000000037",
-      "precision": 6
-    },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
       "nai": "@@000000037",
       "precision": 6
     },
@@ -171,17 +127,6 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
-      "nai": "@@000000037",
-      "precision": 6
-    },
     "power_up_count": 732,
     "power_up_hive": {
       "amount": "203947507",
@@ -209,17 +154,6 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
-      "nai": "@@000000037",
-      "precision": 6
-    },
     "power_up_count": 65603,
     "power_up_hive": {
       "amount": "1018932618",
@@ -244,17 +178,6 @@
     "power_down_init_count": 2,
     "power_down_init_vests": {
       "amount": "460000000000000000",
-      "nai": "@@000000037",
-      "precision": 6
-    },
-    "power_down_route_received_count": 0,
-    "power_down_route_received_hive": {
-      "amount": "0",
-      "nai": "@@000000021",
-      "precision": 3
-    },
-    "power_down_route_received_vests": {
-      "amount": "0",
       "nai": "@@000000037",
       "precision": 6
     },
