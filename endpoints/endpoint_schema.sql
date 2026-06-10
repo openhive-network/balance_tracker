@@ -708,18 +708,6 @@ declare
             "$ref": "#/components/schemas/btracker_backend.amount",
             "description": "realised HIVE delivered by fill_vesting_withdraw (excludes routed-to-VESTS) (HIVE NAI/precision)"
           },
-          "power_down_route_received_count": {
-            "type": "integer",
-            "description": "number of fill_vesting_withdraw tranches received via a withdraw route from another account (to<>from). Per-account only; 0 in the global stats."
-          },
-          "power_down_route_received_hive": {
-            "$ref": "#/components/schemas/btracker_backend.amount",
-            "description": "HIVE received from another account''s routed power-down (auto_vest=false) (HIVE NAI/precision). Per-account only."
-          },
-          "power_down_route_received_vests": {
-            "$ref": "#/components/schemas/btracker_backend.amount",
-            "description": "VESTS received from another account''s routed power-down (auto_vest=true) (VESTS NAI/precision). Per-account only."
-          },
           "last_block_num": {
             "type": "integer",
             "description": "last block number contributing to the period"

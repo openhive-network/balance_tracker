@@ -30,7 +30,12 @@ SET ROLE btracker_owner;
  *                                     (to_account <> from_account): the recipient gains the
  *                                     deposited asset — HIVE (auto_vest=false) or VESTS
  *                                     (auto_vest=true). The recipient is NOT powering down,
- *                                     so it is kept apart from power_down_fill (issue #54).
+ *                                     so kind=4 is written to account_vesting_history ONLY and
+ *                                     is intentionally EXCLUDED from the day/month stats
+ *                                     aggregates below — a route recipient never shows up in
+ *                                     power-down STATS (neither folded into power_down_fill nor
+ *                                     as a separate column); the receipt stays visible in the
+ *                                     per-account vesting HISTORY (issue #54 follow-up).
  *
  * Aggregates are stored TALL: one row per (account, kind, period) with generic
  * op_count / hive_amount / vests_amount; the API pivots kinds into its wide shape.
@@ -179,6 +184,7 @@ BEGIN
       date_trunc('month', bv.created_at) AS by_month
     FROM impacted_with_ids iwi
     JOIN hive.blocks_view bv ON bv.num = iwi.block_num
+    WHERE iwi.kind <> btracker_backend.vesting_kind_power_down_route_received()
   ),
   account_aggregated AS MATERIALIZED (
     SELECT
