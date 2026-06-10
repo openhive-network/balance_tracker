@@ -7,7 +7,7 @@ SET ROLE btracker_owner;
  * construction in ONE place, so get_account_vesting_history (and any future vesting
  * reader) shows only its essential logic instead of inlining the same CASE blocks.
  * The event "kinds" themselves are the btracker_backend.vesting_kind_*() constants
- * (backend/utilities/operation_types.sql).
+ * (backend/shared/operation_types.sql).
  */
 
 -- vesting_filter (API enum) -> internal kind. 'all' maps to NULL (no kind filter).

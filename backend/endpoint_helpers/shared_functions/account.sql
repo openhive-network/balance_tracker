@@ -80,34 +80,4 @@ BEGIN
 END
 $$;
 
-/**
- * get_account_name()
- * ------------------
- * Look up an account's name from its internal ID.
- *
- * This is the reverse of get_account_id(). It's used when displaying
- * results to users - internal queries use IDs, but API responses
- * should show human-readable account names.
- *
- * @param _account_id  Internal account ID to look up
- * @returns            Account name if found, NULL if not found
- *
- * Note: This function does not validate existence. If an invalid ID
- * is passed, it simply returns NULL. Callers should ensure IDs come
- * from trusted sources (e.g., database foreign keys).
- *
- * Example Usage:
- *   SELECT btracker_backend.get_account_name(123);  -- Returns 'alice'
- *   SELECT btracker_backend.get_account_name(999999);  -- Returns NULL if not found
- */
-CREATE OR REPLACE FUNCTION btracker_backend.get_account_name(_account_id INT)
-RETURNS TEXT STABLE
-LANGUAGE 'plpgsql'
-AS
-$$
-BEGIN
-  RETURN av.name FROM hive.accounts_view av WHERE av.id = _account_id;
-END
-$$;
-
 RESET ROLE;

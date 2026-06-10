@@ -123,8 +123,10 @@ BOTH functions' aggregations, so they never appear anywhere.
 ### Read-time pivot
 
 The endpoints return the historical **wide** `vesting_stats` shape, rebuilt from the tall
-rows in the read functions (`get_account_vesting_stats`, `get_vesting_stats`, and the
-yearly rollups in `backend/aggregated/vesting_stats.sql`):
+rows by the shared tall→wide engine `backend/endpoint_helpers/shared_functions/vesting_pivot.sql`
+(incl. yearly rollups), consumed by the per-endpoint routers `get_account_vesting_stats`
+(`backend/endpoint_helpers/get_account_vesting_stats/`) and `get_vesting_stats`
+(`backend/endpoint_helpers/get_vesting_stats/`):
 
 ```sql
 SUM(op_count)     FILTER (WHERE kind = 1) AS power_up_count,
