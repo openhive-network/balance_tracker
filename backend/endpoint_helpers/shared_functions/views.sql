@@ -367,6 +367,47 @@ CREATE OR REPLACE VIEW btracker_backend.saving_history_by_day_view AS
   FROM balance_history_by_day t;
 
 /**
+ * account_hbd_interest_view
+ * -------------------------
+ * View over account_hbd_interest.
+ *
+ * Base table: account_hbd_interest
+ * Purpose: Per-account liquid HBD interest accumulator for HAFBE get_account.
+ *
+ * A consumer (e.g. HAFBE get_account) reads this view by account to compute
+ * pending HBD interest. The final interest amount is computed by the consumer
+ * because it depends on the witness median HBD interest rate (top-20 ranked
+ * witnesses), which is outside Balance Tracker's scope.
+ *
+ * IMPORTANT — the stored hbd_seconds is only accrued up to the last balance change.
+ * A consumer must add the interest still pending for the idle period since then,
+ * BEFORE applying the rate:
+ *
+ *     hbd_seconds_pending = hbd_seconds
+ *                         + last_balance * EXTRACT(EPOCH FROM (now - hbd_seconds_last_update))
+ *     interest = hbd_seconds_pending / SECONDS_PER_YEAR * interest_rate / 10000
+ *
+ * Using the raw hbd_seconds without the pending term undercounts accounts that
+ * have not transacted since their last balance change.
+ *
+ * Columns:
+ * - hbd_seconds: accumulated (balance × seconds) since last interest payment (NOT incl. idle period)
+ * - hbd_seconds_last_update: timestamp of last liquid HBD balance change
+ * - last_balance: liquid HBD balance at hbd_seconds_last_update
+ * - hbd_last_interest_payment: timestamp of last liquid HBD interest payment
+ *
+ * No source_op column: this table stores timestamps directly from block data.
+ */
+CREATE OR REPLACE VIEW btracker_backend.account_hbd_interest_view AS
+  SELECT
+    t.account,
+    t.hbd_seconds,
+    t.hbd_seconds_last_update,
+    t.last_balance,
+    t.hbd_last_interest_payment
+  FROM account_hbd_interest t;
+
+/**
  * current_rc_delegations_view
  * ---------------------------
  * View over current_rc_delegations with extracted block info.

@@ -24,6 +24,7 @@ Core balance tracking for HIVE, HBD, and VESTS tokens.
 | `account_balance_history` | W | Every balance change (append-only) |
 | `balance_history_by_day` | RW | Daily min/max/end-of-day balance |
 | `balance_history_by_month` | RW | Monthly min/max/end-of-month balance |
+| `account_hbd_interest` | RW | Liquid HBD interest accumulator (`hbd_seconds`), frozen after HF25 |
 
 ## Processing Pattern
 
@@ -132,6 +133,52 @@ Balance-impacting operations are defined in HAF, not btracker. If HAF's `get_bal
      w_week_all AS (PARTITION BY account_id, nai, date_trunc('week', ...))
    ```
 3. Add insert CTE with `WHERE rn_by_week = 1`
+
+## Liquid HBD Interest Accumulator (`account_hbd_interest`)
+
+A trailing block in `process_balances` maintains the per-account liquid HBD interest
+state, mirroring hived `database.cpp` `adjust_hbd_balance` → `evaluate_hbd_interest`.
+It reuses the running HBD balance the main pipeline already computed (hung off
+`join_created_at_to_balance_history`), so there is no separate processing function and
+no extra operation scan.
+
+Per liquid HBD balance change it tracks:
+- `hbd_seconds` — Σ(balance × elapsed seconds) since the last interest payment
+- `hbd_seconds_last_update` — effective_ts of the latest liquid HBD balance change
+- `last_balance` — liquid HBD balance immediately after that change
+- `hbd_last_interest_payment` — effective_ts of the latest interest payment
+
+Key rules (all verified against hived):
+- **30-day reset:** on a balance change, if `hbd_seconds > 0` AND
+  `effective_ts - hbd_last_interest_payment > hbd_interest_compound_interval_sec()` (30 days),
+  `hbd_seconds` is zeroed and the payment timestamp advances. This is the chain's rule and
+  is **independent of any emitted `interest_operation`** — the chain only emits that vop when
+  the rounded interest is non-zero, so dust balances reset silently. The reset is sequentially
+  dependent (each reset moves the 30-day anchor), so it is computed in a `WITH RECURSIVE` CTE,
+  not a window function.
+- **New-account anchor = epoch:** a brand-new account's `hbd_last_interest_payment` (and
+  `hbd_seconds_last_update`) seed to **epoch (1970)**, exactly like `account_object` — those
+  fields have no initializer and are only written inside `adjust_hbd_balance`. Because the
+  anchor is epoch, the first balance change with a positive pre-change balance already has
+  `(effective_ts - anchor) > 30 days`, so the chain resets at that op no matter how soon it
+  follows the first transfer. Seeding the anchor to the first op's timestamp instead would
+  wrongly defer that first reset by 30 days. The first op itself never resets (pre-change
+  balance is 0, so `hbd_seconds` stays 0).
+- **effective_ts:** transaction ops (`trx_in_block >= 0`) use the previous block's time (head
+  time has not advanced yet during tx application); standalone virtual ops (`trx_in_block = -1`)
+  use the block's own time. Vops generated inside a transaction inherit its `trx_in_block`.
+- **HF25 gate:** accrual is frozen from after HF25; the boundary is inclusive (`<= HF25 block`)
+  because hived applies HF25 at the end of its activation block.
+
+Consumers (HAFBE) read `btracker_backend.account_hbd_interest_view` and must add the idle-period
+term before applying the witness rate:
+`hbd_seconds + last_balance * (now - hbd_seconds_last_update)`.
+
+Tests: the `regression-test` job (`tests/regression/`) compares `hbd_seconds`,
+`hbd_seconds_last_update` and `hbd_last_interest_payment` field-by-field against a real
+hived `database_api.list_accounts` snapshot (`accounts_dump.json.gz`, ~92k accounts), so
+the accumulator is verified for actual parity with the chain (e.g. never-paid accounts
+read back as `0 / 1970-01-01`, the epoch anchor). See `tests/regression/sql/02_compare_accounts.sql`.
 
 ## Related Processing
 
