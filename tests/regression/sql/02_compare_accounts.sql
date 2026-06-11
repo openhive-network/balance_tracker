@@ -63,7 +63,10 @@ expected AS MATERIALIZED (
         reward_vesting_hive,
         delegated_vesting_shares,
         received_vesting_shares,
-        posting_rewards
+        posting_rewards,
+        hbd_seconds,
+        hbd_seconds_last_update,
+        hbd_last_interest_payment
     FROM btracker_test.expected_account_balances
 ),
 
@@ -137,6 +140,16 @@ btracker_withdraws AS MATERIALIZED (
     FROM btracker_app.account_withdraws aw
 ),
 
+-- Balance Tracker's computed liquid HBD interest accumulator
+btracker_hbd_interest AS MATERIALIZED (
+    SELECT
+        hbi.account AS account_id,
+        hbi.hbd_seconds,
+        hbi.hbd_seconds_last_update,
+        hbi.hbd_last_interest_payment
+    FROM btracker_backend.account_hbd_interest_view hbi
+),
+
 -- Join expected with all btracker sources for comparison
 comparison AS MATERIALIZED (
     SELECT
@@ -160,6 +173,9 @@ comparison AS MATERIALIZED (
         e.delegated_vesting_shares,
         e.received_vesting_shares,
         e.posting_rewards,
+        e.hbd_seconds,
+        e.hbd_seconds_last_update,
+        e.hbd_last_interest_payment,
 
         -- Actual (btracker) values
         COALESCE(bb.balance, 0) AS actual_balance,
@@ -178,7 +194,12 @@ comparison AS MATERIALIZED (
         COALESCE(br.reward_vesting_hive, 0) AS actual_reward_vesting_hive,
         COALESCE(bd.delegated_vesting_shares, 0) AS actual_delegated_vesting_shares,
         COALESCE(bd.received_vesting_shares, 0) AS actual_received_vesting_shares,
-        COALESCE(bi.posting_rewards, 0) AS actual_posting_rewards
+        COALESCE(bi.posting_rewards, 0) AS actual_posting_rewards,
+        -- No accumulator row => account never earned liquid HBD interest, which the
+        -- chain represents as 0 seconds anchored at epoch (1970-01-01).
+        COALESCE(bhi.hbd_seconds, 0) AS actual_hbd_seconds,
+        COALESCE(bhi.hbd_seconds_last_update, 'epoch'::TIMESTAMP) AS actual_hbd_seconds_last_update,
+        COALESCE(bhi.hbd_last_interest_payment, 'epoch'::TIMESTAMP) AS actual_hbd_last_interest_payment
 
     FROM expected e
     LEFT JOIN btracker_balances bb ON bb.account_id = e.account_id
@@ -188,6 +209,7 @@ comparison AS MATERIALIZED (
     LEFT JOIN btracker_savings_withdrawals bsw ON bsw.account_id = e.account_id
     LEFT JOIN btracker_info_rewards bi ON bi.account_id = e.account_id
     LEFT JOIN btracker_withdraws bw ON bw.account_id = e.account_id
+    LEFT JOIN btracker_hbd_interest bhi ON bhi.account_id = e.account_id
 )
 
 -- Record all accounts where ANY field differs
@@ -211,7 +233,10 @@ WHERE
     OR c.reward_vesting_hive != c.actual_reward_vesting_hive
     OR c.delegated_vesting_shares != c.actual_delegated_vesting_shares
     OR c.received_vesting_shares != c.actual_received_vesting_shares
-    OR c.posting_rewards != c.actual_posting_rewards;
+    OR c.posting_rewards != c.actual_posting_rewards
+    OR c.hbd_seconds != c.actual_hbd_seconds
+    OR c.hbd_seconds_last_update != c.actual_hbd_seconds_last_update
+    OR c.hbd_last_interest_payment != c.actual_hbd_last_interest_payment;
 
 END;
 $$;
@@ -259,7 +284,10 @@ BEGIN
         reward_vesting_hive,
         delegated_vesting_shares,
         received_vesting_shares,
-        posting_rewards
+        posting_rewards,
+        hbd_seconds,
+        hbd_seconds_last_update,
+        hbd_last_interest_payment
     FROM btracker_test.expected_account_balances
     WHERE account_id = _account_id;
 
