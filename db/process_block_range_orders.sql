@@ -124,7 +124,6 @@ BEGIN
     events AS MATERIALIZED (
         /*
          * Final normalized events with owner_id resolved.
-         * This is the base dataset all subsequent CTEs work from.
          */
         SELECT
             ai.account_id AS owner_id,
