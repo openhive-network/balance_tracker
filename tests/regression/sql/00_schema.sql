@@ -73,6 +73,11 @@ CREATE TABLE IF NOT EXISTS btracker_test.expected_account_balances (
     posting_rewards BIGINT DEFAULT 0,            -- Total posting rewards earned
     curation_rewards BIGINT DEFAULT 0,           -- Total curation rewards earned
 
+    -- Liquid HBD interest accumulator (mirrors account_object; epoch = never paid)
+    hbd_seconds NUMERIC DEFAULT 0,                        -- Σ(liquid HBD × seconds) since last payment
+    hbd_seconds_last_update TIMESTAMP DEFAULT 'epoch',    -- last liquid HBD balance change
+    hbd_last_interest_payment TIMESTAMP DEFAULT 'epoch',  -- last interest payment (30-day anchor)
+
     CONSTRAINT pk_expected_account_balances PRIMARY KEY (account_id)
 );
 
