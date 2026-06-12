@@ -363,6 +363,21 @@ BEGIN
   );
   PERFORM hive.app_register_table( __schema_name, 'saving_history_by_day', __schema_name );
 
+  ------------- LIQUID HBD INTEREST STATE ----------------
+  -- Per-account accumulator for liquid HBD interest, mirroring the chain's account_object
+  -- fields (hived database.cpp adjust_hbd_balance). Frozen from HF25 onward. Consumers
+  -- (e.g. HAFBE get_account) compute pending interest from this state and the witness rate.
+  CREATE TABLE IF NOT EXISTS account_hbd_interest
+  (
+    account                   INT       NOT NULL,                -- HAF account id (hive.accounts_view.id)
+    hbd_seconds               NUMERIC   NOT NULL DEFAULT 0,      -- Σ(liquid HBD balance × seconds) since the last interest payment; reset to 0 on payment
+    hbd_seconds_last_update   TIMESTAMP NOT NULL,                -- effective_ts of the latest liquid HBD balance change (anchor for the next accrual)
+    last_balance              BIGINT    NOT NULL DEFAULT 0,      -- liquid HBD balance (satoshis) immediately after hbd_seconds_last_update
+    hbd_last_interest_payment TIMESTAMP NOT NULL,                -- effective_ts of the latest liquid HBD interest payment (30-day compound anchor)
+    CONSTRAINT pk_account_hbd_interest PRIMARY KEY (account)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'account_hbd_interest', __schema_name );
+
   ------------- TRANSFER STATISTICS ----------------
   CREATE TABLE IF NOT EXISTS transfer_stats_by_month
   (

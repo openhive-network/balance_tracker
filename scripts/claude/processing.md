@@ -26,7 +26,7 @@ HAFBE (hafbe_app.sql)
 
 | Function | File | Operations Handled | Tables Updated |
 |----------|------|-------------------|----------------|
-| `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `account_balance_history` |
+| `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `account_balance_history`, `balance_history_by_day/month`, `account_hbd_interest` |
 | `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares | `current_accounts_delegations`, `account_delegations` |
 | `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc) | `current_rc_delegations`, `account_rc_delegations` |
 | `process_rewards` | `db/process_rewards.sql` | author_reward, curation_reward, claim_reward_balance | `account_rewards` |

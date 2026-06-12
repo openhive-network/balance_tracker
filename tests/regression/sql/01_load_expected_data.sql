@@ -61,7 +61,10 @@ BEGIN
         withdrawn,
         withdraw_routes,
         posting_rewards,
-        curation_rewards
+        curation_rewards,
+        hbd_seconds,
+        hbd_seconds_last_update,
+        hbd_last_interest_payment
     )
     SELECT
         (account_data->>'id')::INT,
@@ -82,7 +85,12 @@ BEGIN
         (account_data->>'withdrawn')::BIGINT,
         (account_data->>'withdraw_routes')::INT,
         (account_data->>'posting_rewards')::BIGINT,
-        (account_data->>'curation_rewards')::BIGINT;
+        (account_data->>'curation_rewards')::BIGINT,
+        -- hbd_seconds is uint128 on chain (-> NUMERIC); the two anchors are ISO
+        -- timestamps, epoch (1970-01-01) for accounts that never earned interest.
+        (account_data->>'hbd_seconds')::NUMERIC,
+        (account_data->>'hbd_seconds_last_update')::TIMESTAMP,
+        (account_data->>'hbd_last_interest_payment')::TIMESTAMP;
 END;
 $$;
 
@@ -115,7 +123,10 @@ CREATE TYPE btracker_test.account_stats_type AS (
     reward_vesting_hive BIGINT,
     delegated_vesting_shares BIGINT,
     received_vesting_shares BIGINT,
-    posting_rewards BIGINT
+    posting_rewards BIGINT,
+    hbd_seconds NUMERIC,
+    hbd_seconds_last_update TIMESTAMP,
+    hbd_last_interest_payment TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
@@ -158,7 +169,11 @@ BEGIN
         COALESCE(rwd.hive_vesting_rewards, 0),
         COALESCE(del.delegated_vests, 0),
         COALESCE(del.received_vests, 0),
-        COALESCE(info.posting_rewards, 0)
+        COALESCE(info.posting_rewards, 0),
+        -- Liquid HBD interest accumulator; no row -> never earned interest (epoch, matching chain)
+        COALESCE(hbi.hbd_seconds, 0),
+        COALESCE(hbi.hbd_seconds_last_update, 'epoch'::TIMESTAMP),
+        COALESCE(hbi.hbd_last_interest_payment, 'epoch'::TIMESTAMP)
     INTO result
     FROM
         (SELECT * FROM btracker_endpoints.get_account_balances(_account_id)) AS bal,
@@ -166,7 +181,8 @@ BEGIN
         (SELECT * FROM btracker_endpoints.get_account_rewards(_account_id)) AS rwd,
         (SELECT * FROM btracker_endpoints.get_account_savings(_account_id)) AS sav,
         (SELECT * FROM btracker_endpoints.get_account_info_rewards(_account_id)) AS info,
-        (SELECT * FROM btracker_endpoints.get_account_withdraws(_account_id)) AS wdr;
+        (SELECT * FROM btracker_endpoints.get_account_withdraws(_account_id)) AS wdr
+        LEFT JOIN btracker_backend.account_hbd_interest_view AS hbi ON hbi.account = _account_id;
 
     RETURN result;
 END;

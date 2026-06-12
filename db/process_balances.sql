@@ -19,11 +19,21 @@ AS
 $$
 DECLARE
  _result INT;
+ _nai_hbd              SMALLINT := btracker_backend.nai_hbd();
+ _hf_hbd_interest      INT      := btracker_backend.hf_hbd_interest();
+ _hf_hbd_interest_block INT;
+ _hbd_interest_interval INT     := btracker_backend.hbd_interest_compound_interval_sec();
  __balance_history INT;
  __current_balances INT;
  __balance_history_by_day INT;
  __balance_history_by_month INT;
+ __hbd_interest INT;
 BEGIN
+
+SELECT block_num
+INTO _hf_hbd_interest_block
+FROM hafd.applied_hardforks
+WHERE hardfork_num = _hf_hbd_interest;
 --RAISE NOTICE 'Processing balances';
 
 /*
@@ -84,7 +94,12 @@ ops_in_range AS MATERIALIZED
     get_impacted_balances.asset_symbol_nai AS nai,
     get_impacted_balances.amount AS balance,
     ho.id AS source_op,
-    ho.block_num AS source_op_block
+    ho.block_num AS source_op_block,
+    -- threaded down to the HBD interest accumulator so it does not have to re-read
+    -- _btracker_ops_batch; trx_in_block distinguishes transaction ops (>= 0, applied
+    -- before head_block_time advances -> use block-1 time) from standalone virtual ops
+    -- (-1, applied after -> use block time). See hbd_ops effective_ts.
+    ho.trx_in_block AS trx_in_block
   FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
   JOIN balance_impacting_ops bio ON bio.id = ho.op_type_id
   JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
@@ -197,19 +212,22 @@ union_latest_balance_with_impacted_balances AS (
     cp.balance,
     1 AS balance_seq_no,
     cp.source_op,
-    cp.source_op_block
+    cp.source_op_block,
+    cp.trx_in_block
   FROM ops_in_range cp
 
   UNION ALL
 
 -- latest stored balance is needed to replicate balance history
+-- (synthetic source_op=0 row; trx_in_block is irrelevant and filtered out later)
   SELECT
     glb.account_id,
     glb.nai,
     glb.balance,
     glb.balance_seq_no,
     glb.source_op,
-    glb.source_op_block
+    glb.source_op_block,
+    NULL::SMALLINT AS trx_in_block
   FROM get_latest_balance glb
 ),
 
@@ -289,7 +307,8 @@ sum_balances AS (
     SUM(ulb.balance) OVER w_asc AS balance,
     SUM(ulb.balance_seq_no) OVER w_asc AS balance_seq_no,
     ulb.source_op,
-    ulb.source_op_block
+    ulb.source_op_block,
+    ulb.trx_in_block
   FROM union_latest_balance_with_impacted_balances ulb
   WINDOW
     w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
@@ -307,6 +326,7 @@ prepare_balance_history AS MATERIALIZED (
     sb.balance_seq_no,
     sb.source_op,
     sb.source_op_block,
+    sb.trx_in_block,
     ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
   FROM sum_balances sb
 ),
@@ -388,7 +408,8 @@ remove_latest_stored_balance_record AS MATERIALIZED (
     pbh.balance_seq_no,
     pbh.source_op,
     pbh.source_op_block,
-    pbh.balance
+    pbh.balance,
+    pbh.trx_in_block
   FROM prepare_balance_history pbh
   -- Remove the synthetic row that contained the prepared previous balance
   WHERE pbh.source_op > 0
@@ -451,6 +472,9 @@ join_created_at_to_balance_history AS MATERIALIZED (
     rls.source_op,
     rls.source_op_block,
     rls.balance,
+    rls.balance_seq_no,
+    rls.trx_in_block,
+    bv.created_at,
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
   FROM remove_latest_stored_balance_record rls
@@ -620,6 +644,189 @@ insert_account_balance_history_by_month AS (
     min_balance = LEAST(EXCLUDED.min_balance, acc_history.min_balance),
     max_balance = GREATEST(EXCLUDED.max_balance, acc_history.max_balance)
   RETURNING (xmax = 0) as is_new_entry, acc_history.account
+),
+
+/*
+ * ===================================================================================
+ * HBD INTEREST STATE
+ * ===================================================================================
+ * Maintains the per-account liquid HBD interest accumulator in account_hbd_interest.
+ *
+ * WHY HERE (not its own process_*.sql): the accumulator integrates the per-operation
+ * liquid HBD running balance against time. That running balance is exactly what the
+ * main pipeline above already computes (sum_balances -> join_created_at_to_balance_history).
+ * Recomputing it in a separate processing function would re-run the get_impacted_balances
+ * extraction and the window sums — expensive, and worse during massive sync when app
+ * indexes are dropped. So we hang the accumulator off join_created_at_to_balance_history,
+ * which already carries the running balance, source op id, block number and timestamp.
+ *
+ * COST: this block reads no extra prefetch rows (trx_in_block is threaded down from
+ * ops_in_range, so _btracker_ops_batch is not re-scanned). It does add ONE more
+ * hive.blocks_view access — bv_prev, to fetch the previous block's time for the
+ * regular-op timestamp rule — scoped to HBD rows only.
+ *
+ * CHAIN MODEL (hived database.cpp adjust_hbd_balance -> evaluate_hbd_interest):
+ *   On every liquid HBD balance change the chain accrues
+ *       hbd_seconds += balance_before_change * (head_block_time - hbd_seconds_last_update)
+ *   and then, if hbd_seconds > 0 AND head_block_time - hbd_last_interest_payment >
+ *   HIVE_HBD_INTEREST_COMPOUND_INTERVAL_SEC (30 days), pays interest and resets
+ *   hbd_seconds to 0, advancing hbd_last_interest_payment. The reset is UNCONDITIONAL
+ *   once the interval passes; the interest_operation virtual op is only emitted when the
+ *   rounded interest is > 0, so the reset must be derived from the 30-day rule, not from
+ *   observing an interest_operation (dust balances reset silently with no op). Accrual is
+ *   frozen from HF25 onward (the whole block is gated on has_hardfork(HF25) == false).
+ *
+ * TIMESTAMP RULE (head_block_time as seen during application, verified in _apply_block):
+ *   transaction ops (trx_in_block >= 0) are applied before update_global_dynamic_data, so
+ *     head_block_time is still the PREVIOUS block's time -> use block-1 time. Virtual ops
+ *     generated inside a transaction (e.g. the interest_operation from a transfer) inherit
+ *     that transaction's trx_in_block, so they share the same effective_ts as their trigger.
+ *   standalone virtual ops (trx_in_block = -1) run after update_global_dynamic_data -> use
+ *     the block's own time.
+ *
+ * Structure mirrors the delayed_vests pattern in process_withdrawals.sql:
+ *   sentinel (source_op=0) carries previous state -> UNION ALL with ops -> ROW_NUMBER ->
+ *   recursive CTE accumulates hbd_seconds row-by-row (sequentially dependent because each
+ *   reset advances the 30-day anchor) -> upsert.
+ */
+
+-- Liquid HBD rows with their effective timestamp.
+-- trx_in_block is threaded down from ops_in_range (no re-read of _btracker_ops_batch).
+-- HF25 gate: Hive core stopped updating liquid hbd_seconds at HF25 (database.cpp:3209).
+-- _hf_hbd_interest_block IS NULL means HF25 not yet applied in this dataset, so all
+-- blocks pass (an explicit IS NULL check — relying on NULL <= x would drop every row).
+-- The boundary is inclusive (<=): HF25 is applied by process_hardforks() at the END of
+-- its activation block, so ops within that block still see has_hardfork(HF25) == false
+-- and still accrue; only block N+1 onward is frozen.
+hbd_ops AS MATERIALIZED (
+  SELECT
+    jc.account_id,
+    jc.balance,
+    jc.source_op,
+    jc.source_op_block,
+    jc.balance_seq_no,
+    CASE WHEN jc.trx_in_block >= 0
+         THEN COALESCE(bv_prev.created_at, jc.created_at)
+         ELSE jc.created_at
+    END AS effective_ts
+  FROM join_created_at_to_balance_history jc
+  LEFT JOIN hive.blocks_view bv_prev ON bv_prev.num = jc.source_op_block - 1
+  WHERE jc.nai = _nai_hbd
+    AND (_hf_hbd_interest_block IS NULL OR jc.source_op_block <= _hf_hbd_interest_block)
+),
+
+-- Sentinel rows: previous state from account_hbd_interest (source_op = 0 sorts first).
+-- For a brand-new account (no stored row) the anchors default to EPOCH, exactly matching
+-- the chain: account_object.hbd_last_interest_payment / hbd_seconds_last_update are
+-- time_point_sec with no initializer (epoch) and are only ever written inside
+-- adjust_hbd_balance (database.cpp). This is load-bearing for the 30-day reset rule:
+-- because the anchor is epoch, the FIRST balance change that finds a positive pre-change
+-- balance has (effective_ts - epoch) >> 30 days, so the chain resets hbd_seconds (and pays
+-- interest) at that op regardless of how soon it follows the first one. Seeding the anchor
+-- to the first op's timestamp instead would wrongly defer that first reset by 30 days.
+-- hbd_seconds_last_update can also be epoch: the first op accrues last_balance(0) * dt = 0.
+prev_hbd_interest AS (
+  SELECT
+    ho.account_id,
+    COALESCE(hi.hbd_seconds, 0::NUMERIC)                       AS hbd_seconds,
+    COALESCE(hi.hbd_seconds_last_update, 'epoch'::TIMESTAMP)   AS hbd_seconds_last_update,
+    COALESCE(hi.last_balance, 0::BIGINT)                       AS last_balance,
+    COALESCE(hi.hbd_last_interest_payment, 'epoch'::TIMESTAMP) AS hbd_last_interest_payment,
+    0::BIGINT       AS source_op,
+    0               AS balance_seq_no,
+    NULL::TIMESTAMP AS effective_ts
+  FROM (SELECT DISTINCT account_id FROM hbd_ops) ho
+  LEFT JOIN account_hbd_interest hi ON hi.account = ho.account_id
+),
+
+-- Union previous state + ops, then assign row numbers for recursive iteration.
+hbd_interest_union AS (
+  SELECT account_id, hbd_seconds, hbd_seconds_last_update, last_balance,
+         hbd_last_interest_payment, source_op, balance_seq_no, effective_ts
+  FROM prev_hbd_interest
+
+  UNION ALL
+
+  SELECT account_id,
+         0::NUMERIC          AS hbd_seconds,
+         NULL::TIMESTAMP     AS hbd_seconds_last_update,
+         balance             AS last_balance,
+         NULL::TIMESTAMP     AS hbd_last_interest_payment,
+         source_op, balance_seq_no, effective_ts
+  FROM hbd_ops
+),
+
+hbd_interest_rows AS MATERIALIZED (
+  SELECT *,
+         ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY source_op, balance_seq_no) AS rn
+  FROM hbd_interest_union
+),
+
+-- Recursive accumulator. Each row first accrues hbd_seconds from the PREVIOUS row's balance
+-- over the elapsed time, then applies the chain's 30-day reset rule: if the accrued value is
+-- positive AND more than the compound interval has elapsed since the last interest payment,
+-- zero hbd_seconds and advance hbd_last_interest_payment to this op's effective_ts. This is
+-- sequentially dependent (each reset moves the 30-day anchor), which is why a window function
+-- cannot express it. The accrual expression is repeated in both CASE arms because a recursive
+-- term cannot reference a sibling output column.
+hbd_interest_accumulator AS MATERIALIZED (
+  WITH RECURSIVE acc AS (
+    SELECT account_id, hbd_seconds, hbd_seconds_last_update,
+           last_balance, hbd_last_interest_payment, source_op, rn
+    FROM hbd_interest_rows
+    WHERE rn = 1
+
+    UNION ALL
+
+    SELECT
+      nxt.account_id,
+      CASE WHEN (acc.hbd_seconds
+                 + acc.last_balance::NUMERIC * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))) > 0
+                AND EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_last_interest_payment)) > _hbd_interest_interval
+           THEN 0::NUMERIC
+           ELSE acc.hbd_seconds
+              + acc.last_balance::NUMERIC
+                * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))
+      END                                                           AS hbd_seconds,
+      nxt.effective_ts                                              AS hbd_seconds_last_update,
+      nxt.last_balance,
+      CASE WHEN (acc.hbd_seconds
+                 + acc.last_balance::NUMERIC * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))) > 0
+                AND EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_last_interest_payment)) > _hbd_interest_interval
+           THEN nxt.effective_ts
+           ELSE acc.hbd_last_interest_payment
+      END                                                           AS hbd_last_interest_payment,
+      nxt.source_op,
+      nxt.rn
+    FROM acc
+    JOIN hbd_interest_rows nxt
+      ON nxt.account_id = acc.account_id AND nxt.rn = acc.rn + 1
+  )
+  SELECT * FROM acc
+),
+
+-- Extract the final state per account (last op processed = highest source_op).
+hbd_interest_final AS (
+  SELECT DISTINCT ON (account_id)
+    account_id, hbd_seconds, hbd_seconds_last_update,
+    last_balance, hbd_last_interest_payment
+  FROM hbd_interest_accumulator
+  WHERE source_op > 0
+  ORDER BY account_id, rn DESC
+),
+
+insert_hbd_interest AS (
+  INSERT INTO account_hbd_interest
+    (account, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment)
+  SELECT
+    account_id, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment
+  FROM hbd_interest_final
+  ON CONFLICT ON CONSTRAINT pk_account_hbd_interest DO UPDATE SET
+    hbd_seconds               = EXCLUDED.hbd_seconds,
+    hbd_seconds_last_update   = EXCLUDED.hbd_seconds_last_update,
+    last_balance              = EXCLUDED.last_balance,
+    hbd_last_interest_payment = EXCLUDED.hbd_last_interest_payment
+  RETURNING account
 )
 
 /*
@@ -639,8 +846,10 @@ SELECT
   (SELECT count(*) FROM insert_account_balance_history) as balance_history,
   (SELECT count(*) FROM insert_current_account_balances) AS current_balances,
   (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
-  (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month
-INTO __balance_history, __current_balances, __balance_history_by_day,__balance_history_by_month;
+  (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month,
+  (SELECT count(*) FROM insert_hbd_interest) AS hbd_interest
+INTO __balance_history, __current_balances, __balance_history_by_day,
+     __balance_history_by_month, __hbd_interest;
 
 END
 $$;

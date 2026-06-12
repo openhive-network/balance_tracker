@@ -55,6 +55,27 @@ BEGIN
 END;
 $$;
 
+-- HF25: Liquid HBD interest accrual stopped (hbd_seconds no longer updated by chain)
+CREATE OR REPLACE FUNCTION btracker_backend.hf_hbd_interest()
+RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  RETURN 25;
+END;
+$$;
+
+-- HBD interest compound interval, in seconds (HIVE_HBD_INTEREST_COMPOUND_INTERVAL_SEC = 60*60*24*30).
+-- On every liquid HBD balance change the chain accrues hbd_seconds and, when more than this interval
+-- has elapsed since the last interest payment, pays interest and resets hbd_seconds to 0 (hived
+-- database.cpp adjust_hbd_balance -> evaluate_hbd_interest). The reset is unconditional once the
+-- interval passes and hbd_seconds > 0; the interest_operation virtual op is only emitted when the
+-- rounded interest is non-zero, so the reset cannot be detected from the op stream alone.
+CREATE OR REPLACE FUNCTION btracker_backend.hbd_interest_compound_interval_sec()
+RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  RETURN 60 * 60 * 24 * 30;
+END;
+$$;
+
 -- HF26: Introduced RC (Resource Credit) delegations
 CREATE OR REPLACE FUNCTION btracker_backend.hf_rc_delegations()
 RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$
