@@ -1,0 +1,19 @@
+---
+test_name: Top holders reject VESTS bounds for other assets
+
+marks:
+  - patterntest
+
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Reject min_vests for HIVE
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HIVE
+        min_vests: 1
+    response:
+      status_code: 400

@@ -1,0 +1,68 @@
+---
+test_name: Top VESTS holders support balance range filtering
+
+marks:
+  - patterntest
+
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Filter before pagination with inclusive minimum and exclusive maximum
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: VESTS
+        min_vests: 336662952017765
+        max_vests: 344881690242464
+        page-size: 2
+    response:
+      status_code: 200
+      json:
+        total_accounts: 3
+        total_pages: 2
+        holders_result:
+          - rank: 1
+            account: steemychicken1
+            value: "340834009930190"
+          - rank: 2
+            account: faddy
+            value: "336900857841845"
+
+  - name: Filtered second page keeps subset rank and inclusive minimum
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: VESTS
+        min_vests: 336662952017765
+        max_vests: 344881690242464
+        page: 2
+        page-size: 2
+    response:
+      status_code: 200
+      json:
+        total_accounts: 3
+        total_pages: 2
+        holders_result:
+          - rank: 3
+            account: cryptoctopus
+            value: "336662952017765"
+
+  - name: Open-ended minimum returns the upper VESTS bracket
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: VESTS
+        min_vests: 225671901920188893
+    response:
+      status_code: 200
+      json:
+        total_accounts: 1
+        total_pages: 1
+        holders_result:
+          - rank: 1
+            account: steemit
+            value: "225671901920188893"

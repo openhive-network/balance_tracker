@@ -11,7 +11,9 @@ CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
     _coin_type    INT,
     _balance_type btracker_backend.balance_type,
     _page         INT,
-    _limit        INT
+    _limit        INT,
+    _min_vests    BIGINT,
+    _max_vests    BIGINT
 )
 RETURNS btracker_backend.top_holders
 LANGUAGE plpgsql
@@ -24,11 +26,14 @@ DECLARE
   _rows         btracker_backend.ranked_holder[];
 BEGIN
   IF _balance_type = 'balance' THEN
-    -- Count total accounts with positive balance (required for pagination UI)
+    -- Count after filtering so pagination metadata describes the selected range.
     SELECT COUNT(*)
       INTO _total
     FROM btracker_backend.current_account_balances_view
-    WHERE nai = _coin_type AND balance > 0;
+    WHERE nai = _coin_type
+      AND balance > 0
+      AND (_min_vests IS NULL OR balance >= _min_vests)
+      AND (_max_vests IS NULL OR balance < _max_vests);
 
     IF _total = 0 THEN
       _total_pages := 0;
@@ -44,6 +49,9 @@ BEGIN
         FROM btracker_backend.current_account_balances_view AS src
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
+          AND src.balance > 0
+          AND (_min_vests IS NULL OR src.balance >= _min_vests)
+          AND (_max_vests IS NULL OR src.balance < _max_vests)
         ORDER BY src.balance DESC, av.name ASC
         OFFSET _ofs
         LIMIT _limit

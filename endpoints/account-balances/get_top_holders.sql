@@ -59,6 +59,26 @@ SET ROLE btracker_owner;
           default: 100
         description: Max results per page (capped by backend validator).
 
+      - in: query
+        name: min_vests
+        required: false
+        schema:
+          type: integer
+          format: int64
+          x-sql-datatype: BIGINT
+          x-sql-default-value: "NULL"
+        description: Only return VESTS holders with balance greater than or equal to this value. Valid only with coin-type=VESTS.
+
+      - in: query
+        name: max_vests
+        required: false
+        schema:
+          type: integer
+          format: int64
+          x-sql-datatype: BIGINT
+          x-sql-default-value: "NULL"
+        description: Only return VESTS holders with balance less than this value. Valid only with coin-type=VESTS.
+
     responses:
       '200':
         description: Ranked holders with totals number of pages and acounts.
@@ -75,7 +95,9 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
     "coin-type" btracker_backend.nai_type,
     "balance-type" btracker_backend.balance_type = 'balance',
     "page" INT = 1,
-    "page-size" INT = 100
+    "page-size" INT = 100,
+    "min_vests" BIGINT = NULL,
+    "max_vests" BIGINT = NULL
 )
 RETURNS btracker_backend.top_holders 
 -- openapi-generated-code-end
@@ -100,12 +122,14 @@ PARAMETERS:
   - balance-type: 'balance' (liquid) or 'savings_balance' (savings accounts)
   - page: 1-based page number
   - page-size: Results per page (max 1000)
+  - min_vests: Optional inclusive lower VESTS balance bound
+  - max_vests: Optional exclusive upper VESTS balance bound
 
 ARCHITECTURE:
   1. Validate inputs (page-size cap, VESTS+savings restriction)
   2. Convert coin-type enum to NAI integer
   3. Delegate to backend helper which performs:
-     a. COUNT(*) for total accounts with positive balance
+     a. COUNT(*) for total accounts after applying the VESTS range
      b. Paginated query with OFFSET/LIMIT
      c. ROW_NUMBER() for global ranking
 
@@ -113,6 +137,7 @@ RANKING LOGIC:
   - Accounts sorted by balance DESC, then by name ASC (tiebreaker)
   - Rank is global (not per-page) - page 2 starts at rank 101 if page-size=100
   - Only accounts with balance > 0 are included
+  - VESTS ranges use min_vests <= balance < max_vests
 
 DATA SOURCES:
   - current_account_balances (via view) for liquid balances
@@ -128,6 +153,7 @@ VALIDATION:
   - page-size capped at 1000
   - page must be >= 1
   - VESTS + savings_balance is invalid (no such thing as VESTS savings)
+  - min_vests/max_vests are accepted only for VESTS
 
 USE CASES:
   - "Whale alert" monitoring tools
@@ -152,6 +178,11 @@ BEGIN
   PERFORM btracker_backend.validate_limit("page-size", 1000);
   -- VESTS cannot have savings_balance (savings only holds HBD/HIVE)
   PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
+  IF ("min_vests" IS NOT NULL OR "max_vests" IS NOT NULL)
+     AND "coin-type" <> 'VESTS' THEN
+    RAISE EXCEPTION 'min_vests and max_vests are supported only for coin-type=VESTS'
+      USING ERRCODE = '22023';
+  END IF;
 
   ---------------------------------------------------------------------------
   -- CACHE HEADER
@@ -167,7 +198,9 @@ BEGIN
     _coin_type_id,
     "balance-type",
     COALESCE("page", 1),
-    COALESCE("page-size", 100)
+    COALESCE("page-size", 100),
+    "min_vests",
+    "max_vests"
   );
 END
 $$;

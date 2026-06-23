@@ -1519,6 +1519,30 @@ declare
               "default": 100
             },
             "description": "Max results per page (capped by backend validator)."
+          },
+          {
+            "in": "query",
+            "name": "min_vests",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "x-sql-datatype": "BIGINT",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Only return VESTS holders with balance greater than or equal to this value. Valid only with coin-type=VESTS."
+          },
+          {
+            "in": "query",
+            "name": "max_vests",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "x-sql-datatype": "BIGINT",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Only return VESTS holders with balance less than this value. Valid only with coin-type=VESTS."
           }
         ],
         "responses": {
