@@ -94,6 +94,7 @@ BEGIN
         FROM btracker_backend.account_savings_view AS src
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
+          AND src.balance > 0
         ORDER BY src.balance DESC, av.name ASC
         OFFSET _ofs
         LIMIT _limit
