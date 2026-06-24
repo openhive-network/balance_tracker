@@ -1,0 +1,26 @@
+---
+test_name: Top holders reject inverted VESTS range bounds
+
+marks:
+  - patterntest
+  - negative
+
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Reject min-vests greater than max-vests
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: VESTS
+        min-vests: 200000000
+        max-vests: 100000000
+    response:
+      status_code: 400
+      json:
+        code: P0001
+        details: null
+        hint: null
+        message: min-vests must be less than or equal to max-vests

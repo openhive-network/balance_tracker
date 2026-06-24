@@ -1,0 +1,25 @@
+---
+test_name: Top holders reject negative VESTS range bounds
+
+marks:
+  - patterntest
+  - negative
+
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Reject negative min-vests
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: VESTS
+        min-vests: -1
+    response:
+      status_code: 400
+      json:
+        code: P0001
+        details: null
+        hint: null
+        message: min-vests and max-vests must be non-negative

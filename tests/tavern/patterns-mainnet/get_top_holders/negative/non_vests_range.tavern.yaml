@@ -3,17 +3,38 @@ test_name: Top holders reject VESTS bounds for other assets
 
 marks:
   - patterntest
+  - negative
 
 includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: Reject min_vests for HIVE
+  - name: Reject min-vests for HIVE
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
         coin-type: HIVE
-        min_vests: 1
+        min-vests: 1
     response:
       status_code: 400
+      json:
+        code: P0001
+        details: null
+        hint: null
+        message: min-vests and max-vests are supported only for coin-type=VESTS
+
+  - name: Reject max-vests for HIVE
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HIVE
+        max-vests: 1
+    response:
+      status_code: 400
+      json:
+        code: P0001
+        details: null
+        hint: null
+        message: min-vests and max-vests are supported only for coin-type=VESTS

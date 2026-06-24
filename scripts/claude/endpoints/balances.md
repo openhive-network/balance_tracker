@@ -207,13 +207,13 @@ Returns paginated leaderboard of top asset holders.
 | balance-type | balance_type | No | 'balance' | 'balance' or 'savings_balance' |
 | page | INT | No | 1 | 1-based page number |
 | page-size | INT | No | 100 | Results per page (max 1000) |
-| min_vests | BIGINT | No | - | Inclusive lower VESTS balance bound; valid only for VESTS |
-| max_vests | BIGINT | No | - | Exclusive upper VESTS balance bound; valid only for VESTS |
+| min-vests | BIGINT | No | - | Inclusive lower VESTS balance bound; valid only for VESTS |
+| max-vests | BIGINT | No | - | Exclusive upper VESTS balance bound; valid only for VESTS |
 
 The range is applied before pagination, so `total_accounts`, `total_pages`, and
 global ranks describe the filtered subset. Omitting both parameters preserves
 the unfiltered behavior. The open-ended `1M+ HP` bracket passes only
-`min_vests`; HP-to-VESTS conversion remains the client's responsibility.
+`min-vests`; HP-to-VESTS conversion remains the client's responsibility.
 
 #### Returns: `btracker_backend.top_holders`
 
@@ -243,10 +243,10 @@ SELECT * FROM btracker_endpoints.get_top_holders('HIVE', 'balance', 1, 100);
 curl 'http://localhost:3000/balance-api/top-holders?coin-type=HBD&balance-type=savings_balance'
 
 # REST: VESTS holders in [20,000,000, 200,000,000)
-curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min_vests=20000000&max_vests=200000000'
+curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-vests=20000000&max-vests=200000000'
 
 # REST: Open-ended VESTS range
-curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min_vests=2000000000000'
+curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-vests=2000000000000'
 ```
 
 #### Use Cases

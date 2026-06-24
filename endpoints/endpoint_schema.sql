@@ -1522,7 +1522,7 @@ declare
           },
           {
             "in": "query",
-            "name": "min_vests",
+            "name": "min-vests",
             "required": false,
             "schema": {
               "type": "integer",
@@ -1534,7 +1534,7 @@ declare
           },
           {
             "in": "query",
-            "name": "max_vests",
+            "name": "max-vests",
             "required": false,
             "schema": {
               "type": "integer",

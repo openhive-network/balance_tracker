@@ -406,6 +406,8 @@ Returns ranked leaderboard of top asset holders.
 | balance-type | TEXT | No | 'balance' | 'balance' or 'savings_balance' |
 | page | INT | No | 1 | Page number |
 | page-size | INT | No | 100 | Results per page |
+| min-vests | BIGINT | No | - | Inclusive lower VESTS balance bound; valid only for VESTS |
+| max-vests | BIGINT | No | - | Exclusive upper VESTS balance bound; valid only for VESTS |
 
 ### Delegation Functions
 

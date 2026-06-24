@@ -14,8 +14,8 @@ stages:
       method: GET
       params:
         coin-type: VESTS
-        min_vests: 336662952017765
-        max_vests: 344881690242464
+        min-vests: 336662952017765
+        max-vests: 344881690242464
         page-size: 2
     response:
       status_code: 200
@@ -36,8 +36,8 @@ stages:
       method: GET
       params:
         coin-type: VESTS
-        min_vests: 336662952017765
-        max_vests: 344881690242464
+        min-vests: 336662952017765
+        max-vests: 344881690242464
         page: 2
         page-size: 2
     response:
@@ -56,7 +56,7 @@ stages:
       method: GET
       params:
         coin-type: VESTS
-        min_vests: 225671901920188893
+        min-vests: 225671901920188893
     response:
       status_code: 200
       json:
