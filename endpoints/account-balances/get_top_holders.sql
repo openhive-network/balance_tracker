@@ -67,7 +67,7 @@ SET ROLE btracker_owner;
           format: int64
           x-sql-datatype: BIGINT
           x-sql-default-value: "NULL"
-        description: Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type's smallest unit.
+        description: Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type''s smallest unit.
 
       - in: query
         name: max-balance
@@ -77,7 +77,7 @@ SET ROLE btracker_owner;
           format: int64
           x-sql-datatype: BIGINT
           x-sql-default-value: "NULL"
-        description: Only return holders with balance < this value (exclusive upper bound), in the requested coin-type's smallest unit.
+        description: Only return holders with balance < this value (exclusive upper bound), in the requested coin-type''s smallest unit.
 
     responses:
       '200':

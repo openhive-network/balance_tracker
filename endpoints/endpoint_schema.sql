@@ -1530,7 +1530,7 @@ declare
               "x-sql-datatype": "BIGINT",
               "x-sql-default-value": "NULL"
             },
-            "description": "Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type's smallest unit."
+            "description": "Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type''s smallest unit."
           },
           {
             "in": "query",
@@ -1542,7 +1542,7 @@ declare
               "x-sql-datatype": "BIGINT",
               "x-sql-default-value": "NULL"
             },
-            "description": "Only return holders with balance < this value (exclusive upper bound), in the requested coin-type's smallest unit."
+            "description": "Only return holders with balance < this value (exclusive upper bound), in the requested coin-type''s smallest unit."
           }
         ],
         "responses": {
