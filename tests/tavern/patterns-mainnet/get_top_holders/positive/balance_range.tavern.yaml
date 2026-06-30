@@ -1,5 +1,5 @@
 ---
-test_name: Top VESTS holders support balance range filtering
+test_name: Top holders support balance range filtering with global ranking
 
 marks:
   - patterntest
@@ -14,8 +14,8 @@ stages:
       method: GET
       params:
         coin-type: VESTS
-        min-vests: 336662952017765
-        max-vests: 344881690242464
+        min-balance: 336662952017765
+        max-balance: 344881690242464
         page-size: 2
     response:
       status_code: 200
@@ -23,21 +23,21 @@ stages:
         total_accounts: 3
         total_pages: 2
         holders_result:
-          - rank: 1
+          - rank: 98
             account: steemychicken1
             value: "340834009930190"
-          - rank: 2
+          - rank: 99
             account: faddy
             value: "336900857841845"
 
-  - name: Filtered second page keeps subset rank and inclusive minimum
+  - name: Filtered second page keeps global rank and inclusive minimum
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
         coin-type: VESTS
-        min-vests: 336662952017765
-        max-vests: 344881690242464
+        min-balance: 336662952017765
+        max-balance: 344881690242464
         page: 2
         page-size: 2
     response:
@@ -46,17 +46,17 @@ stages:
         total_accounts: 3
         total_pages: 2
         holders_result:
-          - rank: 3
+          - rank: 100
             account: cryptoctopus
             value: "336662952017765"
 
-  - name: Open-ended minimum returns the upper VESTS bracket
+  - name: Open-ended minimum returns the upper bracket at global rank 1
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
         coin-type: VESTS
-        min-vests: 225671901920188893
+        min-balance: 225671901920188893
     response:
       status_code: 200
       json:
@@ -66,3 +66,26 @@ stages:
           - rank: 1
             account: steemit
             value: "225671901920188893"
+
+  # The range is generic, not VESTS-only: it works for HIVE (and HBD) too, and
+  # rank stays global (this bracket sits below the top HIVE holders).
+  - name: Range filtering works for a non-VESTS coin with global rank
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HIVE
+        min-balance: 50968139
+        max-balance: 97417738
+    response:
+      status_code: 200
+      json:
+        total_accounts: 2
+        total_pages: 1
+        holders_result:
+          - rank: 7
+            account: openledger
+            value: "52275479"
+          - rank: 8
+            account: ben
+            value: "50968139"

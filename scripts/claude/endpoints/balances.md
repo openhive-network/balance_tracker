@@ -207,13 +207,19 @@ Returns paginated leaderboard of top asset holders.
 | balance-type | balance_type | No | 'balance' | 'balance' or 'savings_balance' |
 | page | INT | No | 1 | 1-based page number |
 | page-size | INT | No | 100 | Results per page (max 1000) |
-| min-vests | BIGINT | No | - | Inclusive lower VESTS balance bound; valid only for VESTS |
-| max-vests | BIGINT | No | - | Exclusive upper VESTS balance bound; valid only for VESTS |
+| min-balance | BIGINT | No | - | Inclusive lower balance bound (any coin-type), in the asset's smallest unit |
+| max-balance | BIGINT | No | - | Exclusive upper balance bound (any coin-type), in the asset's smallest unit |
 
-The range is applied before pagination, so `total_accounts`, `total_pages`, and
-global ranks describe the filtered subset. Omitting both parameters preserves
-the unfiltered behavior. The open-ended `1M+ HP` bracket passes only
-`min-vests`; HP-to-VESTS conversion remains the client's responsibility.
+The range is a generic half-open `[min-balance, max-balance)` bound applied to
+whichever `coin-type`/`balance-type` is requested. It is applied before
+pagination, so `total_accounts` and `total_pages` describe the filtered subset.
+Rank stays **global**: a filtered holder keeps its position in the full
+leaderboard (the top of a mid bracket is not rank 1), so a range with an upper
+bound offsets ranks by the number of holders above it. Bounds must be
+non-negative and `min-balance <= max-balance`. Omitting both preserves the
+unfiltered behavior; passing only `min-balance` gives an open-ended top bracket.
+For an HP distribution bracket, pass converted VESTS values with
+`coin-type=VESTS` (HP-to-VESTS conversion remains the client's responsibility).
 
 #### Returns: `btracker_backend.top_holders`
 
@@ -243,10 +249,10 @@ SELECT * FROM btracker_endpoints.get_top_holders('HIVE', 'balance', 1, 100);
 curl 'http://localhost:3000/balance-api/top-holders?coin-type=HBD&balance-type=savings_balance'
 
 # REST: VESTS holders in [20,000,000, 200,000,000)
-curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-vests=20000000&max-vests=200000000'
+curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-balance=20000000&max-balance=200000000'
 
-# REST: Open-ended VESTS range
-curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-vests=2000000000000'
+# REST: Open-ended range (top bracket), works for any coin-type
+curl 'http://localhost:3000/balance-api/top-holders?coin-type=HIVE&min-balance=1000000'
 ```
 
 #### Use Cases

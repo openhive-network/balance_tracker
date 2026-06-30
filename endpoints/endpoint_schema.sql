@@ -1522,7 +1522,7 @@ declare
           },
           {
             "in": "query",
-            "name": "min-vests",
+            "name": "min-balance",
             "required": false,
             "schema": {
               "type": "integer",
@@ -1530,11 +1530,11 @@ declare
               "x-sql-datatype": "BIGINT",
               "x-sql-default-value": "NULL"
             },
-            "description": "Only return VESTS holders with balance greater than or equal to this value. Valid only with coin-type=VESTS."
+            "description": "Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type's smallest unit."
           },
           {
             "in": "query",
-            "name": "max-vests",
+            "name": "max-balance",
             "required": false,
             "schema": {
               "type": "integer",
@@ -1542,7 +1542,7 @@ declare
               "x-sql-datatype": "BIGINT",
               "x-sql-default-value": "NULL"
             },
-            "description": "Only return VESTS holders with balance less than this value. Valid only with coin-type=VESTS."
+            "description": "Only return holders with balance < this value (exclusive upper bound), in the requested coin-type's smallest unit."
           }
         ],
         "responses": {

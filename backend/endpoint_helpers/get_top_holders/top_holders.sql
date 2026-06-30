@@ -6,14 +6,24 @@ Called by: btracker_endpoints.get_top_holders()
 
 Uses idx_account_balance_nai_balance_idx or idx_account_savings_nai_balance_idx
 (created after massive sync completes via btracker_app.btracker_on_end_blocks_processing).
+
+The optional [_min_balance, _max_balance) range filters holders before pagination.
+Bounds are half-open (balance >= _min_balance AND balance < _max_balance); a NULL bound
+disables that side, so a NULL _max_balance yields an open-ended top bracket. The range is
+generic and applies to whichever coin-type/balance-type is requested.
+
+Ranking stays GLOBAL: a filtered holder keeps its position in the full leaderboard, so the
+first in-range holder's rank is offset by _above, the count of holders ranked above the
+upper bound (balance >= _max_balance). With no upper bound nothing ranks above the range,
+so the offset is zero.
 */
 CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
     _coin_type    INT,
     _balance_type btracker_backend.balance_type,
     _page         INT,
     _limit        INT,
-    _min_vests    BIGINT,
-    _max_vests    BIGINT
+    _min_balance  BIGINT,
+    _max_balance  BIGINT
 )
 RETURNS btracker_backend.top_holders
 LANGUAGE plpgsql
@@ -23,6 +33,7 @@ DECLARE
   _ofs          INT := (_page - 1) * _limit;
   _total        INT := 0;
   _total_pages  INT := 0;
+  _above        INT := 0;  -- holders ranked above _max_balance, kept in the global rank
   _rows         btracker_backend.ranked_holder[];
 BEGIN
   IF _balance_type = 'balance' THEN
@@ -32,14 +43,25 @@ BEGIN
     FROM btracker_backend.current_account_balances_view
     WHERE nai = _coin_type
       AND balance > 0
-      AND (_min_vests IS NULL OR balance >= _min_vests)
-      AND (_max_vests IS NULL OR balance < _max_vests);
+      AND (_min_balance IS NULL OR balance >= _min_balance)
+      AND (_max_balance IS NULL OR balance < _max_balance);
 
     IF _total = 0 THEN
       _total_pages := 0;
       _rows := ARRAY[]::btracker_backend.ranked_holder[];
     ELSE
       _total_pages := CEIL(_total::numeric / _limit)::INT;
+
+      -- Holders above the upper bound are filtered out of the page but still
+      -- occupy global ranks, so the in-range ranks start after them.
+      IF _max_balance IS NOT NULL THEN
+        SELECT COUNT(*)
+          INTO _above
+        FROM btracker_backend.current_account_balances_view
+        WHERE nai = _coin_type
+          AND balance > 0
+          AND balance >= _max_balance;
+      END IF;
 
       -- Fetch paginated results with global ranking
       -- MATERIALIZED CTE prevents re-execution of expensive sorted query
@@ -50,17 +72,17 @@ BEGIN
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
           AND src.balance > 0
-          AND (_min_vests IS NULL OR src.balance >= _min_vests)
-          AND (_max_vests IS NULL OR src.balance < _max_vests)
+          AND (_min_balance IS NULL OR src.balance >= _min_balance)
+          AND (_max_balance IS NULL OR src.balance < _max_balance)
         ORDER BY src.balance DESC, av.name ASC
         OFFSET _ofs
         LIMIT _limit
       ),
       ranked AS (
         SELECT
-          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs)::INT AS rank,
+          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs + _above)::INT AS rank,
           o.name::TEXT AS account,
-          -- NUMERIC(38,0) prevents overflow for very large VESTS values
+          -- NUMERIC(38,0) holds any balance/VESTS amount without overflow
           o.balance::NUMERIC(38,0) AS value
         FROM ordered_holders o
       )
@@ -76,17 +98,30 @@ BEGIN
     END IF;
 
   ELSIF _balance_type = 'savings_balance' THEN
-    -- Count total accounts with positive savings balance
+    -- Count after filtering so pagination metadata describes the selected range.
     SELECT COUNT(*)
       INTO _total
     FROM btracker_backend.account_savings_view
-    WHERE nai = _coin_type AND balance > 0;
+    WHERE nai = _coin_type
+      AND balance > 0
+      AND (_min_balance IS NULL OR balance >= _min_balance)
+      AND (_max_balance IS NULL OR balance < _max_balance);
 
     IF _total = 0 THEN
       _total_pages := 0;
       _rows := ARRAY[]::btracker_backend.ranked_holder[];
     ELSE
       _total_pages := CEIL(_total::numeric / _limit)::INT;
+
+      -- See the liquid branch: keep rank global across the filtered upper bound.
+      IF _max_balance IS NOT NULL THEN
+        SELECT COUNT(*)
+          INTO _above
+        FROM btracker_backend.account_savings_view
+        WHERE nai = _coin_type
+          AND balance > 0
+          AND balance >= _max_balance;
+      END IF;
 
       -- Same pattern as liquid balance branch
       WITH ordered_holders AS MATERIALIZED (
@@ -95,14 +130,17 @@ BEGIN
         JOIN hive.accounts_view av ON av.id = src.account
         WHERE src.nai = _coin_type
           AND src.balance > 0
+          AND (_min_balance IS NULL OR src.balance >= _min_balance)
+          AND (_max_balance IS NULL OR src.balance < _max_balance)
         ORDER BY src.balance DESC, av.name ASC
         OFFSET _ofs
         LIMIT _limit
       ),
       ranked AS (
         SELECT
-          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs)::INT AS rank,
+          (ROW_NUMBER() OVER (ORDER BY o.balance DESC, o.name ASC) + _ofs + _above)::INT AS rank,
           o.name::TEXT AS account,
+          -- NUMERIC(38,0) holds any balance amount without overflow
           o.balance::NUMERIC(38,0) AS value
         FROM ordered_holders o
       )

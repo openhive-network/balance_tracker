@@ -60,24 +60,24 @@ SET ROLE btracker_owner;
         description: Max results per page (capped by backend validator).
 
       - in: query
-        name: min-vests
+        name: min-balance
         required: false
         schema:
           type: integer
           format: int64
           x-sql-datatype: BIGINT
           x-sql-default-value: "NULL"
-        description: Only return VESTS holders with balance greater than or equal to this value. Valid only with coin-type=VESTS.
+        description: Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type's smallest unit.
 
       - in: query
-        name: max-vests
+        name: max-balance
         required: false
         schema:
           type: integer
           format: int64
           x-sql-datatype: BIGINT
           x-sql-default-value: "NULL"
-        description: Only return VESTS holders with balance less than this value. Valid only with coin-type=VESTS.
+        description: Only return holders with balance < this value (exclusive upper bound), in the requested coin-type's smallest unit.
 
     responses:
       '200':
@@ -96,8 +96,8 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
     "balance-type" btracker_backend.balance_type = 'balance',
     "page" INT = 1,
     "page-size" INT = 100,
-    "min-vests" BIGINT = NULL,
-    "max-vests" BIGINT = NULL
+    "min-balance" BIGINT = NULL,
+    "max-balance" BIGINT = NULL
 )
 RETURNS btracker_backend.top_holders 
 -- openapi-generated-code-end
@@ -122,22 +122,24 @@ PARAMETERS:
   - balance-type: 'balance' (liquid) or 'savings_balance' (savings accounts)
   - page: 1-based page number
   - page-size: Results per page (max 1000)
-  - min-vests: Optional inclusive lower VESTS balance bound
-  - max-vests: Optional exclusive upper VESTS balance bound
+  - min-balance: Optional inclusive lower balance bound (any coin-type)
+  - max-balance: Optional exclusive upper balance bound (any coin-type)
 
 ARCHITECTURE:
-  1. Validate inputs (page-size cap, VESTS+savings restriction)
+  1. Validate inputs (page-size cap, VESTS+savings restriction, balance range)
   2. Convert coin-type enum to NAI integer
   3. Delegate to backend helper which performs:
-     a. COUNT(*) for total accounts after applying the VESTS range
+     a. COUNT(*) for total accounts after applying the balance range
      b. Paginated query with OFFSET/LIMIT
      c. ROW_NUMBER() for global ranking
 
 RANKING LOGIC:
   - Accounts sorted by balance DESC, then by name ASC (tiebreaker)
   - Rank is global (not per-page) - page 2 starts at rank 101 if page-size=100
+  - Rank stays global under a balance range: a filtered holder keeps its
+    position in the full leaderboard (the top of a mid bracket is not rank 1)
   - Only accounts with balance > 0 are included
-  - VESTS ranges use min-vests <= balance < max-vests
+  - Balance ranges use min-balance <= balance < max-balance
 
 DATA SOURCES:
   - current_account_balances (via view) for liquid balances
@@ -153,8 +155,7 @@ VALIDATION:
   - page-size capped at 1000
   - page must be >= 1
   - VESTS + savings_balance is invalid (no such thing as VESTS savings)
-  - min-vests/max-vests are accepted only for VESTS
-  - VESTS range bounds must be non-negative and min-vests must be <= max-vests
+  - balance range bounds must be non-negative and min-balance must be <= max-balance
 
 USE CASES:
   - "Whale alert" monitoring tools
@@ -179,20 +180,10 @@ BEGIN
   PERFORM btracker_backend.validate_limit("page-size", 1000);
   -- VESTS cannot have savings_balance (savings only holds HBD/HIVE)
   PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
-  IF ("min-vests" IS NOT NULL OR "max-vests" IS NOT NULL)
-     AND "coin-type" IS DISTINCT FROM 'VESTS' THEN
-    RAISE EXCEPTION 'min-vests and max-vests are supported only for coin-type=VESTS';
-  END IF;
 
-  IF COALESCE("min-vests", 0) < 0 OR COALESCE("max-vests", 0) < 0 THEN
-    RAISE EXCEPTION 'min-vests and max-vests must be non-negative';
-  END IF;
-
-  IF "min-vests" IS NOT NULL
-     AND "max-vests" IS NOT NULL
-     AND "min-vests" > "max-vests" THEN
-    RAISE EXCEPTION 'min-vests must be less than or equal to max-vests';
-  END IF;
+  -- Balance range is a generic [min, max) bound applied to whichever coin-type
+  -- is requested; both bounds are optional and may be open-ended on either side.
+  PERFORM btracker_backend.validate_balance_range("min-balance", "max-balance");
 
   ---------------------------------------------------------------------------
   -- CACHE HEADER
@@ -209,8 +200,8 @@ BEGIN
     "balance-type",
     COALESCE("page", 1),
     COALESCE("page-size", 100),
-    "min-vests",
-    "max-vests"
+    "min-balance",
+    "max-balance"
   );
 END
 $$;

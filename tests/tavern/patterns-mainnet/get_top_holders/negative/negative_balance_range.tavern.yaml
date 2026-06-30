@@ -1,5 +1,5 @@
 ---
-test_name: Top holders reject VESTS bounds for other assets
+test_name: Top holders reject negative balance range bounds
 
 marks:
   - patterntest
@@ -9,32 +9,32 @@ includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: Reject min-vests for HIVE
+  - name: Reject negative min-balance
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
-        coin-type: HIVE
-        min-vests: 1
+        coin-type: VESTS
+        min-balance: -1
     response:
       status_code: 400
       json:
         code: P0001
         details: null
         hint: null
-        message: min-vests and max-vests are supported only for coin-type=VESTS
+        message: min-balance and max-balance must be non-negative
 
-  - name: Reject max-vests for HIVE
+  - name: Reject negative max-balance for HIVE
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
         coin-type: HIVE
-        max-vests: 1
+        max-balance: -5
     response:
       status_code: 400
       json:
         code: P0001
         details: null
         hint: null
-        message: min-vests and max-vests are supported only for coin-type=VESTS
+        message: min-balance and max-balance must be non-negative
