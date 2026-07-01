@@ -1519,6 +1519,30 @@ declare
               "default": 100
             },
             "description": "Max results per page (capped by backend validator)."
+          },
+          {
+            "in": "query",
+            "name": "min-balance",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "x-sql-datatype": "BIGINT",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type''s smallest unit."
+          },
+          {
+            "in": "query",
+            "name": "max-balance",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "x-sql-datatype": "BIGINT",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Only return holders with balance < this value (exclusive upper bound), in the requested coin-type''s smallest unit."
           }
         ],
         "responses": {

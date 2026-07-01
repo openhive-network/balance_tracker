@@ -59,6 +59,26 @@ SET ROLE btracker_owner;
           default: 100
         description: Max results per page (capped by backend validator).
 
+      - in: query
+        name: min-balance
+        required: false
+        schema:
+          type: integer
+          format: int64
+          x-sql-datatype: BIGINT
+          x-sql-default-value: "NULL"
+        description: Only return holders with balance >= this value (inclusive lower bound), in the requested coin-type''s smallest unit.
+
+      - in: query
+        name: max-balance
+        required: false
+        schema:
+          type: integer
+          format: int64
+          x-sql-datatype: BIGINT
+          x-sql-default-value: "NULL"
+        description: Only return holders with balance < this value (exclusive upper bound), in the requested coin-type''s smallest unit.
+
     responses:
       '200':
         description: Ranked holders with totals number of pages and acounts.
@@ -75,7 +95,9 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
     "coin-type" btracker_backend.nai_type,
     "balance-type" btracker_backend.balance_type = 'balance',
     "page" INT = 1,
-    "page-size" INT = 100
+    "page-size" INT = 100,
+    "min-balance" BIGINT = NULL,
+    "max-balance" BIGINT = NULL
 )
 RETURNS btracker_backend.top_holders 
 -- openapi-generated-code-end
@@ -100,19 +122,24 @@ PARAMETERS:
   - balance-type: 'balance' (liquid) or 'savings_balance' (savings accounts)
   - page: 1-based page number
   - page-size: Results per page (max 1000)
+  - min-balance: Optional inclusive lower balance bound (any coin-type)
+  - max-balance: Optional exclusive upper balance bound (any coin-type)
 
 ARCHITECTURE:
-  1. Validate inputs (page-size cap, VESTS+savings restriction)
+  1. Validate inputs (page-size cap, VESTS+savings restriction, balance range)
   2. Convert coin-type enum to NAI integer
   3. Delegate to backend helper which performs:
-     a. COUNT(*) for total accounts with positive balance
+     a. COUNT(*) for total accounts after applying the balance range
      b. Paginated query with OFFSET/LIMIT
      c. ROW_NUMBER() for global ranking
 
 RANKING LOGIC:
   - Accounts sorted by balance DESC, then by name ASC (tiebreaker)
   - Rank is global (not per-page) - page 2 starts at rank 101 if page-size=100
+  - Rank stays global under a balance range: a filtered holder keeps its
+    position in the full leaderboard (the top of a mid bracket is not rank 1)
   - Only accounts with balance > 0 are included
+  - Balance ranges use min-balance <= balance < max-balance
 
 DATA SOURCES:
   - current_account_balances (via view) for liquid balances
@@ -128,6 +155,7 @@ VALIDATION:
   - page-size capped at 1000
   - page must be >= 1
   - VESTS + savings_balance is invalid (no such thing as VESTS savings)
+  - balance range bounds must be non-negative and min-balance must be <= max-balance
 
 USE CASES:
   - "Whale alert" monitoring tools
@@ -153,6 +181,10 @@ BEGIN
   -- VESTS cannot have savings_balance (savings only holds HBD/HIVE)
   PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
 
+  -- Balance range is a generic [min, max) bound applied to whichever coin-type
+  -- is requested; both bounds are optional and may be open-ended on either side.
+  PERFORM btracker_backend.validate_balance_range("min-balance", "max-balance");
+
   ---------------------------------------------------------------------------
   -- CACHE HEADER
   -- Short cache (2 seconds) - balances change with every block
@@ -167,7 +199,9 @@ BEGIN
     _coin_type_id,
     "balance-type",
     COALESCE("page", 1),
-    COALESCE("page-size", 100)
+    COALESCE("page-size", 100),
+    "min-balance",
+    "max-balance"
   );
 END
 $$;
