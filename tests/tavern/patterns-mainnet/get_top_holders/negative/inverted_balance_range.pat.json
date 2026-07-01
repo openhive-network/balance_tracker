@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "min-balance must be less than or equal to max-balance"
+}

@@ -150,7 +150,7 @@ SELECT * FROM btracker_endpoints.get_account_balances('gtg');
 | `btracker_endpoints.get_account_balances(_account)` | Full balance snapshot |
 | `btracker_endpoints.get_balance_history(_account, _type, ...)` | Balance changes |
 | `btracker_endpoints.get_account_delegations(_account)` | Delegation pairs |
-| `btracker_endpoints.get_top_holders(_nai, _limit)` | Ranked holders |
+| `btracker_endpoints.get_top_holders(_coin_type, _balance_type, _page, _page_size, ...)` | Ranked holders |
 
 For HAFBE documentation, see parent repo's `scripts/claude/`.
 

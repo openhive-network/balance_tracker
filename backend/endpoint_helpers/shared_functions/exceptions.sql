@@ -219,4 +219,38 @@ BEGIN
 END
 $$;
 
+/**
+ * validate_balance_range()
+ * ------------------------
+ * Validate an optional half-open [min, max) balance range used by leaderboard
+ * endpoints (e.g. get_top_holders). Both bounds are optional; NULL disables that
+ * side. When present, each bound must be non-negative and min must not exceed
+ * max. An empty min == max range is allowed (the half-open predicate yields no
+ * rows), matching the documented [min-balance, max-balance) contract.
+ *
+ * @param _min_balance  Inclusive lower bound, or NULL
+ * @param _max_balance  Exclusive upper bound, or NULL
+ * @returns             VOID (raises exception on invalid input)
+ *
+ * Example Errors:
+ *   validate_balance_range(-1, NULL)  -> "min-balance and max-balance must be non-negative"
+ *   validate_balance_range(200, 100)  -> "min-balance must be less than or equal to max-balance"
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.validate_balance_range(_min_balance BIGINT, _max_balance BIGINT)
+RETURNS VOID -- noqa: LT01, CP05
+LANGUAGE 'plpgsql'
+IMMUTABLE
+AS
+$$
+BEGIN
+  IF COALESCE(_min_balance, 0) < 0 OR COALESCE(_max_balance, 0) < 0 THEN
+    RAISE EXCEPTION 'min-balance and max-balance must be non-negative';
+  END IF;
+
+  IF _min_balance IS NOT NULL AND _max_balance IS NOT NULL AND _min_balance > _max_balance THEN
+    RAISE EXCEPTION 'min-balance must be less than or equal to max-balance';
+  END IF;
+END
+$$;
+
 RESET ROLE;

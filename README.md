@@ -406,6 +406,8 @@ Returns ranked leaderboard of top asset holders.
 | balance-type | TEXT | No | 'balance' | 'balance' or 'savings_balance' |
 | page | INT | No | 1 | Page number |
 | page-size | INT | No | 100 | Results per page |
+| min-balance | BIGINT | No | - | Inclusive lower balance bound (any coin-type), in the asset's smallest unit |
+| max-balance | BIGINT | No | - | Exclusive upper balance bound (any coin-type), in the asset's smallest unit |
 
 ### Delegation Functions
 
