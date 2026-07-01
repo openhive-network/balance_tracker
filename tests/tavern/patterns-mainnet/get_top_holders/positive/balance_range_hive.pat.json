@@ -1,0 +1,8 @@
+{
+  "total_accounts": 2,
+  "total_pages": 1,
+  "holders_result": [
+    { "rank": 7, "account": "openledger", "value": "52275479" },
+    { "rank": 8, "account": "ben", "value": "50968139" }
+  ]
+}

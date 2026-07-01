@@ -2,21 +2,19 @@
 test_name: btracker PostgREST
 marks:
   - patterntest
-  - negative
-
 includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: Reject min-balance greater than max-balance
+  - name: Range filtering works for a non-VESTS coin with global rank
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
-        coin-type: VESTS
-        min-balance: 200000000
-        max-balance: 100000000
+        coin-type: HIVE
+        min-balance: 50968139
+        max-balance: 97417738
     response:
-      status_code: 400
+      status_code: 200
       verify_response_with:
         function: validate_response:compare_rest_response_with_pattern

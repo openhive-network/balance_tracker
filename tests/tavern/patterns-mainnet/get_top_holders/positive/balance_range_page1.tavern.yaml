@@ -2,21 +2,20 @@
 test_name: btracker PostgREST
 marks:
   - patterntest
-  - negative
-
 includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: Reject min-balance greater than max-balance
+  - name: VESTS bracket, page 1 (inclusive minimum, exclusive maximum)
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
       params:
         coin-type: VESTS
-        min-balance: 200000000
-        max-balance: 100000000
+        min-balance: 336662952017765
+        max-balance: 344881690242464
+        page-size: 2
     response:
-      status_code: 400
+      status_code: 200
       verify_response_with:
         function: validate_response:compare_rest_response_with_pattern
