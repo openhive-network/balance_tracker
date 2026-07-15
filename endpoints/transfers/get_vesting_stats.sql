@@ -80,7 +80,7 @@ SET ROLE btracker_owner;
               $ref: '#/components/schemas/btracker_backend.array_of_vesting_stats'
             example: [
               {
-                "date": "2016-09-16T00:00:00",
+                "date": "2016-09-15T00:00:00",
                 "power_up_count": 12,
                 "power_up_hive": {"nai": "@@000000021", "amount": "1500000", "precision": 3},
                 "power_down_init_count": 4,

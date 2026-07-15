@@ -628,7 +628,7 @@ declare
           "date": {
             "type": "string",
             "format": "date-time",
-            "description": "the time transfers were included in the blockchain"
+            "description": "start of the time bucket (hour, day, month or year)"
           },
           "total_transfer_amount": {
             "$ref": "#/components/schemas/btracker_backend.amount",
@@ -678,7 +678,7 @@ declare
           "date": {
             "type": "string",
             "format": "date-time",
-            "description": "end of the time bucket (day, month or year)"
+            "description": "start of the time bucket (day, month or year)"
           },
           "power_up_count": {
             "type": "integer",
@@ -1631,7 +1631,7 @@ declare
                 },
                 "example": [
                   {
-                    "date": "2017-01-01T00:00:00",
+                    "date": "2016-01-01T00:00:00",
                     "total_transfer_amount": {
                       "nai": "@@000000013",
                       "amount": "69611921266",
@@ -1725,7 +1725,7 @@ declare
                 },
                 "example": [
                   {
-                    "date": "2016-09-16T00:00:00",
+                    "date": "2016-09-15T00:00:00",
                     "power_up_count": 12,
                     "power_up_hive": {
                       "nai": "@@000000021",

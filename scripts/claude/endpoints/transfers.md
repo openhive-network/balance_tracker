@@ -28,7 +28,7 @@ Returns aggregated transfer volume statistics for HIVE or HBD at configurable ti
 
 | Field | Type | Description |
 |-------|------|-------------|
-| date | TIMESTAMP | Period end timestamp |
+| date | TIMESTAMP | Period start timestamp (start of the bucket; the hour/day/month/year the transfers occurred) |
 | total_transfer_amount | TEXT | Sum of all transfer amounts |
 | average_transfer_amount | TEXT | Mean transfer size |
 | maximum_transfer_amount | TEXT | Largest single transfer |

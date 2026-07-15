@@ -382,7 +382,7 @@ BEGIN
   CREATE TABLE IF NOT EXISTS transfer_stats_by_month
   (
     nai                 SMALLINT  NOT NULL, -- NAI of the transfer
-    updated_at          TIMESTAMP NOT NULL, -- Period end time
+    updated_at          TIMESTAMP NOT NULL, -- Period start (bucket, date_trunc of created_at)
     sum_transfer_amount BIGINT    NOT NULL, -- Total amount of transfered tokens
     max_transfer_amount BIGINT    NOT NULL, -- Maximum single transfer amount
     min_transfer_amount BIGINT    NOT NULL, -- Minimum single transfer amount
@@ -396,7 +396,7 @@ BEGIN
   CREATE TABLE IF NOT EXISTS transfer_stats_by_day
   (
     nai                 SMALLINT  NOT NULL, -- NAI of the transfer
-    updated_at          TIMESTAMP NOT NULL, -- Period end time
+    updated_at          TIMESTAMP NOT NULL, -- Period start (bucket, date_trunc of created_at)
     sum_transfer_amount BIGINT    NOT NULL, -- Total amount of transfers
     max_transfer_amount BIGINT    NOT NULL, -- Maximum single transfer amount
     min_transfer_amount BIGINT    NOT NULL, -- Minimum single transfer amount
@@ -410,7 +410,7 @@ BEGIN
   CREATE TABLE IF NOT EXISTS transfer_stats_by_hour
   (
     nai                 SMALLINT  NOT NULL, -- NAI of the transfer
-    updated_at          TIMESTAMP NOT NULL, -- Period end time
+    updated_at          TIMESTAMP NOT NULL, -- Period start (bucket, date_trunc of created_at)
     sum_transfer_amount BIGINT    NOT NULL, -- Total amount of transfers
     max_transfer_amount BIGINT    NOT NULL, -- Maximum single transfer amount
     min_transfer_amount BIGINT    NOT NULL, -- Minimum single transfer amount

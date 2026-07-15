@@ -7,7 +7,7 @@ btracker_backend.transfer_stats:
     date:
       type: string
       format: date-time
-      description: the time transfers were included in the blockchain
+      description: start of the time bucket (hour, day, month or year)
     total_transfer_amount:
       $ref: '#/components/schemas/btracker_backend.amount'
       description: sum of transferred tokens in the period (with NAI and precision)
