@@ -58,7 +58,7 @@ AS
 $$
 BEGIN
   IF given_limit > expected_limit THEN
-    RAISE EXCEPTION '% <= %: % of % is greater than maxmimum allowed', given_limit_name, expected_limit, given_limit_name, given_limit;
+    RAISE EXCEPTION '% <= %: % of % is greater than maximum allowed', given_limit_name, expected_limit, given_limit_name, given_limit;
   END IF;
 
   RETURN;
@@ -93,7 +93,7 @@ AS
 $$
 BEGIN
   IF given_page > max_page AND given_page != 1 THEN
-    RAISE EXCEPTION 'page <= %: page of % is greater than maxmimum page', max_page, given_page;
+    RAISE EXCEPTION 'page <= %: page of % is greater than maximum page', max_page, given_page;
   END IF;
 
   RETURN;
@@ -109,6 +109,13 @@ $$;
  * A page-size of 0 or negative makes no sense and would cause
  * division-by-zero errors in pagination calculations.
  *
+ * NULL is also rejected: because SQL comparisons against NULL yield NULL
+ * (not TRUE), a bare `IF given_limit <= 0` would silently pass a NULL through
+ * to calculate_pages(), producing `LIMIT NULL` (i.e. no limit) and an
+ * unbounded scan. A NULL limit reaches here only when a caller forwards an
+ * explicit null page-size (e.g. a PostgREST RPC body `{"page-size": null}`),
+ * which the SQL default of 100 does NOT cover. Reject it explicitly.
+ *
  * @param given_limit      User-provided limit value
  * @param given_limit_name Parameter name for error message (default: 'page-size')
  * @returns                VOID (raises exception if validation fails)
@@ -116,6 +123,8 @@ $$;
  * Example Error:
  *   validate_negative_limit(0) raises:
  *   "page-size <= 0: page-size of 0 is lesser or equal 0"
+ *   validate_negative_limit(NULL) raises:
+ *   "page-size must not be null"
  */
 CREATE OR REPLACE FUNCTION btracker_backend.validate_negative_limit(given_limit BIGINT, given_limit_name TEXT DEFAULT 'page-size')
 RETURNS VOID -- noqa: LT01, CP05
@@ -124,6 +133,10 @@ IMMUTABLE
 AS
 $$
 BEGIN
+  IF given_limit IS NULL THEN
+    RAISE EXCEPTION '% must not be null', given_limit_name;
+  END IF;
+
   IF given_limit <= 0 THEN
     RAISE EXCEPTION '% <= 0: % of % is lesser or equal 0', given_limit_name, given_limit_name, given_limit;
   END IF;

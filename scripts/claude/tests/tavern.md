@@ -126,6 +126,13 @@ For complex response validation, create a `.pat.json` file:
 | Negative tests | `{endpoint}/negative/` | Error handling verification |
 | Pattern tests | Root of endpoint dir | General validation |
 
+**Paginated endpoints** (those taking `page` / `page-size`, e.g. `get_balance_history`,
+`get_account_vesting_history`, `get_top_holders`) must include negative tests for each
+invalid page-size boundary: `null`, `<= 0`, and `> 1000`. The `null` case must be sent
+via an RPC POST body (`page-size: null`) — a query string cannot express SQL NULL, and a
+null page-size otherwise flows through to `LIMIT NULL` (an unbounded scan). All are
+expected to return `400` (`btracker_backend.validate_negative_limit` / `validate_limit`).
+
 ### 4. Pytest Markers
 
 Available markers in `pytest.ini`:
