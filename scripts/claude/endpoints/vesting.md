@@ -50,6 +50,10 @@ Modeled on `/transfer-statistics`. Reads from `vesting_stats_by_day` /
 `_by_month`, gap-filled via `generate_series` so every period in the
 requested range is represented.
 
+The `date` field labels the **start** of each bucket (the day/month/year the
+events occurred), so same-period events are reported on that period — not the
+next one (GitLab #55).
+
 Parameters:
 - `granularity`: `daily | monthly | yearly` (default `daily`). Yearly
   granularity is rolled up on the fly from the monthly table inside

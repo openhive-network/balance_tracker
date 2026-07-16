@@ -28,7 +28,7 @@ btracker_backend.vesting_stats:
     date:
       type: string
       format: date-time
-      description: end of the time bucket (day, month or year)
+      description: start of the time bucket (day, month or year)
     power_up_count:
       type: integer
       description: number of transfer_to_vesting operations in the period
