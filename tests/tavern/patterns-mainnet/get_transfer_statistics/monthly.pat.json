@@ -1,6 +1,6 @@
 [
   {
-    "date": "2016-10-01T00:00:00",
+    "date": "2016-09-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "798493511",
@@ -25,7 +25,7 @@
     "last_block_num": 4999997
   },
   {
-    "date": "2016-09-01T00:00:00",
+    "date": "2016-08-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "2540310729",
@@ -50,7 +50,7 @@
     "last_block_num": 4574686
   },
   {
-    "date": "2016-08-01T00:00:00",
+    "date": "2016-07-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "35499907552",
@@ -75,7 +75,7 @@
     "last_block_num": 3686716
   },
   {
-    "date": "2016-07-01T00:00:00",
+    "date": "2016-06-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "0",
@@ -100,7 +100,7 @@
     "last_block_num": 2802786
   },
   {
-    "date": "2016-06-01T00:00:00",
+    "date": "2016-05-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "0",
@@ -125,7 +125,7 @@
     "last_block_num": 1942556
   },
   {
-    "date": "2016-05-01T00:00:00",
+    "date": "2016-04-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "0",
@@ -150,7 +150,7 @@
     "last_block_num": 1052191
   },
   {
-    "date": "2016-04-01T00:00:00",
+    "date": "2016-03-01T00:00:00",
     "total_transfer_amount": {
       "nai": "@@000000013",
       "amount": "0",

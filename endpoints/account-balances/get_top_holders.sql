@@ -195,6 +195,11 @@ BEGIN
   -- DELEGATE TO BACKEND HELPER
   -- Returns composite type with totals and ranked holder array
   ---------------------------------------------------------------------------
+  -- validate_negative_limit above already rejects a null/<=0 page-size; the
+  -- COALESCE is a second layer of defense because this endpoint builds its own
+  -- OFFSET/LIMIT and does NOT pass through calculate_pages (which has its own
+  -- NULL/0 backstop). COALESCE("page", 1) is still load-bearing: page legitimately
+  -- arrives null and means "first page".
   RETURN btracker_backend.get_top_holders(
     _coin_type_id,
     "balance-type",

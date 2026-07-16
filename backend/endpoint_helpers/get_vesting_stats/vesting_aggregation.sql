@@ -95,7 +95,9 @@ BEGIN
       FROM joined j
     )
     SELECT
-      LEAST(j.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS updated_at,
+      -- Label each bucket by its period START (the day/month/year the events
+      -- occurred), so same-period events are reported on that period, not the next.
+      j.date::TIMESTAMP AS updated_at,
       j.power_up_count::INT,
       j.power_up_hive::BIGINT,
       j.power_down_init_count::INT,

@@ -174,6 +174,13 @@ DECLARE
   __offset INT;
   __limit INT;
 BEGIN
+  -- Backstop: page-size must be a positive, non-null integer. Endpoints already
+  -- validate this, but guard here too -- the choke point every paginated endpoint
+  -- passes through -- so no caller can drive the math with NULL (-> `LIMIT NULL`
+  -- = unbounded scan) or 0 (-> division by zero at `_count % _limit`). Reuse the
+  -- same validator the endpoints call so the client sees an identical message.
+  PERFORM btracker_backend.validate_negative_limit(_limit);
+
   __rest_of_division := (_count % _limit)::INT;
 
   __total_pages := (

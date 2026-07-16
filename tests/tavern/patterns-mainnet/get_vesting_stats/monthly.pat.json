@@ -1,6 +1,6 @@
 [
   {
-    "date": "2016-10-01T00:00:00",
+    "date": "2016-09-01T00:00:00",
     "last_block_num": 4999981,
     "power_down_fill_count": 4792,
     "power_down_fill_hive": {
@@ -27,7 +27,7 @@
     }
   },
   {
-    "date": "2016-09-01T00:00:00",
+    "date": "2016-08-01T00:00:00",
     "last_block_num": 4574681,
     "power_down_fill_count": 8051,
     "power_down_fill_hive": {
@@ -54,7 +54,7 @@
     }
   },
   {
-    "date": "2016-08-01T00:00:00",
+    "date": "2016-07-01T00:00:00",
     "last_block_num": 3687167,
     "power_down_fill_count": 3931,
     "power_down_fill_hive": {
@@ -81,7 +81,7 @@
     }
   },
   {
-    "date": "2016-07-01T00:00:00",
+    "date": "2016-06-01T00:00:00",
     "last_block_num": 2802610,
     "power_down_fill_count": 1951,
     "power_down_fill_hive": {
@@ -108,7 +108,7 @@
     }
   },
   {
-    "date": "2016-06-01T00:00:00",
+    "date": "2016-05-01T00:00:00",
     "last_block_num": 1942513,
     "power_down_fill_count": 1093,
     "power_down_fill_hive": {
@@ -135,7 +135,7 @@
     }
   },
   {
-    "date": "2016-05-01T00:00:00",
+    "date": "2016-04-01T00:00:00",
     "last_block_num": 1051594,
     "power_down_fill_count": 225,
     "power_down_fill_hive": {
@@ -162,7 +162,7 @@
     }
   },
   {
-    "date": "2016-04-01T00:00:00",
+    "date": "2016-03-01T00:00:00",
     "last_block_num": 209387,
     "power_down_fill_count": 0,
     "power_down_fill_hive": {

@@ -1,0 +1,28 @@
+---
+test_name: btracker PostgREST
+marks:
+  - patterntest
+  - negative
+
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: test
+    # Explicit null page-size must be rejected. top-holders builds its own
+    # OFFSET/LIMIT (not calculate_pages), so a null slipping past would scan the
+    # whole leaderboard. Sent via RPC body since a query string cannot carry null.
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: POST
+      headers:
+        content-type: application/json
+        accept: application/json
+      json:
+        coin-type: "HIVE"
+        balance-type: "balance"
+        page-size: null
+    response:
+      status_code: 400
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

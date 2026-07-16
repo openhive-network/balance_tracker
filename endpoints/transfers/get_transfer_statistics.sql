@@ -101,7 +101,7 @@ SET ROLE btracker_owner;
               $ref: '#/components/schemas/btracker_backend.array_of_transfer_stats'
             example: [
               {
-                "date": "2017-01-01T00:00:00",
+                "date": "2016-01-01T00:00:00",
                 "total_transfer_amount": {"nai": "@@000000013", "amount": "69611921266", "precision": 3},
                 "average_transfer_amount": {"nai": "@@000000013", "amount": "1302405", "precision": 3},
                 "maximum_transfer_amount": {"nai": "@@000000013", "amount": "18000000", "precision": 3},
@@ -178,7 +178,7 @@ USE CASES:
   - Economic analysis and reporting
 
 RETURN TYPE: SETOF btracker_backend.transfer_stats
-  - date: Period end timestamp
+  - date: Period start timestamp
   - total_transfer_amount: Sum as TEXT (bigint safety)
   - average_transfer_amount: Mean as TEXT
   - maximum/minimum_transfer_amount: Extremes as TEXT

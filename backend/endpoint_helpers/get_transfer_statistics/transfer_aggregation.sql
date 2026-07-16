@@ -104,10 +104,11 @@ BEGIN
             COALESCE(fb.last_block_num, btracker_backend.block_at_or_before(fb.date + __one_period)) AS last_block_num
           FROM transfer_records fb
         )
-        -- Final output: compute average, adjust timestamp to period end, apply sort direction
-        -- LEAST prevents future timestamps from exceeding current time
+        -- Final output: compute average, apply sort direction.
+        -- Label each bucket by its period START (the hour/day/month/year the transfers
+        -- occurred), so same-period transfers are reported on that period, not the next.
         SELECT
-          LEAST(fb.date + __one_period, CURRENT_TIMESTAMP)::TIMESTAMP AS adjusted_date,
+          fb.date::TIMESTAMP AS adjusted_date,
           fb.sum_transfer_amount::BIGINT,
           (CASE WHEN fb.transfer_count = 0 THEN 0 ELSE (fb.sum_transfer_amount / fb.transfer_count) END)::BIGINT,
           fb.max_transfer_amount::BIGINT,
