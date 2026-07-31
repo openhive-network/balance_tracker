@@ -25,9 +25,9 @@ SET ROLE btracker_owner;
         description: |
           Last block processed by balance tracker and its timestamp.
           `last_block_time` is null if no block has been processed yet.
-      While the HAF instance is still in massive sync (indexes not yet
-      built) the call fails fast with an error rather than executing an
-      unindexed lookup.
+          While the HAF instance is still in massive sync (indexes not yet
+          built) the call fails fast with an error rather than executing an
+          unindexed lookup.
 
           * Returns `JSON`
         content:
