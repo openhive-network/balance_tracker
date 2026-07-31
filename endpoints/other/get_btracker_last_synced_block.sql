@@ -5,8 +5,13 @@ SET ROLE btracker_owner;
   get:
     tags:
       - Other
-    summary: Get last block number synced by balance tracker
+    summary: Get last block number synced by balance tracker (deprecated)
+    deprecated: true
     description: |
+      **Deprecated** — superseded by `/sync-status`, which returns the block
+      number together with its timestamp (enabling single-call staleness
+      checks). This endpoint remains for backward compatibility.
+
       Get the block number of the last block synced by balance tracker.
 
       SQL example
