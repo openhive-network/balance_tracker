@@ -48,6 +48,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/transfers/get_vesting_stats.sql
 ../$endpoints/other/get_btracker_version.sql
 ../$endpoints/other/get_btracker_last_synced_block.sql
+../$endpoints/other/get_btracker_sync_status.sql
 ../$endpoints/other/get_total_value_locked.sql"
 
 
