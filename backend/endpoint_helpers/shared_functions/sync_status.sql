@@ -52,6 +52,17 @@ BEGIN
     AS
     $pb$
     BEGIN
+      -- Fail fast during HAF massive sync: hafd.blocks' PK is dropped for the
+      -- duration (hive.disable_indexes_of_irreversible), so the join below
+      -- would seq-scan the largest table in the database. Health-check agents
+      -- gate on is_instance_ready() before calling APIs; this guard protects
+      -- any caller that does not (e.g. a raw haproxy httpchk) by erroring in
+      -- milliseconds instead of stalling.
+      IF NOT hive.is_instance_ready() THEN
+        RAISE EXCEPTION 'HAF instance is not ready (massive sync in progress)'
+          USING ERRCODE = '55000';
+      END IF;
+
       RETURN (
         SELECT json_build_object(
           'last_block_num', c.current_block_num,
