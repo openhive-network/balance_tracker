@@ -1,4 +1,4 @@
-# syntax=registry.gitlab.syncad.com/hive/common-ci-configuration/dockerfile:1.5
+# syntax=registry.gitlab.syncad.com/hive/common-ci-configuration/dockerfile:1.11
 # Pinned to the c-c-c develop SHA tag that introduces python3 + py3-psycopg2
 # + /usr/local/bin/install_with_app_lock.py (the wrapper used by install_app.sh).
 # Bump when c-c-c publishes a new semver tag that includes the wrapper.
