@@ -15,6 +15,12 @@ LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
+-- PostgreSQL 17.11 wraps the get_impacted_balances LATERAL in a Memoize node keyed
+-- only on op_type_id, which pushes the bio.id = ho.op_type_id filter above the
+-- lateral: the function then runs once per (operation x every balance-impacting op
+-- type) instead of once per matched operation, and the cache never hits (~100x
+-- slower massive sync). 17.10 and earlier pick the hash-join-first plan on their own.
+SET enable_memoize = OFF
 AS
 $$
 DECLARE
