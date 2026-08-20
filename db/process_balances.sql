@@ -34,6 +34,12 @@ DECLARE
  __balance_history_by_day INT;
  __balance_history_by_month INT;
  __hbd_interest INT;
+ -- During MASSIVE sync (app indexes not yet created) the by_day/by_month rollups
+ -- are deferred: maintaining them per batch costs window sorts + two upserts on
+ -- every batch, while finalize_massive_sync() can rebuild both tables in one
+ -- set-based pass over account_balance_history at the massive->LIVE transition.
+ -- In LIVE (indexes created) the incremental rollups run as before.
+ __maintain_period_rollups BOOLEAN := isIndexesCreated();
 BEGIN
 
 SELECT block_num
@@ -553,6 +559,12 @@ aggregated_balance_history AS MATERIALIZED (
     MIN(balance) OVER w_month_all AS min_balance_month,
     MAX(balance) OVER w_month_all AS max_balance_month
   FROM join_created_at_to_balance_history
+  -- One-time filter: during MASSIVE sync the rollups are deferred to
+  -- finalize_massive_sync() (see __maintain_period_rollups above); emptying this
+  -- CTE makes the window sorts and both upserts below no-ops. The HBD interest
+  -- accumulator reads join_created_at_to_balance_history directly and is not
+  -- affected.
+  WHERE __maintain_period_rollups
   WINDOW
     w_day_desc AS (PARTITION BY account_id, nai, by_day ORDER BY source_op DESC),
     w_month_desc AS (PARTITION BY account_id, nai, by_month ORDER BY source_op DESC),
