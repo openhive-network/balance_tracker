@@ -794,9 +794,61 @@ BEGIN
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
 
+  /*
+   * Backfill the by-day/by-month balance rollups that process_block_range_balances
+   * defers while massive sync is running (see __maintain_period_rollups there).
+   * account_balance_history holds every balance change, so one set-based pass
+   * reproduces exactly what the per-batch incremental upserts would have built:
+   * end-of-period balance = row with the highest source_op in the period,
+   * min/max = MIN/MAX over all rows in the period.
+   *
+   * Runs inside the caller's transaction, so a crash mid-backfill rolls back to
+   * "not finalized" and the next finalize_massive_sync() call redoes it from
+   * scratch -- no partial state to reconcile.
+   */
+  RAISE NOTICE 'btracker: backfilling balance_history_by_day...';
+  INSERT INTO balance_history_by_day
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+  SELECT
+    h.account,
+    h.nai,
+    -- balance_seq_no is strictly increasing per (account, nai) and disambiguates
+    -- multiple balance changes from a single operation (e.g. a self-transfer
+    -- produces two rows with the same source_op).
+    (array_agg(h.source_op ORDER BY h.balance_seq_no DESC))[1] AS source_op,
+    date_trunc('day', bv.created_at)                           AS updated_at,
+    (array_agg(h.balance ORDER BY h.balance_seq_no DESC))[1]   AS balance,
+    MIN(h.balance)                                        AS min_balance,
+    MAX(h.balance)                                        AS max_balance
+  FROM account_balance_history h
+  JOIN blocks_view bv ON bv.num = hafd.operation_id_to_block_num(h.source_op)
+  GROUP BY h.account, h.nai, date_trunc('day', bv.created_at)
+  ORDER BY h.account, h.nai, date_trunc('day', bv.created_at);
+
+  /*
+   * The month rollup is derivable from the day rollup: a month's closing balance
+   * is its last day's closing balance, and the month min/max is the min/max over
+   * its days' min/max. Aggregating ~day-granularity rows here is far cheaper than
+   * a second pass over account_balance_history.
+   */
+  RAISE NOTICE 'btracker: backfilling balance_history_by_month...';
+  INSERT INTO balance_history_by_month
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+  SELECT
+    d.account,
+    d.nai,
+    (array_agg(d.source_op ORDER BY d.updated_at DESC))[1] AS source_op,
+    date_trunc('month', d.updated_at)                      AS updated_at,
+    (array_agg(d.balance ORDER BY d.updated_at DESC))[1]   AS balance,
+    MIN(d.min_balance)                                     AS min_balance,
+    MAX(d.max_balance)                                     AS max_balance
+  FROM balance_history_by_day d
+  GROUP BY d.account, d.nai, date_trunc('month', d.updated_at)
+  ORDER BY d.account, d.nai, date_trunc('month', d.updated_at);
+
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
-  RAISE NOTICE 'btracker: massive sync finalized (LOGGED + forking + indexes restored)';
+  RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
 END
 $$;
 
