@@ -29,6 +29,7 @@ DECLARE
  _hf_hbd_interest      INT      := btracker_backend.hf_hbd_interest();
  _hf_hbd_interest_block INT;
  _hbd_interest_interval INT     := btracker_backend.hbd_interest_compound_interval_sec();
+ __hf01_block INT;
  __balance_history INT;
  __current_balances INT;
  __balance_history_by_day INT;
@@ -46,6 +47,11 @@ SELECT block_num
 INTO _hf_hbd_interest_block
 FROM hafd.applied_hardforks
 WHERE hardfork_num = _hf_hbd_interest;
+
+SELECT block_num
+INTO __hf01_block
+FROM hafd.applied_hardforks
+WHERE hardfork_num = 1;
 --RAISE NOTICE 'Processing balances';
 
 /*
@@ -61,67 +67,37 @@ WHERE hardfork_num = _hf_hbd_interest;
  * This CTE retrieves all operation type IDs that can affect account balances,
  * such as transfers, rewards, vesting operations, etc.
  */
-WITH balance_impacting_ops AS MATERIALIZED
+WITH ops_in_range AS MATERIALIZED
 (
-  SELECT ot.id, replace(ot.name, 'hive::protocol::', '') AS type_name
-  FROM hafd.operation_types ot
-  WHERE ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
-),
-
-/*
- * ===================================================================================
- * CTE: ops_in_range
- * ===================================================================================
- * WHY MATERIALIZED: This is the foundation for all subsequent calculations.
- * Materializing prevents repeated execution of the CROSS JOIN LATERAL with
- * btracker_backend.get_impacted_balances(), which walks the operation's JSONB body
- * to extract balance impacts.
- *
- * DATA FLOW:
- *   1. Filter operations_view to only balance-impacting ops in our block range
- *   2. For each operation, call btracker_backend.get_impacted_balances() to extract:
- *      - account_name: The account whose balance changed
- *      - asset_symbol_nai: The asset type (HIVE=21, HBD=13, VESTS=37)
- *      - amount: The DELTA (change), can be positive or negative
- *   3. Convert account_name to account_id via accounts_view lookup
- *
- * NOTE: get_impacted_balances() is a pure SQL/JSONB reimplementation of the HAF C
- * function hive.get_impacted_balances(). It reads ho.body_value directly instead of
- * deserializing the operation into a C variant, which removes a ~15-30x per-block
- * cost in LIVE processing (issue #53). See backend/operation_parsers/impacted_balances.sql.
- *
- * EDGE CASE - Hardfork handling:
- *   The ho.block_num > ah.block_num check (where ah.hardfork_num = 1) passes a
- *   boolean to get_impacted_balances() indicating whether we're past hardfork 1.
- *   This affects how certain legacy operations are interpreted.
- *
- * NOTE: 'balance' column here is actually a DELTA (amount of change), not an
- * absolute balance. The name is historical but the actual running balance is
- * computed later using SUM() OVER window functions.
- */
-ops_in_range AS MATERIALIZED
-(
+  /*
+   * WHY MATERIALIZED: foundation for all subsequent calculations; materializing
+   * caches the extraction so the union/window CTEs below reuse it.
+   *
+   * btracker_backend.get_impacted_balances_batch extracts every (account, asset,
+   * delta) emission for the range in ONE set-based query over _btracker_ops_batch.
+   * It replaces the previous per-operation CROSS JOIN LATERAL
+   * btracker_backend.get_impacted_balances(...) call: the per-row variant's SQL was
+   * cheap but each of the ~64k calls per op-dense 10k-block batch carried ~55us of
+   * SPI/tuplestore invocation overhead, making extraction the dominant select-side
+   * cost (measured 3.0s -> 0.8s per dense batch at block ~25M). Row-for-row parity
+   * between the two implementations is guarded by tests/parity.
+   *
+   * NOTE: 'balance' column here is actually a DELTA (amount of change), not an
+   * absolute balance. The name is historical but the actual running balance is
+   * computed later using SUM() OVER window functions.
+   */
   SELECT
-    (SELECT av.id FROM accounts_view av WHERE av.name = get_impacted_balances.account_name) AS account_id,
-    get_impacted_balances.asset_symbol_nai AS nai,
-    get_impacted_balances.amount AS balance,
-    ho.id AS source_op,
-    ho.block_num AS source_op_block,
+    (SELECT av.id FROM accounts_view av WHERE av.name = gib.account_name) AS account_id,
+    gib.asset_symbol_nai AS nai,
+    gib.amount AS balance,
+    gib.source_op,
+    gib.source_op_block,
     -- threaded down to the HBD interest accumulator so it does not have to re-read
     -- _btracker_ops_batch; trx_in_block distinguishes transaction ops (>= 0, applied
     -- before head_block_time advances -> use block-1 time) from standalone virtual ops
     -- (-1, applied after -> use block time). See hbd_ops effective_ts.
-    ho.trx_in_block AS trx_in_block
-  FROM _btracker_ops_batch ho --- Pre-fetched operations (see btracker_prefetch_operations)
-  JOIN balance_impacting_ops bio ON bio.id = ho.op_type_id
-  JOIN hive.applied_hardforks_view ah ON ah.hardfork_num = 1
-  CROSS JOIN LATERAL btracker_backend.get_impacted_balances(
-    bio.type_name,
-    ho.body_value,
-    ho.block_num > ah.block_num
-  ) AS get_impacted_balances
-  WHERE
-    ho.block_num BETWEEN _from AND _to
+    gib.trx_in_block
+  FROM btracker_backend.get_impacted_balances_batch( _from, _to, __hf01_block ) AS gib
 ),
 
 /*

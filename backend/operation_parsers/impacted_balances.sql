@@ -175,4 +175,180 @@ BEGIN
 END
 $$;
 
+
+/*
+ * btracker_backend.get_impacted_balances_batch
+ * ============================================
+ * Set-based variant of get_impacted_balances: one query over the whole
+ * _btracker_ops_batch range instead of one SETOF-plpgsql call per operation. The
+ * per-row variant's SQL is cheap (~4us/call) but each invocation carries ~55us of
+ * SPI/tuplestore call overhead, which at ~64k calls per 10k-block batch in op-dense
+ * regions dominated the balances stage (~3.5s/batch measured at block 25M). The
+ * emissions branches below are a mechanical transcription of the per-row CTE - keep
+ * them in the same order and update both together (the parity test compares the two
+ * implementations row-for-row over fixture batches).
+ *
+ * escrow_transfer keeps its special handling: the fee folds into one of the two
+ * per-symbol totals, producing at most two combined rows per operation - emitting
+ * fee/hive/hbd separately would change account_balance_history's user-visible rows.
+ *
+ * Reads the session temp table _btracker_ops_batch (btracker_prefetch_operations),
+ * like the rest of the balances pipeline.
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.get_impacted_balances_batch(
+    _from INT,
+    _to INT,
+    _hf01_block INT
+)
+RETURNS TABLE(
+    source_op BIGINT,
+    source_op_block INT,
+    trx_in_block SMALLINT,
+    account_name VARCHAR,
+    amount BIGINT,
+    asset_precision INT,
+    asset_symbol_nai INT
+)
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN QUERY
+  WITH ops AS MATERIALIZED (
+    SELECT
+      ho.id,
+      ho.block_num,
+      ho.trx_in_block,
+      ho.body_value AS body,
+      replace(ot.name, 'hive::protocol::', '') AS op_name,
+      ho.block_num > _hf01_block AS is_hf01
+    FROM _btracker_ops_batch ho
+    JOIN hafd.operation_types ot ON ot.id = ho.op_type_id
+    WHERE ho.block_num BETWEEN _from AND _to
+      AND ot.name IN (SELECT * FROM hive.get_balance_impacting_operations())
+  ),
+  emissions(id, block_num, trx_in_block, is_hf01, account_name, sign, asset) AS (
+    --- liquid transfers ---
+              SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from', -1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'transfer_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'to',    1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'transfer_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from', -1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'transfer_to_savings_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'to',    1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'fill_transfer_from_savings_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from', -1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'fill_recurrent_transfer_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'to',    1, o.body -> 'amount' FROM ops o WHERE o.op_name = 'fill_recurrent_transfer_operation'
+
+    --- market orders ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner', -1, o.body -> 'amount_to_sell' FROM ops o WHERE o.op_name IN ('limit_order_create_operation', 'limit_order_create2_operation')
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'seller', 1, o.body -> 'amount_back' FROM ops o WHERE o.op_name = 'limit_order_cancelled_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'open_owner',    1, o.body -> 'current_pays' FROM ops o WHERE o.op_name = 'fill_order_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'current_owner', 1, o.body -> 'open_pays' FROM ops o WHERE o.op_name = 'fill_order_operation'
+
+    --- conversions ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner', -1, o.body -> 'amount' FROM ops o WHERE o.op_name IN ('convert_operation', 'collateralized_convert_operation')
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner',  1, o.body -> 'amount_out' FROM ops o WHERE o.op_name = 'fill_convert_request_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner',  1, o.body -> 'excess_collateral' FROM ops o WHERE o.op_name = 'fill_collateralized_convert_request_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner',  1, o.body -> 'hbd_out' FROM ops o WHERE o.op_name = 'collateralized_convert_immediate_conversion_operation'
+
+    --- escrow (release / approved / rejected; transfer handled above) ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'receiver', 1, o.body -> 'hive_amount' FROM ops o WHERE o.op_name = 'escrow_release_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'receiver', 1, o.body -> 'hbd_amount' FROM ops o WHERE o.op_name = 'escrow_release_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'agent',    1, o.body -> 'fee' FROM ops o WHERE o.op_name = 'escrow_approved_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from',     1, o.body -> 'hbd_amount' FROM ops o WHERE o.op_name = 'escrow_rejected_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from',     1, o.body -> 'hive_amount' FROM ops o WHERE o.op_name = 'escrow_rejected_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from',     1, o.body -> 'fee' FROM ops o WHERE o.op_name = 'escrow_rejected_operation'
+
+    --- block / witness / liquidity / interest rewards ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'worker',   1, o.body -> 'reward' FROM ops o WHERE o.op_name = 'pow_reward_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'producer', 1, o.body -> 'vesting_shares' FROM ops o WHERE o.op_name = 'producer_reward_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner',    1, o.body -> 'payout' FROM ops o WHERE o.op_name = 'liquidity_reward_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'owner',    1, o.body -> 'interest' FROM ops o WHERE o.op_name = 'interest_operation' AND (o.body ->> 'is_saved_into_hbd_balance')::BOOLEAN
+
+    --- author / benefactor / curation rewards (skipped when deferred to claim_reward_balance) ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'author',     1, o.body -> 'hbd_payout' FROM ops o WHERE o.op_name = 'author_reward_operation'             AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'author',     1, o.body -> 'hive_payout' FROM ops o WHERE o.op_name = 'author_reward_operation'             AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'author',     1, o.body -> 'vesting_payout' FROM ops o WHERE o.op_name = 'author_reward_operation'             AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'benefactor', 1, o.body -> 'hbd_payout' FROM ops o WHERE o.op_name = 'comment_benefactor_reward_operation' AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'benefactor', 1, o.body -> 'hive_payout' FROM ops o WHERE o.op_name = 'comment_benefactor_reward_operation' AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'benefactor', 1, o.body -> 'vesting_payout' FROM ops o WHERE o.op_name = 'comment_benefactor_reward_operation' AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'curator',    1, o.body -> 'reward' FROM ops o WHERE o.op_name = 'curation_reward_operation'           AND NOT (o.body ->> 'payout_must_be_claimed')::BOOLEAN
+
+    --- claim reward balance ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'account', 1, o.body -> 'reward_hive' FROM ops o WHERE o.op_name = 'claim_reward_balance_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'account', 1, o.body -> 'reward_hbd' FROM ops o WHERE o.op_name = 'claim_reward_balance_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'account', 1, o.body -> 'reward_vests' FROM ops o WHERE o.op_name = 'claim_reward_balance_operation'
+
+    --- vesting power-up / power-down completions ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'to_account',       1, o.body -> 'deposited' FROM ops o WHERE o.op_name = 'fill_vesting_withdraw_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from_account',    -1, o.body -> 'withdrawn' FROM ops o WHERE o.op_name = 'fill_vesting_withdraw_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'to_account',       1, o.body -> 'vesting_shares_received' FROM ops o WHERE o.op_name = 'transfer_to_vesting_completed_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from_account',    -1, o.body -> 'hive_vested' FROM ops o WHERE o.op_name = 'transfer_to_vesting_completed_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'new_account_name', 1, o.body -> 'initial_vesting_shares' FROM ops o WHERE o.op_name = 'account_created_operation'
+
+    --- account-creation fee burn (creator pays, null receives) ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'creator', -1, o.body -> 'fee' FROM ops o WHERE o.op_name IN ('account_create_operation', 'account_create_with_delegation_operation', 'claim_account_operation')
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, 'null',               1, o.body -> 'fee' FROM ops o WHERE o.op_name IN ('account_create_operation', 'account_create_with_delegation_operation', 'claim_account_operation')
+
+    --- DHF / proposals ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'receiver',  1, o.body -> 'payment' FROM ops o WHERE o.op_name = 'proposal_pay_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'payer',    -1, o.body -> 'payment' FROM ops o WHERE o.op_name = 'proposal_pay_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'creator',  -1, o.body -> 'fee' FROM ops o WHERE o.op_name = 'proposal_fee_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'fee' FROM ops o WHERE o.op_name = 'proposal_fee_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'additional_funds' FROM ops o WHERE o.op_name = 'dhf_funding_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury', -1, o.body -> 'hive_amount_in' FROM ops o WHERE o.op_name = 'dhf_conversion_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'hbd_amount_out' FROM ops o WHERE o.op_name = 'dhf_conversion_operation'
+
+    --- hardfork balance migrations ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'hive_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'hbd_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury',  1, o.body -> 'total_hive_from_vests' FROM ops o WHERE o.op_name = 'hardfork_hive_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'account',   1, o.body -> 'hbd_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_restore_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury', -1, o.body -> 'hbd_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_restore_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'account',   1, o.body -> 'hive_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_restore_operation'
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'treasury', -1, o.body -> 'hive_transferred' FROM ops o WHERE o.op_name = 'hardfork_hive_restore_operation'
+
+    --- treasury consolidation: total_moved is an array of assets ---
+    UNION ALL SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, 'hive.fund', 1, elem
+              FROM ops o, jsonb_array_elements(o.body -> 'total_moved') AS elem
+              WHERE o.op_name = 'consolidate_treasury_balance_operation'
+  ),
+
+  parsed AS (
+    SELECT e.id, e.block_num, e.trx_in_block, e.is_hf01, e.account_name, e.sign,
+           a.amount, a.asset_precision, a.asset_symbol_nai
+    FROM emissions e
+    CROSS JOIN LATERAL btracker_backend.parse_amount_object(e.asset) AS a
+
+    UNION ALL
+
+    --- escrow_transfer: fee folded into the matching per-symbol total ---
+    SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from', -1,
+           (h).amount + CASE WHEN (f).asset_symbol_nai = (h).asset_symbol_nai THEN (f).amount ELSE 0 END,
+           (h).asset_precision, (h).asset_symbol_nai
+    FROM ops o,
+         LATERAL btracker_backend.parse_amount_object(o.body -> 'hive_amount') AS h,
+         LATERAL btracker_backend.parse_amount_object(o.body -> 'fee') AS f
+    WHERE o.op_name = 'escrow_transfer_operation'
+
+    UNION ALL
+
+    SELECT o.id, o.block_num, o.trx_in_block, o.is_hf01, o.body ->> 'from', -1,
+           (hb).amount + CASE WHEN (f).asset_symbol_nai = (hb).asset_symbol_nai THEN (f).amount ELSE 0 END,
+           (hb).asset_precision, (hb).asset_symbol_nai
+    FROM ops o,
+         LATERAL btracker_backend.parse_amount_object(o.body -> 'hbd_amount') AS hb,
+         LATERAL btracker_backend.parse_amount_object(o.body -> 'fee') AS f
+    WHERE o.op_name = 'escrow_transfer_operation'
+  )
+  SELECT
+    p.id,
+    p.block_num,
+    p.trx_in_block,
+    p.account_name::VARCHAR,
+    (p.sign * p.amount * (CASE WHEN p.asset_symbol_nai = 37 AND NOT p.is_hf01 THEN 1000000 ELSE 1 END))::BIGINT,
+    p.asset_precision,
+    p.asset_symbol_nai
+  FROM parsed p
+  WHERE p.sign * p.amount * (CASE WHEN p.asset_symbol_nai = 37 AND NOT p.is_hf01 THEN 1000000 ELSE 1 END) <> 0;
+END
+$$;
+
 RESET ROLE;
