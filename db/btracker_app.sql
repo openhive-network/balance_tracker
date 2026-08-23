@@ -934,6 +934,7 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
+  __stage_ts timestamptz;
   __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
 BEGIN
   PERFORM set_config('synchronous_commit', 'OFF', false);
@@ -941,7 +942,9 @@ BEGIN
   -- Pre-fetch all operations for this batch into a temp table.
   -- The 11 process_* functions read from _btracker_ops_batch instead of
   -- scanning operations_view independently (eliminates 10+ redundant scans).
+  __stage_ts := clock_timestamp();
   PERFORM btracker_prefetch_operations(_from, _to);
+  IF _logs THEN RAISE NOTICE 'btracker stage prefetch: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
 
   IF _logs THEN
     RAISE NOTICE 'Btracker is attempting to process a block range: <%, %>', _from, _to;
@@ -993,20 +996,49 @@ BEGIN
     END IF;
 
   ELSE
-    -- If 41818752 is not in range, process the full range normally
+    -- If 41818752 is not in range, process the full range normally.
+    -- Per-stage timing NOTICEs make every sync its own profiler (the
+    -- rc1 timing investigation needed exactly this breakdown and had to
+    -- reconstruct it from pg_stat_statements, which had evicted half of it).
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_balances(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage balances: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_withdrawals(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage withdrawals: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_savings(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage savings: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_rewards(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage rewards: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_delegations(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage delegations: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_rc_delegations(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage rc_delegations: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_recurrent_transfers(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage recurrent_transfers: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_transfer_stats(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage transfer_stats: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_vesting_stats(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage vesting_stats: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_account_vesting_stats(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage account_vesting_stats: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_converts(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage converts: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_orders(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage orders: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_escrows(_from, _to);
+    IF _logs THEN RAISE NOTICE 'btracker stage escrows: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); END IF;
   END IF;
 
   IF _logs THEN
