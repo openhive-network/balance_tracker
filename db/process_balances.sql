@@ -490,7 +490,14 @@ join_created_at_to_balance_history AS MATERIALIZED (
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
   FROM remove_latest_stored_balance_record rls
+  -- The explicit range on bv.num is redundant with the join condition but
+  -- necessary: blocks_view is a reversible-union view and the planner cannot
+  -- propagate the batch range through the join equivalence - without it, the
+  -- view is re-executed per row (one pk_hive_blocks probe plus a reversible
+  -- Append per emission, ~76k executions per op-dense batch) instead of being
+  -- scanned once and hash-joined. Same planner guard as haf_block_explorer!503.
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
+                          AND bv.num BETWEEN _from AND _to
 ),
 
 /*
@@ -728,7 +735,10 @@ hbd_ops AS MATERIALIZED (
          ELSE jc.created_at
     END AS effective_ts
   FROM join_created_at_to_balance_history jc
+  -- Range guard for the same reason as the bv join above; the previous block
+  -- of the range's first block is _from - 1, hence the widened lower bound.
   LEFT JOIN hive.blocks_view bv_prev ON bv_prev.num = jc.source_op_block - 1
+                                    AND bv_prev.num BETWEEN _from - 1 AND _to
   WHERE jc.nai = _nai_hbd
     AND (_hf_hbd_interest_block IS NULL OR jc.source_op_block <= _hf_hbd_interest_block)
 ),
