@@ -29,6 +29,11 @@ DECLARE
   __savings_history                INT;
   __savings_history_by_day         INT;
   __savings_history_by_month       INT;
+  -- During MASSIVE sync (app indexes not yet created) the by_day/by_month savings
+  -- rollups are deferred: finalize_massive_sync() rebuilds both tables in one
+  -- set-based pass over account_savings_history at the massive->LIVE transition,
+  -- exactly like the balance rollups (see process_balances.sql / bt!383).
+  __maintain_period_rollups BOOLEAN := isIndexesCreated();
 BEGIN
 
 /*
@@ -875,7 +880,15 @@ join_created_at_to_balance_history AS MATERIALIZED (
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
   FROM remove_latest_stored_balance_record rls
+  -- Redundant-but-necessary range guard on the reversible-union view (same planner
+  -- pattern as bt!387): without it the view is re-executed per row instead of
+  -- hash-joined against the batch's blocks.
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
+                          AND bv.num BETWEEN _from AND _to
+  -- One-time filter: while massive sync is running the rollups (this CTE's only
+  -- consumers) are deferred to finalize_massive_sync(), which also skips the
+  -- timestamp join entirely for those batches.
+  WHERE __maintain_period_rollups
 ),
 
 /*

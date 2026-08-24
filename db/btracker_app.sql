@@ -846,6 +846,41 @@ BEGIN
   GROUP BY d.account, d.nai, date_trunc('month', d.updated_at)
   ORDER BY d.account, d.nai, date_trunc('month', d.updated_at);
 
+  /* Savings rollups: same deferral + backfill as the balance rollups above
+   * (see process_savings.sql). account_savings_history holds every savings
+   * balance change; balance_seq_no disambiguates multiple changes from one
+   * operation. */
+  RAISE NOTICE 'btracker: backfilling saving_history_by_day...';
+  INSERT INTO saving_history_by_day
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+  SELECT
+    h.account,
+    h.nai,
+    (array_agg(h.source_op ORDER BY h.balance_seq_no DESC))[1] AS source_op,
+    date_trunc('day', bv.created_at)                           AS updated_at,
+    (array_agg(h.balance ORDER BY h.balance_seq_no DESC))[1]   AS balance,
+    MIN(h.balance)                                             AS min_balance,
+    MAX(h.balance)                                             AS max_balance
+  FROM account_savings_history h
+  JOIN blocks_view bv ON bv.num = hafd.operation_id_to_block_num(h.source_op)
+  GROUP BY h.account, h.nai, date_trunc('day', bv.created_at)
+  ORDER BY h.account, h.nai, date_trunc('day', bv.created_at);
+
+  RAISE NOTICE 'btracker: backfilling saving_history_by_month...';
+  INSERT INTO saving_history_by_month
+    (account, nai, source_op, updated_at, balance, min_balance, max_balance)
+  SELECT
+    d.account,
+    d.nai,
+    (array_agg(d.source_op ORDER BY d.updated_at DESC))[1] AS source_op,
+    date_trunc('month', d.updated_at)                      AS updated_at,
+    (array_agg(d.balance ORDER BY d.updated_at DESC))[1]   AS balance,
+    MIN(d.min_balance)                                     AS min_balance,
+    MAX(d.max_balance)                                     AS max_balance
+  FROM saving_history_by_day d
+  GROUP BY d.account, d.nai, date_trunc('month', d.updated_at)
+  ORDER BY d.account, d.nai, date_trunc('month', d.updated_at);
+
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
   RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
