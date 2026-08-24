@@ -1,6 +1,120 @@
 SET ROLE btracker_owner;
 
 /*
+ * btracker_backend.accumulate_hbd_interest
+ * ========================================
+ * Single-pass replacement for the recursive-CTE HBD interest accumulator that
+ * used to live inside process_block_range_balances. The fold is sequentially
+ * dependent (each 30-day reset moves the anchor), which a window function
+ * cannot express - but a plain ordered loop expresses it directly, in O(rows)
+ * with trivial constants. The recursive form additionally poisoned the whole
+ * statement's planning: through the CTE chain the planner estimated it at
+ * ~5e17 rows (actual: tens of thousands), distorting join choices everywhere.
+ *
+ * Consumes the session temp table _hbd_batch_rows staged by
+ * process_block_range_balances (liquid-HBD running-balance rows of the batch,
+ * HF25-gated there). Timestamp rule, epoch defaults and the reset condition are
+ * verbatim from the previous implementation - see the staging comment in
+ * process_block_range_balances for the chain model references.
+ *
+ * Returns the number of accounts upserted into account_hbd_interest.
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.accumulate_hbd_interest(
+    _from INT,
+    _to INT,
+    _hbd_interest_interval INT
+)
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  r RECORD;
+  __cur_account   INT := NULL;
+  __seconds       NUMERIC;
+  __last_update   TIMESTAMP;
+  __last_balance  BIGINT;
+  __last_payment  TIMESTAMP;
+  __accrued       NUMERIC;
+  __acc_ids  INT[]       := '{}';
+  __secs     NUMERIC[]   := '{}';
+  __updates  TIMESTAMP[] := '{}';
+  __balances BIGINT[]    := '{}';
+  __payments TIMESTAMP[] := '{}';
+  __n INT := 0;
+BEGIN
+  FOR r IN
+    SELECT
+      h.account_id,
+      h.balance,
+      -- transaction ops (trx_in_block >= 0) are applied before head_block_time
+      -- advances -> previous block's time; standalone virtual ops -> own time
+      CASE WHEN h.trx_in_block >= 0
+           THEN COALESCE(bvp.created_at, bv.created_at)
+           ELSE bv.created_at
+      END AS effective_ts,
+      hi.hbd_seconds               AS p_seconds,
+      hi.hbd_seconds_last_update   AS p_update,
+      hi.last_balance              AS p_balance,
+      hi.hbd_last_interest_payment AS p_payment
+    FROM _hbd_batch_rows h
+    -- range guards: reversible-union view, planner cannot propagate the range
+    JOIN hive.blocks_view bv ON bv.num = h.source_op_block
+                            AND bv.num BETWEEN _from AND _to
+    LEFT JOIN hive.blocks_view bvp ON bvp.num = h.source_op_block - 1
+                                  AND bvp.num BETWEEN _from - 1 AND _to
+    LEFT JOIN account_hbd_interest hi ON hi.account = h.account_id
+    ORDER BY h.account_id, h.source_op, h.balance_seq_no
+  LOOP
+    IF __cur_account IS DISTINCT FROM r.account_id THEN
+      IF __cur_account IS NOT NULL THEN
+        __n := __n + 1;
+        __acc_ids[__n] := __cur_account; __secs[__n] := __seconds;
+        __updates[__n] := __last_update; __balances[__n] := __last_balance;
+        __payments[__n] := __last_payment;
+      END IF;
+      __cur_account  := r.account_id;
+      -- epoch defaults are load-bearing (see chain model notes): the first
+      -- positive-balance op of a brand-new account must reset immediately
+      __seconds      := COALESCE(r.p_seconds, 0::NUMERIC);
+      __last_update  := COALESCE(r.p_update, 'epoch'::TIMESTAMP);
+      __last_balance := COALESCE(r.p_balance, 0::BIGINT);
+      __last_payment := COALESCE(r.p_payment, 'epoch'::TIMESTAMP);
+    END IF;
+
+    __accrued := __seconds
+               + __last_balance::NUMERIC * EXTRACT(EPOCH FROM (r.effective_ts - __last_update));
+    IF __accrued > 0 AND EXTRACT(EPOCH FROM (r.effective_ts - __last_payment)) > _hbd_interest_interval THEN
+      __seconds      := 0::NUMERIC;
+      __last_payment := r.effective_ts;
+    ELSE
+      __seconds := __accrued;
+    END IF;
+    __last_update  := r.effective_ts;
+    __last_balance := r.balance;
+  END LOOP;
+
+  IF __cur_account IS NOT NULL THEN
+    __n := __n + 1;
+    __acc_ids[__n] := __cur_account; __secs[__n] := __seconds;
+    __updates[__n] := __last_update; __balances[__n] := __last_balance;
+    __payments[__n] := __last_payment;
+  END IF;
+
+  INSERT INTO account_hbd_interest
+    (account, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment)
+  SELECT * FROM unnest(__acc_ids, __secs, __updates, __balances, __payments)
+  ON CONFLICT ON CONSTRAINT pk_account_hbd_interest DO UPDATE SET
+    hbd_seconds               = EXCLUDED.hbd_seconds,
+    hbd_seconds_last_update   = EXCLUDED.hbd_seconds_last_update,
+    last_balance              = EXCLUDED.last_balance,
+    hbd_last_interest_payment = EXCLUDED.hbd_last_interest_payment;
+
+  RETURN __n;
+END
+$$;
+
+/*
  * process_block_range_balances: Processes balance-impacting operations for a block range.
  *
  * Core operations: Extracts balance deltas from blockchain operations, computes running
@@ -52,6 +166,18 @@ SELECT block_num
 INTO __hf01_block
 FROM hafd.applied_hardforks
 WHERE hardfork_num = 1;
+
+-- Staging table for the HBD interest accumulator (consumed by
+-- btracker_backend.accumulate_hbd_interest after the main statement below).
+DROP TABLE IF EXISTS _hbd_batch_rows;
+CREATE TEMP TABLE _hbd_batch_rows(
+  account_id      INT,
+  balance         BIGINT,
+  source_op       BIGINT,
+  source_op_block INT,
+  balance_seq_no  BIGINT,
+  trx_in_block    SMALLINT
+);
 --RAISE NOTICE 'Processing balances';
 
 /*
@@ -474,6 +600,11 @@ join_created_at_to_balance_history AS MATERIALIZED (
   -- scanned once and hash-joined. Same planner guard as haf_block_explorer!503.
   JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
                           AND bv.num BETWEEN _from AND _to
+  -- One-time filter: with the HBD accumulator moved out of this statement
+  -- (btracker_backend.accumulate_hbd_interest), the period rollups are this
+  -- CTE's only consumers, so massive batches skip the timestamp join entirely
+  -- (same gating as the savings pipeline).
+  WHERE __maintain_period_rollups
 ),
 
 /*
@@ -649,188 +780,36 @@ insert_account_balance_history_by_month AS (
 
 /*
  * ===================================================================================
- * HBD INTEREST STATE
+ * HBD INTEREST STAGING
  * ===================================================================================
- * Maintains the per-account liquid HBD interest accumulator in account_hbd_interest.
+ * The per-account HBD interest accumulator (30-day reset fold; chain model:
+ * hived database.cpp adjust_hbd_balance -> evaluate_hbd_interest) is sequentially
+ * dependent, and its previous in-statement recursive-CTE implementation both cost
+ * real time and poisoned the whole statement's row estimates (~5e17 estimated vs
+ * ~1e4-1e5 actual). It now runs as a single ordered pass in
+ * btracker_backend.accumulate_hbd_interest, invoked right after this statement.
+ * Here we only stage the liquid-HBD running-balance rows it consumes.
  *
- * WHY HERE (not its own process_*.sql): the accumulator integrates the per-operation
- * liquid HBD running balance against time. That running balance is exactly what the
- * main pipeline above already computes (sum_balances -> join_created_at_to_balance_history).
- * Recomputing it in a separate processing function would re-run the get_impacted_balances
- * extraction and the window sums — expensive, and worse during massive sync when app
- * indexes are dropped. So we hang the accumulator off join_created_at_to_balance_history,
- * which already carries the running balance, source op id, block number and timestamp.
- *
- * COST: this block reads no extra prefetch rows (trx_in_block is threaded down from
- * ops_in_range, so _btracker_ops_batch is not re-scanned). It does add ONE more
- * hive.blocks_view access — bv_prev, to fetch the previous block's time for the
- * regular-op timestamp rule — scoped to HBD rows only.
- *
- * CHAIN MODEL (hived database.cpp adjust_hbd_balance -> evaluate_hbd_interest):
- *   On every liquid HBD balance change the chain accrues
- *       hbd_seconds += balance_before_change * (head_block_time - hbd_seconds_last_update)
- *   and then, if hbd_seconds > 0 AND head_block_time - hbd_last_interest_payment >
- *   HIVE_HBD_INTEREST_COMPOUND_INTERVAL_SEC (30 days), pays interest and resets
- *   hbd_seconds to 0, advancing hbd_last_interest_payment. The reset is UNCONDITIONAL
- *   once the interval passes; the interest_operation virtual op is only emitted when the
- *   rounded interest is > 0, so the reset must be derived from the 30-day rule, not from
- *   observing an interest_operation (dust balances reset silently with no op). Accrual is
- *   frozen from HF25 onward (the whole block is gated on has_hardfork(HF25) == false).
- *
- * TIMESTAMP RULE (head_block_time as seen during application, verified in _apply_block):
- *   transaction ops (trx_in_block >= 0) are applied before update_global_dynamic_data, so
- *     head_block_time is still the PREVIOUS block's time -> use block-1 time. Virtual ops
- *     generated inside a transaction (e.g. the interest_operation from a transfer) inherit
- *     that transaction's trx_in_block, so they share the same effective_ts as their trigger.
- *   standalone virtual ops (trx_in_block = -1) run after update_global_dynamic_data -> use
- *     the block's own time.
- *
- * Structure mirrors the delayed_vests pattern in process_withdrawals.sql:
- *   sentinel (source_op=0) carries previous state -> UNION ALL with ops -> ROW_NUMBER ->
- *   recursive CTE accumulates hbd_seconds row-by-row (sequentially dependent because each
- *   reset advances the 30-day anchor) -> upsert.
+ * TIMESTAMP RULE and epoch-default semantics live in the helper; the HF25 gate
+ * stays here: Hive core stopped updating liquid hbd_seconds at HF25
+ * (database.cpp:3209); _hf_hbd_interest_block IS NULL means HF25 not yet applied
+ * in this dataset. The boundary is inclusive (<=): ops within the activation
+ * block still accrue.
  */
-
--- Liquid HBD rows with their effective timestamp.
--- trx_in_block is threaded down from ops_in_range (no re-read of _btracker_ops_batch).
--- HF25 gate: Hive core stopped updating liquid hbd_seconds at HF25 (database.cpp:3209).
--- _hf_hbd_interest_block IS NULL means HF25 not yet applied in this dataset, so all
--- blocks pass (an explicit IS NULL check — relying on NULL <= x would drop every row).
--- The boundary is inclusive (<=): HF25 is applied by process_hardforks() at the END of
--- its activation block, so ops within that block still see has_hardfork(HF25) == false
--- and still accrue; only block N+1 onward is frozen.
-hbd_ops AS MATERIALIZED (
+stage_hbd_rows AS (
+  INSERT INTO _hbd_batch_rows
+    (account_id, balance, source_op, source_op_block, balance_seq_no, trx_in_block)
   SELECT
-    jc.account_id,
-    jc.balance,
-    jc.source_op,
-    jc.source_op_block,
-    jc.balance_seq_no,
-    CASE WHEN jc.trx_in_block >= 0
-         THEN COALESCE(bv_prev.created_at, jc.created_at)
-         ELSE jc.created_at
-    END AS effective_ts
-  FROM join_created_at_to_balance_history jc
-  -- Range guard for the same reason as the bv join above; the previous block
-  -- of the range's first block is _from - 1, hence the widened lower bound.
-  LEFT JOIN hive.blocks_view bv_prev ON bv_prev.num = jc.source_op_block - 1
-                                    AND bv_prev.num BETWEEN _from - 1 AND _to
-  WHERE jc.nai = _nai_hbd
-    AND (_hf_hbd_interest_block IS NULL OR jc.source_op_block <= _hf_hbd_interest_block)
-),
-
--- Sentinel rows: previous state from account_hbd_interest (source_op = 0 sorts first).
--- For a brand-new account (no stored row) the anchors default to EPOCH, exactly matching
--- the chain: account_object.hbd_last_interest_payment / hbd_seconds_last_update are
--- time_point_sec with no initializer (epoch) and are only ever written inside
--- adjust_hbd_balance (database.cpp). This is load-bearing for the 30-day reset rule:
--- because the anchor is epoch, the FIRST balance change that finds a positive pre-change
--- balance has (effective_ts - epoch) >> 30 days, so the chain resets hbd_seconds (and pays
--- interest) at that op regardless of how soon it follows the first one. Seeding the anchor
--- to the first op's timestamp instead would wrongly defer that first reset by 30 days.
--- hbd_seconds_last_update can also be epoch: the first op accrues last_balance(0) * dt = 0.
-prev_hbd_interest AS (
-  SELECT
-    ho.account_id,
-    COALESCE(hi.hbd_seconds, 0::NUMERIC)                       AS hbd_seconds,
-    COALESCE(hi.hbd_seconds_last_update, 'epoch'::TIMESTAMP)   AS hbd_seconds_last_update,
-    COALESCE(hi.last_balance, 0::BIGINT)                       AS last_balance,
-    COALESCE(hi.hbd_last_interest_payment, 'epoch'::TIMESTAMP) AS hbd_last_interest_payment,
-    0::BIGINT       AS source_op,
-    0               AS balance_seq_no,
-    NULL::TIMESTAMP AS effective_ts
-  FROM (SELECT DISTINCT account_id FROM hbd_ops) ho
-  LEFT JOIN account_hbd_interest hi ON hi.account = ho.account_id
-),
-
--- Union previous state + ops, then assign row numbers for recursive iteration.
-hbd_interest_union AS (
-  SELECT account_id, hbd_seconds, hbd_seconds_last_update, last_balance,
-         hbd_last_interest_payment, source_op, balance_seq_no, effective_ts
-  FROM prev_hbd_interest
-
-  UNION ALL
-
-  SELECT account_id,
-         0::NUMERIC          AS hbd_seconds,
-         NULL::TIMESTAMP     AS hbd_seconds_last_update,
-         balance             AS last_balance,
-         NULL::TIMESTAMP     AS hbd_last_interest_payment,
-         source_op, balance_seq_no, effective_ts
-  FROM hbd_ops
-),
-
-hbd_interest_rows AS MATERIALIZED (
-  SELECT *,
-         ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY source_op, balance_seq_no) AS rn
-  FROM hbd_interest_union
-),
-
--- Recursive accumulator. Each row first accrues hbd_seconds from the PREVIOUS row's balance
--- over the elapsed time, then applies the chain's 30-day reset rule: if the accrued value is
--- positive AND more than the compound interval has elapsed since the last interest payment,
--- zero hbd_seconds and advance hbd_last_interest_payment to this op's effective_ts. This is
--- sequentially dependent (each reset moves the 30-day anchor), which is why a window function
--- cannot express it. The accrual expression is repeated in both CASE arms because a recursive
--- term cannot reference a sibling output column.
-hbd_interest_accumulator AS MATERIALIZED (
-  WITH RECURSIVE acc AS (
-    SELECT account_id, hbd_seconds, hbd_seconds_last_update,
-           last_balance, hbd_last_interest_payment, source_op, rn
-    FROM hbd_interest_rows
-    WHERE rn = 1
-
-    UNION ALL
-
-    SELECT
-      nxt.account_id,
-      CASE WHEN (acc.hbd_seconds
-                 + acc.last_balance::NUMERIC * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))) > 0
-                AND EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_last_interest_payment)) > _hbd_interest_interval
-           THEN 0::NUMERIC
-           ELSE acc.hbd_seconds
-              + acc.last_balance::NUMERIC
-                * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))
-      END                                                           AS hbd_seconds,
-      nxt.effective_ts                                              AS hbd_seconds_last_update,
-      nxt.last_balance,
-      CASE WHEN (acc.hbd_seconds
-                 + acc.last_balance::NUMERIC * EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_seconds_last_update))) > 0
-                AND EXTRACT(EPOCH FROM (nxt.effective_ts - acc.hbd_last_interest_payment)) > _hbd_interest_interval
-           THEN nxt.effective_ts
-           ELSE acc.hbd_last_interest_payment
-      END                                                           AS hbd_last_interest_payment,
-      nxt.source_op,
-      nxt.rn
-    FROM acc
-    JOIN hbd_interest_rows nxt
-      ON nxt.account_id = acc.account_id AND nxt.rn = acc.rn + 1
-  )
-  SELECT * FROM acc
-),
-
--- Extract the final state per account (last op processed = highest source_op).
-hbd_interest_final AS (
-  SELECT DISTINCT ON (account_id)
-    account_id, hbd_seconds, hbd_seconds_last_update,
-    last_balance, hbd_last_interest_payment
-  FROM hbd_interest_accumulator
-  WHERE source_op > 0
-  ORDER BY account_id, rn DESC
-),
-
-insert_hbd_interest AS (
-  INSERT INTO account_hbd_interest
-    (account, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment)
-  SELECT
-    account_id, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment
-  FROM hbd_interest_final
-  ON CONFLICT ON CONSTRAINT pk_account_hbd_interest DO UPDATE SET
-    hbd_seconds               = EXCLUDED.hbd_seconds,
-    hbd_seconds_last_update   = EXCLUDED.hbd_seconds_last_update,
-    last_balance              = EXCLUDED.last_balance,
-    hbd_last_interest_payment = EXCLUDED.hbd_last_interest_payment
-  RETURNING account
+    rls.account_id,
+    rls.balance,
+    rls.source_op,
+    rls.source_op_block,
+    rls.balance_seq_no,
+    rls.trx_in_block
+  FROM remove_latest_stored_balance_record rls
+  WHERE rls.nai = _nai_hbd
+    AND (_hf_hbd_interest_block IS NULL OR rls.source_op_block <= _hf_hbd_interest_block)
+  RETURNING 1
 )
 
 /*
@@ -851,9 +830,12 @@ SELECT
   (SELECT count(*) FROM insert_current_account_balances) AS current_balances,
   (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
   (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month,
-  (SELECT count(*) FROM insert_hbd_interest) AS hbd_interest
+  (SELECT count(*) FROM stage_hbd_rows) AS hbd_interest
 INTO __balance_history, __current_balances, __balance_history_by_day,
      __balance_history_by_month, __hbd_interest;
+
+-- Single-pass fold over the staged rows (replaces the in-statement recursive CTE).
+__hbd_interest := btracker_backend.accumulate_hbd_interest( _from, _to, _hbd_interest_interval );
 
 END
 $$;
