@@ -88,7 +88,12 @@ BEGIN
       date_trunc('day',   bv.created_at) AS by_day,
       date_trunc('month', bv.created_at) AS by_month
     FROM parsed p
+    -- Redundant-but-necessary range guard: blocks_view is a reversible-union view
+    -- and the planner cannot propagate the batch range through the join equivalence;
+    -- without it the view is re-executed per row instead of hash-joined (see
+    -- process_balances.sql and haf_block_explorer!503 for the same pattern).
     JOIN hive.blocks_view bv ON bv.num = p.block_num
+                            AND bv.num BETWEEN _from AND _to
   ),
   /**
    * GROUPING SETS over (kind, by_day) and (kind, by_month) — single-pass two-level
