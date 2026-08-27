@@ -71,6 +71,18 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POS
 process_blocks() {
     local n_blocks="${1:-null}"
     log_file="btracker_sync.log"
+
+    # The generic HAF block-processing driver (haf#341) runs the registered
+    # ${BTRACKER_SCHEMA}.process_blocks procedure per delivered range and idles
+    # on its own connection between blocks. It ships with the psql base image.
+    # exec it directly: as PID 1 it must receive SIGTERM itself to stop cleanly.
+    if command -v haf_app_driver.py >/dev/null 2>&1; then
+        local limit_arg=()
+        [ "$n_blocks" != "null" ] && limit_arg=(--stop-at-block="$n_blocks")
+        exec haf_app_driver.py --app="${BTRACKER_SCHEMA}" --postgres-url="$POSTGRES_ACCESS" --lock=balance_tracker "${limit_arg[@]}"
+    fi
+
+    echo "WARNING: haf_app_driver.py not found, falling back to the legacy CALL main() loop"
     date -uIseconds > /tmp/block_processing_startup_time.txt
     exec run_with_reconnect.sh -- psql "$POSTGRES_ACCESS" -v "ON_ERROR_STOP=on" -v BTRACKER_SCHEMA="${BTRACKER_SCHEMA}" -c "\timing" -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL ${BTRACKER_SCHEMA}.main('${BTRACKER_SCHEMA}', $n_blocks);"
 }
