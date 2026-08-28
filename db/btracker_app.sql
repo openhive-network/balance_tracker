@@ -1113,7 +1113,7 @@ BEGIN
   PERFORM btracker_prefetch_operations(_block, _block);
 
   IF _logs THEN
-    RAISE NOTICE 'Btracker processing block: %...', _block;
+    RAISE DEBUG 'Btracker processing block: %...', _block;
     __start_ts := clock_timestamp();
   END IF;
 
@@ -1134,7 +1134,7 @@ BEGIN
 
   IF _logs THEN
     __end_ts := clock_timestamp();
-    RAISE NOTICE 'Btracker processed block % successfully in % s
+    RAISE DEBUG 'Btracker processed block % successfully in % s
     ', _block, (extract(epoch FROM __end_ts - __start_ts));
   END IF;
 END
