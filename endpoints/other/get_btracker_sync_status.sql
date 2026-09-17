@@ -66,8 +66,8 @@ PURPOSE:
 
 DATA SOURCE:
   btracker_backend.sync_status() — reads current_block_num from the HAF
-  context and reads the block's created_at through the context's blocks_view
-  (covers blocks still in hafd.blocks_reversible).
+  context and resolves the block's created_at via hive.get_app_current_block_age()
+  (covers blocks still in hafd.blocks_reversible; touches no context view).
 
 CACHING:
   No cache (max-age=0): used for real-time sync-status / health monitoring.
