@@ -766,21 +766,35 @@ $$;
 -- ============================================================================
 
 /**
- * finalize_massive_sync()
- * -----------------------
- * Transition from massive sync to LIVE-ready state.
- * Reverses the optimizations applied during setup:
+ * finalize_massive_sync_before_forking()
+ * --------------------------------------
+ * The part of massive-sync finalization that bulk-writes registered tables, and
+ * therefore MUST run before the context is switched to forking:
  *   1. Switch UNLOGGED tables back to LOGGED (WAL-safe)
- *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
- *   3. Restore app indexes (updates HAF tracking table)
+ *   2. Backfill the by-day/by-month balance and savings rollups that are deferred
+ *      during massive sync (~70M rows on mainnet)
  *
- * Called from btracker_process_blocks() at LIVE transition and from
- * CI startup script after bounded replay completes.
- * Safe to call multiple times (idempotent via isIndexesCreated check).
+ * WHY THE ORDER MATTERS: once a context is forking and attached, HAF's rewind
+ * triggers copy every inserted row into the table's shadow table. Backfilling
+ * afterwards pushed all ~70M rollup rows through hafd.shadow_*_balance_history_by_day.
+ * They are deleted again one block later, but a shadow table's file never shrinks
+ * and HAF's per-block cleanup sequentially scans the whole file, so that one
+ * backfill left a 6.7 GB file of empty pages costing 0.4-1.1 s on EVERY later
+ * block (haf#346). The rows are history up to the last massive-sync block, which
+ * is irreversible, so they never need an undo record.
+ *
+ * finalize_massive_sync() calls this itself, so a standalone balance tracker needs
+ * nothing else. An application that EMBEDS the balance tracker and switches the
+ * contexts to forking itself (haf_block_explorer does, for both of its contexts
+ * together, on the first LIVE block) must call this BEFORE doing so.
+ *
+ * Idempotent: a no-op once finalized (isIndexesCreated), and a no-op the second
+ * time within the finalizing transaction (transaction-local marker, which is
+ * rolled back together with the backfill if that transaction fails).
  *
  * @param _context_name  HAF context name (typically schema name)
  */
-CREATE OR REPLACE FUNCTION finalize_massive_sync(_context_name hive.context_name)
+CREATE OR REPLACE FUNCTION finalize_massive_sync_before_forking(_context_name hive.context_name)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 SECURITY DEFINER
@@ -790,6 +804,15 @@ BEGIN
   IF isIndexesCreated() THEN
     RETURN;  -- Already finalized
   END IF;
+
+  IF current_setting('btracker.rollups_backfilled', true) = 'true' THEN
+    RETURN;  -- Already done earlier in this transaction
+  END IF;
+
+  IF hive.app_is_forking(_context_name) AND hive.app_context_is_attached(_context_name) THEN
+    RAISE WARNING 'btracker: context % is already forking: the rollup backfill will be copied row by row into the shadow tables and bloat them (haf#346). Call finalize_massive_sync_before_forking() before hive.app_context_set_forking().', _context_name;
+  END IF;
+
 
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
@@ -880,6 +903,39 @@ BEGIN
   FROM saving_history_by_day d
   GROUP BY d.account, d.nai, date_trunc('month', d.updated_at)
   ORDER BY d.account, d.nai, date_trunc('month', d.updated_at);
+
+  PERFORM set_config('btracker.rollups_backfilled', 'true', true);
+END
+$$;
+
+/**
+ * finalize_massive_sync()
+ * -----------------------
+ * Transition from massive sync to LIVE-ready state.
+ * Reverses the optimizations applied during setup:
+ *   1. Switch UNLOGGED tables back to LOGGED and backfill the deferred rollups
+ *      (finalize_massive_sync_before_forking, see there for why it comes first)
+ *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
+ *   3. Restore app indexes (updates HAF tracking table)
+ *
+ * Called from btracker_process_blocks() at LIVE transition and from
+ * CI startup script after bounded replay completes.
+ * Safe to call multiple times (idempotent via isIndexesCreated check).
+ *
+ * @param _context_name  HAF context name (typically schema name)
+ */
+CREATE OR REPLACE FUNCTION finalize_massive_sync(_context_name hive.context_name)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+SECURITY DEFINER
+AS
+$$
+BEGIN
+  IF isIndexesCreated() THEN
+    RETURN;  -- Already finalized
+  END IF;
+
+  PERFORM finalize_massive_sync_before_forking(_context_name);
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
