@@ -132,7 +132,7 @@ find_haf_image:
   extends: .find_haf_image
   stage: detect
   variables:
-    UPSTREAM_BRANCH: "develop"
+    UPSTREAM_BRANCH: "1.28.8-rc1"
     HAF_PATTERNS_REF: "develop"
 
 # =============================================================================
