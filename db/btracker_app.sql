@@ -956,7 +956,10 @@ $$;
  * Routes to either massive or single processing based on current HAF stage.
  *
  * Behavior by stage:
- * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync
+ * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync.
+ *   Requests a VACUUM of the history tables only during the initial sync
+ *   (before finalize_massive_sync); HAF also uses this stage for catch-ups
+ *   of more than 101 blocks after the app is already finalized.
  * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
  *
  * @param _context_name  HAF context name (typically schema name)
@@ -976,8 +979,18 @@ $$
 BEGIN
   IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
-    PERFORM hive.app_request_table_vacuum(_context_name, 'account_balance_history', interval '10 minutes');
-    PERFORM hive.app_request_table_vacuum(_context_name, 'account_vesting_history', interval '10 minutes');
+    -- Initial sync only. HAF re-enters MASSIVE_PROCESSING for any catch-up of
+    -- more than 101 blocks (restart, stack switch, live drift), and HAF runs
+    -- every vacuum request as VACUUM FULL ANALYZE under an ACCESS EXCLUSIVE
+    -- lock. On a multi-tens-of-GB account_balance_history that stalls every
+    -- reader and writer, including the parent hafbe context, for the whole
+    -- rewrite (#64). Both tables are insert-only, so the vacuum reclaims
+    -- nothing; it survives here only as ANALYZE for the unindexed sync tables.
+    -- isIndexesCreated() is false exactly until finalize_massive_sync() runs.
+    IF NOT isIndexesCreated() THEN
+      PERFORM hive.app_request_table_vacuum(_context_name, 'account_balance_history', interval '10 minutes');
+      PERFORM hive.app_request_table_vacuum(_context_name, 'account_vesting_history', interval '10 minutes');
+    END IF;
     RETURN;
   END IF;
 

@@ -109,6 +109,16 @@ MASSIVE_PROCESSING (blocks 1→5M, 10K batches, synchronous_commit=OFF)
 LIVE (new blocks 1 at a time, synchronous_commit=ON)
 ```
 
+HAF re-enters MASSIVE_PROCESSING whenever the app falls more than 101 blocks
+behind (restart, stack switch, slow live processing), not only for the initial
+sync. `finalize_massive_sync()` runs once, on the first LIVE call, and
+`isIndexesCreated()` is the marker that it has happened. Anything that is only
+appropriate for the genesis replay must check that marker rather than the stage
+name. Example: `btracker_process_blocks()` requests a VACUUM (executed by HAF as
+`VACUUM FULL ANALYZE`, ACCESS EXCLUSIVE lock) of the history tables only while
+`isIndexesCreated()` is false; doing it on every MASSIVE iteration turned each
+post-restart catch-up into a multi-minute outage (#64).
+
 ## HAF Integration
 
 Balance Tracker uses HAF for:
