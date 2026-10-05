@@ -52,8 +52,11 @@ this feature on a populated context.
      ./scripts/backfill_order_lifecycle.sh --schema=btracker_app --batch-size=10000
    ```
 
-   For the embedded instance, use `--schema=hafbe_bal`. A custom driver can
-   provide its actual lock name with `--app-lock-name`.
+   For the embedded instance, use `--schema=hafbe_bal`; the command selects
+   `hafbe_owner`, which owns the parent context and inherits `btracker_owner`.
+   The standalone default role is `btracker_owner`. A custom driver can provide
+   its actual lock name with `--app-lock-name` and its owning maintenance role
+   with `--role`. That role must be allowed to maintain every context in the group.
 4. Restart the owning processor after the command reports completion. It
    replays the reversible tail through the ordinary application workflow.
 

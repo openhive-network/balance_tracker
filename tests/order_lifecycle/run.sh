@@ -36,13 +36,14 @@ if [[ $ready != true ]]; then
 fi
 # Copy current sources through Docker's API. A Docker-in-Docker service does not
 # necessarily see the checkout's host path, so do not rely on bind mounts.
-docker exec --user root "$test_container" mkdir -p /repo/tests/order_lifecycle
+docker exec --user root "$test_container" mkdir -p /repo/tests/order_lifecycle /repo/scripts
 for source_dir in backend db endpoints; do
   docker cp "$repo_dir/$source_dir" "$test_container:/repo/$source_dir"
 done
 for test_sql in "$repo_dir"/tests/order_lifecycle/*.sql; do
   docker cp "$test_sql" "$test_container:/repo/tests/order_lifecycle/"
 done
+docker cp "$repo_dir/scripts/backfill_order_lifecycle.sh" "$test_container:/repo/scripts/"
 docker exec "$test_container" createdb -U haf_admin "$test_database"
 docker exec "$test_container" psql -X -U haf_admin -d "$test_database" -v ON_ERROR_STOP=1 \
   -c 'CREATE EXTENSION hive_fork_manager CASCADE' >"$test_logs/extension.log" 2>&1
@@ -131,6 +132,14 @@ psql_test -c 'SET ROLE btracker_owner' -c 'SET search_path TO order59_upgrade' \
   || fail_log "$test_logs/resume.log"
 psql_test -f /repo/tests/order_lifecycle/group.sql >"$test_logs/group.log" 2>&1 \
   || fail_log "$test_logs/group.log"
+# The embedded wrapper must select hafbe_owner by default, since that role owns
+# the parent and inherits btracker_owner; the reverse membership does not exist.
+docker exec "$test_container" bash /repo/scripts/backfill_order_lifecycle.sh \
+  --schema=hafbe_bal --batch-size=2 --app-lock-name=order59_embedded_lock \
+  "--postgres-url=postgresql://haf_admin@/$test_database" >"$test_logs/group-wrapper.log" 2>&1 \
+  || fail_log "$test_logs/group-wrapper.log"
+psql_test -f /repo/tests/order_lifecycle/group_finished.sql >"$test_logs/group-finished.log" 2>&1 \
+  || fail_log "$test_logs/group-finished.log"
 echo 'Actual HAF upgrade, fixed-target interruption/resume and embedded group passed.'
 psql_test -At -c "SELECT 'Assertions passed: ' || last_value FROM order59_test.test_checks_count; SELECT 'HAF revision: ' || extversion FROM pg_extension WHERE extname='hive_fork_manager';"
 echo "Test logs: $test_logs"

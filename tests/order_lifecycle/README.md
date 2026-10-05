@@ -43,7 +43,9 @@ Coverage includes:
   rewind of a reversible projection tail, fixed irreversible target, committed
   checkpoint surviving an intentional failure in a later batch, resume without
   duplicate history, cursor-preserving reattach, subsequent normal processing,
-  and an embedded parent/tracker context group.
+  and an embedded parent/tracker context group with distinct owners. The actual
+  wrapper selects the parent `hafbe_owner` role, which inherits `btracker_owner`;
+  the tracker role cannot impersonate the parent owner.
 
 The intentionally failing batch exercises PostgreSQL transaction failure and
 resume across real procedure commits. The separate fork tests exercise actual
@@ -51,5 +53,5 @@ HAF undo; transaction rollback alone is not used as evidence of fork safety.
 Synthetic inputs do not verify hived's production of the operation stream or
 represent a performance benchmark.
 
-Validated on HAF commit `3c237ec1495da795679f767a7aa40c8b2d583dfa` with 121
+Validated on HAF commit `3c237ec1495da795679f767a7aa40c8b2d583dfa` with 123
 assertions. The test logs print the installed HAF revision and assertion count.
