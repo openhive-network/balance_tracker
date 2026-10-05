@@ -44,6 +44,8 @@ for test_sql in "$repo_dir"/tests/order_lifecycle/*.sql; do
   docker cp "$test_sql" "$test_container:/repo/tests/order_lifecycle/"
 done
 docker cp "$repo_dir/scripts/backfill_order_lifecycle.sh" "$test_container:/repo/scripts/"
+docker exec --user root "$test_container" mkdir -p /repo/tests/mocks/sql
+docker cp "$repo_dir/tests/mocks/sql/update_haf_state.sql" "$test_container:/repo/tests/mocks/sql/"
 docker exec "$test_container" createdb -U haf_admin "$test_database"
 docker exec "$test_container" psql -X -U haf_admin -d "$test_database" -v ON_ERROR_STOP=1 \
   -c 'CREATE EXTENSION hive_fork_manager CASCADE' >"$test_logs/extension.log" 2>&1
@@ -141,5 +143,8 @@ docker exec "$test_container" bash /repo/scripts/backfill_order_lifecycle.sh \
 psql_test -f /repo/tests/order_lifecycle/group_finished.sql >"$test_logs/group-finished.log" 2>&1 \
   || fail_log "$test_logs/group-finished.log"
 echo 'Actual HAF upgrade, fixed-target interruption/resume and embedded group passed.'
+psql_test -f /repo/tests/order_lifecycle/mock_cursor.sql >"$test_logs/mock-cursor.log" 2>&1 \
+  || fail_log "$test_logs/mock-cursor.log"
+echo 'Actual mock cursor helper preserves strict production range guards and permits prepared synthetic range.'
 psql_test -At -c "SELECT 'Assertions passed: ' || last_value FROM order59_test.test_checks_count; SELECT 'HAF revision: ' || extversion FROM pg_extension WHERE extname='hive_fork_manager';"
 echo "Test logs: $test_logs"

@@ -123,10 +123,11 @@ detect_changes:
   extends: .haf_app_detect_changes
   variables:
     # Files that don't require re-sync:
-    # - tests/, docs/, gui/ (don't affect sync)
+    # - Read-only test suites, docs/, gui/ (don't affect sync)
+    # - tests/mocks/ SQL builds the fixture database and requires re-sync
     # - *.md, README, CHANGELOG, LICENSE (docs)
     # Note: SQL changes DO require sync (affect database schema)
-    HAF_APP_SKIP_PATTERNS: '^tests/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$'
+    HAF_APP_SKIP_PATTERNS: '^tests/(functional|order_lifecycle|parity|performance|regression|tavern)/|^docs/|^gui/|\.md$|^README|^CHANGELOG|^LICENSE|^\.gitlab-ci\.yml$|^CLAUDE\.md$'
 
 find_haf_image:
   extends: .find_haf_image

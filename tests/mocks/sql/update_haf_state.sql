@@ -85,6 +85,15 @@ BEGIN
     RAISE EXCEPTION 'No mock blocks found in hafd.blocks (expected blocks >= 90000000)';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM btracker_app.order_lifecycle_status s
+    JOIN hafd.contexts c ON c.name = 'btracker_app'
+    WHERE s.singleton AND NOT s.backfill_required AND s.backfill_target IS NULL
+      AND s.processed_through = c.current_block_num
+  ) THEN
+    RAISE EXCEPTION 'Mock cursor shift requires lifecycle coverage at the pre-mock application cursor';
+  END IF;
+
   -- Set consistent block to the end of mock data range
   UPDATE hafd.hive_state
   SET consistent_block = _mock_end_block_num;
@@ -95,6 +104,18 @@ BEGIN
   UPDATE hafd.contexts
   SET current_block_num = _mock_start_block_num - 1,
     irreversible_block = _mock_start_block_num - 1;
+
+  -- This fixture remaps the next block from the retained prefix to height 90M.
+  -- Align its lifecycle checkpoint with that synthetic cursor, preserving the
+  -- indexed prefix timestamp and all order incarnations/outcomes. The ordinary
+  -- reducer still validates contiguous ranges against this checkpoint.
+  UPDATE btracker_app.order_lifecycle_status
+  SET processed_through = _mock_start_block_num - 1,
+    indexed_at = COALESCE(indexed_at, (
+      SELECT created_at - INTERVAL '3 seconds' FROM hafd.blocks
+      WHERE num = _mock_start_block_num
+    ))
+  WHERE singleton;
 
   -- Simulate 24th hardfork, required for delayed votes test
   -- HF24 introduced delayed voting (30-day delay before full voting power)

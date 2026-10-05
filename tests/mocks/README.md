@@ -41,6 +41,14 @@ tests/mocks/
 
 Mock blocks use block numbers **>= 90,000,000** to avoid conflicts with real blockchain data. The actual range is determined dynamically from the inserted fixture data.
 
+The fixture remaps the next block after the retained prefix into that synthetic
+height range. Its state helper requires the lifecycle index to cover the original
+application cursor, then shifts both the context and lifecycle checkpoint to one
+block before the mock range. Existing creations, outcomes and the indexed prefix
+timestamp are preserved. The lifecycle reducer processes subsequent mock blocks
+with its ordinary contiguous-range checks. The dedicated lifecycle regression
+suite also verifies rejection of an unprepared cursor jump.
+
 ### 2. Installation Process
 
 The `install_mock_data.sh` script performs these steps:
