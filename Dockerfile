@@ -54,6 +54,7 @@ EOF
 USER hived
 
 COPY scripts/install_app.sh /app/scripts/install_app.sh
+COPY scripts/backfill_order_lifecycle.sh /app/scripts/backfill_order_lifecycle.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
 COPY db /app/db

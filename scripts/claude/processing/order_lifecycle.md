@@ -57,6 +57,8 @@ this feature on a populated context.
    The standalone default role is `btracker_owner`. A custom driver can provide
    its actual lock name with `--app-lock-name` and its owning maintenance role
    with `--role`. That role must be allowed to maintain every context in the group.
+   The application image also includes the command at
+   `/app/scripts/backfill_order_lifecycle.sh` for container-based maintenance.
 4. Restart the owning processor after the command reports completion. It
    replays the reversible tail through the ordinary application workflow.
 
