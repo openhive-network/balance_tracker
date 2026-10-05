@@ -29,6 +29,8 @@ DECLARE
     __del_any     INT := 0;
     __upd_pre     INT := 0;
 BEGIN
+    PERFORM process_order_lifecycle(_from, _to);
+
     WITH ops_in_range AS MATERIALIZED (
         /*
          * Fetch all order-related operations in this block range.

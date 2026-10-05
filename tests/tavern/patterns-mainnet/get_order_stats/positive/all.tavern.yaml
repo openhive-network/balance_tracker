@@ -1,0 +1,18 @@
+---
+test_name: Global lifecycle counts through five million blocks
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Global lifecycle counts through five million blocks
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_order_stats"
+      method: GET
+    response:
+      status_code: 200
+      headers:
+        Cache-Control: "public, max-age=2"
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

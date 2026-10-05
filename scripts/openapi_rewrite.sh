@@ -35,6 +35,7 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/types/vesting_stats.sql
 ../$endpoints/types/ranked_holder.sql
 ../$endpoints/types/total_value_locked.sql
+../$endpoints/types/order_stats.sql
 ../$endpoints/account-balances/get_account_balances.sql
 ../$endpoints/account-balances/get_balance_history.sql
 ../$endpoints/account-balances/get_history_aggregation.sql
@@ -46,6 +47,8 @@ ENDPOINTS_IN_ORDER="
 ../$endpoints/account-balances/get_top_holders.sql
 ../$endpoints/transfers/get_transfer_statistics.sql
 ../$endpoints/transfers/get_vesting_stats.sql
+../$endpoints/orders/get_order_stats.sql
+../$endpoints/orders/get_account_order_stats.sql
 ../$endpoints/other/get_btracker_version.sql
 ../$endpoints/other/get_btracker_last_synced_block.sql
 ../$endpoints/other/get_btracker_sync_status.sql

@@ -1,0 +1,6 @@
+{
+  "code": "22007",
+  "details": null,
+  "hint": null,
+  "message": "invalid input syntax for type timestamp: \"not-a-date\""
+}

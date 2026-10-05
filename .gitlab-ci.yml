@@ -839,6 +839,28 @@ sync_with_mock_data:
 # Test Jobs
 # =============================================================================
 
+order-lifecycle-test:
+  extends: .docker_image_builder_job_template
+  stage: test
+  image: "${HAF_APP_TEST_RUNNER_IMAGE}"
+  needs:
+  - job: find_haf_image
+    artifacts: true
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_CERT_PATH: /certs/client
+    DOCKER_TLS_VERIFY: "1"
+    ORDER_LIFECYCLE_TEST_LOG_DIR: "${CI_PROJECT_DIR}/tests/order_lifecycle/logs"
+  script:
+  - ORDER_LIFECYCLE_HAF_IMAGE="$HAF_IMAGE_NAME" bash tests/order_lifecycle/run.sh
+  artifacts:
+    paths:
+    - tests/order_lifecycle/logs/
+    when: always
+    expire_in: 1 week
+  tags:
+  - public-runner-docker
+
 regression-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync

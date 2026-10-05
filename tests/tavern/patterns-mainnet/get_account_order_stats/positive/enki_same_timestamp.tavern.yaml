@@ -1,0 +1,22 @@
+---
+test_name: Account equal creation bounds include cancellation after the upper bound
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Account equal creation bounds include cancellation after the upper bound
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_order_stats"
+      method: GET
+      params:
+        account: "enki"
+        from-date: "2016-07-06T18:26:42"
+        to-date: "2016-07-06T18:26:42"
+    response:
+      status_code: 200
+      headers:
+        Cache-Control: "public, max-age=2"
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

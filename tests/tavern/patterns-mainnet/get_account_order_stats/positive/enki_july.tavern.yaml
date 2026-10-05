@@ -1,0 +1,22 @@
+---
+test_name: Account and July creation filters compose
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Account and July creation filters compose
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_order_stats"
+      method: GET
+      params:
+        account: "enki"
+        from-date: "2016-07-01T00:00:00"
+        to-date: "2016-07-31T23:59:59"
+    response:
+      status_code: 200
+      headers:
+        Cache-Control: "public, max-age=2"
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

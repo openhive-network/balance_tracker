@@ -1,0 +1,22 @@
+---
+test_name: Reject a malformed account creation date
+marks:
+  - patterntest
+  - negative
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Reject a malformed account creation date
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_order_stats"
+      method: GET
+      params:
+        account: "enki"
+        to-date: "not-a-date"
+    response:
+      status_code: 400
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern
+        extra_kwargs:
+          error_response: true

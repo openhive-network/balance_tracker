@@ -1,0 +1,20 @@
+---
+test_name: Unbounded lower creation date with an empty historical cohort
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: Unbounded lower creation date with an empty historical cohort
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_order_stats"
+      method: GET
+      params:
+        to-date: "2016-01-01T00:00:00"
+    response:
+      status_code: 200
+      headers:
+        Cache-Control: "public, max-age=2"
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

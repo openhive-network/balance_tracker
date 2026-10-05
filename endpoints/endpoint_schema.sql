@@ -833,6 +833,60 @@ declare
           }
         }
       },
+      "btracker_backend.order_stats": {
+        "type": "object",
+        "description": "Limit-order creation cohort and its outcomes at the indexed block.\nCounts reconcile as created = filled + canceled + open. A partially filled\norder is open until fully filled or canceled; a partially filled order\nsubsequently canceled contributes only to canceled.\n",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int64",
+            "x-sql-datatype": "BIGINT",
+            "description": "Number of successfully created limit orders in the cohort"
+          },
+          "filled": {
+            "type": "integer",
+            "format": "int64",
+            "x-sql-datatype": "BIGINT",
+            "description": "Number of cohort orders fully filled at the indexed block"
+          },
+          "canceled": {
+            "type": "integer",
+            "format": "int64",
+            "x-sql-datatype": "BIGINT",
+            "description": "Number of cohort orders canceled at the indexed block, including expiration and account clearing"
+          },
+          "open": {
+            "type": "integer",
+            "format": "int64",
+            "x-sql-datatype": "BIGINT",
+            "description": "Number of cohort orders still open, including partially filled orders"
+          },
+          "fill_rate_pct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "x-sql-datatype": "NUMERIC",
+            "description": "Fully filled orders divided by created orders, multiplied by 100 and rounded to three decimal places; null for an empty cohort"
+          },
+          "indexed_through_block": {
+            "type": "integer",
+            "description": "Inclusive block number through which lifecycle outcomes have been indexed"
+          },
+          "indexed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC timestamp of indexed_through_block; null before the first block has been indexed"
+          },
+          "coverage_from_block": {
+            "type": "integer",
+            "description": "First block included in the complete lifecycle history; always 1"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
@@ -1761,6 +1815,134 @@ declare
         }
       }
     },
+    "/order-stats": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Global limit-order lifecycle statistics",
+        "description": "Counts successful limit-order creations and their latest indexed outcomes.\nOptional UTC dates select orders by creation time, inclusively. Outcomes\nare evaluated at indexed_through_block, even when to-date is historical.\nReused owner/order IDs represent separate order creations.\n\nfilled counts only fully filled orders. Partial fills remain open until\nthe order is fully filled or canceled. canceled includes explicit\ncancellations, expiration, and account clearing. Counts reconcile as\ncreated = filled + canceled + open.\n\nA complete index from block 1 through the application head is required.\nWhile lifecycle history is being backfilled or the index is behind the\napplication head, this endpoint returns HTTP 503. Responses have a\ntwo-second cache because outcomes of historical creation cohorts change.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_order_stats();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/order-stats?from-date=2020-01-01T00:00:00&to-date=2020-12-31T23:59:59''`\n",
+        "operationId": "btracker_endpoints.get_order_stats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from-date",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "default": null,
+              "nullable": true
+            },
+            "description": "Inclusive UTC lower bound on order creation time; omitted or null leaves the lower bound unrestricted"
+          },
+          {
+            "in": "query",
+            "name": "to-date",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "default": null,
+              "nullable": true
+            },
+            "description": "Inclusive UTC upper bound on order creation time; outcomes are still evaluated at the indexed block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete global creation cohort and outcomes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                },
+                "example": {
+                  "created": 100,
+                  "filled": 75,
+                  "canceled": 20,
+                  "open": 5,
+                  "fill_rate_pct": 75.0,
+                  "indexed_through_block": 5000000,
+                  "indexed_at": "2016-09-15T19:47:21",
+                  "coverage_from_block": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date or from-date is greater than to-date"
+          },
+          "503": {
+            "description": "Complete lifecycle history is not ready or has not reached the application head"
+          }
+        }
+      }
+    },
+    "/accounts/{account}/order-stats": {
+      "get": {
+        "tags": [
+          "Accounts",
+          "Orders"
+        ],
+        "summary": "Account limit-order lifecycle statistics",
+        "description": "Counts successful limit orders created by the account and their outcomes\nat indexed_through_block. Optional UTC dates select creation times\ninclusively; to-date does not limit when an order is filled or canceled.\nPartially filled orders remain open until fully filled or canceled.\nCounts reconcile as created = filled + canceled + open.\n\nThe account must exist. An existing account with no matching creations\nreturns zero counts and a null fill_rate_pct. Complete lifecycle history\nfrom block 1 through the application head is required; an incomplete\nor lagging lifecycle index returns HTTP 503. Responses are cached for\ntwo seconds because historical creation cohorts can acquire new outcomes.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_order_stats(''alice'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/alice/order-stats''`\n",
+        "operationId": "btracker_endpoints.get_account_order_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Account that created the orders"
+          },
+          {
+            "in": "query",
+            "name": "from-date",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "default": null,
+              "nullable": true
+            },
+            "description": "Inclusive UTC lower bound on order creation time; omitted or null leaves the lower bound unrestricted"
+          },
+          {
+            "in": "query",
+            "name": "to-date",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "default": null,
+              "nullable": true
+            },
+            "description": "Inclusive UTC upper bound on order creation time; outcomes are still evaluated at the indexed block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete account creation cohort and outcomes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date, inverted date bounds, or account does not exist"
+          },
+          "503": {
+            "description": "Complete lifecycle history is not ready or has not reached the application head"
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "tags": [
@@ -1792,8 +1974,9 @@ declare
         "tags": [
           "Other"
         ],
-        "summary": "Get last block number synced by balance tracker",
-        "description": "Get the block number of the last block synced by balance tracker.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_last_synced_block();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/last-synced-block''`\n",
+        "summary": "Get last block number synced by balance tracker (deprecated)",
+        "deprecated": true,
+        "description": "**Deprecated** \u2014 superseded by `/sync-status`, which returns the block\nnumber together with its timestamp (enabling single-call staleness\nchecks). This endpoint remains for backward compatibility.\n\nGet the block number of the last block synced by balance tracker.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_last_synced_block();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/last-synced-block''`\n",
         "operationId": "btracker_endpoints.get_btracker_last_synced_block",
         "responses": {
           "200": {
@@ -1809,6 +1992,44 @@ declare
           },
           "404": {
             "description": "No blocks synced"
+          }
+        }
+      }
+    },
+    "/sync-status": {
+      "get": {
+        "tags": [
+          "Other"
+        ],
+        "summary": "Get balance tracker''s sync status",
+        "description": "Get the last block processed by balance tracker as an object containing\nboth the block number and its timestamp (UTC). This is the uniform\nHAF-app sync/health endpoint: the timestamp lets a consumer compute\nstaleness with a single call (`age = now() - last_block_time`) without\nneeding a separate head-block reference. Supersedes the deprecated\n`/last-synced-block`.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_sync_status();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/sync-status''`\n",
+        "operationId": "btracker_endpoints.get_btracker_sync_status",
+        "responses": {
+          "200": {
+            "description": "Last block processed by balance tracker and its timestamp.\n`last_block_time` is null if no block has been processed yet.\nWhile the HAF instance is still in massive sync (indexes not yet\nbuilt) the call fails fast with an error rather than executing an\nunindexed lookup.\n\n* Returns `JSON`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "x-sql-datatype": "JSON",
+                  "properties": {
+                    "last_block_num": {
+                      "type": "integer",
+                      "description": "highest block number processed by the app"
+                    },
+                    "last_block_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "UTC timestamp of that block"
+                    }
+                  }
+                },
+                "example": {
+                  "last_block_num": 5000000,
+                  "last_block_time": "2016-09-15T19:47:21"
+                }
+              }
+            }
           }
         }
       }

@@ -34,6 +34,7 @@ SET ROLE btracker_owner;
           application/json:
             schema:
               type: object
+              x-sql-datatype: JSON
               properties:
                 last_block_num:
                   type: integer
@@ -51,7 +52,7 @@ DROP FUNCTION IF EXISTS btracker_endpoints.get_btracker_sync_status;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_btracker_sync_status()
 RETURNS JSON
 -- openapi-generated-code-end
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE plpgsql STABLE
 AS
 $$
 /*

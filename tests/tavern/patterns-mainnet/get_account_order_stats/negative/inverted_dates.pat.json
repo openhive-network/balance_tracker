@@ -1,0 +1,6 @@
+{
+  "code": "PT400",
+  "details": null,
+  "hint": null,
+  "message": "from-date must be less than or equal to to-date"
+}

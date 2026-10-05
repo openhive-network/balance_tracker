@@ -1,0 +1,21 @@
+---
+test_name: July creation cohort with outcomes through the indexed head
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: July creation cohort with outcomes through the indexed head
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_order_stats"
+      method: GET
+      params:
+        from-date: "2016-07-01T00:00:00"
+        to-date: "2016-07-31T23:59:59"
+    response:
+      status_code: 200
+      headers:
+        Cache-Control: "public, max-age=2"
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern
