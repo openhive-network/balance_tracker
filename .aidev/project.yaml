@@ -91,3 +91,291 @@ verification:
     artifacts: ["test-results/coverage/"]
 
 capabilities: []
+
+# Database queries planned against a captured shape of a full-scale node
+# (aidev docs/operations/db-shape.md). Observe only: nothing here blocks yet.
+performance:
+  mode: observe
+  # What the db_shape check watches: a diff touching none of these (or this
+  # profile) is reported `not applicable` without loading the shape. fnmatch
+  # globs, where `*` also crosses `/`. db/ is left out on purpose:
+  # .aidev/shape-apply.sh installs only the query code (types, backend helpers,
+  # endpoints), never the tables or the block processing, so a db/ change
+  # cannot move a declared plan on the shape.
+  inputs:
+    - backend/*.sql
+    - endpoints/*.sql
+    - scripts/install_app.sh
+    - .aidev/shape-apply.sh
+  shape:
+    # A full-scale haf_block_log with haf_block_explorer 1.28.8, the balance
+    # tracker embedded as schema hafbe_bal, captured 2026-10-15. The source
+    # node is operator configuration and is not named here; this section only
+    # plans on the shape, which the fleet store serves by digest.
+    artifact: 66e51296f6b1c1bd16a802018e47f61b9fb4dda1978733e4a87331d3327fdcc5
+    image: registry.gitlab.syncad.com/hive/haf:1.28.8
+    # Installs each tree's query code on its shape copy in install_app.sh's
+    # order (see the script for what it leaves out and why).
+    apply: {command: [.aidev/shape-apply.sh]}
+  # The statements behind the endpoints, inlined from their plpgsql functions
+  # (a set-returning plpgsql function plans as an opaque Function Scan). Every
+  # ${account} accepts a name or a numeric id, as a REST path carries a name.
+  # Parameter columns are not yet in the shape's value catalog: each query is
+  # planned with its default value until the shape is recaptured with
+  # `aidev db shape capture --queries .aidev/project.yaml`.
+  queries:
+  - name: rest-balance-history-page
+    sql: "SELECT page.balance_seq_no, page.balance, page.source_op, page.source_op_block, page.op_type_id, bv.created_at\nFROM (\n  SELECT ab.balance_seq_no, ab.balance, ab.source_op, ab.source_op_block,\
+      \ ops.op_type_id\n  FROM btracker_backend.account_balance_history_view ab\n  JOIN hafd.operations ops ON ops.id = ab.source_op\n  WHERE ab.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT\
+      \ ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    AND ab.nai = (SELECT at.asset_symbol_nai FROM hafbe_bal.asset_table at WHERE at.asset_name = ${coin}::TEXT)\n  ORDER\
+      \ BY ab.balance_seq_no DESC\n  LIMIT ${page_size} + 1\n) page\nJOIN hive.blocks_view bv ON bv.num = page.source_op_block"
+    parameters:
+      account: &id001
+        column: hafbe_bal.account_balance_history.account
+        value: '440'
+      coin: &id002
+        column: hafbe_bal.asset_table.asset_name
+        value: VESTS
+    limit:
+      param: page_size
+      value: 100
+      values:
+      - 10
+      - 100
+      - 200
+      - 1000
+    api_methods:
+    - rest:/balance-api/accounts/*/balance-history
+    parameter_map:
+      account: path.3
+      coin: query.coin-type
+      page_size: query.page-size
+    role:
+      frequency: per balance-history page — wallets' account history, the most frequent account call
+      waiter: REST client through PostgREST
+      latency_ms: 200
+    plan:
+      no_seq_scan:
+      - hafbe_bal.account_balance_history
+      - hafd.operations
+      - hafd.blocks
+      uses_index:
+      - idx_account_balance_history_account_seq_num_idx
+      - pk_hive_operations
+  - name: rest-aggregated-history-daily
+    sql: "WITH date_series AS (\n        SELECT\n          generate_series(\n            '2016-03-24 00:00:00'::timestamp,\n            '2026-10-17 00:00:00'::timestamp,\n            '1 day'::interval\n \
+      \         ) AS date\n      ),\n      add_row_num_to_series AS (\n        SELECT\n          date,\n          ROW_NUMBER() OVER (ORDER BY date) AS row_num\n        FROM date_series\n      ),\n      balance_records\
+      \ AS MATERIALIZED (\n        SELECT\n          ds.date,\n          ds.row_num,\n          bh.balance,\n          bh.min_balance,\n          bh.max_balance,\n          sa.balance AS savings_balance,\n\
+      \          sa.min_balance AS min_savings_balance,\n          sa.max_balance AS max_savings_balance\n        FROM add_row_num_to_series ds\n        LEFT JOIN LATERAL (\n          SELECT * FROM btracker_backend.balance_history(\n\
+      \            (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END),\n            (SELECT at.asset_symbol_nai\
+      \ FROM hafbe_bal.asset_table at WHERE at.asset_name = ${coin}::TEXT),\n            'daily'::btracker_backend.granularity,\n            'balance',\n            '2016-03-24 00:00:00'::timestamp,\n   \
+      \         '2026-10-17 00:00:00'::timestamp\n          )\n        ) bh ON ds.date = bh.updated_at\n        LEFT JOIN LATERAL (\n          SELECT * FROM btracker_backend.balance_history(\n           \
+      \ (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END),\n            (SELECT at.asset_symbol_nai FROM hafbe_bal.asset_table\
+      \ at WHERE at.asset_name = ${coin}::TEXT),\n            'daily'::btracker_backend.granularity,\n            'savings_balance',\n            '2016-03-24 00:00:00'::timestamp,\n            '2026-10-17\
+      \ 00:00:00'::timestamp\n          )\n        ) sa ON ds.date = sa.updated_at\n      ),\n      filled_balances AS (\n        WITH RECURSIVE agg_history AS (\n          SELECT\n            ds.date,\n\
+      \            ds.row_num,\n            COALESCE(ds.balance, prev_balance.balance, 0) AS balance,\n            COALESCE(prev_balance.balance, 0) AS prev_balance,\n            COALESCE(ds.min_balance,\
+      \ ds.balance, prev_balance.balance, 0) AS min_balance,\n            COALESCE(ds.max_balance, ds.balance, prev_balance.balance, 0) AS max_balance,\n\n            COALESCE(ds.savings_balance, savings_prev_balance.balance,\
+      \ 0) AS savings_balance,\n            COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,\n            COALESCE(ds.min_savings_balance, ds.savings_balance, savings_prev_balance.balance,\
+      \ 0) AS min_savings_balance,\n            COALESCE(ds.max_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS max_savings_balance\n          FROM balance_records ds\n          LEFT\
+      \ JOIN LATERAL (\n            SELECT\n              bh.balance,\n              bh.min_balance,\n              bh.max_balance\n            FROM btracker_backend.balance_history_last_record(\n       \
+      \       (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END),\n              (SELECT at.asset_symbol_nai FROM\
+      \ hafbe_bal.asset_table at WHERE at.asset_name = ${coin}::TEXT),\n              'daily'::btracker_backend.granularity,\n              'balance',\n              '2016-03-24 00:00:00'::timestamp\n   \
+      \         ) bh\n          ) prev_balance ON TRUE\n          LEFT JOIN LATERAL (\n            SELECT\n              bh.balance,\n              bh.min_balance,\n              bh.max_balance\n        \
+      \    FROM btracker_backend.balance_history_last_record(\n              (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT)\
+      \ END),\n              (SELECT at.asset_symbol_nai FROM hafbe_bal.asset_table at WHERE at.asset_name = ${coin}::TEXT),\n              'daily'::btracker_backend.granularity,\n              'savings_balance',\n\
+      \              '2016-03-24 00:00:00'::timestamp\n            ) bh\n          ) savings_prev_balance ON TRUE\n          WHERE ds.row_num = 1\n\n          UNION ALL\n\n          SELECT\n            next_b.date,\n\
+      \            next_b.row_num,\n            COALESCE(next_b.balance, prev_b.balance, 0) AS balance,\n            COALESCE(prev_b.balance, 0) AS prev_balance,\n            COALESCE(next_b.min_balance,\
+      \ next_b.balance, prev_b.balance, 0) AS min_balance,\n            COALESCE(next_b.max_balance, next_b.balance, prev_b.balance, 0) AS max_balance,\n\n            COALESCE(next_b.savings_balance, prev_b.savings_balance,\
+      \ 0) AS savings_balance,\n            COALESCE(prev_b.savings_balance, 0) AS prev_savings_balance,\n            COALESCE(next_b.min_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0)\
+      \ AS min_savings_balance,\n            COALESCE(next_b.max_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS max_savings_balance\n          FROM agg_history prev_b\n          JOIN\
+      \ balance_records next_b ON next_b.row_num = prev_b.row_num + 1\n        )\n        SELECT * FROM agg_history\n      )\n      SELECT\n        LEAST(fb.date + '1 day'::interval, CURRENT_TIMESTAMP)::TIMESTAMP\
+      \ AS adjusted_date,\n        (\n          fb.balance::TEXT,\n          fb.savings_balance::TEXT\n        )::btracker_backend.balances AS balance,\n        (\n          fb.prev_balance::TEXT,\n     \
+      \     fb.prev_savings_balance::TEXT\n        )::btracker_backend.balances AS prev_balance,\n        (\n          fb.min_balance::TEXT,\n          fb.min_savings_balance::TEXT\n        )::btracker_backend.balances\
+      \ AS min_balance,\n        (\n          fb.max_balance::TEXT,\n          fb.max_savings_balance::TEXT\n        )::btracker_backend.balances AS max_balance\n      FROM filled_balances fb\n      ORDER\
+      \ BY\n        (CASE WHEN 'desc' = 'desc' THEN fb.date ELSE NULL END) DESC,\n        (CASE WHEN 'desc' = 'asc' THEN fb.date ELSE NULL END) ASC"
+    parameters:
+      account: *id001
+      coin: *id002
+    api_methods:
+    - rest:/balance-api/accounts/*/aggregated-history
+    parameter_map:
+      account: path.3
+      coin: query.coin-type
+    role:
+      frequency: per aggregated-history request with granularity=daily over the whole history (3,860 periods)
+      waiter: REST client through PostgREST
+      latency_ms: 200
+  - name: rest-top-holders-count
+    sql: SELECT COUNT(*) FROM btracker_backend.current_account_balances_view WHERE nai = (SELECT at.asset_symbol_nai FROM hafbe_bal.asset_table at WHERE at.asset_name = ${coin}::TEXT) AND balance > 0
+    parameters:
+      coin: *id002
+    api_methods:
+    - rest:/balance-api/top-holders
+    parameter_map:
+      coin: query.coin-type
+    role:
+      frequency: per top-holders request (total_accounts / total_pages)
+      waiter: REST client through PostgREST
+      latency_ms: 200
+  - name: rest-top-holders-page
+    sql: SELECT av.name, src.balance FROM btracker_backend.current_account_balances_view AS src JOIN hive.accounts_view av ON av.id = src.account WHERE src.nai = (SELECT at.asset_symbol_nai FROM hafbe_bal.asset_table
+      at WHERE at.asset_name = ${coin}::TEXT) AND src.balance > 0 ORDER BY src.balance DESC, av.name ASC OFFSET 0 LIMIT ${page_size}
+    parameters:
+      coin: *id002
+    limit:
+      param: page_size
+      value: 100
+      values:
+      - 100
+      - 1000
+    api_methods:
+    - rest:/balance-api/top-holders
+    parameter_map:
+      coin: query.coin-type
+      page_size: query.page-size
+    role:
+      frequency: per top-holders page
+      waiter: REST client through PostgREST
+      latency_ms: 200
+    plan:
+      uses_index:
+      - idx_account_balance_nai_balance_idx
+  - name: rest-total-value-locked
+    sql: SELECT COALESCE(SUM(cab.balance::NUMERIC), 0)::TEXT FROM hafbe_bal.current_account_balances cab WHERE cab.nai = 37
+    api_methods:
+    - rest:/balance-api/total-value-locked
+    role:
+      frequency: per total-value-locked request
+      waiter: REST client through PostgREST
+      latency_ms: 500
+  - name: rest-vesting-history-page
+    sql: SELECT avh.vesting_seq_no, avh.kind, avh.hive_amount, avh.vests_amount, avh.source_op FROM hafbe_bal.account_vesting_history avh WHERE avh.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN
+      ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END) ORDER BY avh.vesting_seq_no DESC LIMIT ${page_size}
+    parameters:
+      account:
+        column: hafbe_bal.account_vesting_history.account
+        value: '1184848'
+    limit:
+      param: page_size
+      value: 100
+      values:
+      - 100
+      - 1000
+    api_methods:
+    - rest:/balance-api/accounts/*/vesting-history
+    parameter_map:
+      account: path.3
+      page_size: query.page-size
+    role:
+      frequency: per vesting-history page
+      waiter: REST client through PostgREST
+      latency_ms: 200
+    plan:
+      uses_index:
+      - idx_account_vesting_history_account_seq_no
+  - name: rest-transfer-statistics-hourly
+    sql: SELECT ah.updated_at, btracker_backend.create_amount_object(21, ah.sum_transfer_amount), btracker_backend.create_amount_object(21, ah.avg_transfer_amount), btracker_backend.create_amount_object(21,
+      ah.max_transfer_amount), btracker_backend.create_amount_object(21, ah.min_transfer_amount), ah.transfer_count, ah.last_block_num FROM btracker_backend.get_transfer_aggregation(21, 'hourly', 'desc',
+      NULL, NULL) ah
+    api_methods:
+    - rest:/balance-api/transfer-statistics
+    role:
+      frequency: per transfer-statistics request with granularity=hourly over the whole history
+      waiter: REST client through PostgREST
+      latency_ms: 1000
+  - name: rest-delegations-incoming
+    sql: SELECT (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.delegator)::TEXT AS delegator, d.balance::TEXT AS amount, d.source_op::TEXT AS operation_id, d.source_op_block AS block_num FROM
+      btracker_backend.current_accounts_delegations_view d WHERE d.delegatee = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT)
+      END)
+    parameters:
+      account:
+        column: hafbe_bal.current_accounts_delegations.delegatee
+        value: '440'
+    api_methods:
+    - rest:/balance-api/accounts/*/delegations
+    parameter_map:
+      account: path.3
+    role:
+      frequency: per delegations request
+      waiter: REST client through PostgREST
+      latency_ms: 100
+    plan:
+      no_seq_scan:
+      - hafbe_bal.current_accounts_delegations
+  - name: rest-recurrent-transfers-incoming
+    sql: SELECT (SELECT av.name FROM hive.accounts_view av WHERE av.id = d.from_account)::TEXT AS sender, d.transfer_id, d.amount, d.recurrence, bv.created_at + (d.recurrence::TEXT || 'hour')::INTERVAL AS
+      trigger_date FROM btracker_backend.recurrent_transfers_view d JOIN hive.blocks_view bv ON bv.num = d.source_op_block WHERE d.to_account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT
+      ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)
+    parameters:
+      account:
+        column: hafbe_bal.recurrent_transfers.to_account
+        value: '440'
+    api_methods:
+    - rest:/balance-api/accounts/*/recurrent-transfers
+    parameter_map:
+      account: path.3
+    role:
+      frequency: per recurrent-transfers request
+      waiter: REST client through PostgREST
+      latency_ms: 100
+  - name: rest-account-balances
+    sql: "WITH\n    -- Get delegation summary (VESTS delegated to/received from other accounts)\n    -- Uses dummy table pattern to ensure a row is returned even with no delegations\n    get_delegations AS\
+      \ (\n      SELECT\n        COALESCE(ad.delegated_vests, 0)::BIGINT AS delegated_vests,\n        COALESCE(ad.received_vests, 0)::BIGINT  AS received_vests\n      FROM (VALUES(1)) AS dummy(_)\n      LEFT\
+      \ JOIN hafbe_bal.account_delegations ad\n        ON ad.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT)\
+      \ END)\n    ),\n\n    -- Get current liquid balances for all asset types\n    -- MATERIALIZED: vesting_shares is referenced by multiple downstream CTEs\n    -- Conditional aggregation pivots NAI rows\
+      \ (one per asset) into named columns\n    get_balances AS MATERIALIZED (\n      SELECT\n        COALESCE(MAX(CASE WHEN cab.nai = 13 THEN cab.balance END), 0)::BIGINT AS hbd_balance,\n        COALESCE(MAX(CASE\
+      \ WHEN cab.nai = 21 THEN cab.balance END), 0)::BIGINT AS hive_balance,\n        COALESCE(MAX(CASE WHEN cab.nai = 37 THEN cab.balance END), 0)::BIGINT AS vesting_shares\n      FROM btracker_backend.current_account_balances_view\
+      \ cab\n      WHERE cab.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Convert\
+      \ VESTS to HIVE equivalent using current blockchain exchange rate\n    -- Uses hive.get_vesting_balance() which calculates: vests * (total_fund_hive / total_vests)\n    get_vest_balance AS (\n     \
+      \ SELECT\n        COALESCE(\n          hive.get_vesting_balance(bv.num, gb.vesting_shares),\n          0\n        )::BIGINT AS vesting_balance_hive\n      FROM get_balances gb\n      CROSS JOIN LATERAL\
+      \ (\n        SELECT num\n        FROM hive.blocks_view\n        ORDER BY num DESC\n        LIMIT 1\n      ) bv\n    ),\n\n    -- Calculate effective voting power after delegations\n    -- Formula: owned_vests\
+      \ - delegated_out + received_in\n    get_post_voting_power AS (\n      SELECT\n        (gb.vesting_shares - gd.delegated_vests + gd.received_vests)::BIGINT AS post_voting_power_vests\n      FROM get_balances\
+      \ gb\n      CROSS JOIN get_delegations gd\n    ),\n\n    -- Get lifetime accumulated rewards (curation + posting)\n    -- Uses dummy table pattern to return zeros if account has no reward history\n\
+      \    get_info_rewards AS (\n      SELECT\n        COALESCE(air.curation_rewards, 0)::BIGINT AS curation_rewards,\n        COALESCE(air.posting_rewards, 0)::BIGINT  AS posting_rewards\n      FROM (VALUES(1))\
+      \ AS dummy(_)\n      LEFT JOIN hafbe_bal.account_info_rewards air\n        ON air.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a\
+      \ WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get pending unclaimed rewards for all asset types\n    -- NAI 38 (vests_as_hive) is a virtual type: VESTS valued at HIVE rate when reward was\
+      \ earned\n    calculate_rewards AS MATERIALIZED (\n      SELECT\n        COALESCE(MAX(CASE WHEN ar.nai = 13 THEN ar.balance END), 0)::BIGINT AS hbd_rewards,\n        COALESCE(MAX(CASE WHEN ar.nai =\
+      \ 21 THEN ar.balance END), 0)::BIGINT AS hive_rewards,\n        COALESCE(MAX(CASE WHEN ar.nai = 37 THEN ar.balance END), 0)::BIGINT AS vests_rewards,\n        COALESCE(MAX(CASE WHEN ar.nai = 38 THEN\
+      \ ar.balance END), 0)::BIGINT AS hive_vesting_rewards\n      FROM btracker_backend.account_rewards_view ar\n      WHERE ar.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT\
+      \ ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get savings account balances and pending withdrawal request count\n    -- Savings have a 3-day withdrawal\
+      \ delay for security\n    get_savings AS (\n      SELECT\n        COALESCE(MAX(CASE WHEN ats.nai = 13 THEN ats.balance END), 0)::BIGINT AS hbd_savings,\n        COALESCE(MAX(CASE WHEN ats.nai = 21 THEN\
+      \ ats.balance END), 0)::BIGINT AS hive_savings,\n        COALESCE(SUM(ats.savings_withdraw_requests), 0)::INT                  AS savings_withdraw_requests\n      FROM btracker_backend.account_savings_view\
+      \ ats\n      WHERE ats.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get\
+      \ power-down (vesting withdrawal) state\n    -- vesting_withdraw_rate = weekly payout (total / 13 weeks)\n    -- delayed_vests = VESTS blocked during 30-day voting delay (HF24+)\n    get_withdraws AS\
+      \ (\n      SELECT\n        COALESCE(aw.vesting_withdraw_rate, 0)::BIGINT AS vesting_withdraw_rate,\n        COALESCE(aw.to_withdraw, 0)::BIGINT           AS to_withdraw,\n        COALESCE(aw.withdrawn,\
+      \ 0)::BIGINT             AS withdrawn,\n        COALESCE(aw.withdraw_routes, 0)::INT          AS withdraw_routes,\n        COALESCE(aw.delayed_vests, 0)::BIGINT         AS delayed_vests\n      FROM\
+      \ (VALUES(1)) AS dummy(_)\n      LEFT JOIN hafbe_bal.account_withdraws aw\n        ON aw.account = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts\
+      \ a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get pending HBD<->HIVE conversion requests\n    -- Conversions have a 3.5-day delay before completion\n    conv_pivot AS (\n      SELECT\n\
+      \        COALESCE(SUM(cs.remaining) FILTER (WHERE cs.nai = 13), 0)::BIGINT AS conversion_pending_amount_hbd,\n        COUNT(*) FILTER (WHERE cs.nai = 13)::INT                          AS conversion_pending_count_hbd,\n\
+      \        COALESCE(SUM(cs.remaining) FILTER (WHERE cs.nai = 21), 0)::BIGINT AS conversion_pending_amount_hive,\n        COUNT(*) FILTER (WHERE cs.nai = 21)::INT                          AS conversion_pending_count_hive\n\
+      \      FROM hafbe_bal.convert_state cs\n      WHERE cs.owner_id = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT)\
+      \ END)\n    ),\n\n    -- Get open limit orders on the internal HBD/HIVE market\n    open_orders AS (\n      SELECT\n        COUNT(*) FILTER (WHERE s.nai = 13)::INT                          AS open_orders_hbd_count,\n\
+      \        COUNT(*) FILTER (WHERE s.nai = 21)::INT                          AS open_orders_hive_count,\n        COALESCE(SUM(s.remaining) FILTER (WHERE s.nai = 21), 0)::BIGINT  AS open_orders_hive_amount,\n\
+      \        COALESCE(SUM(s.remaining) FILTER (WHERE s.nai = 13), 0)::BIGINT  AS open_orders_hbd_amount\n      FROM hafbe_bal.order_state s\n      WHERE s.owner_id = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$'\
+      \ THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get amounts in 3-day savings withdrawal delay\n    -- These funds have left\
+      \ savings but not yet arrived in liquid balance\n    savings_pivot AS (\n      SELECT\n        COALESCE(-SUM(tsi.balance) FILTER (WHERE tsi.nai = 13), 0)::BIGINT AS savings_pending_amount_hbd,\n   \
+      \     COALESCE(-SUM(tsi.balance) FILTER (WHERE tsi.nai = 21), 0)::BIGINT AS savings_pending_amount_hive\n      FROM hafbe_bal.transfer_saving_id tsi\n      WHERE tsi.account = (CASE WHEN ${account}::TEXT\
+      \ ~ '^[0-9]+$' THEN ${account}::TEXT::INT ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    ),\n\n    -- Get active escrow amounts where this account is the sender\n\
+      \    escrow_pivot AS (\n      SELECT\n        COALESCE(SUM(es.hbd_amount), 0)::BIGINT  AS escrow_pending_amount_hbd,\n        COALESCE(SUM(es.hive_amount), 0)::BIGINT AS escrow_pending_amount_hive,\n\
+      \        COUNT(*)::INT                            AS escrow_pending_count\n      FROM hafbe_bal.escrow_state es\n      WHERE es.from_id = (CASE WHEN ${account}::TEXT ~ '^[0-9]+$' THEN ${account}::TEXT::INT\
+      \ ELSE (SELECT a.id FROM hafd.accounts a WHERE a.name = ${account}::TEXT) END)\n    )\n\n  -- Assemble all CTEs into final result via CROSS JOIN (each CTE returns exactly one row)\n  SELECT\n    gb.hbd_balance,\n\
+      \    gb.hive_balance,\n    gb.vesting_shares,\n    gvb.vesting_balance_hive,\n    gpv.post_voting_power_vests,\n    gd.delegated_vests,\n    gd.received_vests,\n    ir.curation_rewards,\n    ir.posting_rewards,\n\
+      \    cr.hbd_rewards,\n    cr.hive_rewards,\n    cr.vests_rewards,\n    cr.hive_vesting_rewards,\n    sv.hbd_savings,\n    sv.hive_savings,\n    sv.savings_withdraw_requests,\n    wd.vesting_withdraw_rate,\n\
+      \    wd.to_withdraw,\n    wd.withdrawn,\n    wd.withdraw_routes,\n    wd.delayed_vests,\n    cp.conversion_pending_amount_hbd,\n    cp.conversion_pending_count_hbd,\n    cp.conversion_pending_amount_hive,\n\
+      \    cp.conversion_pending_count_hive,\n    oo.open_orders_hbd_count,\n    oo.open_orders_hive_count,\n    oo.open_orders_hive_amount,\n    oo.open_orders_hbd_amount,\n    sp.savings_pending_amount_hbd,\n\
+      \    sp.savings_pending_amount_hive,\n    ep.escrow_pending_amount_hbd,\n    ep.escrow_pending_amount_hive,\n    ep.escrow_pending_count\n  \n  FROM get_balances          gb\n  CROSS JOIN get_vest_balance\
+      \       gvb\n  CROSS JOIN get_post_voting_power  gpv\n  CROSS JOIN get_delegations        gd\n  CROSS JOIN get_info_rewards       ir\n  CROSS JOIN calculate_rewards      cr\n  CROSS JOIN get_savings\
+      \            sv\n  CROSS JOIN get_withdraws          wd\n  CROSS JOIN conv_pivot             cp\n  CROSS JOIN open_orders            oo\n  CROSS JOIN savings_pivot          sp\n  CROSS JOIN escrow_pivot\
+      \           ep"
+    parameters:
+      account:
+        column: hafbe_bal.current_account_balances.account
+        value: '440'
+    api_methods:
+    - rest:/balance-api/accounts/*/balances
+    parameter_map:
+      account: path.3
+    role:
+      frequency: per balances request, and per haf_block_explorer /accounts/{name} request
+      waiter: REST client through PostgREST
+      latency_ms: 100

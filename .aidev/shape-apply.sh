@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# performance.shape.apply (.aidev/project.yaml): installs this tree's query code
+# (types, backend helpers, endpoints) on a copy of the db-shape, in the order
+# scripts/install_app.sh installs it, as the block explorer's embedded instance
+# (schema hafbe_bal) that the shape was captured from.
+#
+#   AIDEV_DB_SHAPE_PSQL=<psql invocation reading SQL on stdin> .aidev/shape-apply.sh
+#
+# A shape holds no rows, only the source's schema and statistics, so the files
+# that create the application's tables and HAF context (db/btracker_app.sql,
+# db/builtin_roles.sql) and the block-processing code (db/process_*.sql) are not
+# run: they would replace the shape's tables, and with them their statistics,
+# and nothing an API query plans with lives in them. Every other file
+# install_app.sh feeds to psql is run, in its order, through
+# $AIDEV_DB_SHAPE_PSQL on stdin (the shape server has no network and cannot
+# read a -f path from this tree).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+: "${AIDEV_DB_SHAPE_PSQL:?set by aidev db shape: the psql invocation reaching the shape copy}"
+: "${AIDEV_DB_SHAPE_DATABASE:?set by aidev db shape: the shape copy psql reaches}"
+schema="${BTRACKER_SCHEMA:-hafbe_bal}"
+
+shape_psql=()
+eval "shape_psql=($AIDEV_DB_SHAPE_PSQL)"
+
+# A shape restores the source's btracker schemas owned by postgres, and the files
+# replace their objects as btracker_owner: drop them first, as the shape's
+# superuser, and let btracker_owner create them again (the shape restores the roles).
+"${shape_psql[@]}" -v ON_ERROR_STOP=1 -v db="$AIDEV_DB_SHAPE_DATABASE" -v schema="$schema" <<'SQL'
+SET client_min_messages = warning;
+DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;
+DROP SCHEMA IF EXISTS btracker_backend CASCADE;
+GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
+GRANT ALL ON SCHEMA :"schema" TO btracker_owner;
+GRANT SELECT ON ALL TABLES IN SCHEMA :"schema" TO btracker_owner;
+SQL
+
+# The files install_app.sh runs, in its order, minus the ones above.
+# shellcheck disable=SC2016  # $SCRIPTPATH is matched literally in install_app.sh's text
+mapfile -t files < <(grep -oE '"\$SCRIPTPATH/\.\./[^"]+\.sql"' scripts/install_app.sh \
+    | sed -E 's#^"\$SCRIPTPATH/\.\./##; s#"$##' \
+    | grep -vE '^db/(btracker_app|builtin_roles|process_[a-z_]+)\.sql$')
+[ "${#files[@]}" -gt 0 ] || { echo "shape-apply.sh: no SQL files found in scripts/install_app.sh" >&2; exit 2; }
+
+for f in "${files[@]}"; do
+    printf "SET custom.swagger_url = '{btracker-host}'; SET custom.is_forking = 'false'; SET SEARCH_PATH TO %s;\n" "$schema"
+    cat "$f"
+    printf '\n'
+done | "${shape_psql[@]}" -v ON_ERROR_STOP=1
