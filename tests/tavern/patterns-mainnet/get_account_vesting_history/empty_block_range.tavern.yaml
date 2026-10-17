@@ -1,0 +1,30 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # blocktrades' last vesting event is at block 4998632, so this range is empty
+      # and must return no rows rather than the unranged history.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_vesting_history"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "blocktrades"
+          filter: "all"
+          page-size: 100
+          direction: "desc"
+          from-block: "4999000"
+          to-block: "5000000"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
