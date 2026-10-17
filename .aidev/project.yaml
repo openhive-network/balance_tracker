@@ -1,0 +1,93 @@
+# Profile for hive/balance_tracker, written by `aidev project scaffold` (#13561).
+#
+# Schema reference: docs/architecture/project-profile.md
+# Onboarding procedure: the `onboard-external-project` skill.
+# Guide: docs/operations/onboarding-an-external-project.md
+#
+# The generator writes a starting point, not a governed answer: every
+# binding below is the command a maintainer said this project runs, and it
+# is reviewed and edited like any other declaration.
+version: 2
+project: balance-tracker
+
+gitlab:
+  host: "gitlab.syncad.com"
+  path: "hive/balance_tracker"
+  id: 330
+
+# AIDEV integrates into its own branch; people merge it into develop through
+# merge requests (as in hive/HAfAH and hive/hivemind), so `stable` is omitted
+# and `aidev release` never moves develop or master.
+branches:
+  integration: "aidev/integration"
+
+# How this project's suites execute (#13892): one kind, stated once.
+environment:
+  kind: "container"
+  # Built by .aidev/runtime/build.sh from .aidev/runtime/Dockerfile (its only input).
+  image: "registry.gitlab.syncad.com/hive/balance_tracker/aidev-tests@sha256:6304cb72c3c60d54129cf86c83a0f60171473c6735848da3236c79fc93a5c35b"
+  inputs: [".aidev/runtime/Dockerfile"]
+
+issues:
+  intake_label: todo
+  taxonomy: ".aidev/labels.yaml"
+  decompose:
+    # `never` is where an external project starts: nothing marks work
+    # approved on this project's behalf until there is a track record.
+    auto_todo: never
+  # Reports about this project's work are filed against this project.
+  watcher_reports: self
+
+# The slots that install the balance tracker (every one without `stack: false`)
+# reach the shared HAF the `haf` project hosts (a HAF replayed to block 5000000)
+# as AIDEV_EXTERNAL_HAF_HOST/_PORT. .aidev/run-checks.sh takes a copy-on-write
+# clone of it per run, installs the candidate's own SQL into the clone, syncs the
+# candidate's block processing over the clone's 5M blocks (about 4 minutes) and
+# drops the clone on exit, so no data is copied and no image is built. The
+# consumer role is trusted from the fleet LAN: no secret. See .aidev/README.md.
+sandbox:
+  external:
+    - name: haf
+      provider: "haf/haf"
+
+# Verification slots. Each binding is what this project genuinely runs for
+# that slot — never one selection repeated under seven names, which makes
+# seven gates report on the same evidence while claiming to check seven
+# different things.
+#
+# Lightweight first: lint, then install of the candidate's SQL into a clone of
+# the shared 5M-block HAF, its block processing to block 5000000, CI's parity
+# and regression tests (every account's balances against hived's), and for full
+# and canary the tavern pattern tests (CI's pattern-test) and an upgrade in
+# place. run-checks.sh's `uninstall` step is not bound until hive/haf#371 is in
+# the shared HAF: hive.app_remove_context fails for a non-admin context owner.
+# CI's mock-data patterns, JMeter benchmarks and python api client tests aren't
+# bound; see .aidev/README.md.
+verification:
+  quick:
+    adapter: command
+    args: [".aidev/run-checks.sh", "quick", "shellcheck", "sql-registered"]
+    stack: false
+    artifacts: ["test-results/quick/"]
+  full:
+    adapter: command
+    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "tavern", "reinstall"]
+    artifacts: ["test-results/full/"]
+  baseline:
+    adapter: command
+    args: [".aidev/run-checks.sh", "baseline", "install", "sync", "parity", "regression", "tavern"]
+    artifacts: ["test-results/baseline/"]
+  canary:
+    adapter: command
+    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "tavern", "reinstall"]
+    artifacts: ["test-results/canary/"]
+  # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks
+  # (AIDEV runs it in the post-implementation scan only). `static` and `system`
+  # are left unbound: AIDEV runs neither for a project.
+  coverage:
+    adapter: command
+    args: [".aidev/run-checks.sh", "coverage", "shellcheck", "sql-registered"]
+    stack: false
+    artifacts: ["test-results/coverage/"]
+
+capabilities: []

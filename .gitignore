@@ -28,3 +28,7 @@ docker-compose.override.yml
 
 # IDEs
 .vscode/
+
+# AIDEV check reports (.aidev/run-checks.sh)
+/test-results/
+/.aidev/__pycache__/
