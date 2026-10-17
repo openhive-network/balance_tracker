@@ -27,7 +27,7 @@ MASSIVE_PROCESSING runs `btracker_massive_processing()` over the whole range,
 LIVE runs `finalize_massive_sync()` (a no-op once done) and then
 `btracker_single_processing()`. MASSIVE is not only the initial sync: HAF
 re-enters it for any catch-up of more than 101 blocks. Work that is only meant
-for the genesis replay, such as the VACUUM request on the history tables, is
+for the genesis replay, such as the throttled ANALYZE of the history tables, is
 gated on `NOT isIndexesCreated()`, not on the stage name (see #64 and
 `scripts/claude/main.md`, "Synchronization Stages").
 

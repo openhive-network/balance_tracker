@@ -75,6 +75,43 @@
 
 SET ROLE btracker_owner;
 
+/**
+ * set_history_tables_insert_only_reloptions()
+ * -------------------------------------------
+ * Autovacuum settings for the insert-only history tables. After sync they are
+ * rewritten (SET LOGGED) and left without a visibility map, and the default
+ * insert trigger (1000 + 0.2 * reltuples) is then never reached by live sync:
+ * a fixed insert threshold makes autovacuum visit them every day or two,
+ * freeze_min_age = 0 freezes each page on that first visit (so the
+ * anti-wraparound pass can skip it), and a fixed analyze threshold keeps the
+ * planner statistics current.
+ *
+ * Idempotent and metadata-only (ShareUpdateExclusiveLock); the reloptions live
+ * in pg_class and survive SET LOGGED and VACUUM FULL rewrites.
+ */
+CREATE OR REPLACE FUNCTION set_history_tables_insert_only_reloptions()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  ALTER TABLE account_balance_history SET (
+    autovacuum_vacuum_insert_scale_factor = 0,
+    autovacuum_vacuum_insert_threshold = 100000,
+    autovacuum_freeze_min_age = 0,
+    autovacuum_analyze_scale_factor = 0,
+    autovacuum_analyze_threshold = 1000000
+  );
+  ALTER TABLE account_vesting_history SET (
+    autovacuum_vacuum_insert_scale_factor = 0,
+    autovacuum_vacuum_insert_threshold = 10000,
+    autovacuum_freeze_min_age = 0,
+    autovacuum_analyze_scale_factor = 0,
+    autovacuum_analyze_threshold = 100000
+  );
+END
+$$;
+
 DO $$
   DECLARE __schema_name VARCHAR;
   DECLARE __context_table VARCHAR:='hive.';
@@ -476,6 +513,7 @@ BEGIN
     source_op      BIGINT   NOT NULL  -- hafd.operations.id; block_num via hafd.operation_id_to_block_num
   );
   PERFORM hive.app_register_table( __schema_name, 'account_vesting_history', __schema_name );
+  PERFORM set_history_tables_insert_only_reloptions();
 
   -- Per-account vesting stats aggregated daily / monthly. Same TALL shape as the
   -- global vesting_stats_by_day/_month but with `account` as part of the PK, so each
@@ -646,6 +684,9 @@ BEGIN
 END
 $$;
 
+-- Installs that predate the reloptions return early above.
+SELECT set_history_tables_insert_only_reloptions();
+
 -- ============================================================================
 -- CONTROL FUNCTIONS
 -- ============================================================================
@@ -766,6 +807,49 @@ $$;
 -- ============================================================================
 
 /**
+ * request_history_tables_freeze()
+ * -------------------------------
+ * Ask HAF for one VACUUM (FREEZE, ANALYZE) of the insert-only history tables,
+ * which the SET LOGGED rewrite at finalize leaves without a visibility map.
+ * VACUUM cannot run inside the application's transaction, so it goes through
+ * HAF's out-of-transaction executor; the request is committed with the caller's
+ * transaction and runs after it, once that transaction's ACCESS EXCLUSIVE lock
+ * is released.
+ *
+ * Needs the request kind of hive/haf#360 (a defaulted fourth argument of
+ * hive.app_request_table_vacuum(schema, table, interval)). Without it the
+ * request is skipped with a NOTICE: the only other kind is VACUUM FULL, a
+ * rewrite that leaves no visibility map either.
+ *
+ * @param _context_name  HAF context name (the application schema)
+ */
+CREATE OR REPLACE FUNCTION request_history_tables_freeze(_context_name hive.context_name)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __table TEXT;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE pronamespace = 'hive'::regnamespace
+      AND proname = 'app_request_table_vacuum'
+      AND pronargs = 4
+  ) THEN
+    RAISE NOTICE 'btracker: HAF has no non-FULL vacuum request kind; skipping VACUUM (FREEZE, ANALYZE) of %.account_balance_history and %.account_vesting_history', _context_name, _context_name;
+    RETURN;
+  END IF;
+
+  FOREACH __table IN ARRAY ARRAY['account_balance_history', 'account_vesting_history'] LOOP
+    -- Dynamic so this compiles against a HAF without the four-argument form.
+    EXECUTE 'SELECT hive.app_request_table_vacuum($1, $2, NULL::INTERVAL, ''freeze'')'
+      USING _context_name::TEXT, __table;
+  END LOOP;
+END
+$$;
+
+/**
  * finalize_massive_sync_before_forking()
  * --------------------------------------
  * The part of massive-sync finalization that bulk-writes registered tables, and
@@ -816,6 +900,7 @@ BEGIN
 
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
+  PERFORM request_history_tables_freeze(_context_name);
 
   /*
    * Backfill the by-day/by-month balance rollups that process_block_range_balances
@@ -913,8 +998,9 @@ $$;
  * -----------------------
  * Transition from massive sync to LIVE-ready state.
  * Reverses the optimizations applied during setup:
- *   1. Switch UNLOGGED tables back to LOGGED and backfill the deferred rollups
- *      (finalize_massive_sync_before_forking, see there for why it comes first)
+ *   1. Switch UNLOGGED tables back to LOGGED, request their freeze vacuum and
+ *      backfill the deferred rollups (finalize_massive_sync_before_forking, see
+ *      there for why it comes first)
  *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
  *   3. Restore app indexes (updates HAF tracking table)
  *
@@ -950,6 +1036,34 @@ $$;
 -- Called by the main loop for each block range to sync.
 
 /**
+ * analyze_unless_recent()
+ * -----------------------
+ * ANALYZE a table unless it was analyzed (manually or by autovacuum) within
+ * _min_interval. Unlike VACUUM, ANALYZE may run inside the caller's
+ * transaction.
+ *
+ * @param _table         Table to analyze
+ * @param _min_interval  Minimum time between two analyzes
+ */
+CREATE OR REPLACE FUNCTION analyze_unless_recent(_table REGCLASS, _min_interval INTERVAL)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_stat_user_tables
+    WHERE relid = _table
+      AND GREATEST(last_analyze, last_autoanalyze) > now() - _min_interval
+  ) THEN
+    RETURN;
+  END IF;
+
+  EXECUTE format('ANALYZE %s', _table);
+END
+$$;
+
+/**
  * btracker_process_blocks()
  * -------------------------
  * Main dispatch function for block processing.
@@ -957,9 +1071,9 @@ $$;
  *
  * Behavior by stage:
  * - MASSIVE_PROCESSING: Calls btracker_massive_processing() for batch sync.
- *   Requests a VACUUM of the history tables only during the initial sync
- *   (before finalize_massive_sync); HAF also uses this stage for catch-ups
- *   of more than 101 blocks after the app is already finalized.
+ *   ANALYZEs the history tables only during the initial sync (before
+ *   finalize_massive_sync); HAF also uses this stage for catch-ups of more
+ *   than 101 blocks after the app is already finalized.
  * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
  *
  * @param _context_name  HAF context name (typically schema name)
@@ -979,17 +1093,17 @@ $$
 BEGIN
   IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
-    -- Initial sync only. HAF re-enters MASSIVE_PROCESSING for any catch-up of
-    -- more than 101 blocks (restart, stack switch, live drift), and HAF runs
-    -- every vacuum request as VACUUM FULL ANALYZE under an ACCESS EXCLUSIVE
-    -- lock. On a multi-tens-of-GB account_balance_history that stalls every
-    -- reader and writer, including the parent hafbe context, for the whole
-    -- rewrite (#64). Both tables are insert-only, so the vacuum reclaims
-    -- nothing; it survives here only as ANALYZE for the unindexed sync tables.
-    -- isIndexesCreated() is false exactly until finalize_massive_sync() runs.
+    -- Planner statistics for the unindexed, insert-only sync tables. Not a
+    -- HAF vacuum request: HAF runs those as VACUUM FULL ANALYZE, a rewrite
+    -- under ACCESS EXCLUSIVE that reclaims nothing here, stalls every reader
+    -- and writer (#64) and leaves no visibility map. Initial sync only: HAF
+    -- re-enters MASSIVE_PROCESSING for any catch-up of more than 101 blocks,
+    -- and after finalize the tables' autovacuum reloptions keep the statistics
+    -- current. isIndexesCreated() is false exactly until
+    -- finalize_massive_sync() runs.
     IF NOT isIndexesCreated() THEN
-      PERFORM hive.app_request_table_vacuum(_context_name, 'account_balance_history', interval '10 minutes');
-      PERFORM hive.app_request_table_vacuum(_context_name, 'account_vesting_history', interval '10 minutes');
+      PERFORM analyze_unless_recent('account_balance_history', interval '10 minutes');
+      PERFORM analyze_unless_recent('account_vesting_history', interval '10 minutes');
     END IF;
     RETURN;
   END IF;

@@ -51,6 +51,8 @@ tests/
 │   └── sql/                   # Comparison SQL
 ├── functional/                # Script validation tests
 │   └── test_scripts.sh        # Installation script tests
+├── maintenance/               # SQL checks of the history tables' vacuum setup
+│   └── history_tables_vacuum.sql  # psql -v schema=<app schema>, after sync + finalize
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer
 │   ├── fixtures/              # Mock operation data

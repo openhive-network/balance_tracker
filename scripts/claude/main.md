@@ -114,10 +114,31 @@ behind (restart, stack switch, slow live processing), not only for the initial
 sync. `finalize_massive_sync()` runs once, on the first LIVE call, and
 `isIndexesCreated()` is the marker that it has happened. Anything that is only
 appropriate for the genesis replay must check that marker rather than the stage
-name. Example: `btracker_process_blocks()` requests a VACUUM (executed by HAF as
-`VACUUM FULL ANALYZE`, ACCESS EXCLUSIVE lock) of the history tables only while
-`isIndexesCreated()` is false; doing it on every MASSIVE iteration turned each
-post-restart catch-up into a multi-minute outage (#64).
+name. Example: `btracker_process_blocks()` ANALYZEs the history tables (at most
+every 10 minutes, `analyze_unless_recent()`) only while `isIndexesCreated()` is
+false; the HAF vacuum request it used to make there ran as `VACUUM FULL ANALYZE`
+under ACCESS EXCLUSIVE and turned each post-restart catch-up into a multi-minute
+outage (#64).
+
+### Insert-only history tables and the visibility map
+
+`account_balance_history` and `account_vesting_history` are insert-only, UNLOGGED
+during massive sync and rewritten by `SET LOGGED` at finalize, which leaves them
+without a visibility map (every index-only scan then fetches every heap row).
+Three things keep them all-visible (#69):
+
+- `set_history_tables_insert_only_reloptions()` gives both tables a fixed
+  autovacuum insert threshold, `autovacuum_freeze_min_age = 0` and a fixed
+  analyze threshold. `db/btracker_app.sql` applies it when it creates the tables
+  and again on every install, outside the "context already exists" early return.
+- Never request a HAF vacuum of these tables: HAF runs every request as
+  `VACUUM FULL ANALYZE`, a rewrite that drops the visibility map again.
+- `finalize_massive_sync_before_forking()` calls `request_history_tables_freeze()`,
+  which asks HAF for a `'freeze'` request (`VACUUM (FREEZE, ANALYZE)`, run after
+  the finalize transaction commits) when `hive.app_request_table_vacuum` has the
+  request-kind argument of hive/haf#360, and otherwise skips it with a NOTICE.
+  Until HAF has it, the first insert-triggered autovacuum after finalize builds
+  the visibility map.
 
 ## HAF Integration
 
