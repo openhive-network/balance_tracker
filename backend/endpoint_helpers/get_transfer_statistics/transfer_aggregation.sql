@@ -14,7 +14,7 @@ This function:
 3. LEFT JOINs actual transfer data from get_transfer_stats()
 4. Gap-fills missing periods with zeros (no transfers = zero values)
 5. Computes average dynamically as sum/count
-6. Fills in missing block numbers by looking up the nearest block
+6. Fills in missing block numbers by looking up the nearest block at or before the period end
 
 Reads the current synced block via btracker_backend.last_synced_block().
 */
@@ -92,7 +92,7 @@ BEGIN
           LEFT JOIN get_daily_aggregation bh ON ds.date = bh.updated_at
         ),
         -- join_missing_block: for periods with no transfers, attribute the nearest block
-        -- at or before the period end via btracker_backend.block_at_or_before()
+        -- at or before the period end (one set-based lookup per empty period only)
         join_missing_block AS (
           SELECT
             fb.date,
@@ -101,8 +101,16 @@ BEGIN
             fb.max_transfer_amount,
             fb.min_transfer_amount,
             fb.transfer_count,
-            COALESCE(fb.last_block_num, btracker_backend.block_at_or_before(fb.date + __one_period)) AS last_block_num
+            COALESCE(fb.last_block_num, mb.num) AS last_block_num
           FROM transfer_records fb
+          LEFT JOIN LATERAL (
+            SELECT b.num
+            FROM hive.blocks_view b
+            WHERE fb.last_block_num IS NULL
+              AND b.created_at <= fb.date + __one_period
+            ORDER BY b.created_at DESC
+            LIMIT 1
+          ) mb ON TRUE
         )
         -- Final output: compute average, apply sort direction.
         -- Label each bucket by its period START (the hour/day/month/year the transfers

@@ -84,6 +84,12 @@ History endpoints use page-based pagination:
 - `page-size`: Results per page (max 1000)
 - `direction`: `asc` (oldest first) or `desc` (newest first)
 
+### Per-row and plan-cache costs
+
+- Build amount objects with `btracker_backend.create_amount_object()`: it is an inlinable `LANGUAGE sql IMMUTABLE` CASE on the NAI, guarded against `asset_table` at install. Do not turn it back into a plpgsql table lookup; the statistics endpoints call it four times per output row.
+- Resolve per-row block lookups (e.g. the block at or before a period end) with a `LEFT JOIN LATERAL` in the main statement, not a plpgsql function per row.
+- Choose `plan_cache_mode` per function, never globally. Static plpgsql statements whose best plan depends on direction or bounds (`get_account_vesting_history`, `get_balance_history`, `get_top_holders`) set `force_custom_plan`. `get_account_balances` is a series of small account-equality lookups and sets `force_generic_plan` so it plans once per session.
+
 ## HAFBE Integration
 
 HAFBE endpoints can query btracker data directly:

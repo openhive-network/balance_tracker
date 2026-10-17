@@ -1,0 +1,652 @@
+[
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T16:00:00",
+    "last_block_num": 1090,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T17:00:00",
+    "last_block_num": 2285,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T18:00:00",
+    "last_block_num": 3470,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T19:00:00",
+    "last_block_num": 4648,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T20:00:00",
+    "last_block_num": 5828,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T21:00:00",
+    "last_block_num": 6984,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T22:00:00",
+    "last_block_num": 8136,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-24T23:00:00",
+    "last_block_num": 9318,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T00:00:00",
+    "last_block_num": 10504,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T01:00:00",
+    "last_block_num": 11659,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T02:00:00",
+    "last_block_num": 12835,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T03:00:00",
+    "last_block_num": 14035,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T04:00:00",
+    "last_block_num": 15230,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T05:00:00",
+    "last_block_num": 16386,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T06:00:00",
+    "last_block_num": 17542,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T07:00:00",
+    "last_block_num": 18673,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T08:00:00",
+    "last_block_num": 19843,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T09:00:00",
+    "last_block_num": 21037,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T10:00:00",
+    "last_block_num": 22177,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T11:00:00",
+    "last_block_num": 23327,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T12:00:00",
+    "last_block_num": 24520,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T13:00:00",
+    "last_block_num": 25720,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T14:00:00",
+    "last_block_num": 26919,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T15:00:00",
+    "last_block_num": 28103,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T16:00:00",
+    "last_block_num": 29303,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  },
+  {
+    "average_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "date": "2016-03-25T17:00:00",
+    "last_block_num": 30439,
+    "maximum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "minimum_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "total_transfer_amount": {
+      "amount": "0",
+      "nai": "@@000000013",
+      "precision": 3
+    },
+    "transfer_count": 0
+  }
+]

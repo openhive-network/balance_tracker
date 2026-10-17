@@ -97,8 +97,17 @@ BEGIN
         j.power_down_fill_count,
         j.power_down_fill_vests,
         j.power_down_fill_hive,
-        COALESCE(j.last_block_num, btracker_backend.block_at_or_before(j.date + __one_period)) AS last_block_num
+        COALESCE(j.last_block_num, mb.num) AS last_block_num
       FROM joined j
+      -- Nearest block at or before the period end, looked up for empty periods only
+      LEFT JOIN LATERAL (
+        SELECT b.num
+        FROM hive.blocks_view b
+        WHERE j.last_block_num IS NULL
+          AND b.created_at <= j.date + __one_period
+        ORDER BY b.created_at DESC
+        LIMIT 1
+      ) mb ON TRUE
     )
     SELECT
       -- Label each bucket by its period START (the day/month/year the events

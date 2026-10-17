@@ -97,8 +97,8 @@ BEGIN
 END
 $$;
 
--- Highest block whose timestamp is at or before _ts. Used by the gap-fill aggregations to
--- attribute a block number to empty time buckets, replacing the repeated LATERAL lookup.
+-- Highest block whose timestamp is at or before _ts. The gap-fill aggregations inline this
+-- lookup as a LEFT JOIN LATERAL instead: a per-row plpgsql call costs several times more.
 CREATE OR REPLACE FUNCTION btracker_backend.block_at_or_before(_ts TIMESTAMP)
 RETURNS INT
 LANGUAGE 'plpgsql' STABLE

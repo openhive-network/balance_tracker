@@ -187,7 +187,7 @@ curl 'http://localhost:3000/balance-api/accounts/gtg/aggregated-history?coin-typ
 
 #### Gap Filling
 
-Uses RECURSIVE CTE to carry forward balances for periods with no activity.
+Window functions carry forward balances for periods with no activity: a running `COUNT(balance)` groups each recorded period with the empty ones after it, `FIRST_VALUE` carries the recorded balance through the group, and `LAG` gives `prev_balance`. Periods before the first record carry the balance from before the range. Do not reintroduce a recursive CTE here: it re-joins the whole series once per period (O(n²)).
 
 ---
 

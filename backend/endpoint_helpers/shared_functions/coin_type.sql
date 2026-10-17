@@ -99,29 +99,57 @@ $$;
  *   SELECT btracker_backend.create_amount_object(nai, balance)
  *   FROM current_account_balances WHERE account = 123;
  */
+-- LANGUAGE sql IMMUTABLE with a single CASE, so the planner inlines it into the
+-- calling query instead of running a plpgsql asset_table lookup per output cell
+-- (statistics endpoints build four amount objects per row). The literals mirror
+-- the asset_table seed in db/btracker_app.sql; the DO block below fails the install
+-- if they ever disagree. An unknown NAI yields NULL, as the table lookup did.
 CREATE OR REPLACE FUNCTION btracker_backend.create_amount_object(IN __nai INT, IN __amount BIGINT)
 RETURNS btracker_backend.amount
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
 AS
 $$
-BEGIN
-  RETURN (a.nai_string, __amount::TEXT, a.asset_precision)::btracker_backend.amount
-  FROM asset_table a
-  WHERE a.asset_symbol_nai = __nai;
-END
+  SELECT CASE __nai
+    WHEN 13 THEN ('@@000000013', __amount::TEXT, 3)::btracker_backend.amount
+    WHEN 21 THEN ('@@000000021', __amount::TEXT, 3)::btracker_backend.amount
+    WHEN 37 THEN ('@@000000037', __amount::TEXT, 6)::btracker_backend.amount
+  END
 $$;
 
 -- NUMERIC overload for VESTS aggregations whose sums may exceed BIGINT range.
 -- Otherwise behaves identically to the BIGINT version.
 CREATE OR REPLACE FUNCTION btracker_backend.create_amount_object(IN __nai INT, IN __amount NUMERIC)
 RETURNS btracker_backend.amount
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
 AS
 $$
+  SELECT CASE __nai
+    WHEN 13 THEN ('@@000000013', __amount::TEXT, 3)::btracker_backend.amount
+    WHEN 21 THEN ('@@000000021', __amount::TEXT, 3)::btracker_backend.amount
+    WHEN 37 THEN ('@@000000037', __amount::TEXT, 6)::btracker_backend.amount
+  END
+$$;
+
+-- Guard: both overloads must build exactly what asset_table describes, for every
+-- asset it holds.
+DO $$
+DECLARE
+  __bad TEXT;
 BEGIN
-  RETURN (a.nai_string, __amount::TEXT, a.asset_precision)::btracker_backend.amount
+  SELECT string_agg(format('%s: function=%s/%s asset_table=%s', a.asset_name,
+           btracker_backend.create_amount_object(a.asset_symbol_nai::INT, 0::BIGINT),
+           btracker_backend.create_amount_object(a.asset_symbol_nai::INT, 0::NUMERIC),
+           (a.nai_string, '0', a.asset_precision)::btracker_backend.amount), '; ')
+  INTO __bad
   FROM asset_table a
-  WHERE a.asset_symbol_nai = __nai;
+  WHERE btracker_backend.create_amount_object(a.asset_symbol_nai::INT, 0::BIGINT)
+          IS DISTINCT FROM (a.nai_string, '0', a.asset_precision)::btracker_backend.amount
+     OR btracker_backend.create_amount_object(a.asset_symbol_nai::INT, 0::NUMERIC)
+          IS DISTINCT FROM (a.nai_string, '0', a.asset_precision)::btracker_backend.amount;
+
+  IF __bad IS NOT NULL THEN
+    RAISE EXCEPTION 'btracker_backend.create_amount_object disagrees with asset_table: %', __bad;
+  END IF;
 END
 $$;
 
