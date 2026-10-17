@@ -12,13 +12,16 @@ periods where no balance changes occurred with the previous known balance.
 Key features:
 1. Generates continuous date series for the requested granularity (daily/monthly/yearly)
 2. Fetches both liquid balance AND savings balance for the same coin type
-3. Uses RECURSIVE CTE to forward-fill missing balance values
+3. Forward-fills missing balance values with window functions
 4. Returns prev_balance for each period to show change between periods
 
-The RECURSIVE CTE pattern is essential here because:
-- Simple JOIN cannot propagate values forward (only matches or NULL)
-- We need row N to inherit from computed row N-1, not from source data
-- Each row's prev_balance depends on the computed balance of the previous row
+Forward fill: a running count of non-NULL balances numbers each run of periods
+that starts at a recorded balance; first_value() over that run carries the
+recorded balance through the empty periods after it. Periods before the first
+record carry the balance from before the range (balance_history_last_record()).
+prev_balance is the previous period's filled balance (LAG). This is O(n log n) in
+the number of periods; the RECURSIVE CTE it replaces re-joined the whole series
+once per period.
 
 Reads the current synced block via btracker_backend.last_synced_block().
 */
@@ -70,8 +73,7 @@ BEGIN
             __one_period
           ) AS date
       ),
-      -- add_row_num_to_series: Assign sequential row numbers for RECURSIVE CTE iteration
-      -- The RECURSIVE CTE processes rows by row_num, linking N to N-1
+      -- add_row_num_to_series: Assign sequential row numbers that order the forward fill
       add_row_num_to_series AS (
         SELECT
           date,
@@ -115,78 +117,77 @@ BEGIN
           )
         ) sa ON ds.date = sa.updated_at
       ),
-      -- filled_balances: RECURSIVE CTE for forward-fill gap-filling pattern
-      -- Each iteration processes the next row, inheriting balance from previous if NULL
+      -- seed_balances: last known liquid and savings balances BEFORE the range starts,
+      -- carried into the periods that precede the first record in the range
+      seed_balances AS (
+        SELECT
+          prev_balance.balance,
+          savings_prev_balance.balance AS savings_balance
+        FROM btracker_backend.balance_history_last_record(
+          _account_id,
+          _coin_type,
+          _granularity,
+          'balance',
+          __ah_range.from_timestamp
+        ) prev_balance
+        CROSS JOIN btracker_backend.balance_history_last_record(
+          _account_id,
+          _coin_type,
+          _granularity,
+          'savings_balance',
+          __ah_range.from_timestamp
+        ) savings_prev_balance
+      ),
+      -- balance_groups: each recorded balance opens a new group that the empty
+      -- periods after it belong to
+      balance_groups AS (
+        SELECT
+          br.*,
+          COUNT(br.balance) OVER (ORDER BY br.row_num) AS balance_grp,
+          COUNT(br.savings_balance) OVER (ORDER BY br.row_num) AS savings_grp
+        FROM balance_records br
+      ),
+      -- carried_balances: every period's balance is its group's recorded balance;
+      -- periods before the first record (group 0) carry the seed
+      carried_balances AS (
+        SELECT
+          bg.date,
+          bg.row_num,
+          bg.min_balance,
+          bg.max_balance,
+          bg.min_savings_balance,
+          bg.max_savings_balance,
+          COALESCE(
+            FIRST_VALUE(bg.balance) OVER (PARTITION BY bg.balance_grp ORDER BY bg.row_num),
+            sb.balance,
+            0
+          ) AS balance,
+          COALESCE(
+            FIRST_VALUE(bg.savings_balance) OVER (PARTITION BY bg.savings_grp ORDER BY bg.row_num),
+            sb.savings_balance,
+            0
+          ) AS savings_balance,
+          COALESCE(sb.balance, 0) AS seed_balance,
+          COALESCE(sb.savings_balance, 0) AS seed_savings_balance
+        FROM balance_groups bg
+        CROSS JOIN seed_balances sb
+      ),
+      -- filled_balances: prev_* is the previous period's carried balance (the seed for
+      -- the first period); min/max fall back to the carried balance in empty periods
       filled_balances AS (
-        WITH RECURSIVE agg_history AS (
-          -- Base case (row_num = 1): Initialize first row
-          -- Use balance_history_last_record() to get the balance BEFORE the range starts
-          -- This ensures we have correct prev_balance even for the first period
-          SELECT
-            ds.date,
-            ds.row_num,
-            COALESCE(ds.balance, prev_balance.balance, 0) AS balance,
-            COALESCE(prev_balance.balance, 0) AS prev_balance,
-            COALESCE(ds.min_balance, ds.balance, prev_balance.balance, 0) AS min_balance,
-            COALESCE(ds.max_balance, ds.balance, prev_balance.balance, 0) AS max_balance,
+        SELECT
+          cb.date,
+          cb.row_num,
+          cb.balance,
+          COALESCE(LAG(cb.balance) OVER (ORDER BY cb.row_num), cb.seed_balance) AS prev_balance,
+          COALESCE(cb.min_balance, cb.balance) AS min_balance,
+          COALESCE(cb.max_balance, cb.balance) AS max_balance,
 
-            COALESCE(ds.savings_balance, savings_prev_balance.balance, 0) AS savings_balance,
-            COALESCE(savings_prev_balance.balance, 0) AS prev_savings_balance,
-            COALESCE(ds.min_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS min_savings_balance,
-            COALESCE(ds.max_savings_balance, ds.savings_balance, savings_prev_balance.balance, 0) AS max_savings_balance
-          FROM balance_records ds
-          -- Lookup last known liquid balance before the range
-          LEFT JOIN LATERAL (
-            SELECT
-              bh.balance,
-              bh.min_balance,
-              bh.max_balance
-            FROM btracker_backend.balance_history_last_record(
-              _account_id,
-              _coin_type,
-              _granularity,
-              'balance',
-              __ah_range.from_timestamp
-            ) bh
-          ) prev_balance ON TRUE
-          -- Lookup last known savings balance before the range
-          LEFT JOIN LATERAL (
-            SELECT
-              bh.balance,
-              bh.min_balance,
-              bh.max_balance
-            FROM btracker_backend.balance_history_last_record(
-              _account_id,
-              _coin_type,
-              _granularity,
-              'savings_balance',
-              __ah_range.from_timestamp
-            ) bh
-          ) savings_prev_balance ON TRUE
-          WHERE ds.row_num = 1
-
-          UNION ALL
-
-          -- Recursive case: Process row N using computed values from row N-1
-          -- Key insight: prev_b.balance is the COMPUTED balance, not source data
-          -- This propagates the last known balance forward through gaps
-          SELECT
-            next_b.date,
-            next_b.row_num,
-            -- If current row has no balance data, inherit from previous computed row
-            COALESCE(next_b.balance, prev_b.balance, 0) AS balance,
-            COALESCE(prev_b.balance, 0) AS prev_balance,
-            COALESCE(next_b.min_balance, next_b.balance, prev_b.balance, 0) AS min_balance,
-            COALESCE(next_b.max_balance, next_b.balance, prev_b.balance, 0) AS max_balance,
-
-            COALESCE(next_b.savings_balance, prev_b.savings_balance, 0) AS savings_balance,
-            COALESCE(prev_b.savings_balance, 0) AS prev_savings_balance,
-            COALESCE(next_b.min_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS min_savings_balance,
-            COALESCE(next_b.max_savings_balance, next_b.savings_balance, prev_b.savings_balance, 0) AS max_savings_balance
-          FROM agg_history prev_b
-          JOIN balance_records next_b ON next_b.row_num = prev_b.row_num + 1
-        )
-        SELECT * FROM agg_history
+          cb.savings_balance,
+          COALESCE(LAG(cb.savings_balance) OVER (ORDER BY cb.row_num), cb.seed_savings_balance) AS prev_savings_balance,
+          COALESCE(cb.min_savings_balance, cb.savings_balance) AS min_savings_balance,
+          COALESCE(cb.max_savings_balance, cb.savings_balance) AS max_savings_balance
+        FROM carried_balances cb
       )
       -- Final output: format results into composite types for JSON serialization
       -- LEAST prevents future timestamps from exceeding current time

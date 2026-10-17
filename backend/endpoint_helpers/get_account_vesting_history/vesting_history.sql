@@ -22,6 +22,11 @@ Two seq_no columns drive this:
   * kind_seq_no    — per (account, kind), monotonic, used for filter=specific
 
 Both populated at sync time by process_account_vesting_stats.
+
+plan_cache_mode = force_custom_plan: the page statements pick their scan direction
+and bounds from _direction and the seq window. A generic plan cannot see either; it
+estimates one row and sorts the account's whole seq window instead of a bounded
+index scan with LIMIT, and plpgsql switches to it after five calls per session.
 */
 CREATE OR REPLACE FUNCTION btracker_backend.get_account_vesting_history(
     _account_id  INT,
@@ -37,6 +42,7 @@ LANGUAGE 'plpgsql' STABLE
 SET from_collapse_limit = 16
 SET join_collapse_limit = 16
 SET jit = OFF
+SET plan_cache_mode = 'force_custom_plan'
 AS
 $$
 DECLARE
