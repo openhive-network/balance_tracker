@@ -58,9 +58,8 @@ sandbox:
 # Lightweight first: lint, then install of the candidate's SQL into a clone of
 # the shared 5M-block HAF, its block processing to block 5000000, CI's parity
 # and regression tests (every account's balances against hived's), and for full
-# and canary the tavern pattern tests (CI's pattern-test) and an upgrade in
-# place. run-checks.sh's `uninstall` step is not bound until hive/haf#371 is in
-# the shared HAF: hive.app_remove_context fails for a non-admin context owner.
+# and canary the tavern pattern tests (CI's pattern-test), an upgrade in place
+# and an uninstall followed by a fresh install (CI's setup-scripts-test).
 # CI's mock-data patterns, JMeter benchmarks and python api client tests aren't
 # bound; see .aidev/README.md.
 verification:
@@ -71,7 +70,7 @@ verification:
     artifacts: ["test-results/quick/"]
   full:
     adapter: command
-    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall"]
+    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
     artifacts: ["test-results/full/"]
   baseline:
     adapter: command
@@ -79,7 +78,7 @@ verification:
     artifacts: ["test-results/baseline/"]
   canary:
     adapter: command
-    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall"]
+    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
     artifacts: ["test-results/canary/"]
   # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks
   # (AIDEV runs it in the post-implementation scan only). `static` and `system`

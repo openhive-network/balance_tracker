@@ -35,14 +35,13 @@ checkout has no usable git), because a workflow checkout may have no `.git`.
 | Slot | Steps | Shared HAF |
 |---|---|---|
 | quick, coverage | shellcheck, sql-registered | no |
-| full, canary | those plus install, sync, parity, regression, maintenance, tavern, reinstall | yes |
+| full, canary | those plus install, sync, parity, regression, maintenance, tavern, reinstall, uninstall | yes |
 | baseline | install, sync, parity, regression, tavern | yes |
 
-`static` and `system` are unbound: AIDEV runs neither for a project. `uninstall` is
-not bound yet: as the shared HAF's consumer, `hive.app_remove_context` fails with
-`permission denied for table indexes_constraints` (hive.remove_index_dependencies is
-not `SECURITY DEFINER`; hive/haf#371). Bind it in `full` and `canary` once the shared
-HAF serves a HAF with that fix.
+`static` and `system` are unbound: AIDEV runs neither for a project. `uninstall` needs
+a shared HAF whose `hive.app_remove_context` lets a non-admin context owner remove its
+index dependencies (hive/haf#371); an older one fails it with `permission denied for
+table indexes_constraints`.
 
 ## What the checks cannot see
 
