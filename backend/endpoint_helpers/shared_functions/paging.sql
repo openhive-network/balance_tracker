@@ -672,10 +672,17 @@ BEGIN
     END IF;
   END IF;
 
+  -- A missing bound means no row falls in the range. Coalescing only that
+  -- bound to 0 would leave the other one real and open the window over the
+  -- whole history, so return a window that selects nothing (from > to).
+  IF __from_seq IS NULL OR __to_seq IS NULL THEN
+    RETURN (0, 1, 0)::btracker_backend.balance_history_range_return;
+  END IF;
+
   RETURN (
-    COALESCE((__to_seq - __from_seq + 1), 0),
-    COALESCE(__from_seq, 0),
-    COALESCE(__to_seq, 0)
+    GREATEST(__to_seq - __from_seq + 1, 0),
+    __from_seq,
+    __to_seq
   )::btracker_backend.balance_history_range_return;
 END
 $$;

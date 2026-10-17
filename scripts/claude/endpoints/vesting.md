@@ -77,7 +77,9 @@ Pagination uses `vesting_seq_no` (per-account monotonic), so:
 - `filter=specific` COUNT = `COUNT(*) WHERE account=? AND kind=?` —
   index-only scan
 - Block-range filter uses
-  `(account, hafd.operation_id_to_block_num(source_op))` index
+  `(account, hafd.operation_id_to_block_num(source_op))` index; a range
+  that matches no event yields an empty seq window (from > to), so the
+  page is empty rather than the unranged history
 
 Parameters:
 - `filter`: see Filter enum (default `all`)
