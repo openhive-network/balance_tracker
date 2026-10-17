@@ -5,13 +5,15 @@
  * account_vesting_history) after a massive sync and finalize_massive_sync():
  *
  *   - both tables carry the insert-only autovacuum reloptions;
- *   - neither the massive sync nor finalize left a HAF vacuum request (HAF runs
- *     those as VACUUM FULL ANALYZE) for either table;
- *   - a MASSIVE_PROCESSING catch-up after finalize requests no vacuum, does not
- *     rewrite either table and does not ANALYZE it;
+ *   - the massive sync and finalize left no HAF vacuum request for either table
+ *     other than finalize's one 'freeze' request per table (none at all on a HAF
+ *     without request kinds, where every request runs as VACUUM FULL ANALYZE);
+ *   - a MASSIVE_PROCESSING catch-up after finalize adds no vacuum request, does
+ *     not rewrite either table and does not ANALYZE it;
  *   - request_history_tables_freeze() asks for one 'freeze' request per table
  *     when HAF has the request kind (a test double records it when the installed
- *     HAF lacks it), and requests nothing when it does not.
+ *     HAF lacks it), and requests nothing when it does not;
+ *   - a leftover 'full' request for a history table fails the request check.
  *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Every case that changes state runs in a
@@ -22,6 +24,50 @@
 SET stats_fetch_consistency = none;
 SELECT set_config('btracker_test.schema', :'schema', false);
 SET search_path TO :"schema", public;
+
+-- Vacuum requests for the history tables as sorted 'table:kind' pairs. A HAF
+-- without hafd.vacuum_requests.kind runs every request as VACUUM FULL, so its
+-- requests read as kind 'full'.
+CREATE FUNCTION pg_temp.history_vacuum_requests()
+RETURNS TEXT[] LANGUAGE sql STABLE
+AS $f$
+  SELECT coalesce(array_agg(p.pair ORDER BY p.pair), '{}')
+  FROM hafd.vacuum_requests r
+  CROSS JOIN LATERAL (SELECT r.table_name || ':' || coalesce(to_jsonb(r) ->> 'kind', 'full') AS pair) p
+  WHERE r.schema_name = current_setting('btracker_test.schema')
+    AND r.table_name IN ('account_balance_history', 'account_vesting_history')
+$f$;
+
+-- Detected as request_history_tables_freeze() does.
+CREATE FUNCTION pg_temp.haf_has_request_kind()
+RETURNS BOOLEAN LANGUAGE sql STABLE
+AS $f$
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE pronamespace = 'hive'::regnamespace AND proname = 'app_request_table_vacuum' AND pronargs = 4)
+$f$;
+
+-- The requests finalize_massive_sync leaves: one 'freeze' per table when HAF
+-- has the request kind, none when it does not.
+CREATE FUNCTION pg_temp.requests_after_finalize()
+RETURNS TEXT[] LANGUAGE sql STABLE
+AS $f$
+  SELECT CASE WHEN pg_temp.haf_has_request_kind()
+    THEN ARRAY['account_balance_history:freeze', 'account_vesting_history:freeze']
+    ELSE '{}'::TEXT[] END
+$f$;
+
+CREATE FUNCTION pg_temp.assert_history_vacuum_requests(_expected TEXT[], _what TEXT)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+DECLARE
+  __actual CONSTANT TEXT[] := pg_temp.history_vacuum_requests();
+BEGIN
+  IF __actual IS DISTINCT FROM _expected THEN
+    RAISE EXCEPTION 'vacuum requests left by %: expected %, found %', _what, _expected, __actual;
+  END IF;
+END
+$f$;
 
 -- Reloptions, as both install paths leave them.
 DO
@@ -56,23 +102,40 @@ BEGIN
 END
 $$;
 
--- The massive sync and finalize requested no vacuum of either table.
+-- The massive sync and finalize requested nothing but finalize's freeze.
+DO
+$$
+BEGIN
+  PERFORM pg_temp.assert_history_vacuum_requests(pg_temp.requests_after_finalize(), 'the sync and finalize');
+  RAISE NOTICE 'PASS: no vacuum request from the massive sync or finalize besides finalize''s freeze (request kind available: %)',
+    pg_temp.haf_has_request_kind();
+END
+$$;
+
+-- A leftover VACUUM FULL request fails the check above.
+BEGIN;
 DO
 $$
 DECLARE
-  __requests TEXT[];
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
 BEGIN
-  SELECT array_agg(table_name || ':' || status) INTO __requests
-  FROM hafd.vacuum_requests
-  WHERE schema_name = current_setting('btracker_test.schema')
-    AND table_name IN ('account_balance_history', 'account_vesting_history');
-
-  IF __requests IS NOT NULL THEN
-    RAISE EXCEPTION 'vacuum requests left by the sync: %', __requests;
+  IF pg_temp.haf_has_request_kind() THEN
+    EXECUTE 'SELECT hive.app_request_table_vacuum($1, $2, NULL::INTERVAL, ''full'')'
+      USING __schema, 'account_balance_history';
+  ELSE
+    PERFORM hive.app_request_table_vacuum(__schema, 'account_balance_history', NULL::INTERVAL);
   END IF;
-  RAISE NOTICE 'PASS: no vacuum request from the massive sync or finalize';
+
+  BEGIN
+    PERFORM pg_temp.assert_history_vacuum_requests(pg_temp.requests_after_finalize(), 'the injected request');
+  EXCEPTION WHEN raise_exception THEN
+    RAISE NOTICE 'PASS: a leftover full request is detected (%)', SQLERRM;
+    RETURN;
+  END;
+  RAISE EXCEPTION 'an injected full request went undetected: %', pg_temp.history_vacuum_requests();
 END
 $$;
+ROLLBACK;
 
 -- A MASSIVE_PROCESSING catch-up after finalize: one empty range past the
 -- synced block.
@@ -86,7 +149,7 @@ DECLARE
   __filenodes_after OID[];
   __analyzed_before TIMESTAMPTZ[];
   __analyzed_after TIMESTAMPTZ[];
-  __requests BIGINT;
+  __requests_before CONSTANT TEXT[] := pg_temp.history_vacuum_requests();
 BEGIN
   IF NOT isIndexesCreated() THEN
     RAISE EXCEPTION 'expected a finalized schema';
@@ -109,14 +172,7 @@ BEGIN
   FROM unnest(ARRAY['account_balance_history', 'account_vesting_history']::regclass[]) t
   JOIN pg_stat_user_tables s ON s.relid = t;
 
-  SELECT count(*) INTO __requests
-  FROM hafd.vacuum_requests
-  WHERE schema_name = __schema
-    AND table_name IN ('account_balance_history', 'account_vesting_history');
-
-  IF __requests <> 0 THEN
-    RAISE EXCEPTION 'post-finalize catch-up requested % vacuum(s)', __requests;
-  END IF;
+  PERFORM pg_temp.assert_history_vacuum_requests(__requests_before, 'the post-finalize catch-up');
   IF __filenodes_after IS DISTINCT FROM __filenodes_before THEN
     RAISE EXCEPTION 'post-finalize catch-up rewrote a history table: % -> %', __filenodes_before, __filenodes_after;
   END IF;
@@ -132,27 +188,10 @@ ROLLBACK;
 BEGIN;
 DO
 $$
-DECLARE
-  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
-  __has_kind CONSTANT BOOLEAN := EXISTS (
-    SELECT 1 FROM pg_proc
-    WHERE pronamespace = 'hive'::regnamespace AND proname = 'app_request_table_vacuum' AND pronargs = 4);
-  __requested TEXT[];
 BEGIN
-  PERFORM request_history_tables_freeze(__schema);
-
-  SELECT array_agg(table_name ORDER BY table_name) INTO __requested
-  FROM hafd.vacuum_requests
-  WHERE schema_name = __schema
-    AND table_name IN ('account_balance_history', 'account_vesting_history');
-
-  IF __has_kind AND __requested IS DISTINCT FROM ARRAY['account_balance_history', 'account_vesting_history'] THEN
-    RAISE EXCEPTION 'HAF has the request kind, but the freeze requests are %', __requested;
-  END IF;
-  IF NOT __has_kind AND __requested IS NOT NULL THEN
-    RAISE EXCEPTION 'HAF has no request kind, but vacuum requests were made: %', __requested;
-  END IF;
-  RAISE NOTICE 'PASS: freeze request on the installed HAF (request kind available: %)', __has_kind;
+  PERFORM request_history_tables_freeze(current_setting('btracker_test.schema'));
+  PERFORM pg_temp.assert_history_vacuum_requests(pg_temp.requests_after_finalize(), 'request_history_tables_freeze()');
+  RAISE NOTICE 'PASS: freeze request on the installed HAF (request kind available: %)', pg_temp.haf_has_request_kind();
 END
 $$;
 ROLLBACK;
