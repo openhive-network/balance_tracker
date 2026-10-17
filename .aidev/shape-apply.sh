@@ -36,6 +36,17 @@ GRANT ALL ON SCHEMA :"schema" TO btracker_owner;
 GRANT SELECT ON ALL TABLES IN SCHEMA :"schema" TO btracker_owner;
 SQL
 
+# A shape holds no rows, but backend/shared/nai_types.sql refuses to install
+# unless asset_table carries the three assets db/btracker_app.sql seeds it with:
+# seed the copy's empty asset_table with that file's own INSERT.
+seed="$(awk '/INSERT INTO asset_table/,/;/' db/btracker_app.sql)"
+[ -n "$seed" ] || { echo "shape-apply.sh: no asset_table seed found in db/btracker_app.sql" >&2; exit 2; }
+{
+    printf 'SET SEARCH_PATH TO %s;\n' "$schema"
+    printf 'SELECT NOT EXISTS (SELECT 1 FROM asset_table) AS asset_table_empty \\gset\n'
+    printf '\\if :asset_table_empty\n%s\n\\endif\n' "$seed"
+} | "${shape_psql[@]}" -v ON_ERROR_STOP=1
+
 # The files install_app.sh runs, in its order, minus the ones above.
 # shellcheck disable=SC2016  # $SCRIPTPATH is matched literally in install_app.sh's text
 mapfile -t files < <(grep -oE '"\$SCRIPTPATH/\.\./[^"]+\.sql"' scripts/install_app.sh \
