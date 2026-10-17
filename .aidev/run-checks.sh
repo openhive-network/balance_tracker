@@ -18,6 +18,9 @@
 #                     blocks (haf_app_driver.py, as scripts/process_blocks.sh runs it),
 #                     then finalize_massive_sync and ANALYZE, as CI's `sync` job does
 #   - parity          tests/parity: the SQL impacted-balances port against HAF's C visitor
+#   - maintenance     tests/maintenance: the history tables' autovacuum reloptions, no
+#                     HAF vacuum request from the sync, finalize or a later catch-up,
+#                     and the post-finalize freeze request
 #   - regression      tests/regression: every account's balances at block 5,000,000
 #                     against hived's database_api.list_accounts dump
 #   - tavern          the tavern pattern tests (tests/tavern/patterns-mainnet) against
@@ -25,13 +28,14 @@
 #                     case per test
 #   - reinstall       scripts/install_app.sh again over the installed, synced schema
 #                     (an upgrade in place, as CI's setup-scripts-test), then the
-#                     synced block is checked to be unchanged
+#                     synced block is checked to be unchanged and the history tables'
+#                     reloptions, removed beforehand, to be back
 #   - uninstall       scripts/uninstall_app.sh, then the context and schemas are gone,
 #                     then install again from scratch
 #
 # Every step after install needs the shared HAF (sandbox.external haf, provider
 # haf/haf); the clone is dropped when the script exits, pass or fail. sync needs
-# install; parity, regression and tavern need sync. Reports go to
+# install; parity, regression, maintenance and tavern need sync. Reports go to
 # test-results/<suite>/: junit.xml (one case per step) plus tavern.xml.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -184,6 +188,13 @@ sync_blocks() {
     block="$(current_block)" || return 1
     echo "processed up to block $block"
     [ "$block" -ge "$STOP_AT_BLOCK" ] || { echo "expected block $STOP_AT_BLOCK"; return 1; }
+    # The massive sync ANALYZEs the history tables itself (no HAF vacuum request);
+    # checked before finalize and the ANALYZE below can do it instead.
+    q -Atc "SELECT relname FROM pg_stat_user_tables WHERE schemaname = '$SCHEMA'
+              AND relname IN ('account_balance_history', 'account_vesting_history')
+              AND last_analyze IS NOT NULL" | sort | paste -sd' ' \
+        | grep -qx 'account_balance_history account_vesting_history' \
+        || { echo "the massive sync did not ANALYZE both history tables"; return 1; }
     q -c "SET search_path TO $SCHEMA, public; SET ROLE btracker_owner; SELECT finalize_massive_sync('$SCHEMA');" || return 1
     q -c "SET ROLE btracker_owner; ANALYZE;" 2>&1 | grep -v 'WARNING:  permission denied to analyze' || true
     synced=yes
@@ -222,13 +233,36 @@ regression() {
     fi
 }
 
+maintenance() {
+    local f
+    for f in tests/maintenance/*.sql; do
+        echo "== $f"
+        q -q -v schema="$SCHEMA" -f "$f" || return 1
+    done
+}
+
+history_reloptions() {
+    q -Atc "SELECT relname || ' ' || coalesce(array_to_string(reloptions, ','), '-') FROM pg_class
+              WHERE relnamespace = '$SCHEMA'::regnamespace
+                AND relname IN ('account_balance_history', 'account_vesting_history') ORDER BY relname"
+}
+
 reinstall() {
-    local before after
+    local before after options
     before="$(current_block)" || return 1
+    options="$(history_reloptions)" || return 1
+    [ "$(grep -c 'autovacuum_freeze_min_age=0' <<< "$options")" = 2 ] \
+        || { echo "the install left the history tables with:"; echo "$options"; return 1; }
+    # An install that predates the reloptions: the upgrade must add them.
+    q -c "SET ROLE btracker_owner;
+          ALTER TABLE $SCHEMA.account_balance_history RESET (autovacuum_vacuum_insert_scale_factor, autovacuum_vacuum_insert_threshold, autovacuum_freeze_min_age, autovacuum_analyze_scale_factor, autovacuum_analyze_threshold);
+          ALTER TABLE $SCHEMA.account_vesting_history RESET (autovacuum_vacuum_insert_scale_factor, autovacuum_vacuum_insert_threshold, autovacuum_freeze_min_age, autovacuum_analyze_scale_factor, autovacuum_analyze_threshold);" || return 1
     (cd "$stage" && bash scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
     after="$(current_block)" || return 1
     echo "synced block before $before, after $after"
     [ "$before" = "$after" ] || { echo "reinstalling over a synced schema moved its block"; return 1; }
+    echo "history table reloptions before the reset:"; echo "$options"
+    [ "$(history_reloptions)" = "$options" ] || { echo "reinstall left the history tables with:"; history_reloptions; return 1; }
 }
 
 uninstall() {
@@ -251,6 +285,7 @@ for s in "$@"; do
         install) step install install ;;
         sync) step sync needs_clone sync_blocks ;;
         parity) step parity needs_clone parity ;;
+        maintenance) step maintenance needs_sync maintenance ;;
         regression) step regression needs_sync regression ;;
         tavern) step tavern needs_sync python3 .aidev/btracker_tavern.py "$out" ;;
         reinstall) step reinstall needs_clone reinstall ;;

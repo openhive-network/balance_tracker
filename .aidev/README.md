@@ -20,11 +20,12 @@ the failure body. `tavern` also writes one case per test (`tavern.xml`).
 | `shellcheck` | ShellCheck at error severity on every `*.sh` under `scripts/`, `docker/` and `tests/`, and at its default severity on `.aidev/`'s own scripts |
 | `sql-registered` | every `.sql` file under `db/`, `backend/` and `endpoints/` is applied by `scripts/install_app.sh` |
 | `install` | a per-run copy-on-write clone of the shared HAF (below), `scripts/install_app.sh` into it as `haf_shared_consumer`; the context `btracker_app` must exist afterwards |
-| `sync` | the candidate's own block processing over the clone's 5,000,000 blocks, run as `scripts/process_blocks.sh` runs it in the production image (`haf_app_driver.py --app=btracker_app --lock=balance_tracker --stop-at-block=5000000`, as `btracker_owner`), then `finalize_massive_sync('btracker_app')` and `ANALYZE`, as CI's `sync` job does. About 4 minutes |
+| `sync` | the candidate's own block processing over the clone's 5,000,000 blocks, run as `scripts/process_blocks.sh` runs it in the production image (`haf_app_driver.py --app=btracker_app --lock=balance_tracker --stop-at-block=5000000`, as `btracker_owner`), then `finalize_massive_sync('btracker_app')` and `ANALYZE`, as CI's `sync` job does; before finalize both history tables must have been ANALYZEd by the sync itself. About 4 minutes |
 | `parity` | `tests/parity/*.sql`: the SQL port of the impacted-balances visitor against HAF's C implementation (CI's `setup-scripts-test`, test 3) |
 | `regression` | `tests/regression` (CI's `regression-test`): every account's balances at block 5,000,000 against hived's `database_api.list_accounts` dump `accounts_dump.json.gz`; no account may differ. The dump is loaded server-side (one `COPY`, then `btracker_test.load_expected_account` per row in one statement) instead of by `load_expected_balances.py`'s one round trip per account |
+| `maintenance` | `tests/maintenance/*.sql` (with `-v schema=btracker_app`): the history tables' insert-only autovacuum reloptions, no HAF vacuum request for them from the sync, finalize or a post-finalize MASSIVE catch-up (which must not rewrite or ANALYZE them either), and the post-finalize `'freeze'` request, against a test double when the shared HAF has no request kind (hive/haf#360) |
 | `tavern` | `.aidev/btracker_tavern.py`: the tavern pattern tests `tests/tavern/patterns-mainnet` (CI's `pattern-test`) against PostgREST over the clone, configured as `docker/docker-compose.yml`'s `backend-postgrest` (schema `btracker_endpoints`, anonymous role `btracker_user`, extra search path `btracker_app`), 4 xdist workers, run from a copy in `test-results/<suite>/tavern/` (the comparator writes each answer beside its test) |
-| `reinstall` | `scripts/install_app.sh` again over the installed, synced schema — an upgrade in place, as CI's `setup-scripts-test` — and the synced block must not move |
+| `reinstall` | `scripts/install_app.sh` again over the installed, synced schema — an upgrade in place, as CI's `setup-scripts-test` — and the synced block must not move; the history tables' reloptions, reset beforehand, must be back |
 | `uninstall` | `scripts/uninstall_app.sh` (without its role statements), the leftover `btracker_endpoints`/`btracker_backend` schemas dropped, the context and the three schemas checked gone, then `install` again from scratch |
 
 The install steps copy `db/ backend/ endpoints/ scripts/` to a scratch directory and
@@ -34,7 +35,7 @@ checkout has no usable git), because a workflow checkout may have no `.git`.
 | Slot | Steps | Shared HAF |
 |---|---|---|
 | quick, coverage | shellcheck, sql-registered | no |
-| full, canary | those plus install, sync, parity, regression, tavern, reinstall | yes |
+| full, canary | those plus install, sync, parity, regression, maintenance, tavern, reinstall | yes |
 | baseline | install, sync, parity, regression, tavern | yes |
 
 `static` and `system` are unbound: AIDEV runs neither for a project. `uninstall` is
@@ -101,7 +102,7 @@ haf-shared` shows its endpoint):
 image="$(grep -o 'registry[^"]*aidev-tests@sha256:[0-9a-f]*' .aidev/project.yaml)"
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/w" -w /w \
     -e AIDEV_EXTERNAL_HAF_HOST=<host> -e AIDEV_EXTERNAL_HAF_PORT=<port> "$image" \
-    .aidev/run-checks.sh full shellcheck sql-registered install sync parity regression tavern reinstall
+    .aidev/run-checks.sh full shellcheck sql-registered install sync parity regression maintenance tavern reinstall
 ```
 
 ## The test runtime image (`runtime/`)
