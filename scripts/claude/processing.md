@@ -35,7 +35,7 @@ gated on `NOT isIndexesCreated()`, not on the stage name (see #64 and
 
 | Function | File | Operations Handled | Tables Updated |
 |----------|------|-------------------|----------------|
-| `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `account_balance_history`, `balance_history_by_day/month`, `account_hbd_interest` |
+| `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `balance_totals`, `account_balance_history`, `balance_history_by_day/month`, `account_hbd_interest` |
 | `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares | `current_accounts_delegations`, `account_delegations` |
 | `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc) | `current_rc_delegations`, `account_rc_delegations` |
 | `process_rewards` | `db/process_rewards.sql` | author_reward, curation_reward, claim_reward_balance | `account_rewards` |
@@ -142,6 +142,20 @@ Balance Tracker maintains two types of data:
 |------|---------|----------|
 | **Current State** | Latest values for fast queries | `current_account_balances`, `order_state`, `recurrent_transfers` |
 | **History** | Every change for audit/analysis | `account_balance_history`, `transfer_stats_by_hour` |
+
+### Derived aggregates kept by processing
+
+`balance_totals` (one row per NAI: `holders` = accounts with `balance > 0`, `total` =
+`SUM(balance)`) is updated by `process_block_range_balances` in the same statement that
+upserts `current_account_balances`, in massive sync and live alike. The `update_balance_totals`
+CTE takes each touched (account, nai)'s balance before the range (the synthetic
+`source_op = 0` row of `prepare_balance_history`, 0 for an account new to the asset) and
+after it (`rn = 1`), and adds the per-NAI differences. Any new writer of
+`current_account_balances` must keep `balance_totals` in step;
+`tests/maintenance/balance_totals.sql` checks it after sync, a live block and a fork rollback.
+
+History rows carry `op_type_id`: `get_impacted_balances_batch` returns each emission's
+operation type, and `process_savings` already carries it per operation.
 
 ### Lifecycle Tracking
 

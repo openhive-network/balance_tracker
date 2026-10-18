@@ -58,9 +58,8 @@ BEGIN
         ab.balance,
         ab.source_op,
         ab.source_op_block,
-        ops.op_type_id
+        ab.op_type_id
       FROM btracker_backend.%1$I ab
-      JOIN hafd.operations ops ON ops.id = ab.source_op
       WHERE ab.account         = $1
         AND ab.nai             = $2
         AND ab.balance_seq_no >= $3

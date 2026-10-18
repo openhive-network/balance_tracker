@@ -20,7 +20,10 @@
 #   - parity          tests/parity: the SQL impacted-balances port against HAF's C visitor
 #   - maintenance     tests/maintenance: the history tables' autovacuum reloptions, no
 #                     HAF vacuum request from the sync, finalize or a later catch-up
-#                     besides finalize's 'freeze' requests, and those freeze requests
+#                     besides finalize's 'freeze' requests, and those freeze requests;
+#                     balance_totals against current_account_balances after the sync,
+#                     a live block and its fork rollback; the history tables' stored
+#                     op_type_id against hafd.operations
 #   - regression      tests/regression: every account's balances at block 5,000,000
 #                     against hived's database_api.list_accounts dump
 #   - tavern          the tavern pattern tests (tests/tavern/patterns-mainnet) against

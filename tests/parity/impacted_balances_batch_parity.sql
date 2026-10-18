@@ -69,7 +69,7 @@ BEGIN
   ASSERT __rows = 13, FORMAT('fixture setup incomplete: %s of 13 operation types resolved', __rows);
 
   WITH per_row AS MATERIALIZED (
-    SELECT ho.id AS source_op, ho.block_num AS source_op_block, ho.trx_in_block,
+    SELECT ho.id AS source_op, ho.op_type_id, ho.block_num AS source_op_block, ho.trx_in_block,
            gib.account_name, gib.amount, gib.asset_precision, gib.asset_symbol_nai
     FROM _btracker_ops_batch ho
     JOIN hafd.operation_types ot ON ot.id = ho.op_type_id

@@ -189,6 +189,7 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 
 ### Current State Tables
 - `current_account_balances` - Latest HIVE/HBD/VESTS
+- `balance_totals` - Per-NAI holder count (balance > 0) and balance sum of `current_account_balances`, kept by `process_balances` in the statement that upserts it (registered, so fork rollback reverts it); read by `/total-value-locked` and the unfiltered `/top-holders` count
 - `account_savings` - Latest savings balances
 - `account_rewards` - Pending reward balances
 - `account_delegations` - Total delegated/received VESTS summary
@@ -204,6 +205,8 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 ### History Tables
 - `account_balance_history` - Every balance change
 - `account_savings_history` - Every savings change
+
+Both history tables store `op_type_id` (the type of `source_op`), written by the processing functions, so readers never probe `hafd.operations` for it. It sits right after `nai`, in the alignment pad before the first BIGINT, and adds no width; keep it there.
 - `balance_history_by_day/month` - Aggregated snapshots
 - `transfer_stats_by_hour/day/month` - Volume statistics
 - `vesting_stats_by_day/month` - Power-up / power-down statistics (global)

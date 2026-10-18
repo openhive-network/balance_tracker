@@ -83,6 +83,7 @@ CREATE OR REPLACE VIEW btracker_backend.current_account_balances_view AS
  * Key columns:
  * - balance_seq_no: Sequence number for pagination (per account/nai)
  * - source_op_block: Block number (used for block range filtering)
+ * - op_type_id: Operation type of source_op (stored, no hafd.operations lookup)
  *
  * This is the primary view used by balance history endpoints.
  * The balance_seq_no enables efficient cursor-based pagination.
@@ -94,7 +95,8 @@ CREATE OR REPLACE VIEW btracker_backend.account_balance_history_view AS
     t.balance,
     t.balance_seq_no,
     t.source_op,
-    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    t.op_type_id
   FROM account_balance_history t;
 
 /**
@@ -137,7 +139,8 @@ CREATE OR REPLACE VIEW btracker_backend.account_savings_history_view AS
     t.balance,
     t.balance_seq_no,
     t.source_op,
-    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block
+    hafd.operation_id_to_block_num( t.source_op ) AS source_op_block,
+    t.op_type_id
   FROM account_savings_history t;
 
 /**

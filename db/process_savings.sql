@@ -679,6 +679,7 @@ prepare_savings_history AS (
     SUM(uo.savings_withdraw_request) OVER w_asc AS savings_withdraw_request,
     SUM(uo.balance_seq_no) OVER w_asc AS balance_seq_no,
     uo.source_op,
+    uo.op_type_id,
     uo.source_op_block,
     ROW_NUMBER() OVER w_desc AS rn
   FROM union_operations_with_latest_balance uo
@@ -774,6 +775,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
     pbh.balance_seq_no,
     pbh.balance,
     pbh.source_op,
+    pbh.op_type_id,
     pbh.source_op_block,
     pbh.savings_withdraw_request,
     pbh.rn
@@ -838,10 +840,11 @@ insert_sum_of_transfers AS (
  */
 insert_saving_balance_history AS (
   INSERT INTO account_savings_history AS acc_history
-    (account, nai, balance_seq_no, source_op, balance)
+    (account, nai, op_type_id, balance_seq_no, source_op, balance)
   SELECT
     pbh.account_id,
     pbh.nai,
+    pbh.op_type_id,
     pbh.balance_seq_no,
     pbh.source_op,
     pbh.balance

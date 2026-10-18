@@ -27,10 +27,19 @@ eval "shape_psql=($AIDEV_DB_SHAPE_PSQL)"
 # A shape restores the source's btracker schemas owned by postgres, and the files
 # replace their objects as btracker_owner: drop them first, as the shape's
 # superuser, and let btracker_owner create them again (the shape restores the roles).
+# The query code may read table columns and tables db/btracker_app.sql defines
+# after the shape's capture: add them, catalog only (nullable, no rewrite, no
+# statistics), with HAF's event triggers on registered tables off (replica role).
 "${shape_psql[@]}" -v ON_ERROR_STOP=1 -v db="$AIDEV_DB_SHAPE_DATABASE" -v schema="$schema" <<'SQL'
 SET client_min_messages = warning;
 DROP SCHEMA IF EXISTS btracker_endpoints CASCADE;
 DROP SCHEMA IF EXISTS btracker_backend CASCADE;
+SET session_replication_role = replica;
+ALTER TABLE :"schema".account_balance_history ADD COLUMN IF NOT EXISTS op_type_id SMALLINT;
+ALTER TABLE :"schema".account_savings_history ADD COLUMN IF NOT EXISTS op_type_id SMALLINT;
+CREATE TABLE IF NOT EXISTS :"schema".balance_totals
+  (nai SMALLINT NOT NULL, holders BIGINT NOT NULL, total NUMERIC NOT NULL, CONSTRAINT pk_balance_totals PRIMARY KEY (nai));
+RESET session_replication_role;
 GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
 GRANT ALL ON SCHEMA :"schema" TO btracker_owner;
 GRANT SELECT ON ALL TABLES IN SCHEMA :"schema" TO btracker_owner;
