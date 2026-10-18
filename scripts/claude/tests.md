@@ -51,8 +51,10 @@ tests/
 │   └── sql/                   # Comparison SQL
 ├── functional/                # Script validation tests
 │   └── test_scripts.sh        # Installation script tests
-├── maintenance/               # SQL checks of the history tables' vacuum setup
-│   └── history_tables_vacuum.sql  # psql -v schema=<app schema>, after sync + finalize
+├── maintenance/               # SQL checks of a synced schema; psql -v schema=<app schema>, after sync + finalize
+│   ├── history_tables_vacuum.sql  # history tables' vacuum setup
+│   ├── balance_totals.sql     # balance_totals = aggregates of current_account_balances after sync, a live block, a fork rollback
+│   └── history_op_type.sql    # stored op_type_id = hafd.operations.op_type_id; no extra tuple width
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer
 │   ├── fixtures/              # Mock operation data

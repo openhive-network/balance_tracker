@@ -118,8 +118,9 @@ $$;
  * process_block_range_balances: Processes balance-impacting operations for a block range.
  *
  * Core operations: Extracts balance deltas from blockchain operations, computes running
- * balances, and updates current_account_balances, account_balance_history, and
- * aggregated history tables (by_day, by_month).
+ * balances, and updates current_account_balances (with its per-NAI aggregates in
+ * balance_totals), account_balance_history, and aggregated history tables
+ * (by_day, by_month).
  */
 CREATE OR REPLACE FUNCTION process_block_range_balances(
     IN _from INT, IN _to INT
@@ -146,6 +147,7 @@ DECLARE
  __hf01_block INT;
  __balance_history INT;
  __current_balances INT;
+ __balance_totals INT;
  __balance_history_by_day INT;
  __balance_history_by_month INT;
  __hbd_interest INT;
@@ -217,6 +219,7 @@ WITH ops_in_range AS MATERIALIZED
     gib.asset_symbol_nai AS nai,
     gib.amount AS balance,
     gib.source_op,
+    gib.op_type_id,
     gib.source_op_block,
     -- threaded down to the HBD interest accumulator so it does not have to re-read
     -- _btracker_ops_batch; trx_in_block distinguishes transaction ops (>= 0, applied
@@ -326,6 +329,7 @@ union_latest_balance_with_impacted_balances AS (
     cp.balance,
     1 AS balance_seq_no,
     cp.source_op,
+    cp.op_type_id,
     cp.source_op_block,
     cp.trx_in_block
   FROM ops_in_range cp
@@ -340,6 +344,7 @@ union_latest_balance_with_impacted_balances AS (
     glb.balance,
     glb.balance_seq_no,
     glb.source_op,
+    NULL::SMALLINT AS op_type_id,
     glb.source_op_block,
     NULL::SMALLINT AS trx_in_block
   FROM get_latest_balance glb
@@ -421,6 +426,7 @@ sum_balances AS (
     SUM(ulb.balance) OVER w_asc AS balance,
     SUM(ulb.balance_seq_no) OVER w_asc AS balance_seq_no,
     ulb.source_op,
+    ulb.op_type_id,
     ulb.source_op_block,
     ulb.trx_in_block
   FROM union_latest_balance_with_impacted_balances ulb
@@ -439,6 +445,7 @@ prepare_balance_history AS MATERIALIZED (
     sb.balance,
     sb.balance_seq_no,
     sb.source_op,
+    sb.op_type_id,
     sb.source_op_block,
     sb.trx_in_block,
     ROW_NUMBER() OVER (PARTITION BY sb.account_id, sb.nai ORDER BY sb.source_op DESC, sb.balance DESC) AS rn
@@ -495,6 +502,39 @@ insert_current_account_balances AS (
 
 /*
  * ===================================================================================
+ * CTE: update_balance_totals
+ * ===================================================================================
+ * PURPOSE: Keep balance_totals (holder count and balance sum per NAI) equal to the
+ *          aggregates over current_account_balances, so readers do a point read.
+ *
+ * Each touched (account, nai) partition of prepare_balance_history holds the
+ * balance before this range (the synthetic source_op = 0 row, 0 for an account
+ * new to the asset) and the one after it (rn = 1). Their difference is the
+ * account's contribution to the sum delta, and the change of (balance > 0) its
+ * contribution to the holder delta. Both images come from the statement snapshot
+ * that insert_current_account_balances overwrites, so no RETURNING OLD is needed.
+ */
+update_balance_totals AS (
+  INSERT INTO balance_totals AS bt
+    (nai, holders, total)
+  SELECT
+    pbh.nai,
+    SUM(CASE WHEN pbh.rn = 1 THEN (pbh.balance > 0)::INT ELSE 0 END)
+      - SUM(CASE WHEN pbh.source_op = 0 THEN (pbh.balance > 0)::INT ELSE 0 END),
+    SUM(CASE WHEN pbh.rn = 1 THEN pbh.balance ELSE 0 END)
+      - SUM(CASE WHEN pbh.source_op = 0 THEN pbh.balance ELSE 0 END)
+  FROM prepare_balance_history pbh
+  WHERE pbh.rn = 1 OR pbh.source_op = 0
+  GROUP BY pbh.nai
+  ON CONFLICT ON CONSTRAINT pk_balance_totals DO
+  UPDATE SET
+    holders = bt.holders + EXCLUDED.holders,
+    total = bt.total + EXCLUDED.total
+  RETURNING bt.nai
+),
+
+/*
+ * ===================================================================================
  * CTE: remove_latest_stored_balance_record
  * ===================================================================================
  * WHY MATERIALIZED: This filtered dataset is used by two downstream CTEs
@@ -521,6 +561,7 @@ remove_latest_stored_balance_record AS MATERIALIZED (
     pbh.nai,
     pbh.balance_seq_no,
     pbh.source_op,
+    pbh.op_type_id,
     pbh.source_op_block,
     pbh.balance,
     pbh.trx_in_block
@@ -548,10 +589,11 @@ remove_latest_stored_balance_record AS MATERIALIZED (
  */
 insert_account_balance_history AS (
   INSERT INTO account_balance_history AS acc_history
-    (account, nai, balance_seq_no, source_op, balance)
+    (account, nai, op_type_id, balance_seq_no, source_op, balance)
   SELECT
     pbh.account_id,
     pbh.nai,
+    pbh.op_type_id,
     pbh.balance_seq_no,
     pbh.source_op,
     pbh.balance
@@ -828,10 +870,11 @@ stage_hbd_rows AS (
 SELECT
   (SELECT count(*) FROM insert_account_balance_history) as balance_history,
   (SELECT count(*) FROM insert_current_account_balances) AS current_balances,
+  (SELECT count(*) FROM update_balance_totals) AS balance_totals,
   (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
   (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month,
   (SELECT count(*) FROM stage_hbd_rows) AS hbd_interest
-INTO __balance_history, __current_balances, __balance_history_by_day,
+INTO __balance_history, __current_balances, __balance_totals, __balance_history_by_day,
      __balance_history_by_month, __hbd_interest;
 
 -- Single-pass fold over the staged rows (replaces the in-statement recursive CTE).

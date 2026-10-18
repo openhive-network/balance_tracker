@@ -18,6 +18,7 @@
  *
  * 2. ACCOUNT BALANCES
  *    - current_account_balances: Current liquid balances (latest state)
+ *    - balance_totals: Per-NAI holder count and balance sum of current_account_balances
  *    - account_balance_history: Complete history of all balance changes
  *    - balance_history_by_day/month: Aggregated balance snapshots
  *
@@ -181,11 +182,30 @@ BEGIN
   );
   PERFORM hive.app_register_table( __schema_name, 'current_account_balances', __schema_name );
 
+  -- Per-NAI aggregates of current_account_balances, maintained by process_balances
+  -- in the statement that upserts it, so readers need not scan ~1.2M rows.
+  CREATE TABLE IF NOT EXISTS balance_totals
+  (
+    nai     SMALLINT NOT NULL, -- Balance type (currency)
+    holders BIGINT   NOT NULL, -- Accounts with balance > 0
+    total   NUMERIC  NOT NULL, -- Sum of balance over all accounts
+
+    CONSTRAINT pk_balance_totals PRIMARY KEY (nai)
+  );
+  PERFORM hive.app_register_table( __schema_name, 'balance_totals', __schema_name );
+  -- Seeded after registration: rows present when HAF registers a table all get
+  -- hive_rowid 0, and a fork rollback then reverts every row as one.
+  INSERT INTO balance_totals(nai, holders, total)
+  SELECT asset_symbol_nai, 0, 0 FROM asset_table;
+
   ------------- ACCOUNT BALANCE HISTORY ----------------
   CREATE TABLE IF NOT EXISTS account_balance_history
   (
     account        INT      NOT NULL, -- Balance owner account id
     nai            SMALLINT NOT NULL, -- Balance type (currency)
+    -- Type of source_op, kept here so readers need not probe hafd.operations.
+    -- Placed after nai it fills the 2-byte pad before the BIGINT: no extra width.
+    op_type_id     SMALLINT NOT NULL,
     balance        BIGINT   NOT NULL, -- Balance value after a change
     balance_seq_no INT      NOT NULL, -- Sequence number of the balance change
     source_op      BIGINT   NOT NULL  -- The operation triggered given balance change
@@ -362,6 +382,7 @@ BEGIN
   (
     account        INT      NOT NULL, -- Balance owner account id
     nai            SMALLINT NOT NULL, -- Balance type (currency)
+    op_type_id     SMALLINT NOT NULL, -- Type of source_op (see account_balance_history)
     balance        BIGINT   NOT NULL, -- Balance value after a change
     balance_seq_no INT      NOT NULL, -- Sequence number of the balance change
     source_op      BIGINT   NOT NULL  -- The operation triggered given balance change

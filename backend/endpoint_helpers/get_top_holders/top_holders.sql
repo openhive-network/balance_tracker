@@ -6,6 +6,7 @@ Called by: btracker_endpoints.get_top_holders()
 
 Uses idx_account_balance_nai_balance_idx or idx_account_savings_nai_balance_idx
 (created after massive sync completes via btracker_app.btracker_on_end_blocks_processing).
+The unfiltered liquid holder count is read from balance_totals.
 
 The optional [_min_balance, _max_balance) range filters holders before pagination.
 Bounds are half-open (balance >= _min_balance AND balance < _max_balance); a NULL bound
@@ -38,13 +39,19 @@ DECLARE
 BEGIN
   IF _balance_type = 'balance' THEN
     -- Count after filtering so pagination metadata describes the selected range.
-    SELECT COUNT(*)
-      INTO _total
-    FROM btracker_backend.current_account_balances_view
-    WHERE nai = _coin_type
-      AND balance > 0
-      AND (_min_balance IS NULL OR balance >= _min_balance)
-      AND (_max_balance IS NULL OR balance < _max_balance);
+    -- Unfiltered, it is the holder count balance_totals maintains.
+    IF _min_balance IS NULL AND _max_balance IS NULL THEN
+      SELECT COALESCE((SELECT bt.holders FROM balance_totals bt WHERE bt.nai = _coin_type), 0)
+        INTO _total;
+    ELSE
+      SELECT COUNT(*)
+        INTO _total
+      FROM btracker_backend.current_account_balances_view
+      WHERE nai = _coin_type
+        AND balance > 0
+        AND (_min_balance IS NULL OR balance >= _min_balance)
+        AND (_max_balance IS NULL OR balance < _max_balance);
+    END IF;
 
     IF _total = 0 THEN
       _total_pages := 0;

@@ -5,7 +5,8 @@ Computes blockchain-wide Total Value Locked (TVL) metrics.
 Called by: btracker_endpoints.get_total_value_locked()
 
 Returns sum of all VESTS (staked HIVE) and all savings balances (HIVE + HBD).
-Full-table aggregations - consider materialized view for high-traffic deployments.
+The VESTS sum is a point read of balance_totals (maintained by process_balances);
+the savings sums aggregate account_savings.
 */
 CREATE OR REPLACE FUNCTION btracker_backend.get_total_value_locked()
 RETURNS btracker_backend.total_value_locked
@@ -27,12 +28,9 @@ BEGIN
   SELECT btracker_endpoints.get_btracker_last_synced_block()
   INTO _synced_block;
 
-  -- Sum all VESTS from current balances
-  -- NUMERIC type prevents overflow for very large sums
-  SELECT COALESCE(SUM(cab.balance::NUMERIC), 0)::TEXT
-  INTO _sum_vests_txt
-  FROM current_account_balances cab
-  WHERE cab.nai = _nai_vests;
+  -- Sum of all VESTS in current balances
+  SELECT COALESCE((SELECT bt.total FROM balance_totals bt WHERE bt.nai = _nai_vests), 0)::TEXT
+  INTO _sum_vests_txt;
 
   -- Sum savings balances for both asset types in single pass
   -- Conditional aggregation avoids two separate queries

@@ -64,7 +64,7 @@ WHAT IS "LOCKED" VALUE:
 
 ARCHITECTURE:
   Simple pass-through to backend helper which aggregates:
-  - SUM of all VESTS balances from current_account_balances
+  - SUM of all VESTS balances, read from balance_totals (kept by block processing)
   - SUM of all HIVE savings from account_savings
   - SUM of all HBD savings from account_savings
   - Current block number from HAF context (snapshot reference)

@@ -142,12 +142,14 @@ RANKING LOGIC:
   - Balance ranges use min-balance <= balance < max-balance
 
 DATA SOURCES:
-  - current_account_balances (via view) for liquid balances
+  - current_account_balances (via view) for liquid balances; balance_totals for
+    their unfiltered holder count
   - account_savings (via view) for savings balances
 
 PERFORMANCE CONSIDERATIONS:
   - Uses OFFSET/LIMIT pagination - efficient for first few pages
-  - COUNT(*) runs separately to get total (required for pagination UI)
+  - COUNT(*) runs separately to get total (required for pagination UI), except
+    for the unfiltered liquid count, a point read of balance_totals
   - MATERIALIZED CTE prevents re-execution of sorted query
   - force_custom_plan prevents plan caching issues with varying parameters
 
