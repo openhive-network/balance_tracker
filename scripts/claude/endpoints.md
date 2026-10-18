@@ -89,6 +89,7 @@ History endpoints use page-based pagination:
 - Build amount objects with `btracker_backend.create_amount_object()`: it is an inlinable `LANGUAGE sql IMMUTABLE` CASE on the NAI, guarded against `asset_table` at install. Do not turn it back into a plpgsql table lookup; the statistics endpoints call it four times per output row.
 - Resolve per-row block lookups (e.g. the block at or before a period end) with a `LEFT JOIN LATERAL` in the main statement, not a plpgsql function per row.
 - Choose `plan_cache_mode` per function, never globally. Static plpgsql statements whose best plan depends on direction or bounds (`get_account_vesting_history`, `get_balance_history`, `get_top_holders`) set `force_custom_plan`. `get_account_balances` is a series of small account-equality lookups and sets `force_generic_plan` so it plans once per session.
+- A new session's first call pays catalog loading, plpgsql compilation and one plan per statement for every relation it reads (about 4 ms against 0.5 ms steady state). Do not add statements or relations that a statement already reading the same source could answer: `get_account_balances` reads the head block's vesting fund and shares in its one `hive.blocks_view` statement instead of calling `hive.get_vesting_balance()`, which would plan the view again.
 
 ## HAFBE Integration
 

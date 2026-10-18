@@ -40,16 +40,18 @@ BEGIN
   FROM btracker_backend.current_account_balances_view cab
   WHERE cab.account = _account_id;
 
-  -- Convert VESTS to HIVE equivalent using current blockchain exchange rate
-  -- Uses hive.get_vesting_balance() which calculates: vests * (total_fund_hive / total_vests)
+  -- Convert VESTS to HIVE equivalent at the head block's exchange rate:
+  -- vests * total_vesting_fund_hive / total_vesting_shares, rounded as hive.get_vesting_balance() does.
+  -- Inlined because that function looks the head block up in hive.blocks_view a second time, which
+  -- costs every new session one more plan of the view and one more plpgsql compilation.
   SELECT
     COALESCE(
-      hive.get_vesting_balance(bv.num, _vesting_shares),
+      (_vesting_shares * bv.total_vesting_fund_hive::NUMERIC / NULLIF(bv.total_vesting_shares::NUMERIC, 0))::BIGINT,
       0
-    )::BIGINT
+    )
   INTO result_row.vesting_balance_hive
   FROM (
-    SELECT num
+    SELECT total_vesting_fund_hive, total_vesting_shares
     FROM hive.blocks_view
     ORDER BY num DESC
     LIMIT 1
