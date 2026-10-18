@@ -5,15 +5,19 @@
  * account_vesting_history) after a massive sync and finalize_massive_sync():
  *
  *   - both tables carry the insert-only autovacuum reloptions;
- *   - the massive sync and finalize left no HAF vacuum request for either table
- *     other than finalize's one 'freeze' request per table (none at all on a HAF
- *     without request kinds, where every request runs as VACUUM FULL ANALYZE);
+ *   - the massive sync and finalize left no pending HAF vacuum request for either
+ *     table other than finalize's one 'freeze' request per table (none at all on
+ *     a HAF without request kinds, where every request runs as VACUUM FULL
+ *     ANALYZE); a VACUUM FULL request HAF already carried out, as an install
+ *     synced before an upgrade keeps, is not a leftover;
  *   - a MASSIVE_PROCESSING catch-up after finalize adds no vacuum request, does
- *     not rewrite either table and does not ANALYZE it;
+ *     not rewrite either table and does not ANALYZE it (skipped when the context
+ *     has left that stage);
  *   - request_history_tables_freeze() asks for one 'freeze' request per table
  *     when HAF has the request kind (a test double records it when the installed
  *     HAF lacks it), and requests nothing when it does not;
- *   - a leftover 'full' request for a history table fails the request check.
+ *   - a leftover 'full' request for a history table fails the request check, also
+ *     next to a carried-out one.
  *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Every case that changes state runs in a
@@ -27,15 +31,30 @@ SET search_path TO :"schema", public;
 
 -- Vacuum requests for the history tables as sorted 'table:kind' pairs. A HAF
 -- without hafd.vacuum_requests.kind runs every request as VACUUM FULL, so its
--- requests read as kind 'full'.
+-- requests read as kind 'full'. A 'full' request counts only while pending: one
+-- HAF already ran is history (an install's original massive sync leaves one per
+-- table), not a leftover. Other kinds count whatever their status, since HAF may
+-- already have run finalize's freeze.
 CREATE FUNCTION pg_temp.history_vacuum_requests()
 RETURNS TEXT[] LANGUAGE sql STABLE
 AS $f$
-  SELECT coalesce(array_agg(p.pair ORDER BY p.pair), '{}')
+  SELECT coalesce(array_agg(r.table_name || ':' || k.kind ORDER BY r.table_name || ':' || k.kind), '{}')
   FROM hafd.vacuum_requests r
-  CROSS JOIN LATERAL (SELECT r.table_name || ':' || coalesce(to_jsonb(r) ->> 'kind', 'full') AS pair) p
+  CROSS JOIN LATERAL (SELECT coalesce(to_jsonb(r) ->> 'kind', 'full') AS kind) k
   WHERE r.schema_name = current_setting('btracker_test.schema')
     AND r.table_name IN ('account_balance_history', 'account_vesting_history')
+    AND (k.kind <> 'full' OR r.status = 'requested')
+$f$;
+
+-- Status of the history table's 'full' request, NULL when there is none.
+CREATE FUNCTION pg_temp.full_request_status(_table_name TEXT)
+RETURNS TEXT LANGUAGE sql STABLE
+AS $f$
+  SELECT r.status::TEXT
+  FROM hafd.vacuum_requests r
+  WHERE r.schema_name = current_setting('btracker_test.schema')
+    AND r.table_name = _table_name
+    AND coalesce(to_jsonb(r) ->> 'kind', 'full') = 'full'
 $f$;
 
 -- Detected as request_history_tables_freeze() does.
@@ -55,6 +74,26 @@ AS $f$
   SELECT CASE WHEN pg_temp.haf_has_request_kind()
     THEN ARRAY['account_balance_history:freeze', 'account_vesting_history:freeze']
     ELSE '{}'::TEXT[] END
+$f$;
+
+-- A 'full' request HAF has carried out, as an install synced before an upgrade
+-- keeps for each history table.
+CREATE FUNCTION pg_temp.add_vacuumed_full_request(_table_name TEXT)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+BEGIN
+  IF pg_temp.haf_has_request_kind() THEN
+    INSERT INTO hafd.vacuum_requests (schema_name, table_name, kind, status, last_vacuumed_time)
+    VALUES (current_setting('btracker_test.schema'), _table_name, 'full', 'vacuumed', now())
+    ON CONFLICT ON CONSTRAINT pk_hive_vacuum_requests DO UPDATE
+    SET status = 'vacuumed', last_vacuumed_time = now(), error_message = NULL;
+  ELSE
+    INSERT INTO hafd.vacuum_requests (schema_name, table_name, status, last_vacuumed_time)
+    VALUES (current_setting('btracker_test.schema'), _table_name, 'vacuumed', now())
+    ON CONFLICT ON CONSTRAINT pk_hive_vacuum_requests DO UPDATE
+    SET status = 'vacuumed', last_vacuumed_time = now(), error_message = NULL;
+  END IF;
+END
 $f$;
 
 CREATE FUNCTION pg_temp.assert_history_vacuum_requests(_expected TEXT[], _what TEXT)
@@ -112,18 +151,49 @@ BEGIN
 END
 $$;
 
--- A leftover VACUUM FULL request fails the check above.
+-- A VACUUM FULL request HAF has carried out is not a leftover.
+BEGIN;
+DO
+$$
+BEGIN
+  PERFORM pg_temp.add_vacuumed_full_request('account_balance_history');
+  PERFORM pg_temp.add_vacuumed_full_request('account_vesting_history');
+  IF pg_temp.full_request_status('account_balance_history') IS DISTINCT FROM 'vacuumed'
+     OR pg_temp.full_request_status('account_vesting_history') IS DISTINCT FROM 'vacuumed' THEN
+    RAISE EXCEPTION 'expected a vacuumed full request per history table, found % and %',
+      pg_temp.full_request_status('account_balance_history'), pg_temp.full_request_status('account_vesting_history');
+  END IF;
+
+  PERFORM pg_temp.assert_history_vacuum_requests(pg_temp.requests_after_finalize(), 'a carried-out full request');
+  RAISE NOTICE 'PASS: a vacuumed full request is not a leftover';
+END
+$$;
+ROLLBACK;
+
+-- A leftover VACUUM FULL request fails the check above, also when the table
+-- already has a carried-out one: HAF keeps one 'full' row per table, so the
+-- injected request turns it back to pending.
 BEGIN;
 DO
 $$
 DECLARE
   __schema CONSTANT TEXT := current_setting('btracker_test.schema');
 BEGIN
+  PERFORM pg_temp.add_vacuumed_full_request('account_balance_history');
+
   IF pg_temp.haf_has_request_kind() THEN
     EXECUTE 'SELECT hive.app_request_table_vacuum($1, $2, NULL::INTERVAL, ''full'')'
       USING __schema, 'account_balance_history';
   ELSE
     PERFORM hive.app_request_table_vacuum(__schema, 'account_balance_history', NULL::INTERVAL);
+  END IF;
+
+  IF pg_temp.full_request_status('account_balance_history') IS DISTINCT FROM 'requested' THEN
+    RAISE EXCEPTION 'expected the injected full request to be pending, found status %',
+      pg_temp.full_request_status('account_balance_history');
+  END IF;
+  IF NOT 'account_balance_history:full' = ANY (pg_temp.history_vacuum_requests()) THEN
+    RAISE EXCEPTION 'the injected full request is not among the counted requests: %', pg_temp.history_vacuum_requests();
   END IF;
 
   BEGIN
@@ -138,7 +208,7 @@ $$;
 ROLLBACK;
 
 -- A MASSIVE_PROCESSING catch-up after finalize: one empty range past the
--- synced block.
+-- synced block. A context that has reached the live stage has no such catch-up.
 BEGIN;
 DO
 $$
@@ -150,12 +220,14 @@ DECLARE
   __analyzed_before TIMESTAMPTZ[];
   __analyzed_after TIMESTAMPTZ[];
   __requests_before CONSTANT TEXT[] := pg_temp.history_vacuum_requests();
+  __stage CONSTANT TEXT := hive.get_current_stage_name(__schema);
 BEGIN
   IF NOT isIndexesCreated() THEN
     RAISE EXCEPTION 'expected a finalized schema';
   END IF;
-  IF hive.get_current_stage_name(__schema) IS DISTINCT FROM 'MASSIVE_PROCESSING' THEN
-    RAISE EXCEPTION 'expected stage MASSIVE_PROCESSING, found %', hive.get_current_stage_name(__schema);
+  IF __stage IS DISTINCT FROM 'MASSIVE_PROCESSING' THEN
+    RAISE NOTICE 'SKIP: post-finalize catch-up: the context is in stage %, not MASSIVE_PROCESSING', __stage;
+    RETURN;
   END IF;
 
   SELECT array_agg(pg_relation_filenode(t) ORDER BY t),
