@@ -64,6 +64,15 @@ sandbox:
 # and an uninstall followed by a fresh install (CI's setup-scripts-test).
 # CI's mock-data patterns, JMeter benchmarks and python api client tests aren't
 # bound; see .aidev/README.md.
+#
+# `full` and `canary` declare a 1800s wall: without one the 900s default
+# applies, and the sync step alone swings from about 250s to about 600s with
+# host load. Recorded runs on 2026-10-21: full 477s (sync 256s, regression
+# 79s), a promote canary 594s (sync 315s, regression 137s), and a canary
+# killed at 900s with every case passing after a 591s sync. Scaling the 477s
+# run by that worst sync's 2.3x gives about 1100s; 1800s leaves room past it
+# and stays inside full's 2100s activity ceiling. `system` is unbound, so it
+# has no wall to declare.
 verification:
   quick:
     adapter: command
@@ -74,6 +83,7 @@ verification:
     adapter: command
     args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
     artifacts: ["test-results/full/"]
+    timeout: 1800
   baseline:
     adapter: command
     args: [".aidev/run-checks.sh", "baseline", "install", "sync", "parity", "regression", "tavern"]
@@ -82,6 +92,7 @@ verification:
     adapter: command
     args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
     artifacts: ["test-results/canary/"]
+    timeout: 1800
   # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks
   # (AIDEV runs it in the post-implementation scan only). `static` and `system`
   # are left unbound: AIDEV runs neither for a project.
