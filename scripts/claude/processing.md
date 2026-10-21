@@ -30,6 +30,10 @@ re-enters it for any catch-up of more than 101 blocks. Work that is only meant
 for the genesis replay, such as the throttled ANALYZE of the history tables, is
 gated on `NOT isIndexesCreated()`, not on the stage name (see #64 and
 `scripts/claude/main.md`, "Synchronization Stages").
+LIVE does not finalize while HAF's own massive sync is still running and the
+context is unfinalized and non-forking: it keeps processing massively instead
+(`is_massive_sync_pending()`, see `scripts/claude/main.md`, "Processing while
+hived replays").
 
 ## Processing Functions Inventory
 

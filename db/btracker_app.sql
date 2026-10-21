@@ -708,6 +708,27 @@ $$;
 -- Installs that predate the reloptions return early above.
 SELECT set_history_tables_insert_only_reloptions();
 
+-- Early block processing: hive.app_next_iteration delivers irreversible blocks
+-- while hived still replays with psql-massive-index-policy=keep-monotonic, before
+-- HAF has rebuilt the core indexes it defers to the end of the replay. Block
+-- processing reads operations only by block range and looks accounts up by name
+-- (indexes HAF keeps, hive/haf#381); finalization waits for HAF, see
+-- haf_massive_sync_finished(). Outside the "context already exists" early return
+-- so a reinstall opts in too. An embedding application's group starts early only
+-- once all its contexts opted in.
+DO $$
+DECLARE
+  __schema_name TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+  IF to_regproc('hive.app_context_set_early_block_processing') IS NULL THEN
+    RAISE NOTICE 'btracker: HAF has no early block processing (hive/haf#379); context % waits for hive.is_instance_ready()', __schema_name;
+    RETURN;
+  END IF;
+  PERFORM hive.app_context_set_early_block_processing(ARRAY[__schema_name]::hive.contexts_group);
+END
+$$;
+
 -- ============================================================================
 -- CONTROL FUNCTIONS
 -- ============================================================================
@@ -787,6 +808,61 @@ BEGIN
         SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_nai_balance_idx' LIMIT 1
       )
     );
+END
+$$;
+
+/**
+ * haf_massive_sync_finished()
+ * ---------------------------
+ * Whether HAF has finished its own massive sync, i.e. rebuilt every core index
+ * (hive.is_instance_ready()). With early block processing the context receives
+ * blocks before that, and may even reach the LIVE stage while HAF is still
+ * restoring its deferred indexes after the replay.
+ *
+ * @returns TRUE once HAF's massive sync is over
+ */
+CREATE OR REPLACE FUNCTION haf_massive_sync_finished()
+RETURNS BOOLEAN
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  RETURN hive.is_instance_ready();
+END
+$$;
+
+/**
+ * is_massive_sync_pending()
+ * -------------------------
+ * Whether a block range must still be processed massively, before
+ * finalize_massive_sync(): in the MASSIVE_PROCESSING stage, and in the LIVE
+ * stage while HAF's own massive sync has not finished and nobody has finalized
+ * this context yet. The stage alone is not enough: app_next_iteration picks it
+ * against the estimated chain head, so it stays massive while hived replays,
+ * but the context can catch up within the live threshold near the end of the
+ * replay, while HAF is still restoring its indexes. Finalizing then would
+ * build the app indexes and SET LOGGED long before HAF is done.
+ *
+ * A context already switched to forking was finalized (or, under an embedding
+ * application, finalize_massive_sync_before_forking() already ran for it), so
+ * finalization must not be held back any more.
+ *
+ * @param _context_name  HAF context name (typically schema name)
+ * @returns TRUE to process massively, FALSE to finalize and process live
+ */
+CREATE OR REPLACE FUNCTION is_massive_sync_pending(_context_name hive.context_name)
+RETURNS BOOLEAN
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+BEGIN
+  IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
+    RETURN TRUE;
+  END IF;
+
+  RETURN NOT isIndexesCreated()
+     AND NOT hive.app_is_forking(_context_name)
+     AND NOT haf_massive_sync_finished();
 END
 $$;
 
@@ -1095,7 +1171,9 @@ $$;
  *   ANALYZEs the history tables only during the initial sync (before
  *   finalize_massive_sync); HAF also uses this stage for catch-ups of more
  *   than 101 blocks after the app is already finalized.
- * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
+ * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing().
+ *   Before the first finalize, and while HAF's own massive sync is still
+ *   running, processes massively instead (is_massive_sync_pending).
  *
  * @param _context_name  HAF context name (typically schema name)
  * @param _block_range   Range of blocks to process (first_block, last_block)
@@ -1112,7 +1190,7 @@ AS
 $$
 
 BEGIN
-  IF hive.get_current_stage_name(_context_name) = 'MASSIVE_PROCESSING' THEN
+  IF is_massive_sync_pending(_context_name) THEN
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
     -- Planner statistics for the unindexed, insert-only sync tables. Not a
     -- HAF vacuum request: HAF runs those as VACUUM FULL ANALYZE, a rewrite

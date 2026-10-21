@@ -120,6 +120,29 @@ false; the HAF vacuum request it used to make there ran as `VACUUM FULL ANALYZE`
 under ACCESS EXCLUSIVE and turned each post-restart catch-up into a multi-minute
 outage (#64).
 
+### Processing while hived replays
+
+The install opts the context into HAF's early block processing
+(`hive.app_context_set_early_block_processing`, hive/haf#379; skipped with a
+NOTICE on an older HAF). With hived's `psql-massive-index-policy = keep-monotonic`,
+`hive.app_next_iteration` then delivers irreversible blocks while hived still
+replays, before HAF has rebuilt the core indexes it defers (`massive_sync_class =
+'defer'` in `hafd.indexes_constraints`). Rules for the block-processing path:
+
+- Read operations only by block range (`operations_view WHERE block_num ...`,
+  served by the `keep` indexes on `hafd.operations`). Do not read
+  `hafd.account_operations` / `account_operations_view`, transactions by hash,
+  blocks by producer or operations by type without a block range; if a step needs
+  one, call `hive.wait_for_core_indexes()` before it.
+- Account lookups by name (`accounts_view`) rely on hive/haf#381 keeping the
+  `hafd.accounts` indexes.
+- The stage comes from `app_next_iteration`, which compares against the
+  estimated chain head, so it stays MASSIVE_PROCESSING during the replay. Near
+  its end the context can still reach LIVE while HAF restores its indexes;
+  `is_massive_sync_pending()` keeps processing massively then, and finalize
+  waits for `haf_massive_sync_finished()` (`hive.is_instance_ready()`), unless
+  the context is already forking (an embedding application switched it).
+
 ### Insert-only history tables and the visibility map
 
 `account_balance_history` and `account_vesting_history` are insert-only, UNLOGGED
