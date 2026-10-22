@@ -15,6 +15,7 @@
  * Dependencies:
  * -------------
  * - btracker_backend.balance_type: ENUM ('balance', 'savings_balance')
+ * - btracker_backend.top_holders_balance_type: ENUM ('balance', 'savings_balance', 'total')
  * - btracker_backend.nai_type: ENUM ('HBD', 'HIVE', 'VESTS')
  * - btracker_backend.rest_raise_missing_account(): Exception function
  * - btracker_backend.rest_raise_vest_saving_balance(): Exception function

@@ -1,0 +1,21 @@
+---
+test_name: btracker PostgREST
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: "a 5,000,000 tie split across pages 65 and 66 is ordered by name"
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HBD
+        balance-type: total
+        page: 66
+        page-size: 1
+    response:
+      status_code: 200
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern
