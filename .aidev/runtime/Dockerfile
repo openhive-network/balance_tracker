@@ -16,7 +16,7 @@
 # Build and pin it with .aidev/runtime/build.sh; see .aidev/README.md.
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/postgrest@sha256:928a9478f8a4b38dab3448846bf40da3f2075ae770c3f94fb9760ff689aa6561 AS postgrest
 
-FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
+FROM python:3.15-alpine@sha256:d44b1254cb92329418d164b22b20d86bbd3869d48e80e09e476531a409a728bb
 
 ARG TESTS_API_COMMIT=455898cc3462d4e5ee2274756e5e3d44688fe204
 ARG DRIVER_COMMIT=3839feb0c30846aa3ae262143f216a3c1a0fa20b
