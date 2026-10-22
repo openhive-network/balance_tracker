@@ -6,7 +6,7 @@ includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: HIVE liquid + savings in [1,000 HIVE, 50,000 HIVE) with global rank
+  - name: "HIVE liquid + savings in [1,000 HIVE, 50,000 HIVE) with global rank"
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET

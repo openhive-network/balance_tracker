@@ -1,1 +1,8 @@
-{"placeholder": "replaced from the CI mock output"}
+{
+  "total_accounts": 2,
+  "total_pages": 1,
+  "holders_result": [
+    { "rank": 1, "account": "blocktrades", "value": "6000" },
+    { "rank": 2, "account": "steem", "value": "1300" }
+  ]
+}

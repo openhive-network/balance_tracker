@@ -6,7 +6,7 @@ includes:
   - !include ../../common.yaml
 
 stages:
-  - name: HIVE savings holders in the mock data
+  - name: "HIVE savings holders in the mock data"
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
