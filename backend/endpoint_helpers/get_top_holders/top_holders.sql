@@ -19,11 +19,14 @@ upper bound (balance >= _max_balance). With no upper bound nothing ranks above t
 so the offset is zero.
 
 'total' (#63) ranks by liquid + savings. The two live in different tables, so no index
-can order the sum: it is built once per request with a FULL JOIN, and the count, the
-rank offset and the page all come from that one pass. Names are resolved only for
-accounts at or above the page's cut-off total, which keeps the (total DESC, name ASC)
-tie-break exact without a name lookup for every holder (~0.6 s for HIVE, ~586k
-holders, on a synced node). The range filters apply to the sum.
+can order the sum: it is built once per request with a FULL JOIN into a materialized
+CTE, and the count, the rank offset and the page are all read from that one result.
+The page's totals are picked first without names; names (the tie-break) are then
+resolved only for accounts whose total lies within the page's [lowest, highest]
+total, and the accounts above that band are only counted. The range filters apply to
+the sum. On a synced node: ~0.5-0.75 s per page; a page inside a large tie group
+(271k HIVE holders at 0.001 HIVE) must name every tied holder and takes up to ~1.6 s,
+the same order as the liquid branch at that depth.
 */
 CREATE OR REPLACE FUNCTION btracker_backend.get_top_holders(
     _coin_type    INT,

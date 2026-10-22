@@ -201,6 +201,25 @@
                     "request_id": 321
                 }
             }
+        },
+        {
+            "block_num": 90000005,
+            "op_type_id": 32,
+            "op_pos": 2,
+            "trx_in_block": -1,
+            "body": {
+                "type": "transfer_to_savings_operation",
+                "value": {
+                    "to": "alpaca",
+                    "from": "alittle",
+                    "memo": "",
+                    "amount": {
+                        "nai": "@@000000013",
+                        "amount": "60000000",
+                        "precision": 3
+                    }
+                }
+            }
         }
     ]
 }

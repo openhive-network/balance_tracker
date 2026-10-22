@@ -225,10 +225,14 @@ For an HP distribution bracket, pass converted VESTS values with
 accounts with a positive sum are counted and ranked, and the range bounds apply to
 the sum. The two balances live in different tables, so no index orders the sum:
 each request builds it once with a FULL JOIN of `current_account_balances_view`
-and `account_savings_view`, and takes the count, the rank offset and the page from
-that one pass. Names (the tie-break) are looked up only for accounts whose total
-falls within the page's highest and lowest total. About 0.5-0.75 s per page on a
-synced node (HIVE: ~586k holders), at any depth. `total` uses its own enum,
+and `account_savings_view`, and reads the count, the rank offset and the page from
+that one materialized result. Names (the tie-break) are looked up only for accounts
+whose total falls within the page's highest and lowest total. Measured on a synced
+node (HIVE: ~586k holders with a positive sum): 0.33-0.75 s per page, including the
+last page. A page inside a large tie group has to name every tied holder: HIVE has
+271,611 holders at exactly 0.001 HIVE (ranks 314,742-586,352), and pages there take
+~1.0-1.6 s, the same order as the existing liquid branch at that depth (0.4-1.9 s on
+testapi). No JMeter/k6 scenario covers `total` yet. `total` uses its own enum,
 `top_holders_balance_type`, because the shared `balance_type` also drives balance
 history, which has no combined view. The ranking inherits #61: `steem.dao` and
 `null` still carry balances hived reports as zero.
