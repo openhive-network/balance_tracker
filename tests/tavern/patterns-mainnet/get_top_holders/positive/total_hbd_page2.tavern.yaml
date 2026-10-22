@@ -1,0 +1,21 @@
+---
+test_name: btracker PostgREST
+marks:
+  - patterntest
+includes:
+  - !include ../../../common.yaml
+
+stages:
+  - name: HBD liquid + savings, page 2 of 25 keeps the global rank
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HBD
+        balance-type: total
+        page: 2
+        page-size: 25
+    response:
+      status_code: 200
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

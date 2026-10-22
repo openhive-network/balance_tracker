@@ -74,6 +74,30 @@ END
 $$;
 
 /**
+ * validate_top_holders_balance_type()
+ * -----------------------------------
+ * VESTS has no savings, so its only top-holders ranking is the liquid one:
+ * 'savings_balance' and 'total' (liquid + savings) are rejected with the same
+ * message validate_balance_history gives for VESTS savings.
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.validate_top_holders_balance_type(
+    _balance_type btracker_backend.top_holders_balance_type,
+    _coin_type btracker_backend.nai_type
+)
+RETURNS VOID
+LANGUAGE plpgsql
+IMMUTABLE
+AS
+$$
+BEGIN
+  IF _coin_type = 'VESTS' AND _balance_type <> 'balance' THEN
+    RAISE EXCEPTION 'The selected balance type ''%'' does not support ''%'' option. Please choose a different balance type.',
+      _balance_type::TEXT, _coin_type::TEXT;
+  END IF;
+END
+$$;
+
+/**
  * validate_balance_history()
  * --------------------------
  * Validate that the balance_type and coin_type combination is valid.

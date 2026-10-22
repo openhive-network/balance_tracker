@@ -403,7 +403,7 @@ Returns ranked leaderboard of top asset holders.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | coin-type | TEXT | Yes | - | HBD, HIVE, or VESTS |
-| balance-type | TEXT | No | 'balance' | 'balance' or 'savings_balance' |
+| balance-type | TEXT | No | 'balance' | 'balance', 'savings_balance' or 'total' (liquid + savings, HBD/HIVE only) |
 | page | INT | No | 1 | Page number |
 | page-size | INT | No | 100 | Results per page |
 | min-balance | BIGINT | No | - | Inclusive lower balance bound (any coin-type), in the asset's smallest unit |
