@@ -6,7 +6,7 @@ includes:
   - !include ../../../common.yaml
 
 stages:
-  - name: HBD liquid + savings, page 2 of 25 keeps the global rank
+  - name: "HBD liquid + savings, page 2 of 25 keeps the global rank"
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET

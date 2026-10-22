@@ -6,7 +6,7 @@ includes:
   - !include ../../common.yaml
 
 stages:
-  - name: HBD liquid holders in the mock data (the other half of total_hbd)
+  - name: "HBD liquid holders in the mock data (the other half of total_hbd)"
     request:
       url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
       method: GET
