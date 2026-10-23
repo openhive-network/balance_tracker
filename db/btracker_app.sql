@@ -58,6 +58,10 @@
  *    - escrow_state: Active escrow agreements
  *    - escrow_fees: Pending escrow agent fees
  *
+ * 12. DHF PROPOSAL PAYMENTS
+ *    - proposal_payment_totals: Total paid, payment count, first/last payment per proposal
+ *    - proposal_payments: Every proposal_pay_operation, numbered per proposal
+ *
  * HAF Synchronization Stages:
  * ---------------------------
  * - MASSIVE_PROCESSING: Initial sync, processes blocks in batches of 10000
@@ -649,6 +653,40 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
+  ------------- DHF PROPOSAL PAYMENTS ----------------
+  -- One row per proposal paid at least once. payment_count is also the highest
+  -- payment_seq_no in proposal_payments, so processing numbers new payments from it
+  -- and the history endpoint pages without counting. A proposal's receiver is fixed
+  -- when it is created.
+  CREATE TABLE IF NOT EXISTS proposal_payment_totals
+  (
+    proposal_id         INT       NOT NULL,
+    receiver            INT       NOT NULL, -- hive.accounts_view.id
+    total_paid          BIGINT    NOT NULL, -- HBD satoshis (×1000)
+    payment_count       INT       NOT NULL,
+    first_payment_block INT       NOT NULL,
+    first_payment_at    TIMESTAMP NOT NULL,
+    last_payment_block  INT       NOT NULL,
+    last_payment_at     TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_proposal_payment_totals PRIMARY KEY (proposal_id)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'proposal_payment_totals', __schema_name);
+
+  -- Every proposal_pay_operation, numbered 1..payment_count per proposal in operation
+  -- order. Kept rather than read back from HAF: the operations carry proposal_id
+  -- only in their body, so the history of one proposal would scan every payment.
+  CREATE TABLE IF NOT EXISTS proposal_payments
+  (
+    proposal_id    INT    NOT NULL,
+    payment_seq_no INT    NOT NULL,
+    amount         BIGINT NOT NULL, -- HBD satoshis (×1000)
+    source_op      BIGINT NOT NULL, -- hafd.operations.id; block_num via hafd.operation_id_to_block_num
+
+    CONSTRAINT pk_proposal_payments PRIMARY KEY (proposal_id, payment_seq_no)
+  );
+  PERFORM hive.app_register_table(__schema_name, 'proposal_payments', __schema_name);
+
   ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
   -- Non-forking avoids hive_rowid indexes during massive sync.
   -- Also required to match hafbe_app.sql's post-creation sequence so that
@@ -1235,6 +1273,7 @@ $$;
  * 9. Conversions
  * 10. Market orders
  * 11. Escrows
+ * 12. Proposal payments
  *
  * @param _from  First block number to process
  * @param _to    Last block number to process
@@ -1290,6 +1329,7 @@ BEGIN
     PERFORM process_block_range_converts(_from,        __hardfork_23_block);
     PERFORM process_block_range_orders(_from,        __hardfork_23_block);
     PERFORM process_block_range_escrows(_from,        __hardfork_23_block);
+    PERFORM process_block_range_proposal_payments(_from, __hardfork_23_block);
 
     -- Manually process hardfork_hive_operation for balance, rewards, savings
     PERFORM btracker_backend.process_hf_23(__hardfork_23_block);
@@ -1310,6 +1350,7 @@ BEGIN
       PERFORM process_block_range_converts(__hardfork_23_block+1, _to);
       PERFORM process_block_range_orders(__hardfork_23_block+1, _to);
       PERFORM process_block_range_escrows(__hardfork_23_block+1, _to);
+      PERFORM process_block_range_proposal_payments(__hardfork_23_block + 1, _to);
     END IF;
 
   ELSE
@@ -1356,6 +1397,9 @@ BEGIN
     __stage_ts := clock_timestamp();
     PERFORM process_block_range_escrows(_from, _to);
     RAISE NOTICE 'btracker stage escrows: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
+    __stage_ts := clock_timestamp();
+    PERFORM process_block_range_proposal_payments(_from, _to);
+    RAISE NOTICE 'btracker stage proposal_payments: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3);
   END IF;
 
   IF _logs THEN
@@ -1412,6 +1456,7 @@ BEGIN
   PERFORM process_block_range_converts(_block, _block);
   PERFORM process_block_range_orders(_block, _block);
   PERFORM process_block_range_escrows(_block, _block);
+  PERFORM process_block_range_proposal_payments(_block, _block);
 
 
   IF _logs THEN

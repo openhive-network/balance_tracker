@@ -77,6 +77,8 @@ tests/tavern/
 | `get_recurrent_transfers` | `patterns-mainnet/get_recurrent_transfers/` | Scheduled transfer queries |
 | `get_top_holders` | `patterns-mainnet/get_top_holders/` | Leaderboard queries |
 | `get_transfer_statistics` | `patterns-mainnet/get_transfer_statistics/` | Volume statistics |
+| `get_proposals_payments` | `patterns-mainnet/get_proposals_payments/` | Proposal payment totals (all zero below HF21), id-list validation |
+| `get_proposal_payments` | `patterns-mainnet/get_proposal_payments/` | Proposal payment history (empty below HF21), parameter validation |
 
 ## How to Add New Tavern Tests
 

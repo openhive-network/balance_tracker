@@ -20,6 +20,7 @@ Balance Tracker extracts and indexes balance-related data from the Hive blockcha
 | **Escrows** | Multi-party escrow agreements |
 | **Transfer Stats** | Aggregated transfer volumes (hour/day/month) |
 | **Vesting Stats** | Aggregated power-up / power-down volumes (day/month) |
+| **DHF Proposal Payments** | Total HBD paid per proposal and every payment |
 
 ## Directory Structure
 
@@ -40,6 +41,7 @@ btracker/
 ├── endpoints/                    # PostgREST API
 │   ├── account-balances/         # Balance query endpoints
 │   ├── transfers/                # Transfer analytics
+│   ├── proposals/                # DHF proposal payments
 │   ├── other/                    # Utility endpoints
 │   └── types/                    # OpenAPI type definitions
 ├── scripts/                      # Installation, CI
@@ -224,6 +226,7 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `order_state` - Open market orders
 - `convert_state` - Pending conversions
 - `escrow_state` - Active escrows
+- `proposal_payment_totals` - Per DHF proposal: total HBD paid, payment count, first/last payment
 
 ### History Tables
 - `account_balance_history` - Every balance change
@@ -235,6 +238,7 @@ Both history tables store `op_type_id` (the type of `source_op`), written by the
 - `vesting_stats_by_day/month` - Power-up / power-down statistics (global)
 - `account_vesting_history` - Per-account vesting event history (per-impacted-account, with seq_no)
 - `account_vesting_by_day/month` - Per-account vesting aggregates
+- `proposal_payments` - Every `proposal_pay_operation`, numbered per proposal (`payment_seq_no`)
 
 ## Common SQL Patterns
 
