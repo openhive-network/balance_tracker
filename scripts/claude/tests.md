@@ -55,6 +55,7 @@ tests/
 │   ├── history_tables_vacuum.sql  # history tables' vacuum setup
 │   ├── balance_totals.sql     # balance_totals = aggregates of current_account_balances after sync, a live block, a fork rollback
 │   ├── history_op_type.sql    # stored op_type_id = hafd.operations.op_type_id; no extra tuple width
+│   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer

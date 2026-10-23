@@ -1,0 +1,24 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # The DHF starts at HF21, past this chain's 5M blocks: every proposal is unpaid. Duplicates collapse, ids sort.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_proposals_payments"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          proposal-ids: "2,0,1,2"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
