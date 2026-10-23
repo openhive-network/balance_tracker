@@ -49,6 +49,16 @@ DECLARE
   __insert_info_rewards         INT;
 BEGIN
 
+-- #61: hived empties the pending rewards of 'null' / 'steem.dao' at each balance-clearing
+-- op (see btracker_backend.account_clears_in_range). account_rewards keeps no history, so
+-- the clear is applied as: zero the account here, then let only the rewards that arrive
+-- after its last clear in this range through (reward_clears below). The claim math reads
+-- the previous balances from account_rewards, so this must run before the statement.
+UPDATE account_rewards ar
+SET balance = 0
+WHERE ar.balance <> 0
+  AND ar.account IN (SELECT ac.account_id FROM btracker_backend.account_clears_in_range(_from, _to) ac);
+
 -- ============================================================================
 -- CTE: ops
 -- ============================================================================
@@ -61,7 +71,15 @@ BEGIN
 -- into a single batch. This is orders of magnitude faster than processing block-by-block.
 --
 -- Example: Processing blocks 1-1000 in one call vs 1000 separate calls.
-WITH ops AS MATERIALIZED (
+WITH reward_clears AS MATERIALIZED (
+  -- #61: the last clearing op per cleared account in this range
+  SELECT av.name AS account_name, MAX(ac.source_op) AS last_clear_op
+  FROM btracker_backend.account_clears_in_range(_from, _to) ac
+  JOIN accounts_view av ON av.id = ac.account_id
+  GROUP BY av.name
+),
+
+ops AS MATERIALIZED (
   SELECT ov.body_value AS body, ov.op_type_id, ov.id AS source_op, ov.block_num AS source_op_block
   FROM _btracker_ops_batch ov
   WHERE
@@ -151,12 +169,19 @@ get_impacted_bal AS MATERIALIZED (
     ).*
   ) AS result
   WHERE
-    -- Claims are always processed (reduce pending balance)
-    fio.op_type_id = _op_claim_reward_balance OR
-    -- Author/benefactor rewards only tracked if they go to pending balance
     (
-      fio.op_type_id IN (_op_author_reward, _op_comment_benefactor_reward) AND
-      (fio.body->>'payout_must_be_claimed')::BOOLEAN = true
+      -- Claims are always processed (reduce pending balance)
+      fio.op_type_id = _op_claim_reward_balance OR
+      -- Author/benefactor rewards only tracked if they go to pending balance
+      (
+        fio.op_type_id IN (_op_author_reward, _op_comment_benefactor_reward) AND
+        (fio.body->>'payout_must_be_claimed')::BOOLEAN = true
+      )
+    )
+    -- #61: a reward that a later clear in this range has already emptied
+    AND NOT EXISTS (
+      SELECT 1 FROM reward_clears rc
+      WHERE rc.account_name = result.account_name AND rc.last_clear_op > fio.source_op
     )
 ),
 

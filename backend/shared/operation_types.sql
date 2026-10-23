@@ -215,6 +215,21 @@ BEGIN
 END;
 $$;
 
+-- Balance-clearing virtual operations (#61): hived zeroes every balance of the account
+CREATE OR REPLACE FUNCTION btracker_backend.op_clear_null_account_balance()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::clear_null_account_balance_operation');
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION btracker_backend.op_consolidate_treasury_balance()
+RETURNS INT LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN (SELECT id FROM hafd.operation_types WHERE name = 'hive::protocol::consolidate_treasury_balance_operation');
+END;
+$$;
+
 -- Limit order operations
 CREATE OR REPLACE FUNCTION btracker_backend.op_limit_order_create()
 RETURNS INT LANGUAGE plpgsql STABLE AS $$

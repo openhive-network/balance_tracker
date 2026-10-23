@@ -41,6 +41,7 @@
 #       ├── delays/              # Delayed voting (HF24) test data
 #       ├── savings_pending/     # Pending savings withdrawal regression data
 #       ├── multi_balance_ops/   # Multi-balance operation regression data
+#       ├── account_clears/      # clear_null_account_balance on 'null' (issue #61)
 #       └── escrow/              # Escrow operations test data
 #
 # BLOCK RANGE:
@@ -180,6 +181,7 @@ ESCROW_DATA=$(cat "$FIXTURES_DIR/escrow/data.json")
 MULTI_BALANCE_DATA=$(cat "$FIXTURES_DIR/multi_balance_ops/data.json")
 SAVINGS_PENDING_DATA=$(cat "$FIXTURES_DIR/savings_pending/data.json")
 VESTING_ROUTED_DATA=$(cat "$FIXTURES_DIR/vesting_routed/data.json")
+ACCOUNT_CLEARS_DATA=$(cat "$FIXTURES_DIR/account_clears/data.json")
 
 # Step 3: Insert mock blocks
 echo "Step 3: Inserting mock block headers..."
@@ -228,6 +230,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
 echo "  - Routed power-down operations (issue #54 regression)..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$VESTING_ROUTED_DATA')"
+
+echo "  - Balance-clearing operations on 'null' (issue #61 regression)..."
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
+    -c "SELECT btracker_backend.insert_mock_operations('$ACCOUNT_CLEARS_DATA')"
 echo ""
 
 # Step 5: Update HAF state to recognize mock blocks

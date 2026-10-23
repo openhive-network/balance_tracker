@@ -225,8 +225,26 @@ WITH ops_in_range AS MATERIALIZED
     -- _btracker_ops_batch; trx_in_block distinguishes transaction ops (>= 0, applied
     -- before head_block_time advances -> use block-1 time) from standalone virtual ops
     -- (-1, applied after -> use block time). See hbd_ops effective_ts.
-    gib.trx_in_block
+    gib.trx_in_block,
+    FALSE AS is_clear
   FROM btracker_backend.get_impacted_balances_batch( _from, _to, __hf01_block ) AS gib
+
+  UNION ALL
+
+  -- #61: a balance-clearing op (clear_null_account_balance / consolidate_treasury_balance)
+  -- empties every liquid asset of its account. HAF emits no debit for it, so a marker row
+  -- per asset is added here; apply_account_clears below turns it into the exact debit.
+  SELECT
+    ac.account_id,
+    n.nai,
+    0::BIGINT AS balance,
+    ac.source_op,
+    ac.op_type_id,
+    ac.source_op_block,
+    (-1)::SMALLINT AS trx_in_block,
+    TRUE AS is_clear
+  FROM btracker_backend.account_clears_in_range( _from, _to ) AS ac
+  CROSS JOIN (VALUES (13), (21), (37)) AS n(nai)
 ),
 
 /*
@@ -331,7 +349,8 @@ union_latest_balance_with_impacted_balances AS (
     cp.source_op,
     cp.op_type_id,
     cp.source_op_block,
-    cp.trx_in_block
+    cp.trx_in_block,
+    cp.is_clear
   FROM ops_in_range cp
 
   UNION ALL
@@ -346,8 +365,66 @@ union_latest_balance_with_impacted_balances AS (
     glb.source_op,
     NULL::SMALLINT AS op_type_id,
     glb.source_op_block,
-    NULL::SMALLINT AS trx_in_block
+    NULL::SMALLINT AS trx_in_block,
+    FALSE AS is_clear
   FROM get_latest_balance glb
+),
+
+/*
+ * ===================================================================================
+ * CTE: apply_account_clears (#61)
+ * ===================================================================================
+ * Turns each clear marker into a debit of exactly the balance its account holds at that
+ * op, so the running sum below reaches 0 there and continues from 0 - and the history
+ * gets the debit row hived performs (at the clearing op's source_op).
+ *
+ * grp numbers the stretches between clears: a marker closes the stretch it ends (the
+ * clears strictly before it), so SUM(balance) over its stretch is the starting balance
+ * (synthetic row, stretch 0) plus every delta since the previous clear. A marker that
+ * debits nothing is dropped, and a partition left with no real row (an asset the account
+ * never held, touched only by markers) is dropped whole, synthetic row included, so it
+ * neither writes a row nor rewrites source_op to 0.
+ *
+ * Only the accounts cleared in this range take the window path; every other row passes
+ * straight through.
+ */
+apply_account_clears AS (
+  SELECT
+    u.account_id, u.nai, u.balance, u.balance_seq_no, u.source_op, u.op_type_id,
+    u.source_op_block, u.trx_in_block
+  FROM union_latest_balance_with_impacted_balances u
+  WHERE u.account_id NOT IN (SELECT o.account_id FROM ops_in_range o WHERE o.is_clear)
+
+  UNION ALL
+
+  SELECT
+    r.account_id, r.nai, r.balance, r.balance_seq_no, r.source_op, r.op_type_id,
+    r.source_op_block, r.trx_in_block
+  FROM (
+    SELECT
+      d.*,
+      COUNT(*) FILTER (WHERE d.source_op > 0 AND (NOT d.is_clear OR d.balance <> 0))
+        OVER (PARTITION BY d.account_id, d.nai) AS real_rows
+    FROM (
+      SELECT
+        g.account_id, g.nai,
+        CASE WHEN g.is_clear
+             THEN -SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp)
+             ELSE g.balance END AS balance,
+        g.balance_seq_no, g.source_op, g.op_type_id, g.source_op_block, g.trx_in_block, g.is_clear
+      FROM (
+        SELECT
+          u.*,
+          SUM(u.is_clear::INT) OVER (PARTITION BY u.account_id, u.nai ORDER BY u.source_op
+                                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+            - u.is_clear::INT AS grp
+        FROM union_latest_balance_with_impacted_balances u
+        WHERE u.account_id IN (SELECT o.account_id FROM ops_in_range o WHERE o.is_clear)
+      ) g
+    ) d
+  ) r
+  WHERE (NOT r.is_clear OR r.balance <> 0)
+    AND r.real_rows > 0
 ),
 
 /*
@@ -429,7 +506,7 @@ sum_balances AS (
     ulb.op_type_id,
     ulb.source_op_block,
     ulb.trx_in_block
-  FROM union_latest_balance_with_impacted_balances ulb
+  FROM apply_account_clears ulb
   WINDOW
     w_asc AS (PARTITION BY ulb.account_id, ulb.nai ORDER BY ulb.source_op, ulb.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
 ),

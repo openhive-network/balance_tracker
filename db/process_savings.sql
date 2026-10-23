@@ -485,6 +485,12 @@ transfers_from_canceled_in_query AS (
  *   3. canceled_transfers_in_query: Cancel/fill matched in-batch
  *   4. canceled_transfers_already_inserted: Cancel/fill matched from table
  */
+-- #61: balance-clearing ops in range (see btracker_backend.account_clears_in_range).
+account_clears AS MATERIALIZED (
+  SELECT ac.account_id, ac.source_op, ac.op_type_id, ac.source_op_block
+  FROM btracker_backend.account_clears_in_range( _from, _to ) AS ac
+),
+
 union_operations AS MATERIALIZED (
 -- Transfers FROM savings (withdrawal requests)
   SELECT
@@ -547,6 +553,23 @@ union_operations AS MATERIALIZED (
 	  delete_transfer_id_from_table,
 	  insert_transfer_id_to_table
   FROM canceled_transfers_already_inserted
+
+  UNION ALL
+
+-- #61: a clear marker per savings asset; apply_savings_clears turns it into the debit.
+  SELECT
+    ac.account_id,
+    n.nai,
+    0 AS balance,
+    0 AS savings_withdraw_request,
+    0 AS request_id,
+    ac.op_type_id,
+    ac.source_op,
+    ac.source_op_block,
+    FALSE AS delete_transfer_id_from_table,
+    FALSE AS insert_transfer_id_to_table
+  FROM account_clears ac
+  CROSS JOIN (VALUES (13), (21)) AS n(nai)
 ---------------------------------------------------------------------------------------
 ),
 
@@ -649,6 +672,55 @@ union_operations_with_latest_balance AS (
 ---------------------------------------------------------------------------------------
 ),
 
+-- #61: the same reset as apply_account_clears in process_balances.sql. A clear marker
+-- (its source_op is a clearing op) closes the stretch since the previous clear and debits
+-- exactly its sum, so the running balance is 0 at the op; a marker that debits nothing is
+-- dropped, and a partition touched only by markers is dropped whole. The pending-request
+-- count is untouched (hived's clear does not cancel savings withdrawals). Only the
+-- cleared accounts take the window path.
+apply_savings_clears AS (
+  SELECT u.*
+  FROM union_operations_with_latest_balance u
+  WHERE u.account_id NOT IN (SELECT ac.account_id FROM account_clears ac)
+
+  UNION ALL
+
+  SELECT
+    r.account_id, r.nai, r.balance, r.balance_seq_no, r.savings_withdraw_request, r.request_id,
+    r.op_type_id, r.source_op, r.source_op_block, r.delete_transfer_id_from_table,
+    r.insert_transfer_id_to_table
+  FROM (
+    SELECT
+      d.*,
+      COUNT(*) FILTER (WHERE d.source_op > 0 AND (NOT d.is_clear OR d.balance <> 0))
+        OVER (PARTITION BY d.account_id, d.nai) AS real_rows
+    FROM (
+      SELECT
+        g.account_id, g.nai,
+        CASE WHEN g.is_clear
+             THEN -SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp)
+             ELSE g.balance END AS balance,
+        g.balance_seq_no, g.savings_withdraw_request, g.request_id, g.op_type_id, g.source_op,
+        g.source_op_block, g.delete_transfer_id_from_table, g.insert_transfer_id_to_table,
+        g.is_clear
+      FROM (
+        SELECT
+          c.*,
+          SUM(c.is_clear::INT) OVER (PARTITION BY c.account_id, c.nai ORDER BY c.source_op
+                                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+            - c.is_clear::INT AS grp
+        FROM (
+          SELECT u.*, u.source_op IN (SELECT ac.source_op FROM account_clears ac) AS is_clear
+          FROM union_operations_with_latest_balance u
+          WHERE u.account_id IN (SELECT ac.account_id FROM account_clears ac)
+        ) c
+      ) g
+    ) d
+  ) r
+  WHERE (NOT r.is_clear OR r.balance <> 0)
+    AND r.real_rows > 0
+),
+
 /*
  * ===================================================================================
  * CTE: prepare_savings_history
@@ -682,7 +754,7 @@ prepare_savings_history AS (
     uo.op_type_id,
     uo.source_op_block,
     ROW_NUMBER() OVER w_desc AS rn
-  FROM union_operations_with_latest_balance uo
+  FROM apply_savings_clears uo
   WINDOW
     w_asc AS (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op, uo.balance ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
     w_desc AS (PARTITION BY uo.account_id, uo.nai ORDER BY uo.source_op DESC, uo.balance DESC)

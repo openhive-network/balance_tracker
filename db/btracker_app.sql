@@ -1122,6 +1122,9 @@ BEGIN
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
+  -- #61: an install upgraded mid-sync processed its earlier blocks without the clears
+  -- (a no-op for a sync that ran this code throughout; skipped while indexes are absent).
+  PERFORM btracker_backend.rebuild_cleared_accounts_if_needed();
   RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
 END
 $$;
