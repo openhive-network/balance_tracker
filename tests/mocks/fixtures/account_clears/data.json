@@ -8,7 +8,7 @@
       "body": {
         "type": "transfer_operation",
         "value": {
-          "from": "dantheman",
+          "from": "poloniex",
           "to": "null",
           "amount": {
             "nai": "@@000000021",
@@ -27,7 +27,7 @@
       "body": {
         "type": "transfer_to_savings_operation",
         "value": {
-          "from": "dantheman",
+          "from": "poloniex",
           "to": "null",
           "amount": {
             "nai": "@@000000021",
@@ -64,7 +64,7 @@
       "body": {
         "type": "comment_benefactor_reward_operation",
         "value": {
-          "author": "dantheman",
+          "author": "poloniex",
           "permlink": "clear-test",
           "benefactor": "null",
           "hbd_payout": {
@@ -94,7 +94,7 @@
       "body": {
         "type": "transfer_operation",
         "value": {
-          "from": "dantheman",
+          "from": "poloniex",
           "to": "null",
           "amount": {
             "nai": "@@000000021",
@@ -136,7 +136,7 @@
       "body": {
         "type": "comment_benefactor_reward_operation",
         "value": {
-          "author": "dantheman",
+          "author": "poloniex",
           "permlink": "clear-test-2",
           "benefactor": "null",
           "hbd_payout": {

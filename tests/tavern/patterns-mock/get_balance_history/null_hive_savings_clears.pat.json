@@ -1,1 +1,24 @@
-{}
+{
+  "operations_result": [
+    {
+      "balance": "0",
+      "balance_change": "-2",
+      "block_num": 90000058,
+      "op_type_id": 65,
+      "operation_id": "386547305748103170",
+      "prev_balance": "2",
+      "timestamp": "2016-09-16T00:00:12"
+    },
+    {
+      "balance": "2",
+      "balance_change": "2",
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "operation_id": "386547305748103169",
+      "prev_balance": "0",
+      "timestamp": "2016-09-16T00:00:12"
+    }
+  ],
+  "total_operations": 2,
+  "total_pages": 1
+}
