@@ -340,7 +340,7 @@ get_latest_balance AS (
  *
  * And balance_seq_no will be: 5, 6, 7, 8 (continuing the sequence)
  */
-union_latest_balance_with_impacted_balances AS (
+union_latest_balance_with_impacted_balances AS NOT MATERIALIZED (
   SELECT
     cp.account_id,
     cp.nai,
@@ -393,7 +393,8 @@ apply_account_clears AS (
     u.account_id, u.nai, u.balance, u.balance_seq_no, u.source_op, u.op_type_id,
     u.source_op_block, u.trx_in_block
   FROM union_latest_balance_with_impacted_balances u
-  WHERE u.account_id NOT IN (SELECT o.account_id FROM ops_in_range o WHERE o.is_clear)
+  -- NOT EXISTS, not NOT IN: a row with a NULL account must keep failing loudly at the insert
+  WHERE NOT EXISTS (SELECT 1 FROM ops_in_range o WHERE o.is_clear AND o.account_id = u.account_id)
 
   UNION ALL
 
@@ -409,7 +410,7 @@ apply_account_clears AS (
       SELECT
         g.account_id, g.nai,
         CASE WHEN g.is_clear
-             THEN -SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp)
+             THEN (-SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp))::BIGINT
              ELSE g.balance END AS balance,
         g.balance_seq_no, g.source_op, g.op_type_id, g.source_op_block, g.trx_in_block, g.is_clear
       FROM (
@@ -419,7 +420,7 @@ apply_account_clears AS (
                                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
             - u.is_clear::INT AS grp
         FROM union_latest_balance_with_impacted_balances u
-        WHERE u.account_id IN (SELECT o.account_id FROM ops_in_range o WHERE o.is_clear)
+        WHERE EXISTS (SELECT 1 FROM ops_in_range o WHERE o.is_clear AND o.account_id = u.account_id)
       ) g
     ) d
   ) r

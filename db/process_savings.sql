@@ -639,7 +639,7 @@ get_latest_balance AS (
  *
  * After this union, the data is ready for SUM() OVER to compute running balances.
  */
-union_operations_with_latest_balance AS (
+union_operations_with_latest_balance AS NOT MATERIALIZED (
   SELECT
     account_id,
     nai,
@@ -681,7 +681,8 @@ union_operations_with_latest_balance AS (
 apply_savings_clears AS (
   SELECT u.*
   FROM union_operations_with_latest_balance u
-  WHERE u.account_id NOT IN (SELECT ac.account_id FROM account_clears ac)
+  -- NOT EXISTS, not NOT IN: a row with a NULL account must keep failing loudly at the insert
+  WHERE NOT EXISTS (SELECT 1 FROM account_clears ac WHERE ac.account_id = u.account_id)
 
   UNION ALL
 
@@ -698,7 +699,7 @@ apply_savings_clears AS (
       SELECT
         g.account_id, g.nai,
         CASE WHEN g.is_clear
-             THEN -SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp)
+             THEN (-SUM(g.balance) OVER (PARTITION BY g.account_id, g.nai, g.grp))::BIGINT
              ELSE g.balance END AS balance,
         g.balance_seq_no, g.savings_withdraw_request, g.request_id, g.op_type_id, g.source_op,
         g.source_op_block, g.delete_transfer_id_from_table, g.insert_transfer_id_to_table,
@@ -712,7 +713,7 @@ apply_savings_clears AS (
         FROM (
           SELECT u.*, u.source_op IN (SELECT ac.source_op FROM account_clears ac) AS is_clear
           FROM union_operations_with_latest_balance u
-          WHERE u.account_id IN (SELECT ac.account_id FROM account_clears ac)
+          WHERE EXISTS (SELECT 1 FROM account_clears ac WHERE ac.account_id = u.account_id)
         ) c
       ) g
     ) d

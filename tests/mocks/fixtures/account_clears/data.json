@@ -40,8 +40,103 @@
     },
     {
       "block_num": 90000058,
-      "op_type_id": 65,
+      "op_type_id": 2,
       "op_pos": 2,
+      "trx_in_block": 2,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "250",
+            "precision": 3
+          },
+          "memo": "burn"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "op_pos": 3,
+      "trx_in_block": 3,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "4",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 4,
+      "trx_in_block": 4,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          },
+          "memo": "old treasury"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 5,
+      "trx_in_block": 5,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "300",
+            "precision": 3
+          },
+          "memo": "old treasury"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "op_pos": 6,
+      "trx_in_block": 6,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "3",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 65,
+      "op_pos": 7,
       "trx_in_block": -1,
       "body": {
         "type": "clear_null_account_balance_operation",
@@ -49,7 +144,35 @@
           "total_cleared": [
             {
               "nai": "@@000000021",
-              "amount": "1002",
+              "amount": "426705302",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "254",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 71,
+      "op_pos": 8,
+      "trx_in_block": -1,
+      "body": {
+        "type": "consolidate_treasury_balance_operation",
+        "value": {
+          "total_moved": [
+            {
+              "nai": "@@000000021",
+              "amount": "2003",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "300",
               "precision": 3
             }
           ]
@@ -59,7 +182,7 @@
     {
       "block_num": 90000058,
       "op_type_id": 63,
-      "op_pos": 3,
+      "op_pos": 9,
       "trx_in_block": -1,
       "body": {
         "type": "comment_benefactor_reward_operation",
@@ -116,7 +239,7 @@
           "total_cleared": [
             {
               "nai": "@@000000021",
-              "amount": "530",
+              "amount": "550",
               "precision": 3
             },
             {

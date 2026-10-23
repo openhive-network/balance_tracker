@@ -1,5 +1,5 @@
 ---
-  test_name: btracker PostgREST - balance-clearing ops on null (#61)
+  test_name: btracker PostgREST - balance-clearing ops on null and steem.dao (#61)
 
   marks:
     - patterntest

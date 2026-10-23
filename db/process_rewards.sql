@@ -362,8 +362,13 @@ union_operations_with_vesting_balance AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM calculate_vests_from_curation
+  FROM calculate_vests_from_curation cvc
   WHERE payout_must_be_claimed
+    -- #61: as in get_impacted_bal (the lifetime info totals keep every reward)
+    AND NOT EXISTS (
+      SELECT 1 FROM reward_clears rc
+      WHERE rc.account_name = cvc.account_name AND rc.last_clear_op > cvc.source_op
+    )
 
 ),
 

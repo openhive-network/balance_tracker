@@ -231,7 +231,14 @@ echo "  - Routed power-down operations (issue #54 regression)..."
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$VESTING_ROUTED_DATA')"
 
-echo "  - Balance-clearing operations on 'null' (issue #61 regression)..."
+echo "  - Balance-clearing operations on 'null' and 'steem.dao' (issue #61 regression)..."
+# steem.dao (the pre-HF24 treasury) and hive.fund were created after block 5M, so the
+# replayed base does not have them: add them, as hived's account creation would.
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
+    -c "INSERT INTO hafd.accounts (id, name, block_num)
+        SELECT (SELECT max(a.id) FROM hafd.accounts a) + n.ord, n.name, 90000058
+        FROM unnest(ARRAY['steem.dao', 'hive.fund']) WITH ORDINALITY AS n(name, ord)
+        WHERE NOT EXISTS (SELECT 1 FROM hafd.accounts a WHERE a.name = n.name)"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on \
     -c "SELECT btracker_backend.insert_mock_operations('$ACCOUNT_CLEARS_DATA')"
 echo ""
