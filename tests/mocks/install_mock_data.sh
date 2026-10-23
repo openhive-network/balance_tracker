@@ -41,7 +41,7 @@
 #       ├── delays/              # Delayed voting (HF24) test data
 #       ├── savings_pending/     # Pending savings withdrawal regression data
 #       ├── multi_balance_ops/   # Multi-balance operation regression data
-#       ├── account_clears/      # clear_null_account_balance on 'null' (issue #61)
+#       ├── account_clears/      # clears of 'null' and 'steem.dao' (issue #61)
 #       └── escrow/              # Escrow operations test data
 #
 # BLOCK RANGE:

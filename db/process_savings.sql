@@ -639,7 +639,7 @@ get_latest_balance AS (
  *
  * After this union, the data is ready for SUM() OVER to compute running balances.
  */
-union_operations_with_latest_balance AS NOT MATERIALIZED (
+union_operations_with_latest_balance AS (
   SELECT
     account_id,
     nai,

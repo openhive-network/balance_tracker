@@ -87,8 +87,10 @@ $$;
 -- after it: process_balances and process_savings reset the running balance at the op,
 -- process_rewards zeroes the account before applying later rewards.
 --
--- Known limits (not reached on mainnet as of 2026-10: null's two power-ups predate HF24,
--- and btracker has no savings or reward rows for steem.dao):
+-- Known limits, not reached on mainnet (checked on a full node 2026-10-23: the only
+-- transfer_to_vesting ops to either account are null's at blocks 23,852,801 and
+-- 25,269,590, before HF24 at 47,797,680; btracker holds no savings or reward rows for
+-- steem.dao):
 --   * account_withdraws.delayed_vests is not reset (hived also clears the delayed votes
 --     HF24 introduced), so a post-HF24 power-up to either account would leave it behind.
 --   * hive.fund's side of a consolidate stays as HAF's collector emits it: total_moved is
@@ -110,8 +112,8 @@ DECLARE
   _op_clear_null  INT := btracker_backend.op_clear_null_account_balance();
   _op_consolidate INT := btracker_backend.op_consolidate_treasury_balance();
 BEGIN
-  -- Never returns a NULL account: callers use NOT IN over account_id, which a NULL would
-  -- turn into "no rows at all". (Both accounts exist on any chain that emits these ops.)
+  -- Never returns a NULL account: callers split rows by EXISTS over account_id. (Both
+  -- accounts exist on any chain that emits these ops.)
   RETURN QUERY
   SELECT av.id::INT, ob.id::BIGINT, ob.op_type_id::SMALLINT, ob.block_num::INT
   FROM _btracker_ops_batch ob

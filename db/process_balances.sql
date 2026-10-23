@@ -340,7 +340,7 @@ get_latest_balance AS (
  *
  * And balance_seq_no will be: 5, 6, 7, 8 (continuing the sequence)
  */
-union_latest_balance_with_impacted_balances AS NOT MATERIALIZED (
+union_latest_balance_with_impacted_balances AS (
   SELECT
     cp.account_id,
     cp.nai,
