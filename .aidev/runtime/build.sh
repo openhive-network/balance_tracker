@@ -3,8 +3,9 @@
 # and print the digest-pinned reference to put in .aidev/project.yaml's
 # `environment.image`. See .aidev/README.md.
 #
-# The tag is `aidev-<hash>`, the hash of the image input (the Dockerfile; every
-# FROM is digest-pinned); the registry cleanup policy keeps `aidev-*` tags. When
+# The tag is `aidev-<hash>`, the hash of the image input (the Dockerfile, built on
+# its default BASE_IMAGE as that tag stands at the build); the registry cleanup
+# policy keeps `aidev-*` tags. When
 # <repository>:aidev-<hash> is already in the registry nothing is built: the script
 # prints that image's digest.
 #
@@ -81,9 +82,9 @@ region_builder() {
 }
 builder="$(region_builder)"
 
-# The FROM is digest-pinned, so no --pull. No provenance, so the pushed digest is a
-# plain image manifest.
-build=(docker buildx build ${builder:+--builder "$builder"} --provenance=false -f .aidev/runtime/Dockerfile -t "$REPOSITORY:$TAG")
+# --pull: the base is a moving tag. No provenance, so the pushed digest is a plain
+# image manifest.
+build=(docker buildx build ${builder:+--builder "$builder"} --pull --provenance=false -f .aidev/runtime/Dockerfile -t "$REPOSITORY:$TAG")
 if [ "${1:-}" != "--push" ]; then
     "${build[@]}" --load "$context" >&2
     echo "$REPOSITORY:$TAG"
