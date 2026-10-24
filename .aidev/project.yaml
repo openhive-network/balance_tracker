@@ -26,8 +26,14 @@ branches:
 # How this project's suites execute (#13892): one kind, stated once.
 environment:
   kind: "container"
-  # Built by .aidev/runtime/build.sh from .aidev/runtime/Dockerfile (its only input).
-  image: "registry.gitlab.syncad.com/hive/balance_tracker/aidev-tests@sha256:6304cb72c3c60d54129cf86c83a0f60171473c6735848da3236c79fc93a5c35b"
+  # The tool versions are hive/common-ci-configuration's: the runtime follows its
+  # HAF-app test runner, the image CI's test jobs run in, and AIDEV rebuilds
+  # .aidev/runtime/Dockerfile on it whenever the tag moves.
+  base: {image: "registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-test-runner:develop", follow: true}
+  build: {dockerfile: ".aidev/runtime/Dockerfile", context: ".aidev/runtime"}
+  # The seed pin: the Dockerfile built on the base by .aidev/runtime/build.sh. Under a
+  # followed base it is not what the suites run in and need not move with the base.
+  image: "registry.gitlab.syncad.com/hive/balance_tracker/aidev-tests@sha256:c4e0e7f9c15ef37912be3ec27272712e645989e3405fa92e89ce8f00151cde3f"
   inputs: [".aidev/runtime/Dockerfile"]
 
 issues:
