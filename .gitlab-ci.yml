@@ -70,7 +70,7 @@ variables:
   # Set to "true" to run poetry update before install (uses latest dependency versions)
   TEST_WITH_LATEST_DEPENDENCIES: "false"
   # Common CI configuration reference
-  COMMON_CI_REF: "22af333319271fed9fede128d31c384f38d4b93c"
+  COMMON_CI_REF: "5cfd16ecbdf62978633c88a784d39fe6098dc25c"
   # TEMPORARY test of common-ci-configuration#39 (do not merge)
   PYTHON_TEST_TOOLS_TAG: "22af333319271fed9fede128d31c384f38d4b93c"
   NODE_TEST_TOOLS_TAG: "22af333319271fed9fede128d31c384f38d4b93c"
@@ -96,7 +96,7 @@ include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: 22af333319271fed9fede128d31c384f38d4b93c
+  ref: 5cfd16ecbdf62978633c88a784d39fe6098dc25c
   file:
   - '/templates/base.gitlab-ci.yml'
   - '/templates/docker_image_jobs.gitlab-ci.yml'
@@ -1129,3 +1129,36 @@ cleanup_haf_cache_manual:
   - public-runner-docker
   - data-cache-storage
   - fast
+
+# TEMPORARY diagnostic for common-ci-configuration#39 (do not merge)
+dind_ipv6_diag:
+  extends: .docker_image_builder_job_template
+  stage: detect
+  image: "${HAF_APP_TEST_RUNNER_IMAGE}"
+  needs: []
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_CERT_PATH: /certs/client
+    DOCKER_TLS_VERIFY: "1"
+    SRV_IMAGE: registry.gitlab.syncad.com/hive/common-ci-configuration/python-test-tools:def5b1305654921d3aed9db76ce41242c102f816
+    NET_IMAGE: registry.gitlab.syncad.com/hive/common-ci-configuration/mirrors/docker-29.9.2-dind:latest
+  script:
+    - |
+      set -x
+      uname -a
+      docker version --format 'client {{.Client.Version}} server {{.Server.Version}}'
+      docker info 2>/dev/null | grep -iE 'kernel|driver|iptables|firewall|experimental|ipv6' || true
+      getent hosts docker; getent ahosts docker
+      docker network create diag-net
+      docker run -d --name v4only --network diag-net -p 3000:3000 --entrypoint python3 "$SRV_IMAGE" -m http.server --bind 0.0.0.0 3000
+      docker run -d --name dual --network diag-net -p 3001:3001 --entrypoint python3 "$SRV_IMAGE" -m http.server --bind :: 3001
+      sleep 5
+      V6=$(getent hosts docker | awk '{print $1}'); V4=$(getent ahostsv4 docker | awk '{print $1; exit}')
+      for p in 3000 3001; do
+        curl -gs -o /dev/null -w "v6 $p %{http_code}\n" --max-time 5 "http://[$V6]:$p/" || echo "v6 $p FAIL rc=$?"
+        curl -s -o /dev/null -w "v4 $p %{http_code}\n" --max-time 5 "http://$V4:$p/" || echo "v4 $p FAIL rc=$?"
+      done
+      docker network inspect diag-net | python3 -c "import json,sys;d=json.load(sys.stdin)[0];print('EnableIPv6',d['EnableIPv6'],d['IPAM']['Config'],[c.get('IPv6Address') for c in d['Containers'].values()])"
+      docker run --rm --privileged --net=host --entrypoint sh "$NET_IMAGE" -c 'ip -6 addr; ip -4 addr; netstat -ltnp 2>/dev/null || ss -ltnp; ps -o args | grep [d]ocker-proxy; echo == v6 nat; ip6tables -t nat -S 2>&1 | head -40; echo == v6 filter; ip6tables -S 2>&1 | head -60; echo == v4 nat; iptables -t nat -S 2>&1 | head -40; echo == raw6; ip6tables -t raw -S 2>&1 | head -20; sysctl net.ipv6.conf.all.forwarding net.ipv6.conf.all.disable_ipv6' || true
+  tags:
+  - public-runner-docker
