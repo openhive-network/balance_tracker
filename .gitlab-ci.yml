@@ -49,7 +49,7 @@ variables:
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
   # Centralized test runner image with Docker, pytest, tavern, and all test dependencies
-  HAF_APP_TEST_RUNNER_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-test-runner:3.1"
+  HAF_APP_TEST_RUNNER_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-test-runner:7b7ce454e61b198d563ef77972eb9a2a8779c824"
   # =============================================================================
   # Upstream Image Detection (No Submodules Required)
   # =============================================================================
@@ -70,11 +70,11 @@ variables:
   # Set to "true" to run poetry update before install (uses latest dependency versions)
   TEST_WITH_LATEST_DEPENDENCIES: "false"
   # Common CI configuration reference
-  COMMON_CI_REF: "4b140d47f8f38b5250dda182bb04e5c051ebbe17"
+  COMMON_CI_REF: "7b7ce454e61b198d563ef77972eb9a2a8779c824"
   # TEMPORARY test of common-ci-configuration#33 (do not merge)
-  PYTHON_TEST_TOOLS_TAG: "4b140d47f8f38b5250dda182bb04e5c051ebbe17"
-  NODE_TEST_TOOLS_TAG: "4b140d47f8f38b5250dda182bb04e5c051ebbe17"
-  DOCKER_BUILDER_TAG: "4b140d47f8f38b5250dda182bb04e5c051ebbe17"
+  PYTHON_TEST_TOOLS_TAG: "7b7ce454e61b198d563ef77972eb9a2a8779c824"
+  NODE_TEST_TOOLS_TAG: "7b7ce454e61b198d563ef77972eb9a2a8779c824"
+  DOCKER_BUILDER_TAG: "7b7ce454e61b198d563ef77972eb9a2a8779c824"
   COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}"
 
 # AIDEV branches (ai/*, session/*) and pushes to aidev/integration run no
@@ -95,7 +95,7 @@ include:
 - template: Workflows/Branch-Pipelines.gitlab-ci.yml
 # All CI templates from common-ci-configuration (Phase 2: direct includes)
 - project: 'hive/common-ci-configuration'
-  ref: 4b140d47f8f38b5250dda182bb04e5c051ebbe17
+  ref: 7b7ce454e61b198d563ef77972eb9a2a8779c824
   file:
   - '/templates/base.gitlab-ci.yml'
   - '/templates/docker_image_jobs.gitlab-ci.yml'
