@@ -106,16 +106,22 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/w" -w /w \
 
 ## The test runtime image (`runtime/`)
 
-The checks run in a container with your uid: `python:3.14-alpine` (hive/tests_api needs
-Python >= 3.14), the `postgrest` binary of `postgrest:v12.0.2`, `bash`, `psql` and
-`shellcheck` from Alpine's repository, pinned `tavern`, `pytest`, `pytest-xdist`,
-`psycopg2-binary` and hive/tests_api (`validate_response`, the tavern tests'
-comparator) at the commit of the `tests_api` submodule (`TESTS_API_COMMIT`), and
-`haf_app_driver.py` from hive/common-ci-configuration at `DRIVER_COMMIT`
-(checksum-pinned); all bases pinned by digest, nothing installed at run time.
+The checks run in a container with your uid, built from `runtime/Dockerfile` on
+hive/common-ci-configuration's `haf-app-test-runner:develop` — the image CI's test jobs
+run in — which `project.yaml` declares as a followed base (`environment.base`,
+`follow: true`). The tool versions (Python, `bash`, `psql`, `shellcheck`, `postgrest`,
+`tavern`, `pytest`, `pytest-xdist`, `psycopg2`) are that image's, defined once in
+common-ci-configuration's `docker-bake.hcl`; nothing here pins one. The Dockerfile adds
+only hive/tests_api (`validate_response`, the tavern tests' comparator) at the commit of
+the `tests_api` submodule (`TESTS_API_COMMIT`) and `haf_app_driver.py` from
+hive/common-ci-configuration at `DRIVER_COMMIT` (checksum-pinned). Nothing is installed
+at run time.
 
-When `runtime/Dockerfile` changes (e.g. the `tests_api` submodule or the driver moves),
-rebuild and re-pin **in the same commit**:
+AIDEV resolves the base tag before every run and rebuilds the Dockerfile on it when the
+tag or the Dockerfile moves, so a new runner in common-ci-configuration needs no commit
+here. `environment.image` is only the seed pin AIDEV's admission reads; it does not have
+to follow the base. When `runtime/Dockerfile` changes (e.g. the `tests_api` submodule or
+the driver moves), re-pin the seed **in the same commit**:
 
 ```bash
 .aidev/runtime/build.sh --push   # registry digest if aidev-<input hash> exists, else build + push
