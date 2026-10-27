@@ -280,6 +280,106 @@
           "payout_must_be_claimed": true
         }
       }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 3,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 77,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_completed_operation",
+        "value": {
+          "from_account": "poloniex",
+          "to_account": "null",
+          "hive_vested": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          },
+          "vesting_shares_received": {
+            "nai": "@@000000037",
+            "amount": "4000000000",
+            "precision": 6
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 65,
+      "op_pos": 2,
+      "trx_in_block": -1,
+      "body": {
+        "type": "clear_null_account_balance_operation",
+        "value": {
+          "total_cleared": [
+            {
+              "nai": "@@000000021",
+              "amount": "2003",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000062,
+      "op_type_id": 3,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000062,
+      "op_type_id": 77,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_completed_operation",
+        "value": {
+          "from_account": "poloniex",
+          "to_account": "null",
+          "hive_vested": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          },
+          "vesting_shares_received": {
+            "nai": "@@000000037",
+            "amount": "2000000000",
+            "precision": 6
+          }
+        }
+      }
     }
   ]
 }

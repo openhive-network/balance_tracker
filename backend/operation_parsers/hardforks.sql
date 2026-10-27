@@ -87,12 +87,11 @@ $$;
 -- after it: process_balances and process_savings reset the running balance at the op,
 -- process_rewards zeroes the account before applying later rewards.
 --
--- Known limits, not reached on mainnet (checked on a full node 2026-10-23: the only
--- transfer_to_vesting ops to either account are null's at blocks 23,852,801 and
--- 25,269,590, before HF24 at 47,797,680; btracker holds no savings or reward rows for
--- steem.dao):
---   * account_withdraws.delayed_vests is not reset (hived also clears the delayed votes
---     HF24 introduced), so a post-HF24 power-up to either account would leave it behind.
+-- process_withdrawals resets account_withdraws.delayed_vests at the same ops (hived clears
+-- the delayed votes HF24 introduced along with the vesting shares).
+--
+-- Known limit, not reached on mainnet (checked on a full node 2026-10-23: btracker holds no
+-- savings or reward rows for steem.dao):
 --   * hive.fund's side of a consolidate stays as HAF's collector emits it: total_moved is
 --     credited as liquid, while hived moves savings and pending rewards into hive.fund's
 --     savings and rewards.
