@@ -341,6 +341,36 @@
       }
     },
     {
+      "block_num": 90000061,
+      "op_type_id": 63,
+      "op_pos": 3,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test-3",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "5",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "4",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "3000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
       "block_num": 90000062,
       "op_type_id": 3,
       "op_pos": 0,

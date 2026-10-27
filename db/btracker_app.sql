@@ -649,6 +649,19 @@ BEGIN
   );
   PERFORM hive.app_register_table(__schema_name, 'account_rc_delegations', __schema_name);
 
+  -- One-off data repairs and whether this install needs them (plain table, not registered:
+  -- a repair must not be rewound). A fresh install processes every block with the current
+  -- code, so it needs none. See btracker_backend.repair_cleared_accounts (#61).
+  CREATE TABLE IF NOT EXISTS btracker_repairs
+  (
+    name       TEXT      NOT NULL PRIMARY KEY,
+    outcome    TEXT      NOT NULL,
+    at_block   INT,
+    applied_at TIMESTAMP NOT NULL DEFAULT now()
+  );
+  INSERT INTO btracker_repairs (name, outcome, at_block)
+  VALUES ('cleared_accounts', 'not needed: fresh install', 0);
+
   ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
   -- Non-forking avoids hive_rowid indexes during massive sync.
   -- Also required to match hafbe_app.sql's post-creation sequence so that
@@ -707,6 +720,16 @@ $$;
 
 -- Installs that predate the reloptions return early above.
 SELECT set_history_tables_insert_only_reloptions();
+
+-- Installs that predate btracker_repairs return early above: they get it empty, which marks
+-- them for the repairs (fresh installs filled it when they created their tables).
+CREATE TABLE IF NOT EXISTS btracker_repairs
+(
+  name       TEXT      NOT NULL PRIMARY KEY,
+  outcome    TEXT      NOT NULL,
+  at_block   INT,
+  applied_at TIMESTAMP NOT NULL DEFAULT now()
+);
 
 -- Early block processing: hive.app_next_iteration delivers irreversible blocks
 -- while hived still replays with psql-massive-index-policy=keep-monotonic, before
@@ -993,6 +1016,11 @@ BEGIN
   IF hive.app_is_forking(_context_name) AND hive.app_context_is_attached(_context_name) THEN
     RAISE WARNING 'btracker: context % is already forking: the rollup backfill will be copied row by row into the shadow tables and bloat them (haf#346). Call finalize_massive_sync_before_forking() before hive.app_context_set_forking().', _context_name;
   END IF;
+
+  -- #61: an install upgraded in the middle of massive sync repairs null/steem.dao here, while
+  -- the context is still non-forking (nothing is logged); the rollup backfill below then
+  -- builds their rollups from the repaired history. A no-op once recorded in btracker_repairs.
+  PERFORM btracker_backend.repair_cleared_accounts(_context_name, FALSE);
 
 
   ALTER TABLE account_balance_history SET LOGGED;
