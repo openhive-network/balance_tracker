@@ -32,9 +32,12 @@ SELECT set_config('btracker_test.schema', :'schema', false);
 SELECT set_config('btracker_test.require_clears', :'require_clears', false);
 BEGIN;
 
+-- The accounts the clearing ops empty. Not every account with a row written by such an op:
+-- hive.fund is credited by each consolidate and is no part of the repair.
 CREATE TEMP TABLE t_accounts ON COMMIT DROP AS
 SELECT DISTINCT h.account
 FROM account_balance_history h
+JOIN accounts_view av ON av.id = h.account AND av.name IN ('null', 'steem.dao')
 WHERE h.op_type_id IN (btracker_backend.op_clear_null_account_balance(),
                        btracker_backend.op_consolidate_treasury_balance());
 
@@ -59,15 +62,17 @@ CREATE TEMP TABLE s_sav ON COMMIT DROP AS SELECT h.account, h.nai, h.op_type_id,
 CREATE TEMP TABLE s_cab ON COMMIT DROP AS SELECT c.account, c.nai, c.balance, c.balance_change_count, c.source_op FROM current_account_balances c WHERE c.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_acs ON COMMIT DROP AS SELECT c.account, c.nai, c.balance, c.balance_change_count, c.source_op, c.savings_withdraw_requests FROM account_savings c WHERE c.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_bt ON COMMIT DROP AS SELECT b.nai, b.holders, b.total FROM balance_totals b;
-CREATE TEMP TABLE s_bday ON COMMIT DROP AS SELECT d.* FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts);
-CREATE TEMP TABLE s_bmon ON COMMIT DROP AS SELECT d.* FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts);
-CREATE TEMP TABLE s_sday ON COMMIT DROP AS SELECT d.* FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts);
-CREATE TEMP TABLE s_smon ON COMMIT DROP AS SELECT d.* FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts);
+CREATE TEMP TABLE s_bday ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts);
+CREATE TEMP TABLE s_bmon ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts);
+CREATE TEMP TABLE s_sday ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts);
+CREATE TEMP TABLE s_smon ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_rew ON COMMIT DROP AS SELECT r.account, r.nai, r.balance FROM account_rewards r WHERE r.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_wd ON COMMIT DROP AS SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_hbd ON COMMIT DROP AS SELECT i.account, i.last_balance FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts);
 
 -- Differences between the live tables and the snapshot, one line per table that differs.
+-- Rollups compare their own columns: HAF adds hive_rowid to registered tables, and a
+-- re-insert renumbers it.
 CREATE FUNCTION pg_temp.repair_mismatches()
 RETURNS TEXT[] LANGUAGE plpgsql AS $f$
 DECLARE
@@ -83,10 +88,10 @@ BEGIN
     ('current_account_balances', 'SELECT c.account, c.nai, c.balance, c.balance_change_count, c.source_op FROM current_account_balances c WHERE c.account IN (SELECT account FROM t_accounts)', 's_cab'),
     ('account_savings', 'SELECT c.account, c.nai, c.balance, c.balance_change_count, c.source_op, c.savings_withdraw_requests FROM account_savings c WHERE c.account IN (SELECT account FROM t_accounts)', 's_acs'),
     ('balance_totals', 'SELECT b.nai, b.holders, b.total FROM balance_totals b', 's_bt'),
-    ('balance_history_by_day', 'SELECT d.* FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)', 's_bday'),
-    ('balance_history_by_month', 'SELECT d.* FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)', 's_bmon'),
-    ('saving_history_by_day', 'SELECT d.* FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)', 's_sday'),
-    ('saving_history_by_month', 'SELECT d.* FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)', 's_smon'),
+    ('balance_history_by_day', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)', 's_bday'),
+    ('balance_history_by_month', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)', 's_bmon'),
+    ('saving_history_by_day', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)', 's_sday'),
+    ('saving_history_by_month', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)', 's_smon'),
     ('account_rewards', 'SELECT r.account, r.nai, r.balance FROM account_rewards r WHERE r.account IN (SELECT account FROM t_accounts)', 's_rew'),
     ('account_withdraws.delayed_vests', 'SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts)', 's_wd'),
     ('account_hbd_interest.last_balance', 'SELECT i.account, i.last_balance FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts)', 's_hbd')
