@@ -146,8 +146,13 @@ $$;
 --     operations after the account's last clear, with the pipelines' own parsers.
 --   * account_hbd_interest: last_balance follows the repaired HBD series and the accrued
 --     hbd_seconds are dropped (they were accrued on the phantom balance; a clean replay would
---     hold a small accrual there instead of 0 - nothing reads it for these two accounts'
---     balances).
+--     hold a small accrual there instead of 0). hbd_seconds_last_update and
+--     hbd_last_interest_payment keep their values (a replay would hold the last clear's
+--     time); with last_balance 0 neither accrues anything. Nothing reads them for these two
+--     accounts' balances.
+--   * On the finalize path (install upgraded in the middle of massive sync) the history
+--     indexes do not exist yet: the reads and deletes of the two accounts' rows scan the
+--     history tables, once, inside a finalize that scans them for the rollups anyway.
 -- Running it again reproduces its own result.
 CREATE OR REPLACE FUNCTION btracker_backend.rebuild_cleared_accounts(_context TEXT)
 RETURNS BIGINT
@@ -168,7 +173,7 @@ DECLARE
   _hf25_block         INT := (SELECT ah.block_num FROM hafd.applied_hardforks ah
                               WHERE ah.hardfork_num = btracker_backend.hf_hbd_interest());
   _head               INT := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
-  _rollups            BOOLEAN := isIndexesCreated();
+  _rollups            BOOLEAN := btracker_backend.history_indexes_exist(_context);
   _rows               BIGINT;
   _acc                RECORD;
   _op                 RECORD;
@@ -374,6 +379,9 @@ BEGIN
     FROM _rb_clears c JOIN accounts_view av ON av.id = c.account
     GROUP BY c.account, av.name
   LOOP
+    -- Only an account with reward rows has anything to recompute (and only then is the
+    -- window since its last clear scanned).
+    IF EXISTS (SELECT 1 FROM account_rewards ar WHERE ar.account = _acc.account) THEN
     WITH ops AS (
       SELECT ov.id, ov.op_type_id, ov.block_num, ov.body_value AS body
       FROM operations_view ov
@@ -415,10 +423,12 @@ BEGIN
                               WHEN 38 THEN s.vests_as_hive ELSE ar.balance END
     FROM sums s
     WHERE ar.account = _acc.account;
+    END IF;
 
     -- ------------------------------------------------------------ delayed vests (HF24+)
     -- Same clamp as process_withdrawals: what was delayed after the last clear.
     _delayed := 0;
+    CONTINUE WHEN NOT EXISTS (SELECT 1 FROM account_withdraws aw WHERE aw.account = _acc.account);
     FOR _op IN
       SELECT r.from_account, r.withdrawn, r.to_account, r.deposited
       FROM operations_view ov
@@ -455,53 +465,87 @@ BEGIN
 END
 $$;
 
--- Run the rebuild once per install, where it neither races the block processor nor goes
--- through HAF's fork-rewind logging:
---   * at the end of install_app.sh (under the processor's install lock in the production
---     image) on an install whose history indexes exist: the context group is detached for
---     the rebuild (HAF rewinds it to its irreversible block, drops the shadow-table triggers
---     and serves irreversible views) and attached again after, so nothing is logged and no
---     fork can undo it;
---   * from finalize_massive_sync_before_forking on an install upgraded in the middle of
---     massive sync: the context is still non-forking there, so nothing is logged either.
--- The btracker_repairs row decides: a fresh install records 'fresh' when it creates its
--- tables (it processes every block with this code), any other install records the repair.
-CREATE OR REPLACE FUNCTION btracker_backend.repair_cleared_accounts(_context TEXT, _from_installer BOOLEAN)
-RETURNS VOID
+-- Whether this schema's history indexes exist (the LIVE layout). Schema-qualified, unlike
+-- isIndexesCreated(), which finds the index of any schema - btracker_app and hafbe_bal on
+-- the same database both create it.
+CREATE OR REPLACE FUNCTION btracker_backend.history_indexes_exist(_context TEXT)
+RETURNS BOOLEAN
+LANGUAGE 'sql' STABLE
+AS
+$$
+  SELECT to_regclass(format('%I.idx_account_balance_nai_balance_idx', _context)) IS NOT NULL;
+$$;
+
+-- Rebuild and record, unless btracker_repairs already holds the repair (a fresh install
+-- records 'not needed' when it creates its tables). Callers make it safe to write:
+--   * the repair_cleared_accounts procedure (installer) detaches the context group first;
+--   * finalize_massive_sync_before_forking calls it while the context is non-forking.
+-- Returns whether it repaired.
+CREATE OR REPLACE FUNCTION btracker_backend.apply_cleared_accounts_repair(_context TEXT)
+RETURNS BOOLEAN
 LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _head INT;
+  _rows BIGINT;
+BEGIN
+  IF EXISTS (SELECT 1 FROM btracker_repairs r WHERE r.name = 'cleared_accounts') THEN
+    RETURN FALSE;
+  END IF;
+  _head := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
+  _rows := btracker_backend.rebuild_cleared_accounts(_context);
+  INSERT INTO btracker_repairs (name, outcome, at_block)
+  VALUES ('cleared_accounts', format('repaired: %s liquid history rows', _rows), _head);
+  RAISE NOTICE 'btracker: null/steem.dao repaired (#61) at block %, % liquid history rows', _head, _rows;
+  RETURN TRUE;
+END
+$$;
+
+-- The installer's path (called at the very end of install_app.sh, as the install user,
+-- under the processor's install lock in the production image). On an install whose history
+-- indexes exist: detach the context group (HAF rewinds it to its irreversible block, drops
+-- the fork-rewind triggers and serves irreversible views), commit, rebuild, commit, attach
+-- again, commit - so nothing goes through the shadow tables, no fork can undo the repair,
+-- and the exclusive locks of detach/attach are held for those steps only, not for the
+-- rebuild (minutes on mainnet). If it fails after the detach the group stays detached until
+-- the processor's next iteration re-attaches it (hive.update_attachment); the repair is
+-- then retried by the next install. On an install still in massive sync it does nothing:
+-- finalize_massive_sync_before_forking repairs at the end of the sync.
+-- _commit => FALSE skips the commits (tests run it inside a transaction they roll back).
+DROP FUNCTION IF EXISTS btracker_backend.repair_cleared_accounts(TEXT, BOOLEAN);  -- its pre-review form
+CREATE OR REPLACE PROCEDURE btracker_backend.repair_cleared_accounts(_context TEXT, _commit BOOLEAN DEFAULT TRUE)
+LANGUAGE 'plpgsql'
 AS
 $$
 DECLARE
   _group    TEXT[];  -- not hive.contexts_group: that domain rejects the NULL a declaration starts with
   _attached BOOLEAN;
-  _head     INT;
-  _rows     BIGINT;
 BEGIN
   IF EXISTS (SELECT 1 FROM btracker_repairs r WHERE r.name = 'cleared_accounts') THEN
     RETURN;
   END IF;
-  IF _from_installer AND NOT isIndexesCreated() THEN
+  IF NOT btracker_backend.history_indexes_exist(_context) THEN
     RAISE NOTICE 'btracker: null/steem.dao repair (#61) deferred to the end of massive sync';
     RETURN;
   END IF;
 
-  _attached := _from_installer AND hive.app_context_is_attached(_context);
+  _attached := hive.app_context_is_attached(_context);
   IF _attached THEN
     SELECT a.contexts::TEXT[] INTO _group
     FROM hafd.applications a WHERE a.contexts @> ARRAY[_context::TEXT];
     _group := COALESCE(_group, ARRAY[_context::TEXT]);
     PERFORM hive.app_context_detach(_group::hive.contexts_group);
+    IF _commit THEN COMMIT; END IF;
   END IF;
 
-  _head := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
-  _rows := btracker_backend.rebuild_cleared_accounts(_context);
-  INSERT INTO btracker_repairs (name, outcome, at_block)
-  VALUES ('cleared_accounts', format('repaired: %s liquid history rows', _rows), _head);
+  PERFORM btracker_backend.apply_cleared_accounts_repair(_context);
+  IF _commit THEN COMMIT; END IF;
 
   IF _attached THEN
     PERFORM hive.app_context_attach(_group::hive.contexts_group);
+    IF _commit THEN COMMIT; END IF;
   END IF;
-  RAISE NOTICE 'btracker: null/steem.dao repaired (#61) at block %, % liquid history rows', _head, _rows;
 END
 $$;
 

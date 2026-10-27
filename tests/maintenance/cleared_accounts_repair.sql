@@ -12,8 +12,15 @@
  *      accumulating, rollups and balance_totals to match, pending rewards and delayed vests
  *      still holding what the clears emptied;
  *   3. repair, and require every table to equal the snapshot; repair again (idempotent);
- *   4. through repair_cleared_accounts: a recorded repair is a no-op; with the record gone
- *      the installer path (detach, rebuild, attach) repairs and records it.
+ *   4. the once-per-install gate: a recorded repair is a no-op; without the record the
+ *      finalize path (apply_cleared_accounts_repair) repairs and records it, and so does the
+ *      installer path (the repair_cleared_accounts procedure: detach, rebuild, attach) -
+ *      leaving the context attached and nothing of the rewrite in the shadow table.
+ *
+ * Not compared: hbd_seconds (the repair drops what accrued on the phantom balance, a replay
+ * holds a small accrual) and hive_rowid (HAF's row id, renumbered by a re-insert). The mock
+ * has no HF25 entry, so the HF25 bound on the HBD-interest anchor is not exercised here;
+ * steem.dao holds no pending rewards or delayed vests in the mock.
  *
  * Everything runs in a transaction that is rolled back.
  * Expects psql variable `schema` (the application schema, also its context name) and a
@@ -242,21 +249,39 @@ $$;
 
 -- ---------------------------------------------------------------- 4. the once-per-install gate
 DO $$
-DECLARE _schema TEXT := current_setting('btracker_test.schema');
+DECLARE
+  _schema TEXT := current_setting('btracker_test.schema');
+  _shadow TEXT := hive.get_shadow_table_name(_schema, 'account_balance_history');
+  _logged BIGINT;
 BEGIN
   -- a recorded repair (here the fresh install's record) is a no-op even on corrupted data
   IF NOT EXISTS (SELECT 1 FROM btracker_repairs WHERE name = 'cleared_accounts') THEN
     RAISE EXCEPTION 'cleared_accounts_repair: a fresh install did not record btracker_repairs.cleared_accounts';
   END IF;
   UPDATE account_rewards r SET balance = r.balance + 1 WHERE r.account IN (SELECT account FROM t_accounts);
-  PERFORM btracker_backend.repair_cleared_accounts(_schema, TRUE);
+  CALL btracker_backend.repair_cleared_accounts(_schema, FALSE);
   IF NOT ('account_rewards' = ANY (SELECT split_part(x, ':', 1) FROM unnest(pg_temp.repair_mismatches()) x)) THEN
     RAISE EXCEPTION 'cleared_accounts_repair: repair_cleared_accounts ran although the repair is recorded';
   END IF;
 
-  -- without the record, the installer path (detach, rebuild, attach) repairs and records it
+  -- the finalize path (no detach): repairs and records
   DELETE FROM btracker_repairs WHERE name = 'cleared_accounts';
-  PERFORM btracker_backend.repair_cleared_accounts(_schema, TRUE);
+  IF NOT btracker_backend.apply_cleared_accounts_repair(_schema) THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: apply_cleared_accounts_repair did not repair without a record';
+  END IF;
+  IF cardinality(pg_temp.repair_mismatches()) > 0 THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: the finalize path left differences: %', pg_temp.repair_mismatches();
+  END IF;
+
+  -- the installer path on a forking, attached context: detach, rebuild, record, attach -
+  -- and nothing of the rewrite in the fork-rewind shadow table (a rebuild that ran attached
+  -- would have logged every deleted and inserted row of the two accounts there)
+  IF NOT (hive.app_is_forking(_schema) AND hive.app_context_is_attached(_schema)) THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: context % is not forking and attached; the installer path would not be exercised', _schema;
+  END IF;
+  DELETE FROM btracker_repairs WHERE name = 'cleared_accounts';
+  UPDATE account_rewards r SET balance = r.balance + 1 WHERE r.account IN (SELECT account FROM t_accounts);
+  CALL btracker_backend.repair_cleared_accounts(_schema, FALSE);
   IF cardinality(pg_temp.repair_mismatches()) > 0 THEN
     RAISE EXCEPTION 'cleared_accounts_repair: the installer path left differences: %', pg_temp.repair_mismatches();
   END IF;
@@ -266,7 +291,11 @@ BEGIN
   IF NOT hive.app_context_is_attached(_schema) THEN
     RAISE EXCEPTION 'cleared_accounts_repair: the installer path left context % detached', _schema;
   END IF;
-  RAISE NOTICE 'cleared_accounts_repair: gate OK (recorded = no-op; installer path repairs, records, re-attaches)';
+  EXECUTE format('SELECT count(*) FROM hafd.%I WHERE account IN (SELECT account FROM t_accounts)', _shadow) INTO _logged;
+  IF _logged > 0 THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: % row(s) of the repair went into the shadow table %', _logged, _shadow;
+  END IF;
+  RAISE NOTICE 'cleared_accounts_repair: gate OK (recorded = no-op; finalize path repairs; installer path repairs detached, records, re-attaches)';
 END
 $$;
 

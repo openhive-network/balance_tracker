@@ -224,13 +224,14 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT SELECT ON ALL TABLES IN SCHEMA btracker_endpoints TO btracker_user;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT SELECT ON ALL TABLES IN SCHEMA btracker_backend TO btracker_user;"
 
-# One-off repair of null/steem.dao data an older version processed without their clears
-# (#61). Runs once per install (recorded in btracker_repairs), after every function above
-# exists, as the install user (not btracker_owner): it detaches the context group for the
-# rebuild so nothing goes through HAF's fork-rewind logging. Deferred to the end of massive
-# sync on an install whose history indexes do not exist yet.
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA}; SELECT btracker_backend.repair_cleared_accounts('${BTRACKER_SCHEMA}', TRUE);"
-
 # Allow hived to fullfil vacuum full requests
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT MAINTAIN ON ALL TABLES IN SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT ALL ON SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
+
+# One-off repair of null/steem.dao data an older version processed without their clears
+# (#61). Last, after everything above exists and is granted; runs once per install
+# (recorded in btracker_repairs), as the install user (not btracker_owner) because it
+# detaches the context group around the rebuild. A procedure that commits between detach,
+# rebuild and attach, so it gets its own psql command (each -c is its own transaction).
+# Does nothing on an install still in massive sync: finalize_massive_sync repairs there.
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL btracker_backend.repair_cleared_accounts('${BTRACKER_SCHEMA}');"

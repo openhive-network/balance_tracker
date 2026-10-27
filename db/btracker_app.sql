@@ -660,7 +660,8 @@ BEGIN
     applied_at TIMESTAMP NOT NULL DEFAULT now()
   );
   INSERT INTO btracker_repairs (name, outcome, at_block)
-  VALUES ('cleared_accounts', 'not needed: fresh install', 0);
+  VALUES ('cleared_accounts', 'not needed: fresh install', 0)
+  ON CONFLICT (name) DO NOTHING;
 
   ------------- SWITCH TO NON-FORKING FOR MASSIVE SYNC ----------------
   -- Non-forking avoids hive_rowid indexes during massive sync.
@@ -1020,7 +1021,11 @@ BEGIN
   -- #61: an install upgraded in the middle of massive sync repairs null/steem.dao here, while
   -- the context is still non-forking (nothing is logged); the rollup backfill below then
   -- builds their rollups from the repaired history. A no-op once recorded in btracker_repairs.
-  PERFORM btracker_backend.repair_cleared_accounts(_context_name, FALSE);
+  -- Not in the misuse case warned about above: its writes would be logged and a fork could
+  -- undo them; the next install repairs instead.
+  IF NOT (hive.app_is_forking(_context_name) AND hive.app_context_is_attached(_context_name)) THEN
+    PERFORM btracker_backend.apply_cleared_accounts_repair(_context_name);
+  END IF;
 
 
   ALTER TABLE account_balance_history SET LOGGED;
