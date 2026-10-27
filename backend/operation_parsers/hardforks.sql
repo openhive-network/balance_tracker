@@ -513,7 +513,6 @@ $$;
 -- then retried by the next install. On an install still in massive sync it does nothing:
 -- finalize_massive_sync_before_forking repairs at the end of the sync.
 -- _commit => FALSE skips the commits (tests run it inside a transaction they roll back).
-DROP FUNCTION IF EXISTS btracker_backend.repair_cleared_accounts(TEXT, BOOLEAN);  -- its pre-review form
 CREATE OR REPLACE PROCEDURE btracker_backend.repair_cleared_accounts(_context TEXT, _commit BOOLEAN DEFAULT TRUE)
 LANGUAGE 'plpgsql'
 AS

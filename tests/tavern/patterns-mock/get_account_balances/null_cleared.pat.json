@@ -10,10 +10,10 @@
   "escrow_pending_amount_hive": 0,
   "escrow_pending_count": 0,
   "hbd_balance": 0,
-  "hbd_rewards": 5,
+  "hbd_rewards": 6,
   "hbd_savings": 0,
   "hive_balance": 0,
-  "hive_rewards": 4,
+  "hive_rewards": 6,
   "hive_savings": 0,
   "hive_vesting_rewards": 1,
   "open_orders_hbd_amount": 0,
@@ -30,7 +30,7 @@
   "vesting_balance_hive": 666,
   "vesting_shares": "2000000000",
   "vesting_withdraw_rate": "0",
-  "vests_rewards": "3000000",
+  "vests_rewards": "5000000",
   "withdraw_routes": 0,
   "withdrawn": "0"
 }
