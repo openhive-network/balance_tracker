@@ -6,8 +6,8 @@
  *
  *   1. snapshot the two accounts' state after the normal sync (the mock blocks are
  *      processed one block at a time): liquid and savings history from the first clearing
- *      block on, current balances, savings, pending rewards, delayed vests, day/month rollups
- *      of the days involved;
+ *      block on, current balances, savings, pending rewards, delayed vests, and the liquid
+ *      day rollups of the days involved (month and savings rollups are not compared);
  *   2. take the two accounts back to the block before the first clearing block (history from
  *      it on deleted, current rows from the last remaining history row);
  *   3. process every block from it to the head as ONE range with the balances, withdrawals,
@@ -16,7 +16,10 @@
  * Pending rewards and delayed vests are not taken back: the range holds clears of these
  * accounts, which empty both, so the result does not depend on their starting value.
  * Other accounts are processed a second time by step 3 and are not compared (neither is
- * balance_totals); everything runs in a transaction that is rolled back.
+ * balance_totals); everything runs in a transaction that is rolled back. The range runs
+ * with the LIVE layout (indexes present, rollups maintained per range), not massive sync's
+ * (indexes dropped, rollups deferred to finalize): it covers the multi-block code paths of
+ * the clears, not massive sync's table layout.
  * Expects psql variable `schema`. With `-v require_clears=1` it fails when the chain has no
  * clearing op; otherwise it skips with a notice.
  */
