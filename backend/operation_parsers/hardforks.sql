@@ -472,7 +472,7 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 DECLARE
-  _group    hive.contexts_group;
+  _group    TEXT[];  -- not hive.contexts_group: that domain rejects the NULL a declaration starts with
   _attached BOOLEAN;
   _head     INT;
   _rows     BIGINT;
@@ -487,10 +487,10 @@ BEGIN
 
   _attached := _from_installer AND hive.app_context_is_attached(_context);
   IF _attached THEN
-    SELECT a.contexts::hive.contexts_group INTO _group
+    SELECT a.contexts::TEXT[] INTO _group
     FROM hafd.applications a WHERE a.contexts @> ARRAY[_context::TEXT];
-    _group := COALESCE(_group, ARRAY[_context]::hive.contexts_group);
-    PERFORM hive.app_context_detach(_group);
+    _group := COALESCE(_group, ARRAY[_context::TEXT]);
+    PERFORM hive.app_context_detach(_group::hive.contexts_group);
   END IF;
 
   _head := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
@@ -499,7 +499,7 @@ BEGIN
   VALUES ('cleared_accounts', format('repaired: %s liquid history rows', _rows), _head);
 
   IF _attached THEN
-    PERFORM hive.app_context_attach(_group);
+    PERFORM hive.app_context_attach(_group::hive.contexts_group);
   END IF;
   RAISE NOTICE 'btracker: null/steem.dao repaired (#61) at block %, % liquid history rows', _head, _rows;
 END
