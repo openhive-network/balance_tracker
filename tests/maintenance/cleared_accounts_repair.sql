@@ -73,6 +73,7 @@ RETURNS TEXT[] LANGUAGE plpgsql AS $f$
 DECLARE
   _out TEXT[] := '{}';
   _n BIGINT;
+  _sample TEXT;
   _q TEXT;
   _t RECORD;
 BEGIN
@@ -91,10 +92,14 @@ BEGIN
     ('account_hbd_interest.last_balance', 'SELECT i.account, i.last_balance FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts)', 's_hbd')
   ) AS v(label, live, snap)
   LOOP
-    _q := format('SELECT count(*) FROM ((%1$s EXCEPT ALL SELECT * FROM %2$s) UNION ALL (SELECT * FROM %2$s EXCEPT ALL %1$s)) x', _t.live, _t.snap);
-    EXECUTE _q INTO _n;
+    _q := format('SELECT count(*), string_agg(x.side || x.r, '' | '') FILTER (WHERE x.rn <= 4) FROM ('
+                 '  SELECT y.*, ROW_NUMBER() OVER (PARTITION BY y.side ORDER BY y.r) AS rn FROM ('
+                 '    SELECT ''now '' AS side, l::TEXT AS r FROM (%1$s EXCEPT ALL SELECT * FROM %2$s) l'
+                 '    UNION ALL'
+                 '    SELECT ''want '', s::TEXT FROM (SELECT * FROM %2$s EXCEPT ALL %1$s) s) y) x', _t.live, _t.snap);
+    EXECUTE _q INTO _n, _sample;
     IF _n > 0 THEN
-      _out := _out || format('%s: %s row(s) differ', _t.label, _n);
+      _out := _out || format('%s: %s row(s) differ, e.g. %s', _t.label, _n, _sample);
     END IF;
   END LOOP;
   RETURN _out;
