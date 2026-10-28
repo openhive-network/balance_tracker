@@ -1,16 +1,56 @@
 {
-  "total_accounts": 13424,
-  "total_pages": 1343,
   "holders_result": [
-    { "rank": 1, "account": "poloniex", "value": "158946758" },
-    { "rank": 2, "account": "dantheman", "value": "152926978" },
-    { "rank": 3, "account": "steemit1", "value": "134872472" },
-    { "rank": 4, "account": "imadev", "value": "117353589" },
-    { "rank": 5, "account": "steemit2", "value": "106543552" },
-    { "rank": 6, "account": "bittrex", "value": "81920425" },
-    { "rank": 7, "account": "blocktrades", "value": "77255992" },
-    { "rank": 8, "account": "steemit", "value": "70337438" },
-    { "rank": 9, "account": "jamesc", "value": "53229187" },
-    { "rank": 10, "account": "alittle", "value": "45465430" }
-  ]
+    {
+      "account": "poloniex",
+      "rank": 1,
+      "value": "158946504"
+    },
+    {
+      "account": "dantheman",
+      "rank": 2,
+      "value": "152926978"
+    },
+    {
+      "account": "steemit1",
+      "rank": 3,
+      "value": "134872472"
+    },
+    {
+      "account": "imadev",
+      "rank": 4,
+      "value": "117353589"
+    },
+    {
+      "account": "steemit2",
+      "rank": 5,
+      "value": "106543552"
+    },
+    {
+      "account": "bittrex",
+      "rank": 6,
+      "value": "81920425"
+    },
+    {
+      "account": "blocktrades",
+      "rank": 7,
+      "value": "77255992"
+    },
+    {
+      "account": "steemit",
+      "rank": 8,
+      "value": "70337138"
+    },
+    {
+      "account": "jamesc",
+      "rank": 9,
+      "value": "53229187"
+    },
+    {
+      "account": "alittle",
+      "rank": 10,
+      "value": "45465430"
+    }
+  ],
+  "total_accounts": 13424,
+  "total_pages": 1343
 }

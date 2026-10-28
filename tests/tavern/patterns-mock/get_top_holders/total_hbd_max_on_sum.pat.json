@@ -1,9 +1,21 @@
 {
-  "total_accounts": 13418,
-  "total_pages": 4473,
   "holders_result": [
-    { "rank": 8, "account": "steemit", "value": "70337438" },
-    { "rank": 9, "account": "alpaca", "value": "60000000" },
-    { "rank": 10, "account": "jamesc", "value": "53229187" }
-  ]
+    {
+      "account": "steemit",
+      "rank": 8,
+      "value": "70337138"
+    },
+    {
+      "account": "alpaca",
+      "rank": 9,
+      "value": "60000000"
+    },
+    {
+      "account": "jamesc",
+      "rank": 10,
+      "value": "53229187"
+    }
+  ],
+  "total_accounts": 13418,
+  "total_pages": 4473
 }
