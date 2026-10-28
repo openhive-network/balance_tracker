@@ -17,10 +17,12 @@
  *      installer path (the repair_cleared_accounts procedure: detach, rebuild, attach) -
  *      leaving the context attached and nothing of the rewrite in the shadow table.
  *
- * Not compared: hbd_seconds (the repair drops what accrued on the phantom balance, a replay
- * holds a small accrual) and hive_rowid (HAF's row id, renumbered by a re-insert). The mock
- * has no HF25 entry, so the HF25 bound on the HBD-interest anchor is not exercised here;
- * steem.dao holds no pending rewards or delayed vests in the mock.
+ * A pruned HAF (simulated: first_available_block overridden inside a savepoint) must leave
+ * the corrupted data untouched and unrecorded on both paths, and the rebuild must refuse.
+ *
+ * Not compared: hive_rowid (HAF's row id, renumbered by a re-insert). The mock has no HF25
+ * entry, so the HF25 bound on the HBD-interest replay is not exercised here; steem.dao holds
+ * no pending rewards or delayed vests in the mock.
  *
  * Everything runs in a transaction that is rolled back.
  * Expects psql variable `schema` (the application schema, also its context name) and a
@@ -75,7 +77,7 @@ CREATE TEMP TABLE s_sday ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at
 CREATE TEMP TABLE s_smon ON COMMIT DROP AS SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_rew ON COMMIT DROP AS SELECT r.account, r.nai, r.balance FROM account_rewards r WHERE r.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_wd ON COMMIT DROP AS SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts);
-CREATE TEMP TABLE s_hbd ON COMMIT DROP AS SELECT i.account, i.last_balance FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts);
+CREATE TEMP TABLE s_hbd ON COMMIT DROP AS SELECT i.account, i.hbd_seconds, i.hbd_seconds_last_update, i.last_balance, i.hbd_last_interest_payment FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts);
 
 -- Differences between the live tables and the snapshot, one line per table that differs.
 -- Rollups compare their own columns: HAF adds hive_rowid to registered tables, and a
@@ -101,7 +103,7 @@ BEGIN
     ('saving_history_by_month', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)', 's_smon'),
     ('account_rewards', 'SELECT r.account, r.nai, r.balance FROM account_rewards r WHERE r.account IN (SELECT account FROM t_accounts)', 's_rew'),
     ('account_withdraws.delayed_vests', 'SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts)', 's_wd'),
-    ('account_hbd_interest.last_balance', 'SELECT i.account, i.last_balance FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts)', 's_hbd')
+    ('account_hbd_interest', 'SELECT i.account, i.hbd_seconds, i.hbd_seconds_last_update, i.last_balance, i.hbd_last_interest_payment FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts)', 's_hbd')
   ) AS v(label, live, snap)
   LOOP
     _q := format('SELECT count(*), string_agg(x.side || x.r, '' | '') FILTER (WHERE x.rn <= 4) FROM ('
@@ -217,7 +219,12 @@ GROUP BY h.account, h.nai, date_trunc('month', bv.created_at);
 -- pending rewards, delayed vests and the interest anchor still holding what the clears emptied
 UPDATE account_rewards r SET balance = r.balance + 777777 WHERE r.account IN (SELECT account FROM t_accounts);
 UPDATE account_withdraws w SET delayed_vests = w.delayed_vests + 4000000000 WHERE w.account IN (SELECT account FROM t_accounts);
-UPDATE account_hbd_interest i SET last_balance = i.last_balance + 123456 WHERE i.account IN (SELECT account FROM t_accounts);
+-- the interest accumulator ran on the phantom balance: every field differs
+UPDATE account_hbd_interest i
+SET last_balance = i.last_balance + 123456, hbd_seconds = i.hbd_seconds + 987654321,
+    hbd_seconds_last_update = i.hbd_seconds_last_update - INTERVAL '1 day',
+    hbd_last_interest_payment = 'epoch'::TIMESTAMP
+WHERE i.account IN (SELECT account FROM t_accounts);
 
 DO $$
 DECLARE _m TEXT[] := pg_temp.repair_mismatches();
@@ -228,6 +235,50 @@ BEGIN
   RAISE NOTICE 'cleared_accounts_repair: corrupted state differs from the replay in: %', _m;
 END
 $$;
+
+-- ---------------------------------------------------------------- 2b. pruned HAF: hands off
+-- Old application history whose blocks and operations HAF no longer holds: simulated by
+-- making the first available block later than every history row. Inside a savepoint, so
+-- the override and anything the paths do are undone before step 3.
+SAVEPOINT pruned;
+CREATE OR REPLACE FUNCTION btracker_backend.first_available_block(_context TEXT)
+RETURNS INT LANGUAGE sql STABLE AS $$ SELECT 2147483647 $$;
+CREATE TEMP TABLE p_before ON COMMIT DROP AS SELECT unnest(pg_temp.repair_mismatches()) AS m;
+DELETE FROM btracker_repairs WHERE name = 'cleared_accounts';
+DO $$
+DECLARE
+  _schema TEXT := current_setting('btracker_test.schema');
+  _failed BOOLEAN := FALSE;
+BEGIN
+  IF btracker_backend.cleared_accounts_source_gap(_schema) IS NULL THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: the simulated pruned HAF reports no source gap';
+  END IF;
+  IF btracker_backend.apply_cleared_accounts_repair(_schema) THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: the finalize path repaired on a pruned HAF';
+  END IF;
+  CALL btracker_backend.repair_cleared_accounts(_schema, FALSE);
+  IF EXISTS (SELECT 1 FROM btracker_repairs WHERE name = 'cleared_accounts') THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: a repair was recorded on a pruned HAF';
+  END IF;
+  IF NOT hive.app_context_is_attached(_schema) THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: the installer path detached context % on a pruned HAF', _schema;
+  END IF;
+  IF EXISTS (SELECT m FROM unnest(pg_temp.repair_mismatches()) m EXCEPT SELECT m FROM p_before)
+     OR EXISTS (SELECT m FROM p_before EXCEPT SELECT m FROM unnest(pg_temp.repair_mismatches()) m) THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: data changed on a pruned HAF';
+  END IF;
+  BEGIN
+    PERFORM btracker_backend.rebuild_cleared_accounts(_schema);
+  EXCEPTION WHEN raise_exception THEN
+    _failed := SQLERRM LIKE '%pruned HAF%';
+  END;
+  IF NOT _failed THEN
+    RAISE EXCEPTION 'cleared_accounts_repair: rebuild_cleared_accounts ran on a pruned HAF';
+  END IF;
+  RAISE NOTICE 'cleared_accounts_repair: pruned HAF OK (nothing changed, nothing recorded, rebuild refuses)';
+END
+$$;
+ROLLBACK TO SAVEPOINT pruned;
 
 -- ---------------------------------------------------------------- 3. repair, twice
 DO $$

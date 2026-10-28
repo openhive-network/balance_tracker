@@ -144,12 +144,11 @@ $$;
 --     massive sync finalize_massive_sync_before_forking rebuilds them from history after).
 --   * pending rewards and delayed vests have no history: they are recomputed from the
 --     operations after the account's last clear, with the pipelines' own parsers.
---   * account_hbd_interest: last_balance follows the repaired HBD series and the accrued
---     hbd_seconds are dropped (they were accrued on the phantom balance; a clean replay would
---     hold a small accrual there instead of 0). hbd_seconds_last_update and
---     hbd_last_interest_payment keep their values (a replay would hold the last clear's
---     time); with last_balance 0 neither accrues anything. Nothing reads them for these two
---     accounts' balances.
+--   * account_hbd_interest: all four fields are replayed over the repaired HBD series with
+--     accumulate_hbd_interest's rules.
+--   * It refuses to run (cleared_accounts_source_gap) when HAF no longer holds every block
+--     and operation from the first history row of the two accounts on - a pruned HAF: the
+--     clears and timestamps it needs are gone there, and only a resync can rebuild them.
 --   * On the finalize path (install upgraded in the middle of massive sync) the history
 --     indexes do not exist yet: the reads and deletes of the two accounts' rows scan the
 --     history tables, once, inside a finalize that scans them for the rollups anyway.
@@ -178,9 +177,22 @@ DECLARE
   _acc                RECORD;
   _op                 RECORD;
   _delayed            BIGINT;
+  _row                RECORD;
+  _interval           INT := btracker_backend.hbd_interest_compound_interval_sec();
+  _seconds            NUMERIC;
+  _accrued            NUMERIC;
+  _last_update        TIMESTAMP;
+  _last_balance       BIGINT;
+  _last_payment       TIMESTAMP;
+  _staged             BOOLEAN;
+  _gap                TEXT;
 BEGIN
   IF COALESCE(_head, 0) = 0 THEN
     RETURN 0;
+  END IF;
+  _gap := btracker_backend.cleared_accounts_source_gap(_context);
+  IF _gap IS NOT NULL THEN
+    RAISE EXCEPTION 'btracker: cannot rebuild null/steem.dao (#61): %', _gap;
   END IF;
 
   DROP TABLE IF EXISTS _rb_clears;
@@ -287,16 +299,50 @@ BEGIN
     GROUP BY h.account, h.nai, date_trunc('month', bv.created_at);
   END IF;
 
-  -- HBD interest: last_balance is the repaired liquid HBD after the last change the
-  -- accumulator saw (process_balances stops feeding it at HF25); the hbd_seconds accrued on
-  -- the phantom balance are dropped.
-  UPDATE account_hbd_interest ahi
-  SET last_balance = COALESCE((SELECT r.balance FROM _rb_balances r
-                               WHERE r.account = ahi.account AND r.nai = 13
-                                 AND (_hf25_block IS NULL OR hafd.operation_id_to_block_num(r.source_op) <= _hf25_block)
-                               ORDER BY r.balance_seq_no DESC LIMIT 1), 0),
-      hbd_seconds = 0
-  WHERE ahi.account IN (SELECT DISTINCT c.account FROM _rb_clears c);
+  -- HBD interest: the accumulator is replayed over the repaired HBD series with
+  -- accumulate_hbd_interest's own rules - the rows process_balances stages (liquid HBD,
+  -- clears included, up to HF25), the same order, epoch defaults, effective time (a
+  -- transaction op takes the previous block's time, a virtual op its own block's) and the
+  -- compound-interval reset - so all four fields equal a clean replay's. trx_in_block is not
+  -- kept in the history: it is read from the operation.
+  FOR _acc IN SELECT DISTINCT r.account FROM _rb_balances r WHERE r.nai = 13 LOOP
+    _seconds := 0; _last_update := 'epoch'::TIMESTAMP; _last_balance := 0;
+    _last_payment := 'epoch'::TIMESTAMP; _staged := FALSE;
+    FOR _row IN
+      SELECT r.balance,
+             CASE WHEN ov.trx_in_block >= 0 THEN COALESCE(bvp.created_at, bv.created_at)
+                  ELSE bv.created_at END AS effective_ts
+      FROM _rb_balances r
+      JOIN operations_view ov ON ov.id = r.source_op
+      JOIN blocks_view bv ON bv.num = hafd.operation_id_to_block_num(r.source_op)
+      LEFT JOIN blocks_view bvp ON bvp.num = hafd.operation_id_to_block_num(r.source_op) - 1
+      WHERE r.account = _acc.account AND r.nai = 13
+        AND (_hf25_block IS NULL OR hafd.operation_id_to_block_num(r.source_op) <= _hf25_block)
+      ORDER BY r.source_op, r.balance_seq_no
+    LOOP
+      _staged := TRUE;
+      _accrued := _seconds + _last_balance::NUMERIC * EXTRACT(EPOCH FROM (_row.effective_ts - _last_update));
+      IF _accrued > 0 AND EXTRACT(EPOCH FROM (_row.effective_ts - _last_payment)) > _interval THEN
+        _seconds := 0::NUMERIC;
+        _last_payment := _row.effective_ts;
+      ELSE
+        _seconds := _accrued;
+      END IF;
+      _last_update := _row.effective_ts;
+      _last_balance := _row.balance;
+    END LOOP;
+    IF _staged THEN
+      INSERT INTO account_hbd_interest (account, hbd_seconds, hbd_seconds_last_update, last_balance, hbd_last_interest_payment)
+      VALUES (_acc.account, _seconds, _last_update, _last_balance, _last_payment)
+      ON CONFLICT ON CONSTRAINT pk_account_hbd_interest DO UPDATE SET
+        hbd_seconds               = EXCLUDED.hbd_seconds,
+        hbd_seconds_last_update   = EXCLUDED.hbd_seconds_last_update,
+        last_balance              = EXCLUDED.last_balance,
+        hbd_last_interest_payment = EXCLUDED.hbd_last_interest_payment;
+    ELSE
+      DELETE FROM account_hbd_interest ahi WHERE ahi.account = _acc.account;
+    END IF;
+  END LOOP;
 
   -- ---------------------------------------------------------------- savings
   DROP TABLE IF EXISTS _rb_savings;
@@ -476,6 +522,57 @@ $$
   SELECT to_regclass(format('%I.idx_account_balance_nai_balance_idx', _context)) IS NOT NULL;
 $$;
 
+-- First block from which HAF still holds both the block headers and the operations. 1 on
+-- a full HAF; higher on a pruned one, which drops old core data but keeps the
+-- application's own tables.
+CREATE OR REPLACE FUNCTION btracker_backend.first_available_block(_context TEXT)
+RETURNS INT
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  _blocks INT;
+  _ops    INT;
+BEGIN
+  EXECUTE format('SELECT bv.num FROM %I.blocks_view bv ORDER BY bv.num LIMIT 1', _context) INTO _blocks;
+  EXECUTE format('SELECT ov.block_num FROM %I.operations_view ov ORDER BY ov.id LIMIT 1', _context) INTO _ops;
+  RETURN GREATEST(_blocks, _ops);
+END
+$$;
+
+-- Why the #61 rebuild cannot run here, or NULL when it can. It replays the whole history of
+-- 'null' / 'steem.dao' and needs, from their first history row on, every clearing op and
+-- every block's timestamp; a pruned HAF has dropped the older part, so the rebuild would
+-- miss old clears and lose old rollups. Nothing to repair (no history) is not a gap.
+CREATE OR REPLACE FUNCTION btracker_backend.cleared_accounts_source_gap(_context TEXT)
+RETURNS TEXT
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  _first_needed    INT;
+  _first_available INT;
+BEGIN
+  EXECUTE format(
+    'SELECT MIN(hafd.operation_id_to_block_num(x.source_op)) FROM ('
+    '  SELECT MIN(h.source_op) AS source_op FROM %1$I.account_balance_history h'
+    '    WHERE h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
+    '  UNION ALL'
+    '  SELECT MIN(h.source_op) FROM %1$I.account_savings_history h'
+    '    WHERE h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
+    ') x', _context) INTO _first_needed;
+  IF _first_needed IS NULL THEN
+    RETURN NULL;
+  END IF;
+  _first_available := btracker_backend.first_available_block(_context);
+  IF _first_available IS NULL OR _first_available > _first_needed THEN
+    RETURN format('HAF holds blocks and operations only from block %s, but the history of null/steem.dao starts at block %s (pruned HAF)',
+                  COALESCE(_first_available::TEXT, 'none'), _first_needed);
+  END IF;
+  RETURN NULL;
+END
+$$;
+
 -- Rebuild and record, unless btracker_repairs already holds the repair (a fresh install
 -- records 'not needed' when it creates its tables). Callers make it safe to write:
 --   * the repair_cleared_accounts procedure (installer) detaches the context group first;
@@ -489,8 +586,14 @@ $$
 DECLARE
   _head INT;
   _rows BIGINT;
+  _gap  TEXT;
 BEGIN
   IF EXISTS (SELECT 1 FROM btracker_repairs r WHERE r.name = 'cleared_accounts') THEN
+    RETURN FALSE;
+  END IF;
+  _gap := btracker_backend.cleared_accounts_source_gap(_context);
+  IF _gap IS NOT NULL THEN
+    RAISE WARNING 'btracker: null/steem.dao NOT repaired (#61): %. Their data is left as it is and the repair is not recorded, so the next install tries again. To rebuild them, resync btracker (uninstall, install) on a HAF that holds the full block history.', _gap;
     RETURN FALSE;
   END IF;
   _head := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
@@ -520,12 +623,19 @@ $$
 DECLARE
   _group    TEXT[];  -- not hive.contexts_group: that domain rejects the NULL a declaration starts with
   _attached BOOLEAN;
+  _gap      TEXT;
 BEGIN
   IF EXISTS (SELECT 1 FROM btracker_repairs r WHERE r.name = 'cleared_accounts') THEN
     RETURN;
   END IF;
   IF NOT btracker_backend.history_indexes_exist(_context) THEN
     RAISE NOTICE 'btracker: null/steem.dao repair (#61) deferred to the end of massive sync';
+    RETURN;
+  END IF;
+  -- checked before the detach, so a pruned HAF is left exactly as it is
+  _gap := btracker_backend.cleared_accounts_source_gap(_context);
+  IF _gap IS NOT NULL THEN
+    RAISE WARNING 'btracker: null/steem.dao NOT repaired (#61): %. Their data is left as it is and the repair is not recorded, so the next install tries again. To rebuild them, resync btracker (uninstall, install) on a HAF that holds the full block history.', _gap;
     RETURN;
   END IF;
 
