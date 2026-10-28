@@ -153,6 +153,7 @@ $$;
 --     indexes do not exist yet: the reads and deletes of the two accounts' rows scan the
 --     history tables, once, inside a finalize that scans them for the rollups anyway.
 -- Running it again reproduces its own result.
+DROP FUNCTION IF EXISTS btracker_backend.rebuild_cleared_accounts(TEXT);  -- its earlier one-argument form
 CREATE OR REPLACE FUNCTION btracker_backend.rebuild_cleared_accounts(_context TEXT, _source_checked BOOLEAN DEFAULT FALSE)
 RETURNS BIGINT
 LANGUAGE 'plpgsql' VOLATILE
@@ -560,15 +561,17 @@ DECLARE
   _first_available INT;
 BEGIN
   -- The first row of each (account, nai) series is its balance_seq_no 1 (sequence numbers
-  -- follow source_op): one unique-index probe per series instead of reading the history.
+  -- follow source_op): with the nai bound, one probe of the (account, nai, balance_seq_no)
+  -- index per series instead of reading the history. (On the finalize path, before that
+  -- index exists, it is one scan of each history table.)
   EXECUTE format(
     'SELECT MIN(hafd.operation_id_to_block_num(x.source_op)) FROM ('
     '  SELECT h.source_op FROM %1$I.account_balance_history h'
-    '    WHERE h.balance_seq_no = 1'
+    '    WHERE h.balance_seq_no = 1 AND h.nai IN (13, 21, 37)'
     '      AND h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
     '  UNION ALL'
     '  SELECT h.source_op FROM %1$I.account_savings_history h'
-    '    WHERE h.balance_seq_no = 1'
+    '    WHERE h.balance_seq_no = 1 AND h.nai IN (13, 21)'
     '      AND h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
     ') x', _context) INTO _first_needed;
   IF _first_needed IS NULL THEN
