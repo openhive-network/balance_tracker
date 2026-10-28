@@ -19,7 +19,8 @@ HAFBE (hafbe_app.sql)
       ├─> process_block_range_orders()
       ├─> process_block_range_converts()
       ├─> process_block_range_escrows()
-      └─> process_transfer_stats()  # Volume aggregation
+      ├─> process_transfer_stats()  # Volume aggregation
+      └─> process_block_range_proposal_payments()  # DHF payments per proposal
 ```
 
 `btracker_process_blocks()` dispatches on `hive.get_current_stage_name()`:
@@ -52,6 +53,7 @@ hived replays").
 | `process_transfer_stats` | `db/process_transfer_stats.sql` | transfer, fill_recurrent_transfer, escrow_transfer | `transfer_stats_by_hour/day/month` |
 | `process_vesting_stats` | `db/process_vesting_stats.sql` | transfer_to_vesting, withdraw_vesting (excl. cancels), fill_vesting_withdraw | `vesting_stats_by_day/month` (global) |
 | `process_account_vesting_stats` | `db/process_account_vesting_stats.sql` | same 3 vesting ops (excl. cancels), fanned out to impacted accounts | `account_vesting_history`, `account_vesting_by_day/month` |
+| `process_block_range_proposal_payments` | `db/process_proposal_payments.sql` | proposal_pay | `proposal_payment_totals`, `proposal_payments` |
 
 ## Operations Reference
 
@@ -79,6 +81,7 @@ hived replays").
 | `fill_convert_request` | Complete conversion (3.5 days) | `process_balances`, `process_block_range_converts` |
 | `escrow_transfer` | Create escrow | `process_block_range_escrows` |
 | `escrow_release` | Release from escrow | `process_block_range_escrows`, `process_balances` |
+| `proposal_pay` | DHF pays a proposal (hourly) | `process_balances`, `process_block_range_proposal_payments` |
 
 ## The Squashing Pattern
 
@@ -190,6 +193,7 @@ Each processing area has its own detailed documentation:
 | **Escrows** | [escrows.md](processing/escrows.md) | Multi-party approval flow |
 | **Transfer Stats** | [transfer_stats.md](processing/transfer_stats.md) | GROUPING SETS aggregation |
 | **Vesting Stats** | [vesting_stats.md](processing/vesting_stats.md) | Power-up / power-down aggregation (day + month) |
+| **Proposal Payments** | [proposal_payments.md](processing/proposal_payments.md) | DHF payments per proposal, numbered for paging |
 
 ## Common Patterns
 

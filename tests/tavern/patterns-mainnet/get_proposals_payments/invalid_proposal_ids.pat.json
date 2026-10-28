@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "proposal-ids must be a comma-separated list of non-negative integers: '-1' is not one"
+}

@@ -1,0 +1,28 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+    - negative
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # page-size above the 1000 cap must be rejected (parity with the other history endpoints).
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_proposal_payments"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          proposal-id: 0
+          page-size: 1001
+      response:
+        status_code: 400
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
+          extra_kwargs:
+            error_response: true

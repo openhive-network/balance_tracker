@@ -47,5 +47,22 @@ CREATE TYPE btracker_backend.balance_type AS ENUM (
 );
 -- openapi-generated-code-end
 
+/** openapi:components:schemas
+btracker_backend.top_holders_balance_type:
+  type: string
+  enum:
+    - balance
+    - savings_balance
+    - total
+ */
+-- openapi-generated-code-begin
+DROP TYPE IF EXISTS btracker_backend.top_holders_balance_type CASCADE;
+CREATE TYPE btracker_backend.top_holders_balance_type AS ENUM (
+    'balance',
+    'savings_balance',
+    'total'
+);
+-- openapi-generated-code-end
+
 
 RESET ROLE;

@@ -1,0 +1,16 @@
+{
+  "total_accounts": 3072,
+  "total_pages": 308,
+  "holders_result": [
+    { "rank": 1, "account": "steemit", "value": "4778859891" },
+    { "rank": 2, "account": "poloniex", "value": "1931250425" },
+    { "rank": 3, "account": "bittrex", "value": "499025114" },
+    { "rank": 4, "account": "null", "value": "426704300" },
+    { "rank": 5, "account": "steemit2", "value": "197446682" },
+    { "rank": 6, "account": "aurel", "value": "97417738" },
+    { "rank": 7, "account": "openledger", "value": "52275479" },
+    { "rank": 8, "account": "ben", "value": "50968139" },
+    { "rank": 9, "account": "blocktrades", "value": "29609375" },
+    { "rank": 10, "account": "steem", "value": "29324510" }
+  ]
+}

@@ -48,8 +48,6 @@ variables:
   BTRACKER_MOCK_CACHE_TYPE: "haf_btracker_mock"   # HAF + balance_tracker + mock data
   BLOCK_LOG_SOURCE_DIR_5M: /blockchain/block_log_5m
   FF_NETWORK_PER_BUILD: 1
-  # Centralized test runner image with Docker, pytest, tavern, and all test dependencies
-  HAF_APP_TEST_RUNNER_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-test-runner:3.1"
   # =============================================================================
   # Upstream Image Detection (No Submodules Required)
   # =============================================================================

@@ -39,6 +39,13 @@ ALTER TABLE :"schema".account_balance_history ADD COLUMN IF NOT EXISTS op_type_i
 ALTER TABLE :"schema".account_savings_history ADD COLUMN IF NOT EXISTS op_type_id SMALLINT;
 CREATE TABLE IF NOT EXISTS :"schema".balance_totals
   (nai SMALLINT NOT NULL, holders BIGINT NOT NULL, total NUMERIC NOT NULL, CONSTRAINT pk_balance_totals PRIMARY KEY (nai));
+CREATE TABLE IF NOT EXISTS :"schema".proposal_payment_totals
+  (proposal_id INT NOT NULL, receiver INT NOT NULL, total_paid BIGINT NOT NULL, payment_count INT NOT NULL,
+   first_payment_block INT NOT NULL, first_payment_at TIMESTAMP NOT NULL, last_payment_block INT NOT NULL, last_payment_at TIMESTAMP NOT NULL,
+   CONSTRAINT pk_proposal_payment_totals PRIMARY KEY (proposal_id));
+CREATE TABLE IF NOT EXISTS :"schema".proposal_payments
+  (proposal_id INT NOT NULL, payment_seq_no INT NOT NULL, amount BIGINT NOT NULL, source_op BIGINT NOT NULL,
+   CONSTRAINT pk_proposal_payments PRIMARY KEY (proposal_id, payment_seq_no));
 RESET session_replication_role;
 GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
 GRANT ALL ON SCHEMA :"schema" TO btracker_owner;

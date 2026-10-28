@@ -1,0 +1,44 @@
+[
+  {
+    "proposal_id": 0,
+    "receiver": null,
+    "total_paid": {
+      "nai": "@@000000013",
+      "amount": "0",
+      "precision": 3
+    },
+    "payment_count": 0,
+    "first_payment_block": null,
+    "first_payment_time": null,
+    "last_payment_block": null,
+    "last_payment_time": null
+  },
+  {
+    "proposal_id": 1,
+    "receiver": null,
+    "total_paid": {
+      "nai": "@@000000013",
+      "amount": "0",
+      "precision": 3
+    },
+    "payment_count": 0,
+    "first_payment_block": null,
+    "first_payment_time": null,
+    "last_payment_block": null,
+    "last_payment_time": null
+  },
+  {
+    "proposal_id": 2,
+    "receiver": null,
+    "total_paid": {
+      "nai": "@@000000013",
+      "amount": "0",
+      "precision": 3
+    },
+    "payment_count": 0,
+    "first_payment_block": null,
+    "first_payment_time": null,
+    "last_payment_block": null,
+    "last_payment_time": null
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "total_accounts": 13424,
+  "total_pages": 537,
+  "holders_result": [
+    { "rank": 26, "account": "mr11acdee", "value": "15308972" },
+    { "rank": 27, "account": "dan", "value": "14332676" },
+    { "rank": 28, "account": "steemrollin", "value": "12210260" },
+    { "rank": 29, "account": "dana-edwards", "value": "11752939" },
+    { "rank": 30, "account": "asmolokalo", "value": "11112828" },
+    { "rank": 31, "account": "mika", "value": "11000001" },
+    { "rank": 32, "account": "infovore", "value": "10385468" },
+    { "rank": 33, "account": "kush", "value": "10313896" },
+    { "rank": 34, "account": "atip", "value": "10159969" },
+    { "rank": 35, "account": "aton", "value": "10158315" },
+    { "rank": 36, "account": "adeal", "value": "10124026" },
+    { "rank": 37, "account": "adrop", "value": "10119441" },
+    { "rank": 38, "account": "abunch", "value": "10117537" },
+    { "rank": 39, "account": "aload", "value": "10117455" },
+    { "rank": 40, "account": "apinch", "value": "10111880" },
+    { "rank": 41, "account": "adash", "value": "10110672" },
+    { "rank": 42, "account": "apuff", "value": "10110647" },
+    { "rank": 43, "account": "ahint", "value": "10109359" },
+    { "rank": 44, "account": "inventor", "value": "10000000" },
+    { "rank": 45, "account": "fairytalelife", "value": "9919807" },
+    { "rank": 46, "account": "modprobe", "value": "9457967" },
+    { "rank": 47, "account": "neilstrauss", "value": "9138409" },
+    { "rank": 48, "account": "officialfuzzy", "value": "9038696" },
+    { "rank": 49, "account": "void", "value": "7553999" },
+    { "rank": 50, "account": "wackou", "value": "6726821" }
+  ]
+}

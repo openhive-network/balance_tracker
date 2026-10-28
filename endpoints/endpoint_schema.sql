@@ -19,6 +19,8 @@ tags:
     description: Informations about account balances
   - name: Transfers
     description: Information about transfers and their history
+  - name: Proposals
+    description: Payments from the Decentralized Hive Fund to its proposals
   - name: Other
     description: General API information
 servers:
@@ -65,6 +67,10 @@ declare
     {
       "name": "Transfers",
       "description": "Information about transfers and their history"
+    },
+    {
+      "name": "Proposals",
+      "description": "Payments from the Decentralized Hive Fund to its proposals"
     },
     {
       "name": "Other",
@@ -115,6 +121,14 @@ declare
         "enum": [
           "balance",
           "savings_balance"
+        ]
+      },
+      "btracker_backend.top_holders_balance_type": {
+        "type": "string",
+        "enum": [
+          "balance",
+          "savings_balance",
+          "total"
         ]
       },
       "btracker_backend.sort_direction": {
@@ -772,6 +786,93 @@ declare
               "$ref": "#/components/schemas/btracker_backend.vesting_history_event"
             },
             "description": "List of vesting events for the requested page"
+          }
+        }
+      },
+      "btracker_backend.proposal_payment_totals": {
+        "type": "object",
+        "properties": {
+          "proposal_id": {
+            "type": "integer",
+            "description": "id of the DHF proposal"
+          },
+          "receiver": {
+            "type": "string",
+            "description": "account the proposal pays; null when the proposal has not been paid yet"
+          },
+          "total_paid": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "total HBD paid to the proposal so far (zero when never paid)"
+          },
+          "payment_count": {
+            "type": "integer",
+            "description": "number of payments (proposal_pay_operation) so far"
+          },
+          "first_payment_block": {
+            "type": "integer",
+            "description": "block of the first payment; null when never paid"
+          },
+          "first_payment_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "timestamp of the first payment; null when never paid"
+          },
+          "last_payment_block": {
+            "type": "integer",
+            "description": "block of the latest payment; null when never paid"
+          },
+          "last_payment_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "timestamp of the latest payment; null when never paid"
+          }
+        }
+      },
+      "btracker_backend.array_of_proposal_payment_totals": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.proposal_payment_totals"
+        }
+      },
+      "btracker_backend.proposal_payment": {
+        "type": "object",
+        "properties": {
+          "block_num": {
+            "type": "integer",
+            "description": "block number of the payment"
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "unique operation identifier with encoded block number and position"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/btracker_backend.amount",
+            "description": "HBD paid"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "block timestamp"
+          }
+        }
+      },
+      "btracker_backend.proposal_payment_history": {
+        "type": "object",
+        "properties": {
+          "total_operations": {
+            "type": "integer",
+            "description": "Total number of payments to the proposal"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "operations_result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/btracker_backend.proposal_payment"
+            },
+            "description": "Payments on the requested page"
           }
         }
       },
@@ -1493,10 +1594,10 @@ declare
             "name": "balance-type",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/btracker_backend.balance_type",
+              "$ref": "#/components/schemas/btracker_backend.top_holders_balance_type",
               "default": "balance"
             },
-            "description": "`balance` or `savings_balance`\n(`savings_balance` not allowed with `VESTS`).\n"
+            "description": "`balance` (liquid), `savings_balance`, or `total` (liquid + savings, ranked by the sum).\n`savings_balance` and `total` are not allowed with `VESTS`.\nWith `total`, `min-balance` and `max-balance` apply to the sum.\n"
           },
           {
             "in": "query",
@@ -1757,6 +1858,149 @@ declare
           },
           "404": {
             "description": "No vesting statistics found for the given parameters"
+          }
+        }
+      }
+    },
+    "/proposals/payments": {
+      "get": {
+        "tags": [
+          "Proposals"
+        ],
+        "summary": "HBD paid so far to many DHF proposals",
+        "description": "Per proposal, the total HBD the Decentralized Hive Fund has paid it, the number of\npayments and the first and latest payment, summed from its `proposal_pay_operation`s.\nMeant for a proposal list: one call returns every listed proposal.\n\nReturns one entry per distinct requested id, in ascending id order. A proposal that\nhas not been paid yet (or does not exist) gets a zero `total_paid`,\n`payment_count` 0 and nulls for `receiver` and the payment blocks and times.\n\nEvery `proposal_pay_operation` in the chain''s history carries `proposal_id`,\nincluding the payments made by `steem.dao` before HF24, so every payment is\nattributed to its proposal.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_proposals_payments(''0,233,340'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/proposals/payments?proposal-ids=0,233,340''`\n",
+        "operationId": "btracker_endpoints.get_proposals_payments",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "proposal-ids",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Comma-separated proposal ids (at most 1000), e.g. `0,233,340`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment totals per requested proposal\n\n* Returns array of `btracker_backend.proposal_payment_totals`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_proposal_payment_totals"
+                },
+                "example": [
+                  {
+                    "proposal_id": 233,
+                    "receiver": "hbdstabilizer",
+                    "total_paid": {
+                      "nai": "@@000000013",
+                      "amount": "45689194336",
+                      "precision": 3
+                    },
+                    "payment_count": 5808,
+                    "first_payment_block": 68145659,
+                    "first_payment_time": "2022-09-23T00:35:03",
+                    "last_payment_block": 75104523,
+                    "last_payment_time": "2023-05-22T23:35:48"
+                  },
+                  {
+                    "proposal_id": 400,
+                    "receiver": null,
+                    "total_paid": {
+                      "nai": "@@000000013",
+                      "amount": "0",
+                      "precision": 3
+                    },
+                    "payment_count": 0,
+                    "first_payment_block": null,
+                    "first_payment_time": null,
+                    "last_payment_block": null,
+                    "last_payment_time": null
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proposals/{proposal-id}/payments": {
+      "get": {
+        "tags": [
+          "Proposals"
+        ],
+        "summary": "Payment history of one DHF proposal",
+        "description": "Paginated list of the payments (`proposal_pay_operation`) the Decentralized Hive\nFund made to one proposal: block, timestamp and HBD amount of each. A proposal that\nhas not been paid yet (or does not exist) has no payments.\n\nEvery `proposal_pay_operation` in the chain''s history carries `proposal_id`,\nincluding the payments made by `steem.dao` before HF24, so every payment is\nattributed to its proposal.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_proposal_payments(233);`\n\nREST call example\n* `GET ''https://%1$s/balance-api/proposals/233/payments?page-size=50''`\n",
+        "operationId": "btracker_endpoints.get_proposal_payments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal-id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Id of the proposal"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": null
+            },
+            "description": "Return page on `page` number, default null due to reversed order of pages,\nthe first page is the oldest,\nexample: first call returns the newest page and total_pages is 100 - the newest page is number 100, next 99 etc.\n"
+          },
+          {
+            "in": "query",
+            "name": "page-size",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "Items per page (max 1000)"
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/btracker_backend.sort_direction",
+              "default": "desc"
+            },
+            "description": "Sort order:\n\n * `asc` - Ascending, from oldest to newest\n\n * `desc` - Descending, from newest to oldest\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated payment history of the proposal.\n\n* Returns `btracker_backend.proposal_payment_history`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.proposal_payment_history"
+                },
+                "example": {
+                  "total_operations": 5808,
+                  "total_pages": 59,
+                  "operations_result": [
+                    {
+                      "block_num": 75104523,
+                      "operation_id": "322571470066679940",
+                      "amount": {
+                        "nai": "@@000000013",
+                        "amount": "8390554",
+                        "precision": 3
+                      },
+                      "timestamp": "2023-05-22T23:35:48"
+                    }
+                  ]
+                }
+              }
+            }
           }
         }
       }
