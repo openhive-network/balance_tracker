@@ -153,7 +153,7 @@ $$;
 --     indexes do not exist yet: the reads and deletes of the two accounts' rows scan the
 --     history tables, once, inside a finalize that scans them for the rollups anyway.
 -- Running it again reproduces its own result.
-CREATE OR REPLACE FUNCTION btracker_backend.rebuild_cleared_accounts(_context TEXT)
+CREATE OR REPLACE FUNCTION btracker_backend.rebuild_cleared_accounts(_context TEXT, _source_checked BOOLEAN DEFAULT FALSE)
 RETURNS BIGINT
 LANGUAGE 'plpgsql' VOLATILE
 AS
@@ -190,9 +190,11 @@ BEGIN
   IF COALESCE(_head, 0) = 0 THEN
     RETURN 0;
   END IF;
-  _gap := btracker_backend.cleared_accounts_source_gap(_context);
-  IF _gap IS NOT NULL THEN
-    RAISE EXCEPTION 'btracker: cannot rebuild null/steem.dao (#61): %', _gap;
+  IF NOT _source_checked THEN
+    _gap := btracker_backend.cleared_accounts_source_gap(_context);
+    IF _gap IS NOT NULL THEN
+      RAISE EXCEPTION 'btracker: cannot rebuild null/steem.dao (#61): %', _gap;
+    END IF;
   END IF;
 
   DROP TABLE IF EXISTS _rb_clears;
@@ -239,6 +241,7 @@ BEGIN
   FROM d
   WHERE NOT is_clear OR delta <> 0
   WINDOW w AS (PARTITION BY account, nai ORDER BY source_op, ord ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW);
+  ANALYZE _rb_balances;  -- the per-row probes below need the planner to see its size
 
   -- balance_totals: replace the two accounts' old contribution by the new one
   WITH old_rows AS (
@@ -310,7 +313,9 @@ BEGIN
     _last_payment := 'epoch'::TIMESTAMP; _staged := FALSE;
     FOR _row IN
       SELECT r.balance,
-             CASE WHEN ov.trx_in_block >= 0 THEN COALESCE(bvp.created_at, bv.created_at)
+             -- a clear is staged with trx_in_block -1 by process_balances (a block-level vop)
+             CASE WHEN r.op_type_id NOT IN (_op_clear_null, _op_consolidate) AND ov.trx_in_block >= 0
+                  THEN COALESCE(bvp.created_at, bv.created_at)
                   ELSE bv.created_at END AS effective_ts
       FROM _rb_balances r
       JOIN operations_view ov ON ov.id = r.source_op
@@ -523,27 +528,28 @@ $$
 $$;
 
 -- First block from which HAF still holds both the block headers and the operations. 1 on
--- a full HAF; higher on a pruned one, which drops old core data but keeps the
--- application's own tables.
+-- a full HAF; higher on a pruned one (hive.prune_blocks_data drops one contiguous prefix of
+-- blocks, operations, transactions and applied_hardforks, keeping the applications' own
+-- tables). Read from the irreversible tables pruning deletes from, by primary key: the
+-- context views would scan every operation while the context is attached.
 CREATE OR REPLACE FUNCTION btracker_backend.first_available_block(_context TEXT)
 RETURNS INT
-LANGUAGE 'plpgsql' STABLE
+LANGUAGE 'sql' STABLE
 AS
 $$
-DECLARE
-  _blocks INT;
-  _ops    INT;
-BEGIN
-  EXECUTE format('SELECT bv.num FROM %I.blocks_view bv ORDER BY bv.num LIMIT 1', _context) INTO _blocks;
-  EXECUTE format('SELECT ov.block_num FROM %I.operations_view ov ORDER BY ov.id LIMIT 1', _context) INTO _ops;
-  RETURN GREATEST(_blocks, _ops);
-END
+  SELECT GREATEST(
+    (SELECT MIN(b.num) FROM hafd.blocks b),
+    (SELECT hafd.operation_id_to_block_num(MIN(o.id)) FROM hafd.operations o));
 $$;
 
 -- Why the #61 rebuild cannot run here, or NULL when it can. It replays the whole history of
--- 'null' / 'steem.dao' and needs, from their first history row on, every clearing op and
--- every block's timestamp; a pruned HAF has dropped the older part, so the rebuild would
--- miss old clears and lose old rollups. Nothing to repair (no history) is not a gap.
+-- 'null' / 'steem.dao' and needs, from the block before their first history row on, every
+-- clearing op and every block's timestamp (the HBD-interest replay reads the previous
+-- block's time), plus the HF24/HF25 records that bound the delayed-vests and interest
+-- replays. A pruned HAF can have dropped any of these; the rebuild would then miss old
+-- clears, lose old rollups or misplace the hardforks. Nothing to repair is not a gap.
+-- Not covered: pruning that advances WHILE the rebuild runs, which needs another
+-- application on the same HAF lagging below the accounts' first history row.
 CREATE OR REPLACE FUNCTION btracker_backend.cleared_accounts_source_gap(_context TEXT)
 RETURNS TEXT
 LANGUAGE 'plpgsql' STABLE
@@ -553,21 +559,31 @@ DECLARE
   _first_needed    INT;
   _first_available INT;
 BEGIN
+  -- The first row of each (account, nai) series is its balance_seq_no 1 (sequence numbers
+  -- follow source_op): one unique-index probe per series instead of reading the history.
   EXECUTE format(
     'SELECT MIN(hafd.operation_id_to_block_num(x.source_op)) FROM ('
-    '  SELECT MIN(h.source_op) AS source_op FROM %1$I.account_balance_history h'
-    '    WHERE h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
+    '  SELECT h.source_op FROM %1$I.account_balance_history h'
+    '    WHERE h.balance_seq_no = 1'
+    '      AND h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
     '  UNION ALL'
-    '  SELECT MIN(h.source_op) FROM %1$I.account_savings_history h'
-    '    WHERE h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
+    '  SELECT h.source_op FROM %1$I.account_savings_history h'
+    '    WHERE h.balance_seq_no = 1'
+    '      AND h.account IN (SELECT av.id FROM %1$I.accounts_view av WHERE av.name IN (''null'', ''steem.dao''))'
     ') x', _context) INTO _first_needed;
   IF _first_needed IS NULL THEN
     RETURN NULL;
   END IF;
   _first_available := btracker_backend.first_available_block(_context);
-  IF _first_available IS NULL OR _first_available > _first_needed THEN
-    RETURN format('HAF holds blocks and operations only from block %s, but the history of null/steem.dao starts at block %s (pruned HAF)',
-                  COALESCE(_first_available::TEXT, 'none'), _first_needed);
+  IF _first_available IS NULL OR _first_available > GREATEST(_first_needed - 1, 1) THEN
+    RETURN format('HAF holds blocks and operations only from block %s, but the history of null/steem.dao needs them from block %s (pruned HAF)',
+                  COALESCE(_first_available::TEXT, 'none'), GREATEST(_first_needed - 1, 1));
+  END IF;
+  -- pruning drops applied_hardforks rows too; a full HAF has them from block 1 on
+  IF _first_available > 1
+     AND (NOT EXISTS (SELECT 1 FROM hafd.applied_hardforks ah WHERE ah.hardfork_num = btracker_backend.hf_delayed_voting())
+          OR NOT EXISTS (SELECT 1 FROM hafd.applied_hardforks ah WHERE ah.hardfork_num = btracker_backend.hf_hbd_interest())) THEN
+    RETURN format('HAF holds data only from block %s and has no HF24/HF25 record, which the rebuild needs (pruned HAF)', _first_available);
   END IF;
   RETURN NULL;
 END
@@ -597,7 +613,7 @@ BEGIN
     RETURN FALSE;
   END IF;
   _head := (SELECT c.current_block_num FROM hafd.contexts c WHERE c.name = _context);
-  _rows := btracker_backend.rebuild_cleared_accounts(_context);
+  _rows := btracker_backend.rebuild_cleared_accounts(_context, TRUE);
   INSERT INTO btracker_repairs (name, outcome, at_block)
   VALUES ('cleared_accounts', format('repaired: %s liquid history rows', _rows), _head);
   RAISE NOTICE 'btracker: null/steem.dao repaired (#61) at block %, % liquid history rows', _head, _rows;
