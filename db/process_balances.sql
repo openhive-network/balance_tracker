@@ -17,12 +17,19 @@ SET ROLE btracker_owner;
  * verbatim from the previous implementation - see the staging comment in
  * process_block_range_balances for the chain model references.
  *
+ * _staged names another staging table of the same shape (the #61 repair stages its
+ * own: a temp table belongs to the role that created it, and the repair can run as a
+ * different role than the batch that created _hbd_batch_rows in the same session -
+ * hafbe's processor, then btracker_owner in finalize_massive_sync_before_forking).
+ *
  * Returns the number of accounts upserted into account_hbd_interest.
  */
+DROP FUNCTION IF EXISTS btracker_backend.accumulate_hbd_interest(INT, INT, INT);  -- before _staged
 CREATE OR REPLACE FUNCTION btracker_backend.accumulate_hbd_interest(
     _from INT,
     _to INT,
-    _hbd_interest_interval INT
+    _hbd_interest_interval INT,
+    _staged TEXT DEFAULT '_hbd_batch_rows'
 )
 RETURNS INT
 LANGUAGE 'plpgsql' VOLATILE
@@ -43,7 +50,8 @@ DECLARE
   __payments TIMESTAMP[] := '{}';
   __n INT := 0;
 BEGIN
-  FOR r IN
+  -- dynamic only for the table name (planned once per call, as the static form was)
+  FOR r IN EXECUTE format($q$
     SELECT
       h.account_id,
       h.balance,
@@ -57,14 +65,15 @@ BEGIN
       hi.hbd_seconds_last_update   AS p_update,
       hi.last_balance              AS p_balance,
       hi.hbd_last_interest_payment AS p_payment
-    FROM _hbd_batch_rows h
+    FROM pg_temp.%I h
     -- range guards: reversible-union view, planner cannot propagate the range
     JOIN hive.blocks_view bv ON bv.num = h.source_op_block
-                            AND bv.num BETWEEN _from AND _to
+                            AND bv.num BETWEEN $1 AND $2
     LEFT JOIN hive.blocks_view bvp ON bvp.num = h.source_op_block - 1
-                                  AND bvp.num BETWEEN _from - 1 AND _to
+                                  AND bvp.num BETWEEN $1 - 1 AND $2
     LEFT JOIN account_hbd_interest hi ON hi.account = h.account_id
     ORDER BY h.account_id, h.source_op, h.balance_seq_no
+  $q$, _staged) USING _from, _to
   LOOP
     IF __cur_account IS DISTINCT FROM r.account_id THEN
       IF __cur_account IS NOT NULL THEN
@@ -114,24 +123,25 @@ BEGIN
 END
 $$;
 
--- (Re)creates the session temp table accumulate_hbd_interest consumes, empty. Staged by
--- process_block_range_balances per batch, and by the #61 repair
--- (btracker_backend.rebuild_cleared_accounts) for the two accounts it rebuilds.
-CREATE OR REPLACE FUNCTION btracker_backend.create_hbd_batch_rows()
+-- (Re)creates, empty, a session temp table of the shape accumulate_hbd_interest consumes:
+-- _hbd_batch_rows, staged by process_block_range_balances per batch, or another name (the
+-- #61 repair, btracker_backend.rebuild_cleared_accounts, stages its own - see there why).
+DROP FUNCTION IF EXISTS btracker_backend.create_hbd_batch_rows();  -- before _table
+CREATE OR REPLACE FUNCTION btracker_backend.create_hbd_batch_rows(_table TEXT DEFAULT '_hbd_batch_rows')
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 BEGIN
-  DROP TABLE IF EXISTS _hbd_batch_rows;
-  CREATE TEMP TABLE _hbd_batch_rows(
-    account_id      INT,
-    balance         BIGINT,
-    source_op       BIGINT,
-    source_op_block INT,
-    balance_seq_no  BIGINT,
-    trx_in_block    SMALLINT
-  );
+  EXECUTE format('DROP TABLE IF EXISTS pg_temp.%I', _table);
+  EXECUTE format('CREATE TEMP TABLE %I ('
+                 '  account_id      INT,'
+                 '  balance         BIGINT,'
+                 '  source_op       BIGINT,'
+                 '  source_op_block INT,'
+                 '  balance_seq_no  BIGINT,'
+                 '  trx_in_block    SMALLINT'
+                 ')', _table);
 END
 $$;
 
@@ -404,12 +414,13 @@ union_latest_balance_with_impacted_balances AS NOT MATERIALIZED (
  * Only the accounts cleared in this range take the window path; every other row passes
  * straight through.
  */
--- The accounts cleared in this range (at most the two), as one array value, read from the
--- clearing ops rather than from ops_in_range: an array comparison is a plain filter the
--- planner applies inside each branch below, which a semi-join over a set is not.
+-- The accounts cleared in this range (at most the two), from the clear markers already in
+-- ops_in_range, as one array value: an array comparison is a plain filter the planner
+-- applies inside each branch below, which a semi-join over a set is not.
 cleared_accounts AS MATERIALIZED (
-  SELECT COALESCE(array_agg(DISTINCT ac.account_id), '{}'::INT[]) AS ids
-  FROM btracker_backend.account_clears_in_range( _from, _to ) AS ac
+  SELECT COALESCE(array_agg(DISTINCT o.account_id) FILTER (WHERE o.account_id IS NOT NULL), '{}'::INT[]) AS ids
+  FROM ops_in_range o
+  WHERE o.is_clear
 ),
 -- The cleared accounts' rows: their deltas and markers, read from ops_in_range once, and
 -- their starting balances looked up directly. Every (account, nai) of a cleared account is

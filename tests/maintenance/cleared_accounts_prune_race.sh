@@ -4,25 +4,27 @@
 # The #61 repair against HAF pruning that advances WHILE it runs (two sessions; the
 # single-session cleared_accounts_repair.sql covers a HAF pruned before it starts).
 #
-#   1. a holder session locks one of null's day-rollup rows, so the repair, once started,
-#      stops at its rollup DELETE - after its first source check and its first reads;
-#   2. the repair session (finalize path, apply_cleared_accounts_repair, inside a
-#      transaction it rolls back) starts on data it would change, and blocks there;
-#   3. a third session commits "pruning": a row that makes first_available_block report every
-#      block gone, which is what the real function reports once HAF has deleted the prefix.
-#      (Before the sessions start, first_available_block is replaced by one that returns that
-#      row's value when there is one and the real computation otherwise. Data, like real
-#      pruning: a READ COMMITTED statement sees it as soon as it is committed. A function
-#      replaced mid-transaction would not be: the session keeps its cached definition.)
-#   4. the holder releases the row; the repair resumes, finishes its reads, and must then
-#      find the source incomplete: return FALSE, leave every table as it was (its writes
-#      rolled back), and record nothing.
+#   0. setup (committed, undone on exit): null's delayed_vests is made wrong, so the
+#      rebuild's last write - its account_withdraws UPDATE, after every read of HAF data -
+#      has a row to change; first_available_block is replaced by one that reports a
+#      "pruned" first block from a table when the table holds one (see below);
+#   1. a holder session locks null's account_withdraws row;
+#   2. the repair session (finalize path, apply_cleared_accounts_repair, in a transaction
+#      it rolls back) runs the whole rebuild and blocks on that row - after its last read;
+#   3. a third session commits "pruning": the first available block becomes the one after
+#      the first block the rebuild needs (cleared_accounts_first_needed_block + 1);
+#   4. the holder releases the row; the repair writes it, reaches its final source check,
+#      and must find the source incomplete: return FALSE, leave every table as it was (its
+#      writes rolled back) and record nothing.
 #
-# Simulated, not real, pruning: the mock HAF is shared with later CI steps and its cache,
-# so no block is deleted. What it proves is the ordering - pruning committed after the
-# repair's first check, before its last read, is caught.
+# What it shows: pruning committed after the rebuild's first check and after its last
+# read is caught - so the final check runs after that write. What it does not: the mock HAF
+# is shared with later CI steps and their cache, so no block is deleted - the later reads
+# are not shown to come out wrong, and the replaced first_available_block stands in for
+# the real one. Pruning is data, as in HAF: a READ COMMITTED statement sees it once it is
+# committed. (A function replaced mid-transaction would not do: a session keeps its cached
+# definition while it holds locks on the function's tables.)
 #
-# The original first_available_block is put back on exit, whatever happens.
 # PSQL_COMMAND: how to start psql against the HAF database, e.g.
 #   docker compose ... exec -T haf psql -U haf_admin -d haf_block_log
 set -euo pipefail
@@ -31,26 +33,45 @@ SCHEMA="$1"; shift
 PSQL=("$@")
 WORK="$(mktemp -d)"
 TIMEOUT=180
+SETUP_DONE=0
 
 psql_run() { "${PSQL[@]}" -X -q -v ON_ERROR_STOP=on -v schema="$SCHEMA" "$@"; }
+is_original() {  # the real first_available_block (reads hafd.blocks, no test table)
+  psql_run -At -c "SELECT prosrc LIKE '%hafd.blocks%' AND prosrc NOT LIKE '%bt61_prune_race%'
+                   FROM pg_proc WHERE oid = 'btracker_backend.first_available_block(text)'::regprocedure"
+}
 
+[[ "$(is_original)" == "t" ]] || { echo "prune_race: first_available_block is not the original (a leftover override?)"; exit 1; }
 ORIGINAL_DEF="$WORK/first_available_block.sql"
 psql_run -At -c "SELECT pg_get_functiondef('btracker_backend.first_available_block(text)'::regprocedure)" > "$ORIGINAL_DEF"
-grep -q "hafd.blocks" "$ORIGINAL_DEF" || { echo "prune_race: unexpected first_available_block definition:"; cat "$ORIGINAL_DEF"; exit 1; }
+NULL_DELAYED="$(psql_run -At -c "SET search_path TO \"$SCHEMA\"; SELECT aw.delayed_vests FROM account_withdraws aw JOIN accounts_view av ON av.id = aw.account AND av.name = 'null'")"
+[[ -n "$NULL_DELAYED" ]] || { echo "prune_race: null has no account_withdraws row; the repair's last write would not wait"; exit 1; }
 
 cleanup() {
   local rc=$?
+  # the sessions' backends outlive a killed psql client: end them first, or they keep locks
+  psql_run -At -c "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE application_name LIKE 'bt61_prune_race_%'" >/dev/null || rc=1
   jobs -p | xargs -r kill 2>/dev/null || true
-  { echo "SET ROLE btracker_owner;"; cat "$ORIGINAL_DEF"; echo ";"; echo "RESET ROLE;"
-    echo "DROP TABLE IF EXISTS public.bt61_prune_race_signal, public.bt61_prune_race_first_available;"; } | psql_run -f - || rc=1
-  psql_run -At -c "SELECT pg_get_functiondef('btracker_backend.first_available_block(text)'::regprocedure)" | grep -q "hafd.blocks" \
-    || { echo "prune_race: first_available_block was NOT restored"; rc=1; }
+  if [[ $SETUP_DONE == 1 ]]; then
+    { echo "SET ROLE btracker_owner;"; cat "$ORIGINAL_DEF"; echo ";"; echo "RESET ROLE;"
+      echo "UPDATE \"$SCHEMA\".account_withdraws aw SET delayed_vests = $NULL_DELAYED"
+      echo "  FROM \"$SCHEMA\".accounts_view av WHERE av.id = aw.account AND av.name = 'null';"
+    } | psql_run -f - || rc=1
+  fi
+  psql_run -c "DROP TABLE IF EXISTS public.bt61_prune_race_signal, public.bt61_prune_race_first_available;" || rc=1
+  [[ "$(is_original)" == "t" ]] || { echo "prune_race: first_available_block was NOT restored"; rc=1; }
+  if [[ $rc != 0 ]]; then
+    for f in "$WORK"/*.log; do [[ -e "$f" ]] && { echo "---- $(basename "$f")"; cat "$f"; }; done
+  fi
   rm -rf "$WORK"
   exit $rc
 }
 trap cleanup EXIT
 
+# ---------------------------------------------------------------- 0. setup (committed)
+SETUP_DONE=1
 psql_run -f - <<'SQL'
+SET search_path TO :"schema", public;
 DROP TABLE IF EXISTS public.bt61_prune_race_signal, public.bt61_prune_race_first_available;
 CREATE TABLE public.bt61_prune_race_signal (step TEXT);
 CREATE TABLE public.bt61_prune_race_first_available (v INT);
@@ -64,7 +85,11 @@ RETURNS INT LANGUAGE sql STABLE AS $f$
              (SELECT hafd.operation_id_to_block_num(MIN(o.id)) FROM hafd.operations o)));
 $f$;
 RESET ROLE;
+UPDATE account_withdraws aw SET delayed_vests = aw.delayed_vests + 4000000000
+FROM accounts_view av WHERE av.id = aw.account AND av.name = 'null';
 SQL
+NEEDED="$(psql_run -At -c "SELECT btracker_backend.cleared_accounts_first_needed_block('$SCHEMA')")"
+[[ "$NEEDED" =~ ^[0-9]+$ ]] || { echo "prune_race: no first needed block ('$NEEDED'): nothing to repair"; exit 1; }
 
 # wait_for "<SQL returning true when ready>" "<what>"
 wait_for() {
@@ -83,11 +108,11 @@ SET search_path TO :"schema", public;
 BEGIN;
 DO $$
 BEGIN
-  PERFORM 1 FROM balance_history_by_day d
-  WHERE d.account = (SELECT av.id FROM accounts_view av WHERE av.name = 'null')
-  LIMIT 1 FOR UPDATE;
+  PERFORM 1 FROM account_withdraws aw
+  WHERE aw.account = (SELECT av.id FROM accounts_view av WHERE av.name = 'null')
+  FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'prune_race: null has no day rollup to hold; the repair would not stop';
+    RAISE EXCEPTION 'prune_race: no account_withdraws row of null to hold';
   END IF;
   FOR i IN 1..360 LOOP
     EXIT WHEN EXISTS (SELECT 1 FROM public.bt61_prune_race_signal WHERE step = 'pruned');
@@ -102,7 +127,7 @@ COMMIT;
 SQL
 HOLDER=$!
 wait_for "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'bt61_prune_race_holder' AND wait_event = 'PgSleep')" \
-  "the holder to lock null's rollup row"
+  "the holder to lock null's account_withdraws row"
 
 # ---------------------------------------------------------------- 2. the repair
 psql_run -f - > "$WORK/repair.log" 2>&1 <<'SQL' &
@@ -123,6 +148,8 @@ BEGIN
     'SELECT b.nai, b.holders, b.total FROM balance_totals b',
     'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)',
     'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)',
+    'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts)',
+    'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts)',
     'SELECT r.account, r.nai, r.balance FROM account_rewards r WHERE r.account IN (SELECT account FROM t_accounts)',
     'SELECT w.* FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts)',
     'SELECT i.* FROM account_hbd_interest i WHERE i.account IN (SELECT account FROM t_accounts)',
@@ -134,18 +161,15 @@ BEGIN
   RETURN md5(_acc);
 END
 $f$;
--- unrecorded, and on data the rebuild would change: a run that completed would show
+-- unrecorded, so apply runs the rebuild (the wrong delayed_vests from setup is what a
+-- completed rebuild would change)
 DELETE FROM btracker_repairs WHERE name = 'cleared_accounts';
-UPDATE account_rewards r SET balance = r.balance + 777777 WHERE r.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE t_before ON COMMIT DROP AS SELECT pg_temp.digest() AS d;
 DO $$
 DECLARE
   _schema   TEXT := current_setting('btracker_test.schema');
   _repaired BOOLEAN;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM account_rewards WHERE account IN (SELECT account FROM t_accounts)) THEN
-    RAISE EXCEPTION 'prune_race: null/steem.dao hold no reward rows; nothing for a completed rebuild to change';
-  END IF;
   -- the source is complete when the repair starts: only pruning during the run can stop it
   IF btracker_backend.cleared_accounts_source_gap(_schema) IS NOT NULL THEN
     RAISE EXCEPTION 'prune_race: the source is already incomplete before the run: %', btracker_backend.cleared_accounts_source_gap(_schema);
@@ -167,20 +191,20 @@ ROLLBACK;
 SQL
 REPAIR=$!
 wait_for "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'bt61_prune_race_repair' AND wait_event_type = 'Lock')" \
-  "the repair to block on the held rollup row"
+  "the repair to block on null's account_withdraws row (its last write)"
 
 # ---------------------------------------------------------------- 3. pruning, committed
-psql_run -f - <<'SQL'
+psql_run -f - <<SQL
 BEGIN;
-INSERT INTO public.bt61_prune_race_first_available VALUES (2147483647);
+INSERT INTO public.bt61_prune_race_first_available VALUES ($NEEDED + 1);
 INSERT INTO public.bt61_prune_race_signal VALUES ('pruned');
 COMMIT;
 SQL
 
 # ---------------------------------------------------------------- 4. outcome
 rc=0
-wait "$HOLDER" || { echo "prune_race: holder session failed:"; cat "$WORK/holder.log"; rc=1; }
-wait "$REPAIR" || { echo "prune_race: repair session failed:"; cat "$WORK/repair.log"; rc=1; }
-cat "$WORK/repair.log"
+wait "$HOLDER" || { echo "prune_race: holder session failed"; rc=1; }
+wait "$REPAIR" || { echo "prune_race: repair session failed"; rc=1; }
 grep -q "prune_race OK" "$WORK/repair.log" || { echo "prune_race: no OK line from the repair session"; rc=1; }
+[[ $rc == 0 ]] && cat "$WORK/repair.log"
 exit $rc

@@ -562,7 +562,7 @@
         "type": "delayed_voting_operation",
         "value": {
           "voter": "null",
-          "votes": 5000000000
+          "votes": 1000000000
         }
       }
     },

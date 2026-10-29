@@ -17,8 +17,7 @@ backend/operation_parsers/hardforks.sql).
 
 SET ROLE btracker_owner;
 
--- earlier forms of these functions (#61 review rounds)
-DROP FUNCTION IF EXISTS btracker_backend.rebuild_cleared_accounts(TEXT);
+-- forms these functions had in earlier #61 review rounds
 DROP FUNCTION IF EXISTS btracker_backend.rebuild_cleared_accounts(TEXT, BOOLEAN);
 DROP FUNCTION IF EXISTS btracker_backend.cleared_accounts_source_gap(TEXT);
 
@@ -129,7 +128,8 @@ $$;
 --   * pending rewards and delayed vests have no history: they are recomputed from the
 --     operations after the account's last clear, with the pipelines' own parsers.
 --   * account_hbd_interest: the repaired HBD rows are staged as process_balances stages a
---     batch's, and accumulate_hbd_interest replays them from no state. It reads
+--     batch's (into the repair's own _rb_hbd_rows), and accumulate_hbd_interest replays
+--     them from no state. It reads
 --     hive.blocks_view, which holds the same blocks as the context's view up to the
 --     context's block when that block is irreversible: what both callers ensure (the
 --     installer detaches the context first, which rewinds it to its irreversible block;
@@ -143,6 +143,13 @@ $$;
 --   * On the finalize path (install upgraded in the middle of massive sync) the history
 --     indexes do not exist yet: the reads and deletes of the two accounts' rows scan the
 --     history tables, once, inside a finalize that scans them for the rollups anyway.
+--     Known limit there: hive.app_next_iteration has already moved the context's block to
+--     the end of the range about to be processed, so the pending-rewards and delayed-vests
+--     sums also take in that range, which processing then applies again - a surplus until
+--     the account's next clear resets it. The liquid and savings series are not affected
+--     on mainnet: hived clears both accounts in every block that leaves them a balance, so
+--     the processed history ends at zero and a clear in that range debits nothing (its
+--     marker is dropped).
 -- Running it again reproduces its own result.
 CREATE OR REPLACE FUNCTION btracker_backend.rebuild_cleared_accounts(_context TEXT)
 RETURNS BIGINT
@@ -292,8 +299,12 @@ BEGIN
   -- inclusive), then folded by accumulate_hbd_interest from no previous state (its epoch
   -- defaults). trx_in_block is not kept in the history: it is read from the operation. An
   -- account with nothing staged keeps no row, as a clean replay leaves it.
-  PERFORM btracker_backend.create_hbd_batch_rows();
-  INSERT INTO _hbd_batch_rows (account_id, balance, source_op, source_op_block, balance_seq_no, trx_in_block)
+  -- Its own staging table, not the batch's _hbd_batch_rows: on the finalize path this runs
+  -- as btracker_owner (finalize_massive_sync_before_forking is SECURITY DEFINER) in a
+  -- session where another role - hafbe's processor - created _hbd_batch_rows, and only a
+  -- temp table's owner may drop it.
+  PERFORM btracker_backend.create_hbd_batch_rows('_rb_hbd_rows');
+  INSERT INTO _rb_hbd_rows (account_id, balance, source_op, source_op_block, balance_seq_no, trx_in_block)
   SELECT r.account, r.balance, r.source_op, hafd.operation_id_to_block_num(r.source_op), r.balance_seq_no,
          CASE WHEN r.op_type_id IN (_op_clear_null, _op_consolidate) THEN (-1)::SMALLINT
               ELSE ov.trx_in_block::SMALLINT END
@@ -302,8 +313,8 @@ BEGIN
   WHERE r.nai = 13
     AND (_hf25_block IS NULL OR hafd.operation_id_to_block_num(r.source_op) <= _hf25_block);
   DELETE FROM account_hbd_interest ahi WHERE ahi.account IN (SELECT DISTINCT r.account FROM _rb_balances r WHERE r.nai = 13);
-  PERFORM btracker_backend.accumulate_hbd_interest(1, _head, btracker_backend.hbd_interest_compound_interval_sec());
-  DROP TABLE _hbd_batch_rows;
+  PERFORM btracker_backend.accumulate_hbd_interest(1, _head, btracker_backend.hbd_interest_compound_interval_sec(), '_rb_hbd_rows');
+  DROP TABLE _rb_hbd_rows;
 
   -- ---------------------------------------------------------------- savings
   DROP TABLE IF EXISTS _rb_savings;

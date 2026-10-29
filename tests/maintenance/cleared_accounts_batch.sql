@@ -17,9 +17,13 @@
  * accounts, which empty both, so the result does not depend on their starting value - and
  * delayed vests start from a large wrong value to show it. For 'null' the range holds four
  * clears (blocks ...58, 59, 61, 63), delayed-vests credits before and after them, the last
- * after the last clear, and a delayed_voting debit larger than what is pending (clamped):
+ * after the last clear, and after that clear a delayed_voting debit (1e9) larger than what
+ * is pending (0: clamped) but smaller than what a missed reset would leave (2e9), so a clear
+ * that is not applied changes the result instead of being hidden by the clamp:
  * process_withdrawals folds only the last clear of the range, which must give the same
- * value as one clear per block.
+ * value as one clear per block. (Block ...63 holds no delayed op of null: in the
+ * block-by-block sync that made the snapshot, its reset comes from the stored-value arm of
+ * process_withdrawals' guard - without it the snapshot would hold 3e9, not 2e9.)
  * Other accounts are processed a second time by step 3 and are not compared (neither is
  * balance_totals); everything runs in a transaction that is rolled back. The range runs
  * with the LIVE layout (indexes present, rollups maintained per range), not massive sync's
@@ -147,7 +151,7 @@ DELETE FROM balance_history_by_day d
 WHERE d.account IN (SELECT account FROM t_accounts)
   AND d.updated_at >= (SELECT date_trunc('day', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
 
--- a stored delayed-vests value of null's that the range's first clear must empty (the
+-- a stored delayed-vests value of null's that the range's clears must empty (the
 -- snapshot is what block-by-block processing left; this value must not survive into it).
 -- Only null's existing row: a row created here for steem.dao, which has none, would differ
 -- from the snapshot for a reason that is not under test.
