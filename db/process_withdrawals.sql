@@ -608,7 +608,6 @@ union_delays AS MATERIALIZED (
   SELECT ac.account_id, 0::BIGINT AS balance, MAX(ac.source_op) AS source_op, TRUE AS is_clear
   FROM btracker_backend.account_clears_in_range(_from, _to) ac
   WHERE EXISTS (SELECT 1 FROM union_delays_ops u WHERE u.account_id = ac.account_id)
-     OR EXISTS (SELECT 1 FROM account_withdraws aw WHERE aw.account = ac.account_id AND aw.delayed_vests <> 0)
   GROUP BY ac.account_id
 ),
 group_by_account AS MATERIALIZED (
