@@ -596,15 +596,20 @@ union_delays_ops AS MATERIALIZED (
 -- op (sum_delayed_votes = 0; delayed_votes.clear()). A marker at the op resets the clamped
 -- running value below to 0; later ops in the batch continue from it. Only for an account
 -- that has delayed vests stored or touched in this batch, so no empty row is created.
+-- Only the account's LAST clear of the batch: the fold below keeps no intermediate value,
+-- and the last reset makes every earlier clear irrelevant to the final one. (An account
+-- cleared every block - 'null' - would otherwise add a row per block to the recursion,
+-- whose cost grows with the square of its rows.)
 union_delays AS MATERIALIZED (
   SELECT account_id, balance, source_op, is_clear FROM union_delays_ops
 
   UNION ALL
 
-  SELECT ac.account_id, 0::BIGINT AS balance, ac.source_op, TRUE AS is_clear
+  SELECT ac.account_id, 0::BIGINT AS balance, MAX(ac.source_op) AS source_op, TRUE AS is_clear
   FROM btracker_backend.account_clears_in_range(_from, _to) ac
   WHERE EXISTS (SELECT 1 FROM union_delays_ops u WHERE u.account_id = ac.account_id)
      OR EXISTS (SELECT 1 FROM account_withdraws aw WHERE aw.account = ac.account_id AND aw.delayed_vests <> 0)
+  GROUP BY ac.account_id
 ),
 group_by_account AS MATERIALIZED (
   SELECT DISTINCT account_id

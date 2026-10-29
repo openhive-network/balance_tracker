@@ -648,6 +648,10 @@ sync_with_mock_data:
     # ...and processing the clearing blocks as one range must match block-by-block (also rolled back)
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -v ON_ERROR_STOP=on \
       -v schema=btracker_app -v require_clears=1 -f - < "${CI_PROJECT_DIR}/tests/maintenance/cleared_accounts_batch.sql"
+    # ...and HAF pruning committed while the repair runs must leave nothing (two sessions;
+    # rolled back too, and its simulated pruning is undone on exit)
+    bash "${CI_PROJECT_DIR}/tests/maintenance/cleared_accounts_prune_race.sh" btracker_app \
+      docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log
     popd
 
     # === Stop containers and save cache in main script ===

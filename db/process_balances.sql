@@ -114,6 +114,27 @@ BEGIN
 END
 $$;
 
+-- (Re)creates the session temp table accumulate_hbd_interest consumes, empty. Staged by
+-- process_block_range_balances per batch, and by the #61 repair
+-- (btracker_backend.rebuild_cleared_accounts) for the two accounts it rebuilds.
+CREATE OR REPLACE FUNCTION btracker_backend.create_hbd_batch_rows()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  DROP TABLE IF EXISTS _hbd_batch_rows;
+  CREATE TEMP TABLE _hbd_batch_rows(
+    account_id      INT,
+    balance         BIGINT,
+    source_op       BIGINT,
+    source_op_block INT,
+    balance_seq_no  BIGINT,
+    trx_in_block    SMALLINT
+  );
+END
+$$;
+
 /*
  * process_block_range_balances: Processes balance-impacting operations for a block range.
  *
@@ -171,15 +192,7 @@ WHERE hardfork_num = 1;
 
 -- Staging table for the HBD interest accumulator (consumed by
 -- btracker_backend.accumulate_hbd_interest after the main statement below).
-DROP TABLE IF EXISTS _hbd_batch_rows;
-CREATE TEMP TABLE _hbd_batch_rows(
-  account_id      INT,
-  balance         BIGINT,
-  source_op       BIGINT,
-  source_op_block INT,
-  balance_seq_no  BIGINT,
-  trx_in_block    SMALLINT
-);
+PERFORM btracker_backend.create_hbd_batch_rows();
 --RAISE NOTICE 'Processing balances';
 
 /*
@@ -340,7 +353,10 @@ get_latest_balance AS (
  *
  * And balance_seq_no will be: 5, 6, 7, 8 (continuing the sequence)
  */
-union_latest_balance_with_impacted_balances AS (
+-- NOT MATERIALIZED: without it PostgreSQL may write every row of the batch to a tuplestore
+-- (apply_account_clears used to read it twice). Inlined, apply_account_clears' filter on
+-- the uncleared accounts is applied inside both branches.
+union_latest_balance_with_impacted_balances AS NOT MATERIALIZED (
   SELECT
     cp.account_id,
     cp.nai,
@@ -388,13 +404,43 @@ union_latest_balance_with_impacted_balances AS (
  * Only the accounts cleared in this range take the window path; every other row passes
  * straight through.
  */
+-- The accounts cleared in this range (at most the two), as one array value, read from the
+-- clearing ops rather than from ops_in_range: an array comparison is a plain filter the
+-- planner applies inside each branch below, which a semi-join over a set is not.
+cleared_accounts AS MATERIALIZED (
+  SELECT COALESCE(array_agg(DISTINCT ac.account_id), '{}'::INT[]) AS ids
+  FROM btracker_backend.account_clears_in_range( _from, _to ) AS ac
+),
+-- The cleared accounts' rows: their deltas and markers, read from ops_in_range once, and
+-- their starting balances looked up directly. Every (account, nai) of a cleared account is
+-- in ops_in_range (it has a marker for each of the three), so this is what
+-- union_latest_balance_with_impacted_balances holds for them, without its GROUP BY pass.
+cleared_input AS (
+  SELECT
+    cp.account_id, cp.nai, cp.balance, 1 AS balance_seq_no, cp.source_op, cp.op_type_id,
+    cp.source_op_block, cp.trx_in_block, cp.is_clear
+  FROM ops_in_range cp
+  WHERE cp.account_id = ANY ((SELECT c.ids FROM cleared_accounts c)::INT[])
+
+  UNION ALL
+
+  SELECT
+    a.account_id, n.nai,
+    COALESCE(cab.balance, 0), COALESCE(cab.balance_change_count, 0), 0, NULL::SMALLINT,
+    0, NULL::SMALLINT, FALSE
+  FROM unnest((SELECT c.ids FROM cleared_accounts c)::INT[]) AS a(account_id)
+  CROSS JOIN (VALUES (13), (21), (37)) AS n(nai)
+  LEFT JOIN current_account_balances cab ON cab.account = a.account_id AND cab.nai = n.nai
+),
 apply_account_clears AS (
   SELECT
     u.account_id, u.nai, u.balance, u.balance_seq_no, u.source_op, u.op_type_id,
     u.source_op_block, u.trx_in_block
   FROM union_latest_balance_with_impacted_balances u
-  -- NOT EXISTS, not NOT IN: a row with a NULL account must keep failing loudly at the insert
-  WHERE NOT EXISTS (SELECT 1 FROM ops_in_range o WHERE o.is_clear AND o.account_id = u.account_id)
+  -- IS NULL first: a row with a NULL account must keep failing loudly at the insert, and
+  -- <> ALL alone would drop it
+  WHERE u.account_id IS NULL
+     OR u.account_id <> ALL ((SELECT c.ids FROM cleared_accounts c)::INT[])
 
   UNION ALL
 
@@ -419,8 +465,7 @@ apply_account_clears AS (
           SUM(u.is_clear::INT) OVER (PARTITION BY u.account_id, u.nai ORDER BY u.source_op
                                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
             - u.is_clear::INT AS grp
-        FROM union_latest_balance_with_impacted_balances u
-        WHERE EXISTS (SELECT 1 FROM ops_in_range o WHERE o.is_clear AND o.account_id = u.account_id)
+        FROM cleared_input u
       ) g
     ) d
   ) r

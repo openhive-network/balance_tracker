@@ -19,6 +19,8 @@
  *
  * A pruned HAF (simulated: first_available_block overridden inside a savepoint) must leave
  * the corrupted data untouched and unrecorded on both paths, and the rebuild must refuse.
+ * Pruning that advances WHILE the repair runs is cleared_accounts_prune_race.sh (it needs
+ * two sessions).
  *
  * Not compared: hive_rowid (HAF's row id, renumbered by a re-insert). The mock has no HF25
  * entry, so the HF25 bound on the HBD-interest replay is not exercised here; steem.dao holds
@@ -350,7 +352,7 @@ BEGIN
   END IF;
   BEGIN
     PERFORM btracker_backend.rebuild_cleared_accounts(_schema);
-  EXCEPTION WHEN raise_exception THEN
+  EXCEPTION WHEN SQLSTATE 'BT061' THEN
     _failed := SQLERRM LIKE '%pruned HAF%';
   END;
   IF NOT _failed THEN

@@ -14,7 +14,12 @@
  *      savings and rewards stages, and require the two accounts to equal the snapshot.
  *
  * Pending rewards and delayed vests are not taken back: the range holds clears of these
- * accounts, which empty both, so the result does not depend on their starting value.
+ * accounts, which empty both, so the result does not depend on their starting value - and
+ * delayed vests start from a large wrong value to show it. For 'null' the range holds four
+ * clears (blocks ...58, 59, 61, 63), delayed-vests credits before and after them, the last
+ * after the last clear, and a delayed_voting debit larger than what is pending (clamped):
+ * process_withdrawals folds only the last clear of the range, which must give the same
+ * value as one clear per block.
  * Other accounts are processed a second time by step 3 and are not compared (neither is
  * balance_totals); everything runs in a transaction that is rolled back. The range runs
  * with the LIVE layout (indexes present, rollups maintained per range), not massive sync's
@@ -141,6 +146,25 @@ WHERE c.account = l.account AND c.nai = l.nai;
 DELETE FROM balance_history_by_day d
 WHERE d.account IN (SELECT account FROM t_accounts)
   AND d.updated_at >= (SELECT date_trunc('day', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
+
+-- a stored delayed-vests value of null's that the range's first clear must empty (the
+-- snapshot is what block-by-block processing left; this value must not survive into it).
+-- Only null's existing row: a row created here for steem.dao, which has none, would differ
+-- from the snapshot for a reason that is not under test.
+DO $$
+DECLARE
+  _null INT := (SELECT av.id FROM accounts_view av WHERE av.name = 'null');
+BEGIN
+  -- non-vacuity: the credit after null's last clear (block ...64) must leave something
+  IF NOT EXISTS (SELECT 1 FROM s_wd s WHERE s.account = _null AND s.delayed_vests > 0) THEN
+    RAISE EXCEPTION 'cleared_accounts_batch: null has no delayed vests after the mock blocks; the credit after its last clear is not exercised';
+  END IF;
+  UPDATE account_withdraws aw SET delayed_vests = aw.delayed_vests + 4000000000 WHERE aw.account = _null;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'cleared_accounts_batch: null has no account_withdraws row to start from';
+  END IF;
+END
+$$;
 
 -- ---------------------------------------------------------------- 3. one range, then compare
 DO $$
