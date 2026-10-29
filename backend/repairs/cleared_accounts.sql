@@ -476,6 +476,7 @@ BEGIN
     WHERE aw.account = _acc.account AND aw.delayed_vests IS DISTINCT FROM _delayed;
   END LOOP;
 
+  RAISE NOTICE 'negative control: no final check'; RETURN _rows;
   -- After the last read of HAF data: the source must still be complete from where it was at
   -- the start. Each statement above read a snapshot taken when it started (READ COMMITTED),
   -- and pruning only ever moves the first available block forward, so if it has not passed
