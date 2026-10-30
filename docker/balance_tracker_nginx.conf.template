@@ -35,7 +35,7 @@ http {
                     # GET straight to PostgREST takes for no argument either. Each part keeps
                     # its encoding and order. Same split as hivemind's rewriter (hivemind#399).
                     rewrite_by_lua_block {
-                        if ngx.req.get_method() == "GET" and ngx.var.uri:sub(1, 5) == "/rpc/" then
+                        if false and ngx.req.get_method() == "GET" and ngx.var.uri:sub(1, 5) == "/rpc/" then
                             local reserved = { select = true, columns = true, on_conflict = true }
                             local reserved_last = { limit = true, offset = true, order = true, ["and"] = true, ["or"] = true }
                             local body, query = {}, {}
