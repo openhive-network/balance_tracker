@@ -286,7 +286,10 @@ prepare_haf_data:
       docker manifest inspect "$1" > /dev/null
       return $?
     }
-    if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG"; then
+    # The rewriter image is checked too: build_instance.sh pushes it after the main image, so a
+    # build that failed in between would otherwise never produce it (rewriter-test needs it).
+    if image-exists "$CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:$BASE_TAG" \
+       && image-exists "$CI_REGISTRY_IMAGE/postgrest-rewriter:${BASE_TAG}"; then
       echo "Image $CI_REGISTRY_IMAGE${NAME:+/$NAME}${BASE_REPO_NAME:+/$BASE_REPO_NAME}:${BASE_TAG} already exists. Skipping..."
       if [[ -n "$CI_COMMIT_TAG" && "$TARGET" == "full-ci" ]]; then
         echo "Tagging pre-existing images with Git tag..."
@@ -969,6 +972,30 @@ pattern-test-with-mock-data:
     . docker/venv/bin/activate
     # In DinD, PostgREST is available at 'docker' host
     # Run from project root so pattern file paths resolve correctly
+    BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
+
+# The public REST paths through this pipeline's postgrest-rewriter image (#82): values
+# with a PostgREST operator prefix reach their function, and PostgREST's reserved
+# parameters still work. The other test jobs call PostgREST directly.
+rewriter-test:
+  extends: .test-with-docker-compose-tavern
+  <<: *test-needs-sync
+  variables:
+    COMPOSE_PROFILES: "rewriter"
+    REWRITER_IMAGE: "${CI_REGISTRY_IMAGE}/postgrest-rewriter:${CI_COMMIT_SHORT_SHA}"
+    REWRITER_PORT: "3080"
+    TAVERN_DIR: $CI_PROJECT_DIR/tests/rewriter
+    JUNIT_REPORT: $CI_PROJECT_DIR/tests/rewriter/report.xml
+  script:
+  - |
+    cd "${CI_PROJECT_DIR}"
+    . docker/venv/bin/activate
+    for i in $(seq 1 30); do
+      curl -sf -o /dev/null --max-time 5 "http://docker:${REWRITER_PORT}/version" && break
+      [ "$i" -eq 30 ] && { echo "The rewriter did not answer /version after 30 attempts"; exit 1; }
+      sleep 2
+    done
+    curl -s --max-time 15 "http://docker:${REWRITER_PORT}/version"; echo
     BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
 
 python_api_client_test:
