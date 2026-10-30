@@ -992,7 +992,11 @@ rewriter-test:
     . docker/venv/bin/activate
     for i in $(seq 1 30); do
       curl -sf -o /dev/null --max-time 5 "http://docker:${REWRITER_PORT}/version" && break
-      [ "$i" -eq 30 ] && { echo "The rewriter did not answer /version after 30 attempts"; exit 1; }
+      [ "$i" -eq 30 ] && {
+        echo "The rewriter did not answer /version after 30 attempts"
+        (cd docker && docker compose --env-file ci.env --file docker-compose-test.yml logs rewriter) || true
+        exit 1
+      }
       sleep 2
     done
     curl -s --max-time 15 "http://docker:${REWRITER_PORT}/version"; echo

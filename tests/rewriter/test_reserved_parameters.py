@@ -71,6 +71,22 @@ def test_order_and_select():
                               query={"select": "date", "order": "date.desc", "limit": "2"})
 
 
+def test_value_with_a_space():
+    """A timestamp from-block carries a space, sent as `+`: in the form body PostgREST must
+    decode it back, as it does in a query string."""
+    args = {**ROWS_ARGS, "from-block": "2016-06-01 00:00:00"}
+    got = via_rewriter(ROWS_PATH, args)
+    assert _rows(got), got
+    assert got == direct_post("get_balance_aggregation", {**ROWS_FUNCTION_ARGS, **args})
+    assert got != via_rewriter(ROWS_PATH, ROWS_ARGS)
+
+
+def test_limit_on_the_catch_all_route():
+    """The catch-all rule (/<function>) splits the same way: arguments to the body, limit to the URL."""
+    got = via_rewriter("/get_balance_aggregation", {**ROWS_FUNCTION_ARGS, "limit": "1"})
+    assert _rows(got) == _full()[:1]
+
+
 def test_limit_beside_operator_prefixed_argument():
     got = via_rewriter("/accounts/not.existing/aggregated-history", {**ROWS_ARGS, "limit": "1"})
     want = direct_post("get_balance_aggregation", {**ROWS_FUNCTION_ARGS, "account-name": "not.existing"},
