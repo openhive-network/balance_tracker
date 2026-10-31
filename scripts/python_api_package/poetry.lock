@@ -432,23 +432,18 @@ files = [
 ]
 
 [[package]]
-name = "hiveio-beekeepy"
-version = "1.28.6.post20261010174216"
-description = "All in one package for beekeeper interaction via Python interface."
+name = "hiveio-api"
+version = "1.28.8rc3.post20261030154945"
+description = "Hive JSON-RPC API client package with lazy-loaded submodules for all Hive APIs"
 optional = false
 python-versions = ">=3.12,<4"
 groups = ["main"]
 files = [
-    {file = "hiveio_beekeepy-1.28.6.post20261010174216-py3-none-any.whl", hash = "sha256:6a803ef5aeb10739162de92df6a5fb003b6e1750515d8de41ad12c5948be25ad"},
+    {file = "hiveio_api-1.28.8rc3.post20261030154945-py3-none-any.whl", hash = "sha256:19a334aee245fdb28b0f64f41a2348f4b9ca456d2b4ff8a8b25d97017a0a3671"},
 ]
 
 [package.dependencies]
-aiohttp = ">=3.11.15,<4.0.0"
-hiveio-schemas = ">=1.28.2-post.0,<2.0.0"
-loguru = ">=0.7.2,<0.8.0"
-psutil = ">=7.0.0,<8.0.0"
-python-dateutil = ">=2.8.2,<3.0.0"
-requests = ">=2.32.3,<3.0.0"
+msgspec = ">=0.20.0,<0.21.0"
 
 [package.source]
 type = "legacy"
@@ -456,18 +451,24 @@ url = "https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple"
 reference = "gitlab-hive"
 
 [[package]]
-name = "hiveio-schemas"
-version = "1.28.2.post20260303084033"
-description = "Tools for checking if message fits expected format"
+name = "hiveio-beekeepy"
+version = "1.28.6.post20261030080658"
+description = "All in one package for beekeeper interaction via Python interface."
 optional = false
 python-versions = ">=3.12,<4"
 groups = ["main"]
 files = [
-    {file = "hiveio_schemas-1.28.2.post20260303084033-py3-none-any.whl", hash = "sha256:03886bb6d10de9c631948a6bc013c602802cc9120bdf9f90ddb94d8de72a4755"},
+    {file = "hiveio_beekeepy-1.28.6.post20261030080658-py3-none-any.whl", hash = "sha256:2fdab456b809a7b7dc097af26e4c6b5a943aa6f814b7f71d1c4adb3834154ded"},
 ]
 
 [package.dependencies]
+aiohttp = ">=3.11.15,<4.0.0"
+hiveio-api = ">=1.28.8rc3.post20261029210300,<1.28.8rc3.post99999999999999"
+loguru = ">=0.7.2,<0.8.0"
 msgspec = ">=0.20.0,<0.21.0"
+psutil = ">=7.0.0,<8.0.0"
+python-dateutil = ">=2.8.2,<3.0.0"
+requests = ">=2.32.3,<3.0.0"
 
 [package.source]
 type = "legacy"
