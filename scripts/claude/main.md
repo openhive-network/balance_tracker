@@ -175,7 +175,7 @@ listed in `run_one_off_repairs()`. `scripts/install_app.sh` calls
 yet in `one_off_repairs` and records it in the same transaction. A fresh install
 records every repair with 0 rows (its tables are empty). `one_off_repairs` is not
 registered with the context, so a fork rollback never re-runs a repair. A repair
-that updates a registered table must skip the UPDATE when nothing needs changing:
+that edits a registered table must skip the UPDATE or DELETE when nothing needs changing:
 HAF's statement-level triggers reject any edit on a forking context that has not
 processed a block yet.
 
@@ -183,6 +183,7 @@ processed a block yet.
 |--------|----------|----------|
 | `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
+| `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
 
 ## HAF Integration
 
