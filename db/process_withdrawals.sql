@@ -24,10 +24,12 @@ DECLARE
   -- Hardfork numbers (protocol constants)
   _hf_vests_precision                 INT := btracker_backend.hf_vests_precision();
   _hf_withdraw_rate                   INT := btracker_backend.hf_withdraw_rate();
+  _hf_withdraw_rate_round_up          INT := btracker_backend.hf_withdraw_rate_round_up();
   _hf_delayed_voting                  INT := btracker_backend.hf_delayed_voting();
   -- Hardfork blocks (looked up from hafd.applied_hardforks)
   _hf_vests_precision_block           INT;
   _hf_withdraw_rate_block             INT;
+  _hf_withdraw_rate_round_up_block    INT;
   _hf_delayed_voting_block            INT;
   -- Counter variables (prefixed with __) are for debugging/logging purposes.
   -- They capture row counts from various operations to help diagnose sync issues.
@@ -40,16 +42,17 @@ DECLARE
   __reset_filled_withdrawals          INT;
 BEGIN
 -- Look up hardfork blocks once at the start
--- HF16/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
+-- HF16/HF21/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
 -- with NULL return NULL (falsy), so pre-hardfork logic applies automatically:
 --   block_num > NULL => NULL => pre-hardfork behavior used
 SELECT
   MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
+  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate_round_up THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_delayed_voting THEN block_num END)
-INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_delayed_voting_block
+INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block, _hf_delayed_voting_block
 FROM hafd.applied_hardforks
-WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_delayed_voting);
+WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_withdraw_rate_round_up, _hf_delayed_voting);
 
 ------------------------------------------------------------------------------
 -- SECTION 1: WITHDRAWALS (withdraw_vesting_operation, hardfork_hive_operation)
@@ -68,7 +71,7 @@ process_block_range_data_b AS MATERIALIZED
   -- LATERAL + CASE pattern: Parse each operation with appropriate helper based on op_type_id.
   -- Alternative would be separate queries per op_type, requiring multiple table scans.
   -- Hardfork boolean flags passed to helper - determines VESTS precision multiplier and
-  -- withdrawal rate (104 weeks pre-HF16, 13 weeks post-HF16).
+  -- withdrawal rate (104 weeks pre-HF16, 13 weeks post-HF16, rounded up post-HF21).
   SELECT
     result.account_name,
     result.withdrawn,
@@ -83,7 +86,8 @@ process_block_range_data_b AS MATERIALIZED
           THEN btracker_backend.process_withdraw_vesting_operation(
             o.body,
             o.block_num > _hf_vests_precision_block,  -- HF1: VESTS precision change
-            o.block_num > _hf_withdraw_rate_block     -- HF16: 104->13 week withdrawal
+            o.block_num > _hf_withdraw_rate_block,    -- HF16: 104->13 week withdrawal
+            o.block_num > _hf_withdraw_rate_round_up_block  -- HF21: rate rounded up
           )
         WHEN o.op_type_id = _op_hardfork_hive
           -- HF23: Reset withdrawal state to 0 for affected accounts (Steemit Inc accounts)

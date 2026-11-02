@@ -13,7 +13,7 @@ Power-down (vesting withdrawal) state tracking with routes and delayed voting.
 | Function | Purpose | Location |
 |----------|---------|----------|
 | `process_block_range_withdrawals(_from, _to, _report_step)` | Main withdrawals processor | `db/process_withdrawals.sql` |
-| `process_withdraw_vesting_operation(body, post_hf1, post_hf16)` | Parse withdrawal initiation | `backend/operation_parsers/withdrawals.sql` |
+| `process_withdraw_vesting_operation(body, post_hf1, post_hf16, post_hf21)` | Parse withdrawal initiation; rate as hived computes it | `backend/operation_parsers/withdrawals.sql` |
 | `process_set_withdraw_vesting_route_operation(body)` | Parse route setup | `backend/operation_parsers/withdrawals.sql` |
 | `process_fill_vesting_withdraw_operation_for_withdrawals(body, post_hf1)` | Parse weekly payout | `backend/operation_parsers/withdrawals.sql` |
 | `process_reset_withdraw_hf23(body)` | Handle HF23 account reset | `backend/operation_parsers/withdrawals.sql` |
@@ -117,6 +117,7 @@ WITH RECURSIVE calculated_delays AS (
 |----------|--------------|--------|
 | HF1 | `_hf_vests_precision_block` | VESTS precision change (×1000000) |
 | HF16 | `_hf_withdraw_rate_block` | 104→13 week withdrawal period |
+| HF21 | `_hf_withdraw_rate_round_up_block` | Weekly rate rounded up when the amount does not divide evenly |
 | HF23 | In operation body | Reset affected accounts |
 | HF24 | `_hf_delayed_voting_block` | Delayed voting feature enabled |
 
@@ -134,6 +135,13 @@ Currently only current routes are stored. To add history:
 2. Add INSERT CTE before DELETE in route processing
 
 ## Edge Cases
+
+### Weekly Rate Rounding
+
+The rate follows hived's `withdraw_vesting_evaluator`: `amount / intervals`, at least 1 for a
+non-zero amount, plus 1 from HF21 on when `rate * intervals < amount`. Rates stored by versions
+that always rounded down are corrected once per install by `repair_vesting_withdraw_rate()`
+(`db/one_off_repairs.sql`, see `scripts/claude/main.md`).
 
 ### Same request_id After Completion
 
