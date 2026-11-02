@@ -114,7 +114,8 @@ LIVE (new blocks 1 at a time, synchronous_commit=ON)
 HAF re-enters MASSIVE_PROCESSING whenever the app falls more than 101 blocks
 behind (restart, stack switch, slow live processing), not only for the initial
 sync. `finalize_massive_sync()` runs once, on the first LIVE call, and
-`isIndexesCreated()` is the marker that it has happened. Anything that is only
+`isIndexesCreated()` is the marker that it has happened (for its own schema: it names
+the schema it is installed in, so a standalone schema and hafbe_bal are told apart). Anything that is only
 appropriate for the genesis replay must check that marker rather than the stage
 name. Example: `btracker_process_blocks()` ANALYZEs the history tables (at most
 every 10 minutes, `analyze_unless_recent()`) only while `isIndexesCreated()` is
@@ -170,9 +171,14 @@ Three things keep them all-visible (#69):
 A processing fix only corrects the rows it rewrites from then on. When rows an
 earlier version wrote must be corrected too, add a repair to
 `db/one_off_repairs.sql`: a function returning the number of rows it changed,
-listed in `run_one_off_repairs()`. `scripts/install_app.sh` calls
-`run_one_off_repairs()` on every install and upgrade; it applies each repair not
-yet in `one_off_repairs` and records it in the same transaction. A fresh install
+listed in `pending_one_off_repairs()`. `scripts/install_app.sh` calls
+`apply_one_off_repairs()` last, on every install and upgrade; it applies each repair not
+yet in `one_off_repairs` and records it in the same transaction. A repair that cannot
+complete yet returns NULL and stays unrecorded: `finalize_massive_sync()` runs the pending
+ones to completion once the indexes exist (`complete_one_off_repairs()`), and block
+processing runs them once per processed range after finalize (`continue_one_off_repairs()`,
+which logs a failing repair as a WARNING and leaves it pending rather than halting
+processing). A fresh install
 records every repair with 0 rows (its tables are empty). `one_off_repairs` is not
 registered with the context, so a fork rollback never re-runs a repair. A repair
 that edits a registered table must skip the UPDATE or DELETE when nothing needs changing:
@@ -185,7 +191,7 @@ processed a block yet.
 | `power_downs_without_vests` | `repair_power_downs_without_vests()` | ends (`vesting_withdraw_rate`, `to_withdraw`, `withdrawn` = 0) the power-down of every account with 0 VESTS, which hived ended at the payout that took its last VESTS; runs before `rc_delegation_overflow` |
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 | `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
-| `delegation_and_withdraw_history` | `backfill_delegation_and_withdraw_history()` | writes `account_delegation_history` and `account_withdraw_history` of an install synced before they existed, up to its current block: one pass over the delegation and power-down operations by type, the VESTS after each payout probed in `account_balance_history`; needs a finalized install (raises otherwise). HAF records its rows as changes of the context's current block, as any repair's: a fork reverting that block before it is irreversible removes them |
+| `delegation_and_withdraw_history` | `backfill_delegation_and_withdraw_history()` | writes `account_delegation_history` and `account_withdraw_history` of an install synced before they existed, for blocks 1 to a target fixed at its start: the current block, or the block before the first one processing already wrote history for (no `(account, source_op)` twice). In chunks of 1M blocks (progress in `history_backfill`, delegation balances carried in `history_backfill_delegation_pairs`; install commits each chunk), over the delegation and power-down operations by type, the VESTS after each payout probed in `account_balance_history`. Waits (unrecorded) until the install is finalized and the target block irreversible; writes with the tables' HAF triggers disabled, so no fork rollback removes its rows and they bypass the shadow tables |
 
 ## HAF Integration
 

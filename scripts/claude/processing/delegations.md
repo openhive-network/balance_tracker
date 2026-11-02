@@ -23,15 +23,17 @@ Processes `delegate_vesting_shares` operations to track VESTS delegated between 
 ## Delegation History
 
 `account_delegation_history` (account, delegated_vests, received_vests, source_op) gets
-one row per account and operation that changed its totals: the per-operation deltas
+one row per account and operation that changed its totals, and one for the first operation
+ever to touch an account (it creates the account's `account_delegations` row, also when it
+changes nothing, e.g. a delegation of 0): the per-operation deltas
 `union_delegations` already computes (delegator increases, delegatee changes, returns,
 HF23 resets), summed per `(account, source_op)`, and added as a running sum to the
 `account_delegations` totals before the batch (the statement still sees them). Its last
 row per account equals `account_delegations`. The past-block balances read it
 (`scripts/claude/endpoints/balances.md`); an install synced before it existed gets it from
 the one-off repair `delegation_and_withdraw_history` (`scripts/claude/main.md`), which
-replays the same deltas over the whole chain. Keep the two in step:
-`tests/maintenance/delegation_withdraw_history.sql` compares them.
+replays the same deltas over the chain in block chunks. Keep the two in step:
+`tests/maintenance/delegation_withdraw_history.sql` and `history_backfill.sql` compare them.
 
 ## HF23 Edge Case
 

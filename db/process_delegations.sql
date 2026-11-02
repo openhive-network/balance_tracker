@@ -418,17 +418,17 @@ union_delegations AS (
 ),
 ------------------------------------------------------------------------------
 -- Changes per account and operation (an HF23 reset of several delegations is
--- one operation); operations that leave both totals unchanged are dropped.
+-- one operation), with the account's first operation of the batch marked.
 ------------------------------------------------------------------------------
 delegation_changes AS MATERIALIZED (
   SELECT
     ud.account_id,
     ud.source_op,
     SUM(ud.received_vests) AS received_vests,
-    SUM(ud.delegated_vests) AS delegated_vests
+    SUM(ud.delegated_vests) AS delegated_vests,
+    ud.source_op = MIN(ud.source_op) OVER (PARTITION BY ud.account_id) AS first_in_batch
   FROM union_delegations ud
   GROUP BY ud.account_id, ud.source_op
-  HAVING SUM(ud.received_vests) <> 0 OR SUM(ud.delegated_vests) <> 0
 ),
 ------------------------------------------------------------------------------
 -- Aggregate all delegation changes per account
@@ -539,18 +539,33 @@ insert_delegations AS (
 -- The totals before the batch (this statement still sees account_delegations as it
 -- was) plus the running sum of the batch's changes up to each operation. The last
 -- row per account equals the totals insert_delegations stores.
+--
+-- An operation that leaves both totals unchanged writes no row, except the first
+-- operation ever to touch the account (no account_delegations row yet): it creates
+-- the account's account_delegations row, so a read at its block finds the 0 totals
+-- the head read does. "First ever" does not depend on how blocks are batched, so the
+-- upgrade backfill (db/one_off_repairs.sql) writes the same rows.
 ---------------------------------------------------------------------------------------
 insert_delegation_history AS (
   INSERT INTO account_delegation_history
     (account, delegated_vests, received_vests, source_op)
   SELECT
-    dc.account_id,
-    COALESCE(ad.delegated_vests, 0) + SUM(dc.delegated_vests) OVER w_account_asc,
-    COALESCE(ad.received_vests, 0) + SUM(dc.received_vests) OVER w_account_asc,
-    dc.source_op
-  FROM delegation_changes dc
-  LEFT JOIN account_delegations ad ON ad.account = dc.account_id
-  WINDOW w_account_asc AS (PARTITION BY dc.account_id ORDER BY dc.source_op)
+    h.account_id,
+    h.delegated_vests,
+    h.received_vests,
+    h.source_op
+  FROM (
+    SELECT
+      dc.account_id,
+      COALESCE(ad.delegated_vests, 0) + SUM(dc.delegated_vests) OVER w_account_asc AS delegated_vests,
+      COALESCE(ad.received_vests, 0) + SUM(dc.received_vests) OVER w_account_asc AS received_vests,
+      dc.source_op,
+      dc.received_vests <> 0 OR dc.delegated_vests <> 0 OR (dc.first_in_batch AND ad.account IS NULL) AS is_recorded
+    FROM delegation_changes dc
+    LEFT JOIN account_delegations ad ON ad.account = dc.account_id
+    WINDOW w_account_asc AS (PARTITION BY dc.account_id ORDER BY dc.source_op)
+  ) h
+  WHERE h.is_recorded
   RETURNING account
 )
 
