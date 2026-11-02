@@ -247,14 +247,17 @@ BEGIN
   _o := _o || pg_temp.expect('steem.dao delayed vests',
                              (SELECT coalesce(sum(w.delayed_vests), 0) FROM account_withdraws w WHERE w.account = f.dao_id)::TEXT, '0');
 
-  -- unaffected: hive.fund keeps what the consolidate moved (as HAF's collector emits it,
-  -- liquid only), and neither it nor poloniex, which paid null and steem.dao, has a clear row
+  -- unaffected: hive.fund keeps what the consolidate moved (as HAF's collector emits it:
+  -- one liquid credit per asset at the consolidate, nothing taken away), and poloniex,
+  -- which paid null and steem.dao, has no row at a clearing op
+  _o := _o || pg_temp.expect('hive.fund HIVE', pg_temp.hist(FALSE, f.fund_id, 21, 0), '{2003}');
+  _o := _o || pg_temp.expect('hive.fund HBD', pg_temp.hist(FALSE, f.fund_id, 13, 0), '{300}');
   _o := _o || pg_temp.expect('hive.fund current HIVE', pg_temp.current(FALSE, f.fund_id, 21), '2003');
   _o := _o || pg_temp.expect('hive.fund current HBD', pg_temp.current(FALSE, f.fund_id, 13), '300');
-  _o := _o || pg_temp.expect('clear rows of hive.fund and poloniex',
+  _o := _o || pg_temp.expect('poloniex rows at a clearing op',
                              (SELECT count(*) FROM (SELECT account, op_type_id FROM account_balance_history
                                                     UNION ALL SELECT account, op_type_id FROM account_savings_history) h
-                              WHERE h.account IN (f.fund_id, f.polo_id)
+                              WHERE h.account = f.polo_id
                                 AND h.op_type_id IN (btracker_backend.op_clear_null_account_balance(),
                                                      btracker_backend.op_consolidate_treasury_balance()))::TEXT, '0');
   RETURN _o;
