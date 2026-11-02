@@ -68,8 +68,10 @@ btracker reproduces it in `process_rc_delegation_range`:
   triggering operation, which leaves the same delegations.
 - The delegatee order is the HAF account id, which follows hived's account
   creation order like its `account_id_type`.
-- Not modelled: hived also ends a power-down at a payout that leaves the account
-  with 0 VESTS; btracker's `account_withdraws` keeps it.
+- A payout that leaves the account with 0 VESTS ends its power-down (as hived's
+  `process_vesting_withdrawals` does): the check at that payout and every later
+  check of the same power-down use a next withdrawal of 0, before the withdrawals
+  step stores the ended power-down.
 
 Existing installs: `repair_rc_delegation_overflow()` (`db/one_off_repairs.sql`)
 applies the reduction once to every delegator over its effective vests now. A

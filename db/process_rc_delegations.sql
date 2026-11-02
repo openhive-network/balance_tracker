@@ -66,6 +66,8 @@ $$;
  * operation:
  *   vesting_shares - delegated_vesting_shares + received_vesting_shares
  *   - next_vesting_withdrawal (min(rate, to_withdraw - withdrawn) while powering down)
+ * (a power-down ends at a payout that leaves the account with 0 VESTS, as in hived's
+ * process_vesting_withdrawals, so its next_vesting_withdrawal is 0 from that payout on)
  * replayed from the state before the batch (account_withdraws, account_delegations,
  * current_accounts_delegations, which the withdrawals and delegations steps have not
  * updated yet) through the batch's operations from _batch_from, and the VESTS
@@ -191,6 +193,29 @@ checks AS MATERIALIZED (
 ------------------------------------------------------------------------------
 -- The vesting events of those accounts since _batch_from
 ------------------------------------------------------------------------------
+-- A payout is all fills of an account in one block; hived checks its VESTS once,
+-- after the last of them.
+payouts AS MATERIALIZED (
+  SELECT ai.account_id AS account, MAX(f.source_op) AS source_op
+  FROM fills f
+  JOIN account_ids ai ON ai.account_name = f.account_name
+  WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
+  GROUP BY ai.account_id, f.block_num
+),
+payout_vests_after AS (
+  SELECT p.account, p.source_op, SUM(vb.balance) AS balance
+  FROM payouts p
+  JOIN _btracker_vests_batch vb ON vb.account_id = p.account AND vb.source_op > p.source_op
+  GROUP BY p.account, p.source_op
+),
+-- The power-down ends at a payout that leaves the account with 0 VESTS.
+payouts_leaving_no_vests AS MATERIALIZED (
+  SELECT p.account, p.source_op
+  FROM payouts p
+  LEFT JOIN payout_vests_after pva ON pva.account = p.account AND pva.source_op = p.source_op
+  LEFT JOIN current_account_balances cab ON cab.account = p.account AND cab.nai = _nai_vests
+  WHERE COALESCE(cab.balance, 0) = COALESCE(pva.balance, 0)
+),
 delegation_pairs AS (
   SELECT dr.account_id AS delegator, de.account_id AS delegatee, d.amount, d.source_op
   FROM delegations d
@@ -216,7 +241,7 @@ delegation_deltas AS MATERIALIZED (
   LEFT JOIN current_accounts_delegations cad ON cad.delegator = dp.delegator AND cad.delegatee = dp.delegatee
 ),
 events AS (
-  SELECT ai.account_id AS account, w.source_op, TRUE AS starts_withdrawal,
+  SELECT ai.account_id AS account, w.source_op, TRUE AS starts_withdrawal, FALSE AS ends_withdrawal,
          w.vesting_withdraw_rate, w.to_withdraw, 0::BIGINT AS filled, 0::BIGINT AS delegated, 0::BIGINT AS received
   FROM withdraws w
   JOIN account_ids ai ON ai.account_name = w.account_name
@@ -224,32 +249,34 @@ events AS (
 
   UNION ALL
 
-  SELECT ai.account_id, f.source_op, FALSE, NULL, NULL, f.withdrawn, 0, 0
+  SELECT ai.account_id, f.source_op, FALSE, pn.account IS NOT NULL, NULL, NULL, f.withdrawn, 0, 0
   FROM fills f
   JOIN account_ids ai ON ai.account_name = f.account_name
+  LEFT JOIN payouts_leaving_no_vests pn ON pn.account = ai.account_id AND pn.source_op = f.source_op
   WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
 
   UNION ALL
 
-  SELECT dd.delegator, dd.source_op, FALSE, NULL, NULL, 0, GREATEST(dd.delta, 0), 0
+  SELECT dd.delegator, dd.source_op, FALSE, FALSE, NULL, NULL, 0, GREATEST(dd.delta, 0), 0
   FROM delegation_deltas dd
   WHERE dd.delegator IN (SELECT rd.account FROM rc_delegators rd)
 
   UNION ALL
 
-  SELECT dd.delegatee, dd.source_op, FALSE, NULL, NULL, 0, 0, dd.delta
+  SELECT dd.delegatee, dd.source_op, FALSE, FALSE, NULL, NULL, 0, 0, dd.delta
   FROM delegation_deltas dd
   WHERE dd.delegatee IN (SELECT rd.account FROM rc_delegators rd)
 
   UNION ALL
 
-  SELECT ai.account_id, r.source_op, FALSE, NULL, NULL, 0, r.amount, 0
+  SELECT ai.account_id, r.source_op, FALSE, FALSE, NULL, NULL, 0, r.amount, 0
   FROM returns r
   JOIN account_ids ai ON ai.account_name = r.account_name
   WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
 ),
 -- withdrawal_no numbers the power-downs started in the batch: 0 is the one stored
--- in account_withdraws before it.
+-- in account_withdraws before it. withdrawal_ended: a payout of that power-down at
+-- or before the event left 0 VESTS.
 running_events AS (
   SELECT
     e.*,
@@ -268,7 +295,8 @@ event_states AS (
     re.withdrawal_no,
     FIRST_VALUE(re.vesting_withdraw_rate) OVER w_withdrawal AS vesting_withdraw_rate,
     FIRST_VALUE(re.to_withdraw) OVER w_withdrawal AS to_withdraw,
-    SUM(re.filled) OVER w_withdrawal AS filled_since
+    SUM(re.filled) OVER w_withdrawal AS filled_since,
+    BOOL_OR(re.ends_withdrawal) OVER w_withdrawal AS withdrawal_ended
   FROM running_events re
   WINDOW w_withdrawal AS (PARTITION BY re.account, re.withdrawal_no ORDER BY re.source_op)
 ),
@@ -285,9 +313,10 @@ check_states AS (
     COALESCE(cab.balance, 0) - COALESCE(va.balance, 0) AS vests,
     COALESCE(ad.delegated_vests, 0) + COALESCE(es.delegated_since, 0) AS delegated_vests,
     COALESCE(ad.received_vests, 0) + COALESCE(es.received_since, 0) AS received_vests,
-    CASE WHEN es.withdrawal_no > 0 THEN es.vesting_withdraw_rate ELSE COALESCE(aw.vesting_withdraw_rate, 0) END AS vesting_withdraw_rate,
-    CASE WHEN es.withdrawal_no > 0 THEN es.to_withdraw ELSE COALESCE(aw.to_withdraw, 0) END AS to_withdraw,
-    CASE WHEN es.withdrawal_no > 0 THEN 0 ELSE COALESCE(aw.withdrawn, 0) END + COALESCE(es.filled_since, 0) AS withdrawn
+    CASE WHEN es.withdrawal_ended THEN 0 WHEN es.withdrawal_no > 0 THEN es.vesting_withdraw_rate ELSE COALESCE(aw.vesting_withdraw_rate, 0) END AS vesting_withdraw_rate,
+    CASE WHEN es.withdrawal_ended THEN 0 WHEN es.withdrawal_no > 0 THEN es.to_withdraw ELSE COALESCE(aw.to_withdraw, 0) END AS to_withdraw,
+    CASE WHEN es.withdrawal_ended THEN 0
+         ELSE CASE WHEN es.withdrawal_no > 0 THEN 0 ELSE COALESCE(aw.withdrawn, 0) END + COALESCE(es.filled_since, 0) END AS withdrawn
   FROM checks c
   JOIN event_states es ON es.account = c.account AND es.source_op = c.source_op
   LEFT JOIN vests_after va ON va.account = c.account AND va.source_op = c.source_op
