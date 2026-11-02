@@ -113,7 +113,10 @@ $$;
 --     credited as liquid, while hived moves savings and pending rewards into hive.fund's
 --     savings and rewards.
 --
--- Reads the batch staged by btracker_prefetch_operations. Returns one row per op.
+-- Returns one row per op. Reads operations_view through HAF's (op_type_id, block_num)
+-- index rather than the prefetched _btracker_ops_batch: the stages call it once each, and
+-- a scan of the batch (a temp table without indexes) cost 0.5-0.7 s per call on a 10k
+-- batch, clears or not; the index probe costs milliseconds.
 CREATE OR REPLACE FUNCTION btracker_backend.account_clears_in_range(_from INT, _to INT)
 RETURNS TABLE (
   account_id INT,
@@ -131,12 +134,12 @@ BEGIN
   -- Never returns a NULL account: callers split rows by EXISTS over account_id. (Both
   -- accounts exist on any chain that emits these ops.)
   RETURN QUERY
-  SELECT av.id::INT, ob.id::BIGINT, ob.op_type_id::SMALLINT, ob.block_num::INT
-  FROM _btracker_ops_batch ob
+  SELECT av.id::INT, ov.id::BIGINT, ov.op_type_id::SMALLINT, ov.block_num::INT
+  FROM operations_view ov
   JOIN accounts_view av
-    ON av.name = CASE WHEN ob.op_type_id = _op_clear_null THEN 'null' ELSE 'steem.dao' END
-  WHERE ob.op_type_id IN (_op_clear_null, _op_consolidate)
-    AND ob.block_num BETWEEN _from AND _to;
+    ON av.name = CASE WHEN ov.op_type_id = _op_clear_null THEN 'null' ELSE 'steem.dao' END
+  WHERE ov.op_type_id IN (_op_clear_null, _op_consolidate)
+    AND ov.block_num BETWEEN _from AND _to;
 END
 $$;
 

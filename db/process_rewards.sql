@@ -169,19 +169,12 @@ get_impacted_bal AS MATERIALIZED (
     ).*
   ) AS result
   WHERE
+    -- Claims are always processed (reduce pending balance)
+    fio.op_type_id = _op_claim_reward_balance OR
+    -- Author/benefactor rewards only tracked if they go to pending balance
     (
-      -- Claims are always processed (reduce pending balance)
-      fio.op_type_id = _op_claim_reward_balance OR
-      -- Author/benefactor rewards only tracked if they go to pending balance
-      (
-        fio.op_type_id IN (_op_author_reward, _op_comment_benefactor_reward) AND
-        (fio.body->>'payout_must_be_claimed')::BOOLEAN = true
-      )
-    )
-    -- #61: a reward that a later clear in this range has already emptied
-    AND NOT EXISTS (
-      SELECT 1 FROM reward_clears rc
-      WHERE rc.account_name = result.account_name AND rc.last_clear_op > fio.source_op
+      fio.op_type_id IN (_op_author_reward, _op_comment_benefactor_reward) AND
+      (fio.body->>'payout_must_be_claimed')::BOOLEAN = true
     )
 ),
 
@@ -362,14 +355,22 @@ union_operations_with_vesting_balance AS (
     op_type_id,
     source_op,
     source_op_block
-  FROM calculate_vests_from_curation cvc
+  FROM calculate_vests_from_curation
   WHERE payout_must_be_claimed
-    -- #61: as in get_impacted_bal (the lifetime info totals keep every reward)
-    AND NOT EXISTS (
-      SELECT 1 FROM reward_clears rc
-      WHERE rc.account_name = cvc.account_name AND rc.last_clear_op > cvc.source_op
-    )
 
+),
+
+-- #61: drop the pending-reward rows a later clear in this range has emptied (the lifetime
+-- info totals above keep every reward). Applied here, to the parsed rows, not inside
+-- get_impacted_bal: a filter there on the parsed account name parses every reward
+-- operation twice.
+pending_reward_ops AS (
+  SELECT u.*
+  FROM union_operations_with_vesting_balance u
+  WHERE NOT EXISTS (
+    SELECT 1 FROM reward_clears rc
+    WHERE rc.account_name = u.account_name AND rc.last_clear_op > u.source_op
+  )
 ),
 
 -- ============================================================================
@@ -397,7 +398,7 @@ segmented_rows AS (
     -- Claims with 0 VESTS (e.g., claiming only HBD) don't affect NAI 38 calculation
     SUM(CASE WHEN op_type_id = _op_claim_reward_balance AND reward_vests != 0 THEN 1 ELSE 0 END)
       OVER (PARTITION BY account_name ORDER BY source_op) AS segment
-  FROM union_operations_with_vesting_balance
+  FROM pending_reward_ops
 ),
 
 -- ============================================================================
