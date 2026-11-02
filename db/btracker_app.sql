@@ -835,19 +835,31 @@ $$;
  * Used to determine if we're transitioning from MASSIVE to LIVE stage.
  * Indexes are created once before entering LIVE processing.
  *
+ * Answers for the schema the function is installed in, which it names itself:
+ * one database may hold several balance tracker schemas (a standalone one and
+ * haf_block_explorer's embedded hafbe_bal), each finalized on its own, and the
+ * callers' search_path need not start with the schema.
+ *
  * @returns TRUE if indexes exist, FALSE otherwise
  */
-CREATE OR REPLACE FUNCTION isIndexesCreated()
-RETURNS BOOLEAN
-LANGUAGE 'plpgsql' STABLE
-AS
-$$
+DO $$
+DECLARE
+  __schema_name TEXT;
 BEGIN
-  RETURN EXISTS(
-      SELECT true FROM pg_index WHERE indexrelid = (
-        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_nai_balance_idx' LIMIT 1
-      )
-    );
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  EXECUTE format(
+    $BODY$
+      CREATE OR REPLACE FUNCTION %I.isIndexesCreated()
+      RETURNS BOOLEAN
+      LANGUAGE 'plpgsql' STABLE
+      AS
+      $f$
+      BEGIN
+        RETURN to_regclass(%L) IS NOT NULL;
+      END
+      $f$
+    $BODY$, __schema_name, format('%I.idx_account_balance_nai_balance_idx', __schema_name));
 END
 $$;
 
@@ -1140,6 +1152,8 @@ $$;
  *      there for why it comes first)
  *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
  *   3. Restore app indexes (updates HAF tracking table)
+ *   4. Complete the one-off repairs an upgrade during the massive sync left
+ *      pending until the indexes exist (complete_one_off_repairs)
  *
  * Called from btracker_process_blocks() at LIVE transition and from
  * CI startup script after bounded replay completes.
@@ -1162,6 +1176,7 @@ BEGIN
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
+  PERFORM complete_one_off_repairs();
   RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
 END
 $$;
@@ -1277,6 +1292,7 @@ $$;
  * 10. Market orders
  * 11. Escrows
  * 12. Proposal payments
+ * Then the next chunk of a one-off repair left pending (continue_one_off_repairs).
  *
  * @param _from  First block number to process
  * @param _to    Last block number to process
@@ -1405,6 +1421,8 @@ BEGIN
     RAISE NOTICE 'btracker stage proposal_payments: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3);
   END IF;
 
+  PERFORM continue_one_off_repairs();
+
   IF _logs THEN
     __end_ts := clock_timestamp();
     RAISE NOTICE 'Btracker processed block range: <%, %> successfully in % s
@@ -1420,7 +1438,8 @@ $$;
  * Uses synchronous_commit ON for data safety.
  *
  * Called for each new block after initial sync is complete.
- * Processes all operation types for the given block.
+ * Processes all operation types for the given block, then the next chunk of a
+ * one-off repair left pending (continue_one_off_repairs).
  *
  * @param _block  Block number to process
  * @param _logs   Enable progress logging
@@ -1461,6 +1480,7 @@ BEGIN
   PERFORM process_block_range_escrows(_block, _block);
   PERFORM process_block_range_proposal_payments(_block, _block);
 
+  PERFORM continue_one_off_repairs();
 
   IF _logs THEN
     __end_ts := clock_timestamp();

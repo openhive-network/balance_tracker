@@ -6,8 +6,11 @@ SET ROLE btracker_owner;
  * A fix to block processing only corrects the rows it rewrites from then on;
  * rows an earlier version wrote stay wrong until an operation touches them
  * again. A repair recomputes those rows once per install: install_app.sh runs
- * run_one_off_repairs() on every install and upgrade, which applies each repair
- * not yet recorded in one_off_repairs and records it.
+ * apply_one_off_repairs() at the end of every install and upgrade, which applies
+ * each repair not yet recorded in one_off_repairs and records it. A repair that
+ * cannot complete yet returns NULL and stays unrecorded; block processing and
+ * finalize_massive_sync() run it again (continue_one_off_repairs,
+ * complete_one_off_repairs).
  *
  * On a fresh install the tables are empty, so each repair changes nothing and
  * is recorded as applied; the fixed processing writes every row from then on.
@@ -16,7 +19,7 @@ SET ROLE btracker_owner;
  * not make a repair run again.
  *
  * To add a repair: write a function returning the number of rows it changed,
- * and add (name, function) to the list in run_one_off_repairs(). A repair that
+ * and add (name, function) to the list in pending_one_off_repairs(). A repair that
  * edits a registered table must not issue the UPDATE or DELETE when it has
  * nothing to change: HAF's statement-level triggers reject any table edit on a forking
  * context that has not processed a block yet (a fresh install).
@@ -287,33 +290,105 @@ END
 $$;
 
 /**
- * backfill_delegation_and_withdraw_history()
+ * Delegation and power-down history backfill
  * ------------------------------------------
- * Fills account_delegation_history and account_withdraw_history of an install
- * synced before block processing wrote them, from the application's first block
- * to its current one, with the rows processing would have written: one pass over
- * the operations of each kind (operations_view by type), with the state before the
- * first block empty.
+ * The repair delegation_and_withdraw_history fills account_delegation_history and
+ * account_withdraw_history of an install synced before block processing wrote them,
+ * with the rows processing would have written (tests/maintenance/
+ * delegation_withdraw_history.sql and history_backfill.sql check them against a
+ * sync's):
  *
- *   - delegations: process_block_range_delegations' per-operation changes of
- *     delegated and received vests, summed per account;
- *   - power-downs: process_block_range_withdrawals' state after every withdraw_vesting,
- *     HF23 reset and fill. Whether a payout left the account without VESTS is read
- *     from account_balance_history (the account's VESTS after the payout's last
- *     fill), through its block index: the install must have finalized its massive
- *     sync, which builds that index.
+ *   - Range: blocks 1 to a target block fixed when the backfill starts: the
+ *     context's current block, or the block before the first one block processing
+ *     has already written history for, whichever is lower. Processing writes every
+ *     block after the target and the backfill every block up to it, so no
+ *     (account, source_op) is written twice, also when processing resumed between
+ *     the upgrade and the backfill.
+ *   - Forks: it starts only once the target block is irreversible, and writes with
+ *     the two tables' HAF triggers disabled, so its rows are not recorded as changes
+ *     of the context's current block: no fork rollback removes them, as none can
+ *     revert the irreversible blocks they describe, and they do not pass through the
+ *     shadow tables (haf#346). Its progress (history_backfill) and the delegations it
+ *     carries between chunks (history_backfill_delegation_pairs) are not registered
+ *     with the context either.
+ *   - Deferral: the power-down part reads account_balance_history through its block
+ *     index, which finalizing the massive sync builds. Until then, and until the
+ *     target block is irreversible, it waits: it returns NULL and the repair stays
+ *     unrecorded.
+ *   - Chunks: each call backfills the next _chunk_blocks blocks, carrying each
+ *     account's state from the rows already written. scripts/install_app.sh commits
+ *     each chunk (apply_one_off_repairs); finalize_massive_sync runs the remaining
+ *     ones in its transaction (complete_one_off_repairs); block processing runs one
+ *     after each processed range (continue_one_off_repairs). An interrupted backfill
+ *     resumes after its last committed chunk.
  *
- * tests/maintenance/delegation_withdraw_history.sql checks the rows against the ones
- * a sync writes.
- *
- * Like every repair, its rows are recorded by HAF as changes of the context's current
- * block: should a fork revert that block before it becomes irreversible, they are
- * removed with it, and the history before the fork point stays empty until the
- * repair is run again (delete its one_off_repairs row, empty both tables, reinstall).
- *
- * @returns number of history rows written
+ * To run it again: empty both history tables and delete its one_off_repairs row,
+ * then reinstall.
  */
-CREATE OR REPLACE FUNCTION backfill_delegation_and_withdraw_history()
+CREATE TABLE IF NOT EXISTS history_backfill
+(
+  target_block  INT     NOT NULL, -- Last block the backfill writes
+  backfilled_to INT     NOT NULL, -- Last block written so far
+  rows_written  BIGINT  NOT NULL,
+  is_single     BOOLEAN NOT NULL DEFAULT TRUE,
+
+  CONSTRAINT pk_history_backfill PRIMARY KEY (is_single),
+  CONSTRAINT chk_history_backfill_single CHECK (is_single)
+);
+
+-- The balance of every delegation as of the last backfilled block.
+CREATE TABLE IF NOT EXISTS history_backfill_delegation_pairs
+(
+  delegator INT    NOT NULL,
+  delegatee INT    NOT NULL,
+  balance   BIGINT NOT NULL,
+
+  CONSTRAINT pk_history_backfill_delegation_pairs PRIMARY KEY (delegator, delegatee)
+);
+
+/**
+ * history_backfill_target(_current_block)
+ * ---------------------------------------
+ * The last block the backfill must write: _current_block, or the block before the
+ * first one block processing wrote history for, whichever is lower. Only valid
+ * before the backfill has written anything.
+ *
+ * @param _current_block  the context's current block
+ */
+CREATE OR REPLACE FUNCTION history_backfill_target(_current_block INT)
+RETURNS INT
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  __first_op BIGINT;
+BEGIN
+  SELECT MIN(f.source_op) INTO __first_op
+  FROM (
+    SELECT MIN(source_op) AS source_op FROM account_delegation_history
+    UNION ALL
+    SELECT MIN(source_op) FROM account_withdraw_history
+  ) f;
+
+  IF __first_op IS NULL THEN
+    RETURN _current_block;
+  END IF;
+
+  RETURN LEAST(_current_block, hafd.operation_id_to_block_num(__first_op) - 1);
+END
+$$;
+
+/**
+ * backfill_delegation_history_chunk(_from, _to)
+ * ---------------------------------------------
+ * account_delegation_history rows of blocks _from.._to, as process_block_range_delegations
+ * writes them: its per-operation changes of delegated and received vests, summed per
+ * account onto the account's last row before _from. Each delegation's balance
+ * before _from comes from history_backfill_delegation_pairs, which this updates.
+ *
+ * @returns number of rows written
+ */
+CREATE OR REPLACE FUNCTION backfill_delegation_history_chunk(_from INT, _to INT)
 RETURNS INT
 LANGUAGE 'plpgsql' VOLATILE
 SET from_collapse_limit = 16
@@ -326,40 +401,14 @@ DECLARE
   _op_account_create_with_delegation INT := btracker_backend.op_account_create_with_delegation();
   _op_return_vesting_delegation      INT := btracker_backend.op_return_vesting_delegation();
   _op_hardfork_hive                  INT := btracker_backend.op_hardfork_hive();
-  _op_withdraw_vesting               INT := btracker_backend.op_withdraw_vesting();
-  _op_fill_vesting_withdraw          INT := btracker_backend.op_fill_vesting_withdraw();
-  _nai_vests                         INT := btracker_backend.nai_vests();
-  _hf_vests_precision_block          INT;
-  _hf_withdraw_rate_block            INT;
-  _hf_withdraw_rate_round_up_block   INT;
-  __to                               INT := COALESCE(hive.app_get_current_block_num(current_schema()), 0);
-  __delegation_rows                  INT;
-  __withdraw_rows                    INT;
+  __rows                             INT;
 BEGIN
-  -- A fresh install (nothing processed yet) has nothing to fill, and HAF rejects
-  -- an edit of a registered table of a forking context before its first block.
-  IF __to = 0 THEN
-    RETURN 0;
-  END IF;
-
-  IF NOT isIndexesCreated() THEN
-    RAISE EXCEPTION 'btracker: the delegation and power-down history backfill needs a finalized install (account_balance_history''s block index); this one is still in its massive sync at block %. Finish the sync with the previous version first, or sync anew.', __to;
-  END IF;
-
-  SELECT
-    MAX(CASE WHEN hardfork_num = btracker_backend.hf_vests_precision() THEN block_num END),
-    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate() THEN block_num END),
-    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate_round_up() THEN block_num END)
-  INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block
-  FROM hafd.applied_hardforks;
-
-  RAISE NOTICE 'btracker: backfilling account_delegation_history up to block %...', __to;
   WITH ops AS MATERIALIZED (
     SELECT ov.body_value AS body, ov.op_type_id, ov.id
     FROM operations_view ov
     WHERE
       ov.op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation, _op_return_vesting_delegation, _op_hardfork_hive) AND
-      ov.block_num <= __to
+      ov.block_num BETWEEN _from AND _to
   ),
   parsed AS MATERIALIZED (
     SELECT result.delegator, result.delegatee, result.amount AS balance, o.id AS source_op, o.op_type_id
@@ -383,11 +432,23 @@ BEGIN
     FROM accounts_view av
     WHERE av.name IN (SELECT delegator FROM parsed UNION SELECT delegatee FROM parsed)
   ),
-  delegation_ops AS MATERIALIZED (
+  chunk_ops AS MATERIALIZED (
     SELECT dr.account_id AS delegator, de.account_id AS delegatee, p.balance, p.source_op, p.op_type_id
     FROM parsed p
     JOIN account_ids dr ON dr.account_name = p.delegator
     LEFT JOIN account_ids de ON de.account_name = p.delegatee
+  ),
+  -- The chunk's operations, and the delegations its delegators had made before it
+  -- as delegations at source_op 0.
+  delegation_ops AS MATERIALIZED (
+    SELECT delegator, delegatee, balance, source_op, op_type_id
+    FROM chunk_ops
+
+    UNION ALL
+
+    SELECT bp.delegator, bp.delegatee, bp.balance, 0, _op_delegate_vesting_shares
+    FROM history_backfill_delegation_pairs bp
+    WHERE bp.delegator IN (SELECT co.delegator FROM chunk_ops co WHERE co.op_type_id <> _op_return_vesting_delegation)
   ),
   -- HF23 cleared every delegation the account had made before it.
   hf23_resets AS (
@@ -411,11 +472,23 @@ BEGIN
     SELECT
       delegator,
       delegatee,
+      balance,
       balance - LAG(balance, 1, 0::BIGINT) OVER w_pair_asc AS balance_delta,
       source_op,
-      is_hf23_reset
+      is_hf23_reset,
+      ROW_NUMBER() OVER w_pair_desc AS rn
     FROM pair_changes
-    WINDOW w_pair_asc AS (PARTITION BY delegator, delegatee ORDER BY source_op)
+    WINDOW
+      w_pair_asc AS (PARTITION BY delegator, delegatee ORDER BY source_op),
+      w_pair_desc AS (PARTITION BY delegator, delegatee ORDER BY source_op DESC)
+  ),
+  store_pairs AS (
+    INSERT INTO history_backfill_delegation_pairs AS bp (delegator, delegatee, balance)
+    SELECT dd.delegator, dd.delegatee, dd.balance
+    FROM delegation_delta dd
+    WHERE dd.rn = 1 AND dd.source_op > 0
+    ON CONFLICT ON CONSTRAINT pk_history_backfill_delegation_pairs
+    DO UPDATE SET balance = EXCLUDED.balance
   ),
   -- As in process_block_range_delegations: the delegator counts increases only (a
   -- decrease comes back with return_vesting_delegation), except at HF23.
@@ -423,42 +496,105 @@ BEGIN
     SELECT delegator AS account_id, source_op, 0::BIGINT AS received_vests,
       CASE WHEN is_hf23_reset THEN balance_delta ELSE GREATEST(balance_delta, 0) END AS delegated_vests
     FROM delegation_delta
+    WHERE source_op > 0
 
     UNION ALL
 
     SELECT delegatee, source_op, balance_delta, 0
     FROM delegation_delta
+    WHERE source_op > 0
 
     UNION ALL
 
     SELECT delegator, source_op, 0, balance
-    FROM delegation_ops
+    FROM chunk_ops
     WHERE op_type_id = _op_return_vesting_delegation
   ),
-  delegation_changes AS (
-    SELECT account_id, source_op, SUM(received_vests) AS received_vests, SUM(delegated_vests) AS delegated_vests
+  delegation_changes AS MATERIALIZED (
+    SELECT
+      account_id,
+      source_op,
+      SUM(received_vests) AS received_vests,
+      SUM(delegated_vests) AS delegated_vests,
+      source_op = MIN(source_op) OVER (PARTITION BY account_id) AS first_in_chunk
     FROM account_changes
     GROUP BY account_id, source_op
-    HAVING SUM(received_vests) <> 0 OR SUM(delegated_vests) <> 0
+  ),
+  -- The account's last row before the chunk: its totals then, NULL if no operation
+  -- had touched it.
+  carried_totals AS MATERIALIZED (
+    SELECT a.account_id, h.delegated_vests, h.received_vests
+    FROM (SELECT DISTINCT dc.account_id FROM delegation_changes dc) a
+    LEFT JOIN LATERAL (
+      SELECT adh.delegated_vests, adh.received_vests
+      FROM account_delegation_history adh
+      WHERE adh.account = a.account_id AND hafd.operation_id_to_block_num(adh.source_op) < _from
+      ORDER BY hafd.operation_id_to_block_num(adh.source_op) DESC, adh.source_op DESC
+      LIMIT 1
+    ) h ON TRUE
   )
   INSERT INTO account_delegation_history (account, delegated_vests, received_vests, source_op)
+  SELECT h.account_id, h.delegated_vests, h.received_vests, h.source_op
+  FROM (
+    SELECT
+      dc.account_id,
+      COALESCE(ct.delegated_vests, 0) + SUM(dc.delegated_vests) OVER w_account_asc AS delegated_vests,
+      COALESCE(ct.received_vests, 0) + SUM(dc.received_vests) OVER w_account_asc AS received_vests,
+      dc.source_op,
+      dc.received_vests <> 0 OR dc.delegated_vests <> 0 OR (dc.first_in_chunk AND ct.delegated_vests IS NULL) AS is_recorded
+    FROM delegation_changes dc
+    JOIN carried_totals ct ON ct.account_id = dc.account_id
+    WINDOW w_account_asc AS (PARTITION BY dc.account_id ORDER BY dc.source_op)
+  ) h
+  WHERE h.is_recorded;
+
+  GET DIAGNOSTICS __rows = ROW_COUNT;
+  RETURN __rows;
+END
+$$;
+
+/**
+ * backfill_withdraw_history_chunk(_from, _to)
+ * -------------------------------------------
+ * account_withdraw_history rows of blocks _from.._to, as process_block_range_withdrawals
+ * writes them: the power-down state after every withdraw_vesting, HF23 reset and fill,
+ * continuing from the account's last row before _from. Whether a payout left the
+ * account without VESTS is read from account_balance_history (the account's VESTS
+ * after the payout's last fill), through its block index.
+ *
+ * @returns number of rows written
+ */
+CREATE OR REPLACE FUNCTION backfill_withdraw_history_chunk(_from INT, _to INT)
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+AS
+$$
+DECLARE
+  _op_hardfork_hive                  INT := btracker_backend.op_hardfork_hive();
+  _op_withdraw_vesting               INT := btracker_backend.op_withdraw_vesting();
+  _op_fill_vesting_withdraw          INT := btracker_backend.op_fill_vesting_withdraw();
+  _nai_vests                         INT := btracker_backend.nai_vests();
+  _hf_vests_precision_block          INT;
+  _hf_withdraw_rate_block            INT;
+  _hf_withdraw_rate_round_up_block   INT;
+  __rows                             INT;
+BEGIN
   SELECT
-    account_id,
-    SUM(delegated_vests) OVER w_account_asc,
-    SUM(received_vests) OVER w_account_asc,
-    source_op
-  FROM delegation_changes
-  WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op);
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_vests_precision() THEN block_num END),
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate() THEN block_num END),
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate_round_up() THEN block_num END)
+  INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block
+  FROM hafd.applied_hardforks;
 
-  GET DIAGNOSTICS __delegation_rows = ROW_COUNT;
-
-  RAISE NOTICE 'btracker: backfilling account_withdraw_history up to block %...', __to;
   WITH ops AS MATERIALIZED (
     SELECT ov.body_value AS body, ov.op_type_id, ov.id, ov.block_num
     FROM operations_view ov
     WHERE
       ov.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive, _op_fill_vesting_withdraw) AND
-      ov.block_num <= __to
+      ov.block_num BETWEEN _from AND _to
   ),
   parsed AS MATERIALIZED (
     SELECT result.account_name, o.id AS source_op, o.block_num, TRUE AS is_set,
@@ -492,10 +628,27 @@ BEGIN
     FROM accounts_view av
     WHERE av.name IN (SELECT DISTINCT account_name FROM parsed)
   ),
-  power_down_ops AS MATERIALIZED (
+  chunk_ops AS MATERIALIZED (
     SELECT ai.account_id, p.source_op, p.block_num, p.is_set, p.vesting_withdraw_rate, p.to_withdraw, p.withdrawn, p.fill_amount
     FROM parsed p
     JOIN account_ids ai ON ai.account_name = p.account_name
+  ),
+  -- The chunk's operations, and each account's power-down before the chunk (its
+  -- last row) as a withdraw_vesting at source_op 0.
+  power_down_ops AS MATERIALIZED (
+    SELECT * FROM chunk_ops
+
+    UNION ALL
+
+    SELECT a.account_id, 0, 0, TRUE, h.vesting_withdraw_rate, h.to_withdraw, h.withdrawn, NULL
+    FROM (SELECT DISTINCT co.account_id FROM chunk_ops co) a
+    CROSS JOIN LATERAL (
+      SELECT awh.vesting_withdraw_rate, awh.to_withdraw, awh.withdrawn
+      FROM account_withdraw_history awh
+      WHERE awh.account = a.account_id AND hafd.operation_id_to_block_num(awh.source_op) < _from
+      ORDER BY hafd.operation_id_to_block_num(awh.source_op) DESC, awh.source_op DESC
+      LIMIT 1
+    ) h
   ),
   -- A payout is all fills of an account in one block; hived checks the account's
   -- VESTS once, after the last of them.
@@ -559,22 +712,125 @@ BEGIN
     CASE WHEN se.is_set THEN se.to_withdraw WHEN se.ended THEN 0 ELSE se.segment_to_withdraw END,
     CASE WHEN se.is_set THEN se.withdrawn WHEN se.ended THEN 0 ELSE se.segment_withdrawn END,
     se.source_op
-  FROM segment_end se;
+  FROM segment_end se
+  WHERE se.source_op > 0;
 
-  GET DIAGNOSTICS __withdraw_rows = ROW_COUNT;
+  GET DIAGNOSTICS __rows = ROW_COUNT;
+  RETURN __rows;
+END
+$$;
 
+/**
+ * backfill_delegation_and_withdraw_history()
+ * ------------------------------------------
+ * One step of the delegation and power-down history backfill (see above): starts it
+ * when it can, then backfills its next chunk.
+ *
+ * SECURITY DEFINER: disabling the tables' triggers takes their owner, also when an
+ * embedding application's block processor calls it.
+ *
+ * @returns number of history rows written once the backfill is complete; 0 on a
+ *          fresh install; NULL while it waits or has chunks left
+ */
+CREATE OR REPLACE FUNCTION backfill_delegation_and_withdraw_history()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+SECURITY DEFINER
+AS
+$$
+DECLARE
+  _chunk_blocks  CONSTANT INT := 1000000;
+  __current      INT := COALESCE(hive.app_get_current_block_num(current_schema()), 0);
+  __target       INT;
+  __irreversible INT;
+  __progress     history_backfill;
+  __to           INT;
+  __rows         INT;
+BEGIN
+  SELECT * INTO __progress FROM history_backfill;
+
+  IF NOT FOUND THEN
+    -- A fresh install (nothing processed yet) has nothing to fill.
+    IF __current = 0 THEN
+      RETURN 0;
+    END IF;
+
+    IF NOT isIndexesCreated() THEN
+      RAISE NOTICE 'btracker: the delegation and power-down history backfill waits for the massive sync (at block %) to be finalized', __current;
+      RETURN NULL;
+    END IF;
+
+    __target := history_backfill_target(__current);
+    __irreversible := hive.app_get_irreversible_block();
+    IF __target > __irreversible THEN
+      RAISE NOTICE 'btracker: the delegation and power-down history backfill waits for block % to become irreversible (now %)', __target, __irreversible;
+      RETURN NULL;
+    END IF;
+
+    INSERT INTO history_backfill (target_block, backfilled_to, rows_written)
+    VALUES (__target, 0, 0)
+    RETURNING * INTO __progress;
+  END IF;
+
+  IF __progress.backfilled_to < __progress.target_block THEN
+    __to := LEAST(__progress.backfilled_to + _chunk_blocks, __progress.target_block);
+
+    ALTER TABLE account_delegation_history DISABLE TRIGGER USER;
+    ALTER TABLE account_withdraw_history DISABLE TRIGGER USER;
+    __rows := backfill_delegation_history_chunk(__progress.backfilled_to + 1, __to)
+            + backfill_withdraw_history_chunk(__progress.backfilled_to + 1, __to);
+    ALTER TABLE account_delegation_history ENABLE TRIGGER USER;
+    ALTER TABLE account_withdraw_history ENABLE TRIGGER USER;
+
+    UPDATE history_backfill
+    SET backfilled_to = __to, rows_written = rows_written + __rows
+    RETURNING * INTO __progress;
+    RAISE NOTICE 'btracker: delegation and power-down history backfilled up to block % of % (% rows)',
+      __progress.backfilled_to, __progress.target_block, __progress.rows_written;
+  END IF;
+
+  IF __progress.backfilled_to < __progress.target_block THEN
+    RETURN NULL;
+  END IF;
+
+  DELETE FROM history_backfill;
+  TRUNCATE history_backfill_delegation_pairs;
   ANALYZE account_delegation_history;
   ANALYZE account_withdraw_history;
 
-  RETURN __delegation_rows + __withdraw_rows;
+  RETURN __progress.rows_written;
 END
+$$;
+
+/**
+ * pending_one_off_repairs()
+ * -------------------------
+ * The repairs not yet recorded in one_off_repairs, in the order they run.
+ */
+CREATE OR REPLACE FUNCTION pending_one_off_repairs()
+RETURNS TABLE (name TEXT, function_name TEXT)
+LANGUAGE 'sql' STABLE
+AS
+$$
+  SELECT r.name, r.function_name
+  FROM (VALUES
+    (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
+    (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
+    (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
+    (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests'),
+    (5, 'delegation_and_withdraw_history', 'backfill_delegation_and_withdraw_history')
+  ) AS r(position, name, function_name)
+  WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
+  ORDER BY r.position
 $$;
 
 /**
  * run_one_off_repairs()
  * ---------------------
  * Applies, in list order, every repair not yet recorded in one_off_repairs, each
- * recorded in the same transaction as its changes.
+ * recorded in the same transaction as its changes. A repair returning NULL is not
+ * complete (it waits for the install to reach a state, or has chunks left): it stays
+ * unrecorded and runs again on the next call.
  */
 CREATE OR REPLACE FUNCTION run_one_off_repairs()
 RETURNS VOID
@@ -585,22 +841,108 @@ DECLARE
   __repair    RECORD;
   __repaired  INT;
 BEGIN
-  FOR __repair IN
-    SELECT r.name, r.function_name
-    FROM (VALUES
-      (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
-      (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
-      (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
-      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests'),
-      (5, 'delegation_and_withdraw_history', 'backfill_delegation_and_withdraw_history')
-    ) AS r(position, name, function_name)
-    WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
-    ORDER BY r.position
+  FOR __repair IN SELECT * FROM pending_one_off_repairs()
   LOOP
     EXECUTE format('SELECT %I()', __repair.function_name) INTO __repaired;
+    CONTINUE WHEN __repaired IS NULL;
+
     INSERT INTO one_off_repairs (name, rows_repaired) VALUES (__repair.name, __repaired);
     RAISE NOTICE 'One-off repair % applied: % rows changed', __repair.name, __repaired;
   END LOOP;
+END
+$$;
+
+/**
+ * one_off_repairs_in_progress()
+ * -----------------------------
+ * Whether a chunked repair has started and has chunks left.
+ */
+CREATE OR REPLACE FUNCTION one_off_repairs_in_progress()
+RETURNS BOOLEAN
+LANGUAGE 'sql' STABLE
+AS
+$$
+  SELECT EXISTS (SELECT 1 FROM history_backfill)
+$$;
+
+/**
+ * apply_one_off_repairs()
+ * -----------------------
+ * run_one_off_repairs(), committing after every chunk of a chunked repair until it
+ * completes or waits. Called by scripts/install_app.sh (outside a transaction block).
+ */
+CREATE OR REPLACE PROCEDURE apply_one_off_repairs()
+LANGUAGE 'plpgsql'
+AS
+$$
+BEGIN
+  LOOP
+    PERFORM run_one_off_repairs();
+    COMMIT;
+    EXIT WHEN NOT one_off_repairs_in_progress();
+  END LOOP;
+END
+$$;
+
+/**
+ * run_one_off_repairs_during_processing()
+ * ---------------------------------------
+ * run_one_off_repairs() for block processing: a repair that fails is rolled back and
+ * left pending with a WARNING instead of failing, and so halting, block processing.
+ *
+ * @returns FALSE when a repair failed
+ */
+CREATE OR REPLACE FUNCTION run_one_off_repairs_during_processing()
+RETURNS BOOLEAN
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  PERFORM run_one_off_repairs();
+  RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'btracker: one-off repair failed and stays pending: % (%)', SQLERRM, SQLSTATE;
+  RETURN FALSE;
+END
+$$;
+
+/**
+ * complete_one_off_repairs()
+ * --------------------------
+ * run_one_off_repairs(), and every remaining chunk of a chunked repair, in the
+ * caller's transaction. Called by finalize_massive_sync() once the indexes exist.
+ */
+CREATE OR REPLACE FUNCTION complete_one_off_repairs()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  LOOP
+    EXIT WHEN NOT run_one_off_repairs_during_processing();
+    EXIT WHEN NOT one_off_repairs_in_progress();
+  END LOOP;
+END
+$$;
+
+/**
+ * continue_one_off_repairs()
+ * --------------------------
+ * Block processing's part: once the massive sync is finalized, one run_one_off_repairs()
+ * while a repair is pending, i.e. the next chunk of a repair an upgrade left waiting
+ * (for the finalization, or for its target block to become irreversible).
+ */
+CREATE OR REPLACE FUNCTION continue_one_off_repairs()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  IF NOT isIndexesCreated() OR NOT EXISTS (SELECT 1 FROM pending_one_off_repairs()) THEN
+    RETURN;
+  END IF;
+
+  PERFORM run_one_off_repairs_during_processing();
 END
 $$;
 

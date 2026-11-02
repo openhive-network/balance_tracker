@@ -7,8 +7,8 @@
  *     row of every account equals account_delegations / account_withdraws, and the
  *     past-block reader at the last processed block gives every account the head
  *     answer's values;
- *   - synthetic blocks of delegations (delegate, re-delegate lower, undelegate, return)
- *     and power-downs (start, payouts, a payout of two fills, cancel, a payout that
+ *   - synthetic blocks of delegations (delegate, re-delegate lower, undelegate, return,
+ *     a delegation of 0 between two accounts no delegation touched before) and power-downs (start, payouts, a payout of two fills, cancel, a payout that
  *     leaves 0 VESTS) write one history row per change, and the balances at each
  *     block, before and after every change, are the values replayed by hand below;
  *   - the upgrade backfill (backfill_delegation_and_withdraw_history) writes the same
@@ -245,11 +245,11 @@ BEGIN
 END
 $$;
 
--- The fixture: four accounts (a and c delegate to b; a and d power down) without a
--- power-down, a delegation or a balance change from four blocks before the head on,
--- and a weekly rate R.
+-- The fixture: six accounts (a and c delegate to b; a and d power down; x delegates 0
+-- to y) without a power-down, a delegation or a balance change from four blocks before
+-- the head on, and a weekly rate R.
 CREATE TEMP TABLE _fixture AS
-SELECT n[1] AS a, n[2] AS b, n[3] AS c, n[4] AS d, 1000000::BIGINT AS rate, pg_temp.head() - 4 AS b1
+SELECT n[1] AS a, n[2] AS b, n[3] AS c, n[4] AS d, n[5] AS x, n[6] AS y, 1000000::BIGINT AS rate, pg_temp.head() - 4 AS b1
 FROM (SELECT array_agg(s.name ORDER BY s.id) AS n FROM (
   SELECT av.id, av.name::TEXT AS name
   FROM hive.accounts_view av
@@ -259,10 +259,10 @@ FROM (SELECT array_agg(s.name ORDER BY s.id) AS n FROM (
     AND NOT EXISTS (
       SELECT 1 FROM account_balance_history abh
       WHERE abh.account = av.id AND hafd.operation_id_to_block_num(abh.source_op) >= pg_temp.head() - 4)
-  ORDER BY av.id LIMIT 4) s) f;
+  ORDER BY av.id LIMIT 6) s) f;
 
 -- The synthetic blocks b1..b4 (the head is b5):
---   b1: a delegates 1000 to b; a and d start powering down 104R
+--   b1: a delegates 1000 to b; a and d start powering down 104R; x delegates 0 to y
 --   b2: a lowers its delegation to b to 600; c delegates 500 to b; a and d are paid R
 --   b3: a undelegates b; 400 of a's delegation returns; a is paid R in two fills
 --   b4: 600 return to a; a cancels its power-down; d is paid its last R VESTS
@@ -287,7 +287,8 @@ BEGIN
   PERFORM pg_temp.process_block(f.b1,
     pg_temp.delegate_vesting_shares(f.a, f.b, 1000),
     pg_temp.withdraw_vesting(f.a, 104 * __r),
-    pg_temp.withdraw_vesting(f.d, 104 * __r));
+    pg_temp.withdraw_vesting(f.d, 104 * __r),
+    pg_temp.delegate_vesting_shares(f.x, f.y, 0));
   PERFORM pg_temp.process_block(f.b1 + 1,
     pg_temp.delegate_vesting_shares(f.a, f.b, 600),
     pg_temp.delegate_vesting_shares(f.c, f.b, 500),
@@ -305,6 +306,30 @@ BEGIN
 END
 $f$;
 
+-- The history equals the one block processing wrote (_synced_*).
+CREATE FUNCTION pg_temp.expect_backfilled(_case TEXT)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+DECLARE
+  __differing BIGINT;
+BEGIN
+  SELECT count(*) INTO __differing FROM (
+    (SELECT * FROM _synced_withdraws EXCEPT ALL SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op FROM account_withdraw_history)
+    UNION ALL
+    (SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op FROM account_withdraw_history EXCEPT ALL SELECT * FROM _synced_withdraws)) x;
+  IF __differing <> 0 THEN
+    RAISE EXCEPTION '%: the backfill and block processing differ in % account_withdraw_history rows (of % processed)', _case, __differing, (SELECT count(*) FROM _synced_withdraws);
+  END IF;
+  SELECT count(*) INTO __differing FROM (
+    (SELECT * FROM _synced_delegations EXCEPT ALL SELECT account, delegated_vests, received_vests, source_op FROM account_delegation_history)
+    UNION ALL
+    (SELECT account, delegated_vests, received_vests, source_op FROM account_delegation_history EXCEPT ALL SELECT * FROM _synced_delegations)) x;
+  IF __differing <> 0 THEN
+    RAISE EXCEPTION '%: the backfill and block processing differ in % account_delegation_history rows (of % processed)', _case, __differing, (SELECT count(*) FROM _synced_delegations);
+  END IF;
+END
+$f$;
+
 BEGIN;
 DO
 $$
@@ -314,10 +339,9 @@ DECLARE
   __b INT;
   __synced_w INT;
   __synced_d INT;
-  __differing INT;
 BEGIN
   SELECT * INTO f FROM _fixture;
-  IF f.d IS NULL THEN
+  IF f.y IS NULL THEN
     RAISE EXCEPTION 'no fixture accounts';
   END IF;
   __r := f.rate;
@@ -340,7 +364,18 @@ BEGIN
   PERFORM pg_temp.expect('power-downs', 'd''s history', pg_temp.withdraw_rows(f.d),
     jsonb_build_array(jsonb_build_array(__b, __r, 104 * __r, 0), jsonb_build_array(__b + 1, __r, 104 * __r, __r),
                       jsonb_build_array(__b + 3, 0, 0, 0)));
-  RAISE NOTICE 'PASS: delegations and power-downs write one history row per change';
+  -- A delegation of 0 changes no total, but creates x's and y's account_delegations rows.
+  PERFORM pg_temp.expect('zero delegation', 'x''s and y''s history', jsonb_build_array(pg_temp.delegation_rows(f.x), pg_temp.delegation_rows(f.y)),
+    jsonb_build_array(jsonb_build_array(jsonb_build_array(__b, 0, 0)), jsonb_build_array(jsonb_build_array(__b, 0, 0))));
+  PERFORM pg_temp.expect('zero delegation', 'x and y at b1 and at the head',
+    jsonb_build_array(pg_temp.at(f.x, __b), pg_temp.at(f.y, __b)),
+    (SELECT jsonb_agg(jsonb_build_array(h.delegated_vests::BIGINT, h.received_vests::BIGINT, h.vesting_withdraw_rate::BIGINT, h.to_withdraw::BIGINT, h.withdrawn::BIGINT) ORDER BY n.pos)
+     FROM unnest(ARRAY[f.x, f.y]) WITH ORDINALITY AS n(name, pos)
+     CROSS JOIN LATERAL btracker_endpoints.get_account_balances(n.name) h));
+  IF (SELECT count(*) FROM account_delegations ad WHERE ad.account IN (pg_temp.account_id(f.x), pg_temp.account_id(f.y))) <> 2 THEN
+    RAISE EXCEPTION 'zero delegation: expected account_delegations rows for x and y';
+  END IF;
+  RAISE NOTICE 'PASS: delegations and power-downs write one history row per change, and a first delegation of 0 one row';
 
   -- The state at each block: [delegated, received, rate, to_withdraw, withdrawn].
   PERFORM pg_temp.expect('before', 'a, b, c, d', jsonb_build_array(pg_temp.at(f.a, __b - 1), pg_temp.at(f.b, __b - 1), pg_temp.at(f.c, __b - 1), pg_temp.at(f.d, __b - 1)),
@@ -361,11 +396,13 @@ BEGIN
   RAISE NOTICE 'PASS: the balances at every block before and after each change are the replayed ones';
 
   -- The upgrade backfill over the synced chain plus the synthetic blocks: the
-  -- backfill reads operations_view, which this temporary view shadows.
+  -- backfill reads operations_view, which this temporary view shadows (as the
+  -- tables' owner, for which the backfill runs).
   CREATE TEMP VIEW operations_view AS
   SELECT ov.id, ov.block_num, ov.op_type_id, ov.body_value FROM btracker_app.operations_view ov
   UNION ALL
   SELECT so.id, so.block_num, so.op_type_id, so.body_value FROM _synthetic_ops so;
+  GRANT SELECT ON operations_view TO btracker_owner;
 
   CREATE TEMP TABLE _synced_withdraws AS SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op FROM account_withdraw_history;
   CREATE TEMP TABLE _synced_delegations AS SELECT account, delegated_vests, received_vests, source_op FROM account_delegation_history;
@@ -374,31 +411,36 @@ BEGIN
   DELETE FROM account_withdraw_history;
   DELETE FROM account_delegation_history;
 
-  PERFORM backfill_delegation_and_withdraw_history();
+  DELETE FROM history_backfill;
+  DELETE FROM history_backfill_delegation_pairs;
+  LOOP
+    EXIT WHEN backfill_delegation_and_withdraw_history() IS NOT NULL;
+    IF NOT one_off_repairs_in_progress() THEN
+      RAISE EXCEPTION 'the backfill did not start on a finalized schema at an irreversible block';
+    END IF;
+  END LOOP;
 
-  SELECT count(*) INTO __differing FROM (
-    (SELECT * FROM _synced_withdraws EXCEPT ALL SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op FROM account_withdraw_history)
-    UNION ALL
-    (SELECT account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op FROM account_withdraw_history EXCEPT ALL SELECT * FROM _synced_withdraws)) x;
-  IF __differing <> 0 THEN
-    RAISE EXCEPTION 'the backfill and block processing differ in % account_withdraw_history rows (of % processed)', __differing, __synced_w;
-  END IF;
-  SELECT count(*) INTO __differing FROM (
-    (SELECT * FROM _synced_delegations EXCEPT ALL SELECT account, delegated_vests, received_vests, source_op FROM account_delegation_history)
-    UNION ALL
-    (SELECT account, delegated_vests, received_vests, source_op FROM account_delegation_history EXCEPT ALL SELECT * FROM _synced_delegations)) x;
-  IF __differing <> 0 THEN
-    RAISE EXCEPTION 'the backfill and block processing differ in % account_delegation_history rows (of % processed)', __differing, __synced_d;
-  END IF;
-  RAISE NOTICE 'PASS: the backfill writes the % power-down and % delegation history rows block processing wrote', __synced_w, __synced_d;
+  PERFORM pg_temp.expect_backfilled('the backfill');
+
+  -- Chunk boundaries inside the synthetic blocks: each delegation's balance, each
+  -- account's totals and power-down carried from one chunk into the next.
+  DELETE FROM account_withdraw_history;
+  DELETE FROM account_delegation_history;
+  DELETE FROM history_backfill_delegation_pairs;
+  PERFORM backfill_delegation_history_chunk(1, __b), backfill_withdraw_history_chunk(1, __b);
+  PERFORM backfill_delegation_history_chunk(__b + 1, __b + 1), backfill_withdraw_history_chunk(__b + 1, __b + 1);
+  PERFORM backfill_delegation_history_chunk(__b + 2, __b + 2), backfill_withdraw_history_chunk(__b + 2, __b + 2);
+  PERFORM backfill_delegation_history_chunk(__b + 3, pg_temp.head()), backfill_withdraw_history_chunk(__b + 3, pg_temp.head());
+  PERFORM pg_temp.expect_backfilled('chunks of one block');
+  RAISE NOTICE 'PASS: the backfill, whole and in chunks of one block, writes the % power-down and % delegation history rows block processing wrote', __synced_w, __synced_d;
 END
 $$;
 ROLLBACK;
 
 -- A fork rollback removes the history rows written at the rolled-back block. Only
 -- the synthetic blocks' rows are checked: the rollback below goes under the context's
--- irreversible block, which HAF never does, and so also reverts what an upgrade's
--- backfill wrote at that block.
+-- irreversible block, which HAF never does (history_backfill.sql checks that it leaves
+-- an upgrade's backfill intact).
 BEGIN;
 DO
 $$
