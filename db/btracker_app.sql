@@ -1263,11 +1263,12 @@ $$;
  *
  * Processing order per range:
  * 1. Balances (liquid)
- * 2. Withdrawals (power-down)
- * 3. Savings
- * 4. Rewards
- * 5. Delegations
- * 6. RC Delegations
+ * 2. RC Delegations (needs the batch's VESTS changes from 1, and withdrawals
+ *    and delegations as they were before the batch)
+ * 3. Withdrawals (power-down)
+ * 4. Savings
+ * 5. Rewards
+ * 6. Delegations
  * 7. Recurrent transfers
  * 8. Transfer statistics
  * 9. Conversions
@@ -1317,11 +1318,11 @@ BEGIN
   IF __hardfork_23_block BETWEEN _from AND _to THEN
     -- Enter a loop iterating from _from to hf_23
     PERFORM process_block_range_balances(_from, __hardfork_23_block);
+    PERFORM process_block_range_rc_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_withdrawals(_from, __hardfork_23_block);
     PERFORM process_block_range_savings(_from, __hardfork_23_block);
     PERFORM process_block_range_rewards(_from, __hardfork_23_block);
     PERFORM process_block_range_delegations(_from, __hardfork_23_block);
-    PERFORM process_block_range_rc_delegations(_from, __hardfork_23_block);
     PERFORM process_block_range_recurrent_transfers(_from, __hardfork_23_block);
     PERFORM process_transfer_stats(_from, __hardfork_23_block);
     PERFORM process_vesting_stats(_from, __hardfork_23_block);
@@ -1338,11 +1339,11 @@ BEGIN
     IF __hardfork_23_block != _to THEN
       -- Continue the loop from hf_23 to _to
       PERFORM process_block_range_balances(__hardfork_23_block + 1, _to);
+      PERFORM process_block_range_rc_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_withdrawals(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_savings(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_rewards(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_delegations(__hardfork_23_block + 1, _to);
-      PERFORM process_block_range_rc_delegations(__hardfork_23_block + 1, _to);
       PERFORM process_block_range_recurrent_transfers(__hardfork_23_block + 1, _to);
       PERFORM process_transfer_stats(__hardfork_23_block + 1, _to);
       PERFORM process_vesting_stats(__hardfork_23_block + 1, _to);
@@ -1362,6 +1363,9 @@ BEGIN
     PERFORM process_block_range_balances(_from, _to);
     RAISE NOTICE 'btracker stage balances: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
     __stage_ts := clock_timestamp();
+    PERFORM process_block_range_rc_delegations(_from, _to);
+    RAISE NOTICE 'btracker stage rc_delegations: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
+    __stage_ts := clock_timestamp();
     PERFORM process_block_range_withdrawals(_from, _to);
     RAISE NOTICE 'btracker stage withdrawals: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
     __stage_ts := clock_timestamp();
@@ -1373,9 +1377,6 @@ BEGIN
     __stage_ts := clock_timestamp();
     PERFORM process_block_range_delegations(_from, _to);
     RAISE NOTICE 'btracker stage delegations: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
-    __stage_ts := clock_timestamp();
-    PERFORM process_block_range_rc_delegations(_from, _to);
-    RAISE NOTICE 'btracker stage rc_delegations: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
     __stage_ts := clock_timestamp();
     PERFORM process_block_range_recurrent_transfers(_from, _to);
     RAISE NOTICE 'btracker stage recurrent_transfers: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3); 
@@ -1444,11 +1445,11 @@ BEGIN
   END IF;
 
   PERFORM process_block_range_balances(_block, _block);
+  PERFORM process_block_range_rc_delegations(_block, _block);
   PERFORM process_block_range_withdrawals(_block, _block);
   PERFORM process_block_range_savings(_block, _block);
   PERFORM process_block_range_rewards(_block, _block);
   PERFORM process_block_range_delegations(_block, _block);
-  PERFORM process_block_range_rc_delegations(_block, _block);
   PERFORM process_block_range_recurrent_transfers(_block, _block);
   PERFORM process_transfer_stats(_block, _block);
   PERFORM process_vesting_stats(_block, _block);

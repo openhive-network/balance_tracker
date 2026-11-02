@@ -182,6 +182,7 @@ processed a block yet.
 | Repair | Function | Corrects |
 |--------|----------|----------|
 | `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
+| `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 
 ## HAF Integration
 
