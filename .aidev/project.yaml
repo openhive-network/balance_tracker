@@ -59,13 +59,17 @@ sandbox:
       provider: "haf/haf"
 
 # Every test dispatch (full, canary, baseline, promote canary, post-promote
-# verification) is offered first to steem-18, the host of that shared HAF, as
-# the sync step's round trips to it dominate the suites (see the timings under
-# `verification`). `prefer`, not `require`: when steem-18 does not claim the
-# work within its 120s window, any admitted host runs it, so a busy or drained
-# steem-18 slows a run rather than failing it.
+# verification) is offered first to steem-18, the host of that shared HAF, and
+# to steem-20, as the sync step's round trips to it dominate the suites (see the
+# timings under `verification`). steem-20 is 0.37 ms from the shared HAF, and
+# measured sync 146s and one full run 182s there against 561s on steem-3. It is
+# listed alongside steem-18 because a blocked host claims no new work: under an
+# operator block on steem-18 alone, every dispatch waited out the 120s window
+# before falling back. `prefer`, not `require`: when neither host claims the
+# work within its 120s window, any admitted host runs it, so a busy, blocked or
+# drained pair slows a run rather than failing it.
 dispatch:
-  hosts: [steem-18.syncad.com]
+  hosts: [steem-18.syncad.com, steem-20.syncad.com]
   mode: prefer
 
 # Verification slots. Each binding is what this project genuinely runs for
@@ -91,8 +95,10 @@ dispatch:
 # 137s), and a canary killed at 900s with every case passing after a 591s
 # sync. 1800s covers the farthest fallback host's worst run with room to
 # spare and stays inside full's 2100s activity ceiling; it is to be
-# re-derived from steem-18's own timings once `dispatch` below has placed a
-# few runs there. `system` is unbound, so it has no wall to declare.
+# re-derived from the preferred hosts' own timings once `dispatch` below has
+# placed a few runs there. Further evidence for that: on 2026-11-02 a full run
+# took 218s and a post-merge canary 193s, both on steem-20. `system` is
+# unbound, so it has no wall to declare.
 verification:
   quick:
     adapter: command
