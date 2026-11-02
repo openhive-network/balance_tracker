@@ -58,7 +58,7 @@ tests/
 │   ├── withdraw_vesting_rate.sql # power-down rate rounding per hardfork era, through processing, and its one-off repair
 │   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair
-│   ├── cleared_accounts_batch.sql # #61 clears of null/steem.dao on the account_clears fixture: values after the sync (finalized, LIVE), HBD interest, balance_totals, rollups; the same block by block from seeded stored state; one range = block by block
+│   ├── cleared_accounts_batch.sql # #61 clears of null/steem.dao on the account_clears fixture: values after the sync (finalized), HBD interest, balance_totals, rollups; the same block by block from seeded stored state; one range = block by block
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
