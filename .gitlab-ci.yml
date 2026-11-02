@@ -971,32 +971,45 @@ pattern-test-with-mock-data:
     # Run from project root so pattern file paths resolve correctly
     BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
 
-python_api_client_test:
-  extends: .project_develop_configuration_template
+# pytest and pytest-asyncio come from common-ci's python-test-tools image, at the
+# versions in common-ci-configuration's docker-bake.hcl; the package does not pin
+# them. poetry installs the package's dependencies into the image's venv
+# (VIRTUAL_ENV=/python_venv), next to the tools.
+.python_api_package_test_template:
+  extends: .job-defaults
+  image: "${PYTHON_TEST_TOOLS_IMAGE}"
   stage: test
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  variables:
+    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
+  before_script:
+  - *early_exit_check
+  - python3 -V
+  - pip list | grep -i '^pytest'
+
+python_api_client_test:
+  extends: .python_api_package_test_template
   needs:
   - job: detect_changes
     artifacts: true
     optional: true
   - job: generate_python_api_client
     artifacts: true
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
-  parallel:
-    matrix:
-    - PYTHON_VERSION: ["3.14"]
   before_script:
-  - *early_exit_check
-  - !reference [.project_develop_configuration_template, before_script]
+  - !reference [.python_api_package_test_template, before_script]
+  - poetry -C "${PYPROJECT_DIR}" install
   - !reference [.update_deps_for_tests, script]
   script:
-  - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
+  - pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
   tags:
   - public-runner-docker
 
 test_python_api_wheel:
-  extends: .project_develop_configuration_template
-  stage: test
+  extends: .python_api_package_test_template
   needs:
   - job: detect_changes
     artifacts: true
@@ -1004,14 +1017,9 @@ test_python_api_wheel:
   - job: build_python_api_client_wheel
     artifacts: true
   variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
     DIST_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package/dist"
-  parallel:
-    matrix:
-    - PYTHON_VERSION: ["3.14"]
   before_script:
-  - *early_exit_check
-  - !reference [.configuration_template, before_script]
+  - !reference [.python_api_package_test_template, before_script]
   - !reference [.update_deps_for_tests, script]
   - poetry -C "${PYPROJECT_DIR}" install --no-root
   script:
