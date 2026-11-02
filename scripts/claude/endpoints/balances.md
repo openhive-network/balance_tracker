@@ -87,6 +87,10 @@ curl -X GET 'http://localhost:3000/balance-api/accounts/blocktrades/balances'
   VESTS) and `account_withdraw_history` (power-down rate, to_withdraw, withdrawn), each a
   backward scan of the table's `(account, [nai,] block)` index, and values VESTS at the
   block's vesting fund and shares. Every other field has no history and is `null`.
+- `account_delegation_history` and `account_withdraw_history` are filled by block
+  processing only: on an install upgraded from a version before them, past-block
+  `delegated_vests`, `received_vests`, `post_voting_power_vests`, `vesting_withdraw_rate`,
+  `to_withdraw` and `withdrawn` are correct only after a resync
 - `at-block` out of range (before block 1, after the last processed block, a timestamp
   before the first block) or malformed: an error stating the valid range
 - 2-second cache, 1 year for a past block that is irreversible (`set_history_cache_headers`)

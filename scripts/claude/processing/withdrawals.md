@@ -72,11 +72,10 @@ later VESTS changes in `_btracker_vests_batch`, so the step runs after
 per install by `repair_power_downs_without_vests()` (`db/one_off_repairs.sql`).
 
 `account_withdraw_history` is what the past-block balances read
-(`scripts/claude/endpoints/balances.md`). An install synced before it existed gets it
-from the one-off repair `delegation_and_withdraw_history`, which replays the same
-segments over the whole chain from `operations_view` and reads the VESTS after a payout
-from `account_balance_history`; `tests/maintenance/delegation_withdraw_history.sql`
-compares its rows with block processing's.
+(`scripts/claude/endpoints/balances.md`). Only block processing writes it: an install
+upgraded from a version synced before it existed must resync before at-block reads of
+`vesting_withdraw_rate`, `to_withdraw` and `withdrawn` are correct (no upgrade step
+backfills it). `tests/maintenance/delegation_withdraw_history.sql` checks its rows.
 
 ### Section 2: Routes
 

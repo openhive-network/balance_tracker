@@ -543,8 +543,8 @@ insert_delegations AS (
 -- An operation that leaves both totals unchanged writes no row, except the first
 -- operation ever to touch the account (no account_delegations row yet): it creates
 -- the account's account_delegations row, so a read at its block finds the 0 totals
--- the head read does. "First ever" does not depend on how blocks are batched, so the
--- upgrade backfill (db/one_off_repairs.sql) writes the same rows.
+-- the head read does. "First ever" does not depend on how blocks are batched, so a
+-- sync writes the same rows whatever its batch size.
 ---------------------------------------------------------------------------------------
 insert_delegation_history AS (
   INSERT INTO account_delegation_history

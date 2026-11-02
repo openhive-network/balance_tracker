@@ -30,10 +30,10 @@ changes nothing, e.g. a delegation of 0): the per-operation deltas
 HF23 resets), summed per `(account, source_op)`, and added as a running sum to the
 `account_delegations` totals before the batch (the statement still sees them). Its last
 row per account equals `account_delegations`. The past-block balances read it
-(`scripts/claude/endpoints/balances.md`); an install synced before it existed gets it from
-the one-off repair `delegation_and_withdraw_history` (`scripts/claude/main.md`), which
-replays the same deltas over the chain in block chunks. Keep the two in step:
-`tests/maintenance/delegation_withdraw_history.sql` and `history_backfill.sql` compare them.
+(`scripts/claude/endpoints/balances.md`). Only block processing writes it: an install
+upgraded from a version synced before it existed must resync before at-block reads of
+`delegated_vests`, `received_vests` and `post_voting_power_vests` are correct (no upgrade
+step backfills it). `tests/maintenance/delegation_withdraw_history.sql` checks its rows.
 
 ## HF23 Edge Case
 
