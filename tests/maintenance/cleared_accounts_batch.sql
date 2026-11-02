@@ -452,7 +452,7 @@ END
 $f$;
 
 -- null's HBD balance the seed starts from (the same at every take-back)
-CREATE TEMP TABLE t_hbd_start ON COMMIT DROP (balance BIGINT);
+CREATE TEMP TABLE t_hbd_start (balance BIGINT) ON COMMIT DROP;
 
 CREATE FUNCTION pg_temp.process(_from INT, _to INT)
 RETURNS VOID LANGUAGE plpgsql AS $f$
