@@ -182,6 +182,7 @@ processed a block yet.
 | Repair | Function | Corrects |
 |--------|----------|----------|
 | `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
+| `power_downs_without_vests` | `repair_power_downs_without_vests()` | ends (`vesting_withdraw_rate`, `to_withdraw`, `withdrawn` = 0) the power-down of every account with 0 VESTS, which hived ended at the payout that took its last VESTS; runs before `rc_delegation_overflow` |
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 | `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
 

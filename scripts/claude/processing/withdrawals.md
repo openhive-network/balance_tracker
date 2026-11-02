@@ -90,6 +90,14 @@ WHERE cp.source_op > aw.source_op  -- Fill happened AFTER withdrawal started
 
 When `withdrawn >= to_withdraw`, reset withdrawal state to 0 (completed).
 
+A payout that leaves the account with 0 VESTS also resets it, as hived's
+`process_vesting_withdrawals` does (`libraries/chain/database_vesting.cpp`: rate,
+`to_withdraw` and `withdrawn` to 0). A payout is all fills of an account in one block;
+the VESTS balance after its last fill is `current_account_balances` minus the batch's
+later VESTS changes in `_btracker_vests_batch`, so the step runs after
+`process_block_range_balances`. Power-downs stored by earlier versions are ended once
+per install by `repair_power_downs_without_vests()` (`db/one_off_repairs.sql`).
+
 ### Section 4: Delayed Voting (HF24+)
 
 Handles three operations affecting `delayed_vests`:
