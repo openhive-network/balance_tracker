@@ -202,8 +202,6 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_block_range_converts.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_block_range_orders.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_proposal_payments.sql"
-# --- repairs/ : one-off data repairs; reuse the parsers and process_* functions above ---
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/repairs/cleared_accounts.sql"
 
 # One-off repairs of state synced by an earlier version, each applied once per install.
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/one_off_repairs.sql"
@@ -239,11 +237,3 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT S
 # Allow hived to fullfil vacuum full requests
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT MAINTAIN ON ALL TABLES IN SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT ALL ON SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
-
-# One-off repair of null/steem.dao data an older version processed without their clears
-# (#61). Last, after everything above exists and is granted; runs once per install
-# (recorded in btracker_repairs), as the install user (not btracker_owner) because it
-# detaches the context group around the rebuild. A procedure that commits between detach,
-# rebuild and attach, so it gets its own psql command (each -c is its own transaction).
-# Does nothing on an install still in massive sync: finalize_massive_sync repairs there.
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -c "CALL btracker_backend.repair_cleared_accounts('${BTRACKER_SCHEMA}');"
