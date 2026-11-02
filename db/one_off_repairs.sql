@@ -287,6 +287,290 @@ END
 $$;
 
 /**
+ * backfill_delegation_and_withdraw_history()
+ * ------------------------------------------
+ * Fills account_delegation_history and account_withdraw_history of an install
+ * synced before block processing wrote them, from the application's first block
+ * to its current one, with the rows processing would have written: one pass over
+ * the operations of each kind (operations_view by type), with the state before the
+ * first block empty.
+ *
+ *   - delegations: process_block_range_delegations' per-operation changes of
+ *     delegated and received vests, summed per account;
+ *   - power-downs: process_block_range_withdrawals' state after every withdraw_vesting,
+ *     HF23 reset and fill. Whether a payout left the account without VESTS is read
+ *     from account_balance_history (the account's VESTS after the payout's last
+ *     fill), through its block index: the install must have finalized its massive
+ *     sync, which builds that index.
+ *
+ * tests/maintenance/delegation_withdraw_history.sql checks the rows against the ones
+ * a sync writes.
+ *
+ * Like every repair, its rows are recorded by HAF as changes of the context's current
+ * block: should a fork revert that block before it becomes irreversible, they are
+ * removed with it, and the history before the fork point stays empty until the
+ * repair is run again (delete its one_off_repairs row, empty both tables, reinstall).
+ *
+ * @returns number of history rows written
+ */
+CREATE OR REPLACE FUNCTION backfill_delegation_and_withdraw_history()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+AS
+$$
+DECLARE
+  _op_delegate_vesting_shares        INT := btracker_backend.op_delegate_vesting_shares();
+  _op_account_create_with_delegation INT := btracker_backend.op_account_create_with_delegation();
+  _op_return_vesting_delegation      INT := btracker_backend.op_return_vesting_delegation();
+  _op_hardfork_hive                  INT := btracker_backend.op_hardfork_hive();
+  _op_withdraw_vesting               INT := btracker_backend.op_withdraw_vesting();
+  _op_fill_vesting_withdraw          INT := btracker_backend.op_fill_vesting_withdraw();
+  _nai_vests                         INT := btracker_backend.nai_vests();
+  _hf_vests_precision_block          INT;
+  _hf_withdraw_rate_block            INT;
+  _hf_withdraw_rate_round_up_block   INT;
+  __to                               INT := COALESCE(hive.app_get_current_block_num(current_schema()), 0);
+  __delegation_rows                  INT;
+  __withdraw_rows                    INT;
+BEGIN
+  -- A fresh install (nothing processed yet) has nothing to fill, and HAF rejects
+  -- an edit of a registered table of a forking context before its first block.
+  IF __to = 0 THEN
+    RETURN 0;
+  END IF;
+
+  IF NOT isIndexesCreated() THEN
+    RAISE EXCEPTION 'btracker: the delegation and power-down history backfill needs a finalized install (account_balance_history''s block index); this one is still in its massive sync at block %. Finish the sync with the previous version first, or sync anew.', __to;
+  END IF;
+
+  SELECT
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_vests_precision() THEN block_num END),
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate() THEN block_num END),
+    MAX(CASE WHEN hardfork_num = btracker_backend.hf_withdraw_rate_round_up() THEN block_num END)
+  INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block
+  FROM hafd.applied_hardforks;
+
+  RAISE NOTICE 'btracker: backfilling account_delegation_history up to block %...', __to;
+  WITH ops AS MATERIALIZED (
+    SELECT ov.body_value AS body, ov.op_type_id, ov.id
+    FROM operations_view ov
+    WHERE
+      ov.op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation, _op_return_vesting_delegation, _op_hardfork_hive) AND
+      ov.block_num <= __to
+  ),
+  parsed AS MATERIALIZED (
+    SELECT result.delegator, result.delegatee, result.amount AS balance, o.id AS source_op, o.op_type_id
+    FROM ops o
+    CROSS JOIN LATERAL (
+      SELECT (
+        CASE
+          WHEN o.op_type_id = _op_delegate_vesting_shares
+            THEN btracker_backend.process_delegate_vesting_shares_operation(o.body)
+          WHEN o.op_type_id = _op_account_create_with_delegation
+            THEN btracker_backend.process_account_create_with_delegation_operation(o.body)
+          WHEN o.op_type_id = _op_return_vesting_delegation
+            THEN btracker_backend.process_return_vesting_shares_operation(o.body)
+          ELSE btracker_backend.process_hf23_acccounts(o.body)
+        END
+      ).*
+    ) AS result
+  ),
+  account_ids AS MATERIALIZED (
+    SELECT av.name AS account_name, av.id AS account_id
+    FROM accounts_view av
+    WHERE av.name IN (SELECT delegator FROM parsed UNION SELECT delegatee FROM parsed)
+  ),
+  delegation_ops AS MATERIALIZED (
+    SELECT dr.account_id AS delegator, de.account_id AS delegatee, p.balance, p.source_op, p.op_type_id
+    FROM parsed p
+    JOIN account_ids dr ON dr.account_name = p.delegator
+    LEFT JOIN account_ids de ON de.account_name = p.delegatee
+  ),
+  -- HF23 cleared every delegation the account had made before it.
+  hf23_resets AS (
+    SELECT d.delegator, d.delegatee, 0::BIGINT AS balance, MAX(h.source_op) AS source_op, TRUE AS is_hf23_reset
+    FROM delegation_ops d
+    JOIN delegation_ops h ON h.delegator = d.delegator AND h.op_type_id = _op_hardfork_hive AND d.source_op < h.source_op
+    WHERE d.op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation)
+    GROUP BY d.delegator, d.delegatee
+  ),
+  pair_changes AS (
+    SELECT delegator, delegatee, balance, source_op, FALSE AS is_hf23_reset
+    FROM delegation_ops
+    WHERE op_type_id IN (_op_delegate_vesting_shares, _op_account_create_with_delegation)
+
+    UNION ALL
+
+    SELECT delegator, delegatee, balance, source_op, is_hf23_reset
+    FROM hf23_resets
+  ),
+  delegation_delta AS MATERIALIZED (
+    SELECT
+      delegator,
+      delegatee,
+      balance - LAG(balance, 1, 0::BIGINT) OVER w_pair_asc AS balance_delta,
+      source_op,
+      is_hf23_reset
+    FROM pair_changes
+    WINDOW w_pair_asc AS (PARTITION BY delegator, delegatee ORDER BY source_op)
+  ),
+  -- As in process_block_range_delegations: the delegator counts increases only (a
+  -- decrease comes back with return_vesting_delegation), except at HF23.
+  account_changes AS (
+    SELECT delegator AS account_id, source_op, 0::BIGINT AS received_vests,
+      CASE WHEN is_hf23_reset THEN balance_delta ELSE GREATEST(balance_delta, 0) END AS delegated_vests
+    FROM delegation_delta
+
+    UNION ALL
+
+    SELECT delegatee, source_op, balance_delta, 0
+    FROM delegation_delta
+
+    UNION ALL
+
+    SELECT delegator, source_op, 0, balance
+    FROM delegation_ops
+    WHERE op_type_id = _op_return_vesting_delegation
+  ),
+  delegation_changes AS (
+    SELECT account_id, source_op, SUM(received_vests) AS received_vests, SUM(delegated_vests) AS delegated_vests
+    FROM account_changes
+    GROUP BY account_id, source_op
+    HAVING SUM(received_vests) <> 0 OR SUM(delegated_vests) <> 0
+  )
+  INSERT INTO account_delegation_history (account, delegated_vests, received_vests, source_op)
+  SELECT
+    account_id,
+    SUM(delegated_vests) OVER w_account_asc,
+    SUM(received_vests) OVER w_account_asc,
+    source_op
+  FROM delegation_changes
+  WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op);
+
+  GET DIAGNOSTICS __delegation_rows = ROW_COUNT;
+
+  RAISE NOTICE 'btracker: backfilling account_withdraw_history up to block %...', __to;
+  WITH ops AS MATERIALIZED (
+    SELECT ov.body_value AS body, ov.op_type_id, ov.id, ov.block_num
+    FROM operations_view ov
+    WHERE
+      ov.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive, _op_fill_vesting_withdraw) AND
+      ov.block_num <= __to
+  ),
+  parsed AS MATERIALIZED (
+    SELECT result.account_name, o.id AS source_op, o.block_num, TRUE AS is_set,
+      result.vesting_withdraw_rate, result.to_withdraw, result.withdrawn, NULL::BIGINT AS fill_amount
+    FROM ops o
+    CROSS JOIN LATERAL (
+      SELECT (
+        CASE
+          WHEN o.op_type_id = _op_withdraw_vesting
+            THEN btracker_backend.process_withdraw_vesting_operation(
+              o.body,
+              o.block_num > _hf_vests_precision_block,
+              o.block_num > _hf_withdraw_rate_block,
+              o.block_num > _hf_withdraw_rate_round_up_block
+            )
+          ELSE btracker_backend.process_reset_withdraw_hf23(o.body)
+        END
+      ).*
+    ) AS result
+    WHERE o.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive)
+
+    UNION ALL
+
+    SELECT result.account_name, o.id, o.block_num, FALSE, NULL, NULL, NULL, result.withdrawn
+    FROM ops o
+    CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation_for_withdrawals(o.body, o.block_num > _hf_vests_precision_block) AS result
+    WHERE o.op_type_id = _op_fill_vesting_withdraw
+  ),
+  account_ids AS MATERIALIZED (
+    SELECT av.name AS account_name, av.id AS account_id
+    FROM accounts_view av
+    WHERE av.name IN (SELECT DISTINCT account_name FROM parsed)
+  ),
+  power_down_ops AS MATERIALIZED (
+    SELECT ai.account_id, p.source_op, p.block_num, p.is_set, p.vesting_withdraw_rate, p.to_withdraw, p.withdrawn, p.fill_amount
+    FROM parsed p
+    JOIN account_ids ai ON ai.account_name = p.account_name
+  ),
+  -- A payout is all fills of an account in one block; hived checks the account's
+  -- VESTS once, after the last of them.
+  payouts AS (
+    SELECT account_id, block_num, MAX(source_op) AS source_op
+    FROM power_down_ops
+    WHERE NOT is_set
+    GROUP BY account_id, block_num
+  ),
+  payouts_leaving_no_vests AS MATERIALIZED (
+    SELECT p.account_id, p.source_op
+    FROM payouts p
+    LEFT JOIN LATERAL (
+      SELECT abh.balance
+      FROM account_balance_history abh
+      WHERE abh.account = p.account_id AND abh.nai = _nai_vests
+        AND hafd.operation_id_to_block_num(abh.source_op) <= p.block_num
+        AND abh.source_op <= p.source_op
+      ORDER BY hafd.operation_id_to_block_num(abh.source_op) DESC, abh.balance_seq_no DESC
+      LIMIT 1
+    ) vests ON TRUE
+    WHERE COALESCE(vests.balance, 0) = 0
+  ),
+  timeline_segments AS (
+    SELECT
+      pdo.*,
+      pn.account_id IS NOT NULL AS ends,
+      COUNT(*) FILTER (WHERE pdo.is_set) OVER w_account_asc AS segment
+    FROM power_down_ops pdo
+    LEFT JOIN payouts_leaving_no_vests pn ON pn.account_id = pdo.account_id AND pn.source_op = pdo.source_op
+    WINDOW w_account_asc AS (PARTITION BY pdo.account_id ORDER BY pdo.source_op)
+  ),
+  segment_progress AS (
+    SELECT
+      ts.account_id,
+      ts.source_op,
+      ts.is_set,
+      ts.vesting_withdraw_rate,
+      ts.to_withdraw,
+      ts.withdrawn,
+      ts.segment,
+      FIRST_VALUE(ts.vesting_withdraw_rate) OVER w_segment_asc AS segment_rate,
+      FIRST_VALUE(ts.to_withdraw) OVER w_segment_asc AS segment_to_withdraw,
+      FIRST_VALUE(ts.withdrawn) OVER w_segment_asc + COALESCE(SUM(ts.fill_amount) OVER w_segment_asc, 0) AS segment_withdrawn,
+      ts.ends
+    FROM timeline_segments ts
+    WHERE ts.segment > 0
+    WINDOW w_segment_asc AS (PARTITION BY ts.account_id, ts.segment ORDER BY ts.source_op)
+  ),
+  segment_end AS (
+    SELECT
+      sp.*,
+      BOOL_OR(NOT sp.is_set AND (sp.segment_withdrawn >= sp.segment_to_withdraw OR sp.ends)) OVER w_segment_asc AS ended
+    FROM segment_progress sp
+    WINDOW w_segment_asc AS (PARTITION BY sp.account_id, sp.segment ORDER BY sp.source_op)
+  )
+  INSERT INTO account_withdraw_history (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
+  SELECT
+    se.account_id,
+    CASE WHEN se.is_set THEN se.vesting_withdraw_rate WHEN se.ended THEN 0 ELSE se.segment_rate END,
+    CASE WHEN se.is_set THEN se.to_withdraw WHEN se.ended THEN 0 ELSE se.segment_to_withdraw END,
+    CASE WHEN se.is_set THEN se.withdrawn WHEN se.ended THEN 0 ELSE se.segment_withdrawn END,
+    se.source_op
+  FROM segment_end se;
+
+  GET DIAGNOSTICS __withdraw_rows = ROW_COUNT;
+
+  ANALYZE account_delegation_history;
+  ANALYZE account_withdraw_history;
+
+  RETURN __delegation_rows + __withdraw_rows;
+END
+$$;
+
+/**
  * run_one_off_repairs()
  * ---------------------
  * Applies, in list order, every repair not yet recorded in one_off_repairs, each
@@ -307,7 +591,8 @@ BEGIN
       (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
       (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
       (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
-      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
+      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests'),
+      (5, 'delegation_and_withdraw_history', 'backfill_delegation_and_withdraw_history')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position

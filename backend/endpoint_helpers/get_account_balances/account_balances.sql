@@ -164,4 +164,48 @@ BEGIN
 END;
 $BODY$;
 
+/*
+An account's balances at _block_num (btracker_backend.resolve_at_block()), or at
+the head when it is NULL. Called by the balances endpoints.
+*/
+CREATE OR REPLACE FUNCTION btracker_backend.account_balances_at(
+    _account_id INT,
+    _block_num INT
+)
+RETURNS btracker_backend.balance
+LANGUAGE plpgsql
+STABLE
+AS $BODY$
+BEGIN
+  IF _block_num IS NULL THEN
+    RETURN btracker_backend.get_account_balances(_account_id);
+  END IF;
+
+  RETURN btracker_backend.get_account_balances_at_block(_account_id, _block_num);
+END;
+$BODY$;
+
+/*
+The comma-separated account names of the batch balances endpoint, in request
+order. At most _max_accounts; raises when the list is missing or longer.
+*/
+CREATE OR REPLACE FUNCTION btracker_backend.parse_account_names(_accounts TEXT, _max_accounts INT)
+RETURNS TEXT[]
+LANGUAGE plpgsql
+IMMUTABLE
+AS $BODY$
+DECLARE
+  __names TEXT[];
+BEGIN
+  IF _accounts IS NULL THEN
+    RAISE EXCEPTION 'accounts must not be null';
+  END IF;
+
+  __names := ARRAY(SELECT btrim(n) FROM unnest(string_to_array(_accounts, ',')) WITH ORDINALITY AS a(n, pos) ORDER BY a.pos);
+  PERFORM btracker_backend.validate_limit(cardinality(__names), _max_accounts, 'accounts');
+
+  RETURN __names;
+END;
+$BODY$;
+
 RESET ROLE;

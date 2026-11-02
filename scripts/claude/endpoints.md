@@ -36,7 +36,8 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/accounts/{name}/balances` | GET | Full balance snapshot |
+| `/accounts/{name}/balances` | GET | Full balance snapshot, at the head or a past block (`at-block`) |
+| `/balances` | GET | Balance snapshots of up to 100 accounts (`accounts=a,b,c`), at the head or a past block |
 | `/accounts/{name}/balance-history` | GET | Paginated balance changes |
 | `/accounts/{name}/aggregated-history` | GET | Daily/monthly/yearly summaries |
 | `/accounts/{name}/delegations` | GET | Incoming/outgoing delegations |
@@ -93,6 +94,7 @@ History endpoints use page-based pagination:
 - Resolve per-row block lookups (e.g. the block at or before a period end) with a `LEFT JOIN LATERAL` in the main statement, not a plpgsql function per row.
 - Choose `plan_cache_mode` per function, never globally. Static plpgsql statements whose best plan depends on direction or bounds (`get_account_vesting_history`, `get_balance_history`, `get_top_holders`) set `force_custom_plan`. `get_account_balances` is a series of small account-equality lookups and sets `force_generic_plan` so it plans once per session.
 - Do not aggregate `current_account_balances` per request: `/total-value-locked`'s VESTS sum and `/top-holders`' unfiltered liquid count are point reads of `balance_totals`, which block processing maintains. A balance-range filter still counts by scan.
+- Read a value at a past block as the latest history row at or before it, through the history table's `(account, [nai,] block)` index (`ORDER BY hafd.operation_id_to_block_num(source_op) DESC, ... LIMIT 1`): a backward index scan from the block, whatever the account's history size. `account_delegation_history` and `account_withdraw_history` carry `source_op` as the index's last column, so no sort is needed.
 - Read a history row's operation type from its stored `op_type_id` (also on `account_balance_history_view` / `account_savings_history_view`), never by joining `hafd.operations`.
 - A new session's first call pays catalog loading, plpgsql compilation and one plan per statement for every relation it reads (about 4 ms against 0.5 ms steady state). Do not add statements or relations that a statement already reading the same source could answer: `get_account_balances` reads the head block's vesting fund and shares in its one `hive.blocks_view` statement instead of calling `hive.get_vesting_balance()`, which would plan the view again.
 

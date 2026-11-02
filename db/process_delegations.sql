@@ -27,6 +27,7 @@ DECLARE
   __insert_current_delegations       INT;
   __delete_canceled_delegations      INT;
   __insert_delegations               INT;
+  __insert_delegation_history        INT;
 BEGIN
 ------------------------------------------------------------------------------
 -- STEP 1: Fetch all delegation-related operations in the block range
@@ -361,6 +362,7 @@ union_delegations AS (
   ------------------------------------------------------------------------------
   SELECT
     dd.delegator AS account_id,
+    dd.source_op,
     0 AS received_vests,
     (
       CASE
@@ -387,6 +389,7 @@ union_delegations AS (
   ------------------------------------------------------------------------------
   SELECT
     delegatee AS account_id,
+    source_op,
     balance_delta AS received_vests,
     0
   FROM delegation_delta
@@ -407,10 +410,25 @@ union_delegations AS (
   ------------------------------------------------------------------------------
   SELECT
     delegator,
+    source_op,
     0 AS received_vests,
     balance  -- Negative value: reduces delegated_vests
   FROM process_block_range_data_b
   WHERE op_type_id = _op_return_vesting_delegation
+),
+------------------------------------------------------------------------------
+-- Changes per account and operation (an HF23 reset of several delegations is
+-- one operation); operations that leave both totals unchanged are dropped.
+------------------------------------------------------------------------------
+delegation_changes AS MATERIALIZED (
+  SELECT
+    ud.account_id,
+    ud.source_op,
+    SUM(ud.received_vests) AS received_vests,
+    SUM(ud.delegated_vests) AS delegated_vests
+  FROM union_delegations ud
+  GROUP BY ud.account_id, ud.source_op
+  HAVING SUM(ud.received_vests) <> 0 OR SUM(ud.delegated_vests) <> 0
 ),
 ------------------------------------------------------------------------------
 -- Aggregate all delegation changes per account
@@ -514,6 +532,26 @@ insert_delegations AS (
       received_vests = account_delegations.received_vests + EXCLUDED.received_vests,
       delegated_vests = account_delegations.delegated_vests + EXCLUDED.delegated_vests
   RETURNING account AS updated_account
+),
+---------------------------------------------------------------------------------------
+-- STEP 11b: Record account_delegations after every change (account_delegation_history)
+--
+-- The totals before the batch (this statement still sees account_delegations as it
+-- was) plus the running sum of the batch's changes up to each operation. The last
+-- row per account equals the totals insert_delegations stores.
+---------------------------------------------------------------------------------------
+insert_delegation_history AS (
+  INSERT INTO account_delegation_history
+    (account, delegated_vests, received_vests, source_op)
+  SELECT
+    dc.account_id,
+    COALESCE(ad.delegated_vests, 0) + SUM(dc.delegated_vests) OVER w_account_asc,
+    COALESCE(ad.received_vests, 0) + SUM(dc.received_vests) OVER w_account_asc,
+    dc.source_op
+  FROM delegation_changes dc
+  LEFT JOIN account_delegations ad ON ad.account = dc.account_id
+  WINDOW w_account_asc AS (PARTITION BY dc.account_id ORDER BY dc.source_op)
+  RETURNING account
 )
 
 ------------------------------------------------------------------------------
@@ -525,8 +563,9 @@ insert_delegations AS (
 SELECT
   (SELECT count(*) FROM insert_current_delegations) AS insert_current_delegations,
   (SELECT count(*) FROM delete_canceled_delegations) AS delete_canceled_delegations,
-  (SELECT count(*) FROM insert_delegations) AS insert_delegations
-INTO __insert_current_delegations, __delete_canceled_delegations, __insert_delegations;
+  (SELECT count(*) FROM insert_delegations) AS insert_delegations,
+  (SELECT count(*) FROM insert_delegation_history) AS insert_delegation_history
+INTO __insert_current_delegations, __delete_canceled_delegations, __insert_delegations, __insert_delegation_history;
 
 END
 $$;

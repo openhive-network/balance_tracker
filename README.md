@@ -371,7 +371,8 @@ Balance Tracker exposes SQL functions via PostgREST. For detailed documentation,
 
 | Endpoint | Description |
 |----------|-------------|
-| `/accounts/{name}/balances` | Full balance snapshot for an account |
+| `/accounts/{name}/balances` | Full balance snapshot for an account, at the head or a past block (`at-block`) |
+| `/balances` | Balance snapshots of up to 100 accounts (`accounts=a,b,c`), at the head or a past block |
 | `/accounts/{name}/balance-history` | Paginated balance change history |
 | `/accounts/{name}/aggregated-history` | Daily/monthly/yearly balance summaries |
 | `/accounts/{name}/delegations` | Incoming and outgoing delegations |
@@ -391,8 +392,13 @@ Returns comprehensive balance information for a single account.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | account-name | TEXT | Yes | Hive account name |
+| at-block | TEXT | No | Block number or timestamp (last block at or before it), up to the last processed block |
 
 **Returns**: HIVE, HBD, VESTS balances + delegations + rewards + savings + power-down state + conversions + market orders + escrows
+
+At a past block, liquid and savings balances, VESTS (and their HIVE value at that block), delegations and the power-down state are the values at that block; the fields without history (rewards, routes, delayed VESTS, conversions, orders, escrows, pending savings withdrawals) are `null`.
+
+`get_accounts_balances` (`/balances?accounts=a,b,c[&at-block=N]`) returns the same answer for up to 100 accounts, in request order, each as `{account_name, balance}`.
 
 #### get_balance_history
 

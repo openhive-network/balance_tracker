@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "at-block must be between block 1 and block 5000000 (the last block balance tracker has processed): '5000001' is not"
+}
