@@ -253,7 +253,7 @@ WITH ops_in_range AS MATERIALIZED
     ac.source_op,
     ac.op_type_id,
     ac.source_op_block,
-    (-1)::SMALLINT AS trx_in_block,
+    0::SMALLINT AS trx_in_block,
     TRUE AS is_clear
   FROM btracker_backend.account_clears_in_range( _from, _to ) AS ac
   CROSS JOIN (VALUES (13), (21), (37)) AS n(nai)
