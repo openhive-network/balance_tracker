@@ -105,6 +105,7 @@ BEGIN
          pg_temp.withdraw_vesting_body(o.account, o.amount) AS body_value,
          NULL::INT AS custom_json_type_id
   FROM (VALUES (10001, __a, __amount), (10002, __b, 5::BIGINT)) AS o(pos, account, amount);
+  PERFORM process_block_range_balances(__block, __block);
   PERFORM process_block_range_withdrawals(__block, __block);
 
   SELECT jsonb_object_agg(av.name, jsonb_build_array(aw.vesting_withdraw_rate, aw.to_withdraw, aw.withdrawn)) INTO __actual
