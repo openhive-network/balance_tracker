@@ -1152,8 +1152,6 @@ $$;
  *      there for why it comes first)
  *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
  *   3. Restore app indexes (updates HAF tracking table)
- *   4. Complete the one-off repairs an upgrade during the massive sync left
- *      pending until the indexes exist (complete_one_off_repairs)
  *
  * Called from btracker_process_blocks() at LIVE transition and from
  * CI startup script after bounded replay completes.
@@ -1176,7 +1174,6 @@ BEGIN
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
-  PERFORM complete_one_off_repairs();
   RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
 END
 $$;
@@ -1292,7 +1289,6 @@ $$;
  * 10. Market orders
  * 11. Escrows
  * 12. Proposal payments
- * Then the next chunk of a one-off repair left pending (continue_one_off_repairs).
  *
  * @param _from  First block number to process
  * @param _to    Last block number to process
@@ -1421,8 +1417,6 @@ BEGIN
     RAISE NOTICE 'btracker stage proposal_payments: % s', round(EXTRACT(epoch FROM clock_timestamp() - __stage_ts)::numeric, 3);
   END IF;
 
-  PERFORM continue_one_off_repairs();
-
   IF _logs THEN
     __end_ts := clock_timestamp();
     RAISE NOTICE 'Btracker processed block range: <%, %> successfully in % s
@@ -1438,8 +1432,7 @@ $$;
  * Uses synchronous_commit ON for data safety.
  *
  * Called for each new block after initial sync is complete.
- * Processes all operation types for the given block, then the next chunk of a
- * one-off repair left pending (continue_one_off_repairs).
+ * Processes all operation types for the given block.
  *
  * @param _block  Block number to process
  * @param _logs   Enable progress logging
@@ -1480,7 +1473,6 @@ BEGIN
   PERFORM process_block_range_escrows(_block, _block);
   PERFORM process_block_range_proposal_payments(_block, _block);
 
-  PERFORM continue_one_off_repairs();
 
   IF _logs THEN
     __end_ts := clock_timestamp();
@@ -1737,8 +1729,9 @@ $$;
  * a block is the state at that block; the latest row equals the current state.
  *
  * Created here rather than in the context's creation above so that an upgraded
- * install gets them too; the one-off repair delegation_and_withdraw_history
- * (db/one_off_repairs.sql) backfills them there. Their indexes follow the app
+ * install gets them too, though empty: only block processing fills them, so an
+ * install synced before they existed must resync for at-block delegation and
+ * power-down values to be correct. Their indexes follow the app
  * index lifecycle: registered while massive sync has dropped the others, they are
  * built at finalize; on a finalized install they are built here.
  */

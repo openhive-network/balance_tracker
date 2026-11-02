@@ -45,6 +45,11 @@ SET ROLE btracker_owner;
           `hbd_savings`, `hive_savings`, `vesting_withdraw_rate`, `to_withdraw` and `withdrawn`.
           Balance tracker keeps no history of the other fields: they are `null`.
 
+          The history of `delegated_vests`, `received_vests` (and so `post_voting_power_vests`),
+          `vesting_withdraw_rate`, `to_withdraw` and `withdrawn` is written by block processing
+          only: on an install upgraded from a version without it, these are correct at a past
+          block only after a resync.
+
           example input:
 
           * `2016-09-15 19:47:21`
