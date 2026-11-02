@@ -1515,6 +1515,7 @@ AS
 $$
 DECLARE
   _blocks_range hive.blocks_range := (0,0);
+  _idle BOOLEAN := FALSE;
 BEGIN
   -- Block until any active balance_tracker installer releases its exclusive
   -- lock; held by this session until main() returns.
@@ -1544,10 +1545,15 @@ BEGIN
     END IF;
 
     IF _blocks_range IS NULL THEN
-      RAISE INFO 'Waiting for next block...';
+      -- Log only on the transition to idle, not on every polling iteration.
+      IF NOT _idle THEN
+        RAISE INFO 'Waiting for next block...';
+        _idle := TRUE;
+      END IF;
       CONTINUE;
     END IF;
 
+    _idle := FALSE;
     PERFORM btracker_process_blocks(_appContext, _blocks_range);
   END LOOP;
 
