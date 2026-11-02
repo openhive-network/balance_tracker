@@ -6,17 +6,16 @@ Tests for the auto-generated Python API client that provides type-safe access to
 
 ## Running These Tests
 
+The package does not pin pytest or pytest-asyncio: they come from common-ci's
+`python-test-tools` image (versions set in common-ci-configuration's
+`docker-bake.hcl`). Run the tests in that image, where poetry installs the
+package's dependencies into the image venv next to the tools:
+
 ```bash
-cd scripts/python_api_package
-
-# Install dependencies
-poetry install
-
-# Run tests
-poetry run pytest tests/
-
-# Run with verbose output
-poetry run pytest tests/ -v
+docker run --rm -it -v "$PWD:/src" -w /src \
+  registry.gitlab.syncad.com/hive/common-ci-configuration/python-test-tools:develop bash -c '
+    poetry -C scripts/python_api_package install &&
+    pytest scripts/python_api_package/tests/test_generated_api_client.py -v'
 ```
 
 ## Test File Organization
@@ -100,24 +99,26 @@ This script:
 
 ## CI Integration
 
-The `python_api_client_test` job in `.gitlab-ci.yml`:
+`python_api_client_test` and `test_python_api_wheel` in `.gitlab-ci.yml` extend
+`.python_api_package_test_template`, which runs in `${PYTHON_TEST_TOOLS_IMAGE}`:
 
 ```yaml
 python_api_client_test:
-  extends: .project_develop_configuration_template
-  image: "${PYTHON_COMPAT_IMAGE}"
-  allow_failure: true  # Depends on external api.syncad.com
+  extends: .python_api_package_test_template
   needs:
-    - job: generate_python_api_client
+  - job: generate_python_api_client
+  before_script:
+  - !reference [.python_api_package_test_template, before_script]
+  - poetry -C "${PYPROJECT_DIR}" install
   script:
-    - poetry run -C "${PYPROJECT_DIR}" pytest "${PYPROJECT_DIR}/tests"
+  - pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
 ```
 
 ### CI Notes
 
-- **External Dependency**: Tests run against `api.syncad.com`
-- **Allow Failure**: Marked as `allow_failure: true` since external API may be unavailable
-- **Python Version**: Uses Python 3.12 compatibility image (pydantic-core requirement)
+- **External Dependency**: Tests run against `api.syncad.com` (falling back to `api.hive.blog`)
+- **Test tools**: pytest and pytest-asyncio are the image's; the job log lists their versions. Do not add them to `pyproject.toml`
+- **Python Version**: the image's (3.14). It has no C compiler, so every locked dependency needs a wheel for that Python
 
 ## Package Publishing
 
