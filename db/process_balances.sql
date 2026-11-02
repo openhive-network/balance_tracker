@@ -17,19 +17,12 @@ SET ROLE btracker_owner;
  * verbatim from the previous implementation - see the staging comment in
  * process_block_range_balances for the chain model references.
  *
- * _staged names another staging table of the same shape (the #61 repair stages its
- * own: a temp table belongs to the role that created it, and the repair can run as a
- * different role than the batch that created _hbd_batch_rows in the same session -
- * hafbe's processor, then btracker_owner in finalize_massive_sync_before_forking).
- *
  * Returns the number of accounts upserted into account_hbd_interest.
  */
-DROP FUNCTION IF EXISTS btracker_backend.accumulate_hbd_interest(INT, INT, INT);  -- before _staged
 CREATE OR REPLACE FUNCTION btracker_backend.accumulate_hbd_interest(
     _from INT,
     _to INT,
-    _hbd_interest_interval INT,
-    _staged TEXT DEFAULT '_hbd_batch_rows'
+    _hbd_interest_interval INT
 )
 RETURNS INT
 LANGUAGE 'plpgsql' VOLATILE
@@ -50,8 +43,7 @@ DECLARE
   __payments TIMESTAMP[] := '{}';
   __n INT := 0;
 BEGIN
-  -- dynamic only for the table name (planned once per call, as the static form was)
-  FOR r IN EXECUTE format($q$
+  FOR r IN
     SELECT
       h.account_id,
       h.balance,
@@ -65,15 +57,14 @@ BEGIN
       hi.hbd_seconds_last_update   AS p_update,
       hi.last_balance              AS p_balance,
       hi.hbd_last_interest_payment AS p_payment
-    FROM pg_temp.%I h
+    FROM _hbd_batch_rows h
     -- range guards: reversible-union view, planner cannot propagate the range
     JOIN hive.blocks_view bv ON bv.num = h.source_op_block
-                            AND bv.num BETWEEN $1 AND $2
+                            AND bv.num BETWEEN _from AND _to
     LEFT JOIN hive.blocks_view bvp ON bvp.num = h.source_op_block - 1
-                                  AND bvp.num BETWEEN $1 - 1 AND $2
+                                  AND bvp.num BETWEEN _from - 1 AND _to
     LEFT JOIN account_hbd_interest hi ON hi.account = h.account_id
     ORDER BY h.account_id, h.source_op, h.balance_seq_no
-  $q$, _staged) USING _from, _to
   LOOP
     IF __cur_account IS DISTINCT FROM r.account_id THEN
       IF __cur_account IS NOT NULL THEN
@@ -120,28 +111,6 @@ BEGIN
     hbd_last_interest_payment = EXCLUDED.hbd_last_interest_payment;
 
   RETURN __n;
-END
-$$;
-
--- (Re)creates, empty, a session temp table of the shape accumulate_hbd_interest consumes:
--- _hbd_batch_rows, staged by process_block_range_balances per batch, or another name (the
--- #61 repair, btracker_backend.rebuild_cleared_accounts, stages its own - see there why).
-DROP FUNCTION IF EXISTS btracker_backend.create_hbd_batch_rows();  -- before _table
-CREATE OR REPLACE FUNCTION btracker_backend.create_hbd_batch_rows(_table TEXT DEFAULT '_hbd_batch_rows')
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-  EXECUTE format('DROP TABLE IF EXISTS pg_temp.%I', _table);
-  EXECUTE format('CREATE TEMP TABLE %I ('
-                 '  account_id      INT,'
-                 '  balance         BIGINT,'
-                 '  source_op       BIGINT,'
-                 '  source_op_block INT,'
-                 '  balance_seq_no  BIGINT,'
-                 '  trx_in_block    SMALLINT'
-                 ')', _table);
 END
 $$;
 

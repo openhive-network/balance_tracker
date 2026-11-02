@@ -140,7 +140,4 @@ BEGIN
 END
 $$;
 
--- The repair of data an older btracker processed without these clears is in
--- backend/repairs/cleared_accounts.sql.
-
 RESET ROLE;
