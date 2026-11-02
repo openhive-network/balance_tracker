@@ -72,7 +72,7 @@ When a user cancels a withdrawal, we need the original amount (not in the cancel
 
 **Same Batch** (optimized path):
 ```sql
-join_canceled_transfers_in_query AS (
+join_canceled_transfers_in_query AS MATERIALIZED (
   SELECT ...
     (SELECT tf.source_op FROM transfers_from tf
      WHERE tf.account_id = cpo.account_id
@@ -82,6 +82,12 @@ join_canceled_transfers_in_query AS (
   FROM cancel_and_fill_transfers cpo
 )
 ```
+
+Keep this CTE `MATERIALIZED` even though it is referenced once: inlined, the correlated
+subquery lands in `prepare_canceled_transfers_in_query`'s `LEFT JOIN ... ON tf.source_op =
+jct.last_transfer_id` and runs per join pair (nested loop, cubic in withdraw/cancel pairs) or
+per hash collision (HAF op ids collide heavily under `hashint8`). This cost ~2 h in massive sync
+over the 2018 savings spam in blocks 24.69M-25.56M.
 
 **Previous Batch** (requires table lookup):
 ```sql

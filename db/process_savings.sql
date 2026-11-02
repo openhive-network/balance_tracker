@@ -262,8 +262,15 @@ income_transfers AS (
  * RESULT:
  *   last_transfer_id = source_op of the matching transfer_from, or NULL if not found
  *   in this batch (meaning it's in a previous batch, stored in transfer_saving_id).
+ *
+ * WHY MATERIALIZED: Although referenced only once, an inlined CTE copies the
+ * correlated subquery into prepare_canceled_transfers_in_query's join condition.
+ * With collapsed row estimates (many withdraw/cancel pairs in a busy batch) that
+ * becomes a nested-loop Join Filter (cubic in the number of pairs) or a Hash Cond
+ * re-evaluated on every hash collision of the dense HAF operation ids.
+ * Materializing evaluates the subquery exactly once per cancel/fill.
  */
-join_canceled_transfers_in_query AS (
+join_canceled_transfers_in_query AS MATERIALIZED (
   SELECT
     cpo.account_id,
     cpo.nai,
