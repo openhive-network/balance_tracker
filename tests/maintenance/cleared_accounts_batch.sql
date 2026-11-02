@@ -8,7 +8,8 @@
  *      account_clears mock fixture (blocks 90000058-64), its values are checked one by one
  *      (pg_temp.fixture_mismatches below), and so are the HBD-interest accumulator,
  *      balance_totals and the liquid and savings day/month rollups of the accounts;
- *   1. take the two accounts back to the block before their first clearing block (history
+ *   1. take the two accounts (and hive.fund, which the consolidates credit) back to the
+ *      block before their first clearing block (history
  *      from it on deleted, current rows from the last remaining history row, the day
  *      rollups of those days deleted), and seed stored values a clear must not touch or
  *      must work from: null's delayed vests set to a large wrong value, its HBD-interest
@@ -56,8 +57,10 @@ SELECT set_config('btracker_test.require_clears', :'require_clears', false);
 SELECT set_config('btracker_test.schema', :'schema', false);
 BEGIN;
 
+-- the cleared accounts and hive.fund, which the consolidates credit (taken back and
+-- compared like them, so its credits are not applied twice)
 CREATE TEMP TABLE t_accounts ON COMMIT DROP AS
-SELECT av.id AS account FROM accounts_view av WHERE av.name IN ('null', 'steem.dao');
+SELECT av.id AS account FROM accounts_view av WHERE av.name IN ('null', 'steem.dao', 'hive.fund');
 
 -- the first clearing block of these accounts, and the processed head
 CREATE TEMP TABLE t_range ON COMMIT DROP AS
