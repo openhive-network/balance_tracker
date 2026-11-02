@@ -17,8 +17,8 @@ SET ROLE btracker_owner;
  *
  * To add a repair: write a function returning the number of rows it changed,
  * and add (name, function) to the list in run_one_off_repairs(). A repair that
- * updates a registered table must not issue the UPDATE when it has nothing to
- * change: HAF's statement-level triggers reject any table edit on a forking
+ * edits a registered table must not issue the UPDATE or DELETE when it has
+ * nothing to change: HAF's statement-level triggers reject any table edit on a forking
  * context that has not processed a block yet (a fresh install).
  */
 CREATE TABLE IF NOT EXISTS one_off_repairs
@@ -150,6 +150,99 @@ END
 $$;
 
 /**
+ * repair_hf_23_withdraw_requests()
+ * --------------------------------
+ * Deletes the pending savings withdrawals hived removed at HF23 and earlier
+ * versions of process_hf_23 left in transfer_saving_id (see
+ * delete_hf_23_withdraw_requests). Does nothing until the application has
+ * processed the HF23 block: process_hf_23 deletes them then.
+ *
+ * @returns number of transfer_saving_id rows deleted
+ */
+CREATE OR REPLACE FUNCTION repair_hf_23_withdraw_requests()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
+BEGIN
+  IF __hardfork_23_block IS NULL
+     OR COALESCE(hive.app_get_current_block_num(current_schema()), 0) < __hardfork_23_block THEN
+    RETURN 0;
+  END IF;
+
+  RETURN delete_hf_23_withdraw_requests(__hardfork_23_block);
+END
+$$;
+
+/**
+ * delete_hf_23_withdraw_requests(__hardfork_23_block)
+ * ---------------------------------------------------
+ * Deletes the transfer_saving_id rows of the accounts cleared at HF23 whose
+ * transfer_from_savings was requested up to the HF23 block: hived removed those
+ * withdrawals without a fill or cancel. Rows of requests made after HF23 are kept.
+ * Only valid once the application has processed the HF23 block.
+ *
+ * @param __hardfork_23_block  block of HF23
+ * @returns number of transfer_saving_id rows deleted
+ */
+CREATE OR REPLACE FUNCTION delete_hf_23_withdraw_requests(__hardfork_23_block INT)
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _op_transfer_from_savings  INT := btracker_backend.op_transfer_from_savings();
+  __accounts                 INT[];
+  __request_ids              BIGINT[];
+  __repaired                 INT;
+BEGIN
+  SELECT array_agg(tsi.account), array_agg(tsi.request_id)
+  INTO __accounts, __request_ids
+  FROM btracker_backend.hf_23_cleared_accounts(__hardfork_23_block) c
+  JOIN transfer_saving_id tsi ON tsi.account = c.account_id
+  JOIN accounts_view av ON av.id = tsi.account
+  -- The account's latest request with this id: hived frees a removed request's
+  -- id, so a request made after HF23 may reuse it.
+  CROSS JOIN LATERAL (
+    SELECT ov.block_num
+    -- OFFSET 0 keeps both lookups per account (its transfer_from_savings by
+    -- account and type, then a primary-key probe each) instead of a scan of
+    -- every operation of the chain for the body filters.
+    FROM (
+      SELECT aov.operation_id
+      FROM account_operations_view aov
+      WHERE aov.account_id = tsi.account AND aov.op_type_id = _op_transfer_from_savings
+      OFFSET 0
+    ) aov
+    CROSS JOIN LATERAL (
+      SELECT o.block_num, o.body_value
+      FROM operations_view o
+      WHERE o.id = aov.operation_id
+      OFFSET 0
+    ) ov
+    WHERE ov.body_value->>'from' = av.name
+      AND (ov.body_value->>'request_id')::BIGINT = tsi.request_id
+    ORDER BY aov.operation_id DESC
+    LIMIT 1
+  ) req
+  WHERE req.block_num <= __hardfork_23_block;
+
+  IF __accounts IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  DELETE FROM transfer_saving_id tsi
+  USING unnest(__accounts, __request_ids) AS s(account, request_id)
+  WHERE tsi.account = s.account AND tsi.request_id = s.request_id;
+
+  GET DIAGNOSTICS __repaired = ROW_COUNT;
+  RETURN __repaired;
+END
+$$;
+
+/**
  * run_one_off_repairs()
  * ---------------------
  * Applies, in list order, every repair not yet recorded in one_off_repairs, each
@@ -168,7 +261,8 @@ BEGIN
     SELECT r.name, r.function_name
     FROM (VALUES
       (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
-      (2, 'rc_delegation_overflow', 'repair_rc_delegation_overflow')
+      (2, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
+      (3, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position
