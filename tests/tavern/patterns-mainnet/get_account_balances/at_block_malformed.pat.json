@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "at-block must be a block number or a timestamp (YYYY-MM-DD HH:MI:SS): 'yesterday at noon' is neither"
+}

@@ -70,7 +70,8 @@ tests/tavern/
 
 | Endpoint | Test Directory | Purpose |
 |----------|----------------|---------|
-| `get_account_balances` | `patterns-mainnet/get_account_balances/` | Full balance snapshot queries |
+| `get_account_balances` | `patterns-mainnet/get_account_balances/` | Full balance snapshot queries, at the head and at a past block (`at-block` as a number or timestamp, out of range, malformed) |
+| `get_accounts_balances` | `patterns-mainnet/get_accounts_balances/` | Batch balances (`/balances?accounts=`): request order, `at-block`, more than 100 accounts, unknown and missing accounts |
 | `get_balance_history` | `patterns-mainnet/get_balance_history/` | Balance change pagination |
 | `get_balance_delegations` | `patterns-mainnet/get_balance_delegations/` | Delegation pair queries |
 | `get_history_aggregation` | `patterns-mainnet/get_history_aggregation/` | Daily/monthly aggregates |

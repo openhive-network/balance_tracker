@@ -41,11 +41,11 @@ hived replays").
 | Function | File | Operations Handled | Tables Updated |
 |----------|------|-------------------|----------------|
 | `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `balance_totals`, `account_balance_history`, `balance_history_by_day/month`, `account_hbd_interest` |
-| `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares | `current_accounts_delegations`, `account_delegations` |
+| `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares, account_create_with_delegation, return_vesting_delegation, hardfork_hive (HF23) | `current_accounts_delegations`, `account_delegations`, `account_delegation_history` |
 | `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc); withdraw_vesting, fill_vesting_withdraw, delegate_vesting_shares of RC delegators (hived's implicit reduction) | `current_rc_delegations`, `account_rc_delegations` |
 | `process_rewards` | `db/process_rewards.sql` | author_reward, curation_reward, claim_reward_balance | `account_rewards` |
 | `process_savings` | `db/process_savings.sql` | transfer_to_savings, transfer_from_savings, fill_transfer_from_savings | `account_savings`, `account_savings_history`, `savings_withdraws` |
-| `process_withdrawals` | `db/process_withdrawals.sql` | withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw | `account_withdraws`, `withdraw_routes` |
+| `process_withdrawals` | `db/process_withdrawals.sql` | withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw | `account_withdraws`, `withdraw_routes`, `account_withdraw_history` |
 | `process_block_range_recurrent_transfers` | `db/process_recurrent_transfers.sql` | recurrent_transfer, fill_recurrent_transfer, failed_recurrent_transfer | `recurrent_transfers` |
 | `process_block_range_orders` | `db/process_block_range_orders.sql` | limit_order_create/create2, fill_order, limit_order_cancel/cancelled | `order_state` |
 | `process_block_range_converts` | `db/process_block_range_converts.sql` | convert, fill_convert_request | `convert_state` |

@@ -29,6 +29,7 @@
  * 4. DELEGATIONS (VESTS)
  *    - current_accounts_delegations: Active delegation pairs
  *    - account_delegations: Summary per account (total received/delegated)
+ *    - account_delegation_history: account_delegations after every change
  *
  * 5. RC DELEGATIONS (Resource Credits)
  *    - current_rc_delegations: Active RC delegation pairs
@@ -39,6 +40,7 @@
  *
  * 7. WITHDRAWALS (Power-down)
  *    - account_withdraws: Power-down state per account
+ *    - account_withdraw_history: power-down state after every change
  *    - account_routes: Vesting withdrawal routing rules
  *
  * 8. SAVINGS
@@ -1701,6 +1703,65 @@ BEGIN
   ELSE
     PERFORM hive.app_register( __schema_name, ARRAY[ __schema_name ]::hive.contexts_group, __schema_name || '.process_blocks' );
   END IF;
+END
+$$;
+
+/**
+ * Delegation and power-down history
+ * ---------------------------------
+ * account_delegation_history holds an account's account_delegations totals and
+ * account_withdraw_history its account_withdraws power-down state
+ * (vesting_withdraw_rate, to_withdraw, withdrawn) after every operation that
+ * changed them, written by process_block_range_delegations and
+ * process_block_range_withdrawals. The row with the highest source_op at or before
+ * a block is the state at that block; the latest row equals the current state.
+ *
+ * Created here rather than in the context's creation above so that an upgraded
+ * install gets them too; the one-off repair delegation_and_withdraw_history
+ * (db/one_off_repairs.sql) backfills them there. Their indexes follow the app
+ * index lifecycle: registered while massive sync has dropped the others, they are
+ * built at finalize; on a finalized install they are built here.
+ */
+DO $$
+DECLARE
+  __schema_name VARCHAR;
+  __index TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  IF to_regclass(format('%I.account_delegation_history', __schema_name)) IS NULL THEN
+    CREATE TABLE account_delegation_history
+    (
+      account         INT    NOT NULL, -- Account id
+      delegated_vests BIGINT NOT NULL, -- account_delegations.delegated_vests after source_op
+      received_vests  BIGINT NOT NULL, -- account_delegations.received_vests after source_op
+      source_op       BIGINT NOT NULL  -- The operation that changed them
+    );
+    PERFORM hive.app_register_table( __schema_name, 'account_delegation_history', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.account_withdraw_history', __schema_name)) IS NULL THEN
+    CREATE TABLE account_withdraw_history
+    (
+      account               INT    NOT NULL, -- Account id
+      vesting_withdraw_rate BIGINT NOT NULL, -- account_withdraws columns after source_op
+      to_withdraw           BIGINT NOT NULL,
+      withdrawn             BIGINT NOT NULL,
+      source_op             BIGINT NOT NULL  -- The operation that changed them
+    );
+    PERFORM hive.app_register_table( __schema_name, 'account_withdraw_history', __schema_name );
+  END IF;
+
+  FOREACH __index IN ARRAY ARRAY[
+    format('CREATE INDEX IF NOT EXISTS idx_account_delegation_history_account_block_num ON %I.account_delegation_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name),
+    format('CREATE INDEX IF NOT EXISTS idx_account_withdraw_history_account_block_num ON %I.account_withdraw_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name)
+  ]
+  LOOP
+    IF isIndexesCreated() THEN
+      EXECUTE __index;
+    END IF;
+    PERFORM hive.app_register_index_dependency(__schema_name, __index);
+  END LOOP;
 END
 $$;
 

@@ -185,6 +185,7 @@ processed a block yet.
 | `power_downs_without_vests` | `repair_power_downs_without_vests()` | ends (`vesting_withdraw_rate`, `to_withdraw`, `withdrawn` = 0) the power-down of every account with 0 VESTS, which hived ended at the payout that took its last VESTS; runs before `rc_delegation_overflow` |
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 | `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
+| `delegation_and_withdraw_history` | `backfill_delegation_and_withdraw_history()` | writes `account_delegation_history` and `account_withdraw_history` of an install synced before they existed, up to its current block: one pass over the delegation and power-down operations by type, the VESTS after each payout probed in `account_balance_history`; needs a finalized install (raises otherwise). HAF records its rows as changes of the context's current block, as any repair's: a fork reverting that block before it is irreversible removes them |
 
 ## HAF Integration
 
@@ -252,6 +253,13 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 ### History Tables
 - `account_balance_history` - Every balance change
 - `account_savings_history` - Every savings change
+- `account_delegation_history` - `account_delegations` (delegated/received VESTS) after every change
+- `account_withdraw_history` - power-down state (rate, to_withdraw, withdrawn) of `account_withdraws` after every change
+
+The two power the past-block balances (`at-block`): each is indexed on `(account, block, source_op)`
+(registered with HAF's index lifecycle, built at finalize), and its latest row per account equals
+the current-state table. They are created outside the context's creation in `db/btracker_app.sql`,
+so an upgraded install gets them, and filled there by the one-off repair below.
 
 Both history tables store `op_type_id` (the type of `source_op`), written by the processing functions, so readers never probe `hafd.operations` for it. It sits right after `nai`, in the alignment pad before the first BIGINT, and adds no width; keep it there.
 - `balance_history_by_day/month` - Aggregated snapshots
