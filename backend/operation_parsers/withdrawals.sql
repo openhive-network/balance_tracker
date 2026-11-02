@@ -11,6 +11,7 @@ Extracts data from operation JSONBs for:
 Handles hardfork-specific logic:
 - Pre-HF1: VESTS had different precision (multiplier applied)
 - HF16: Changed power-down from 104 weeks to 13 weeks (rate calculation)
+- HF21: Weekly rate rounded up when the amount does not divide evenly
 
 Three return types for different operation categories:
 - impacted_withdraws_return: Power-down state (rate, to_withdraw, withdrawn)
@@ -46,21 +47,33 @@ CREATE TYPE btracker_backend.impacted_withdraw_routes_return AS
 
 -- Extract withdraw_vesting (power-down) data.
 -- Initiates or cancels power-down. Rate depends on hardfork (104 or 13 weeks).
-CREATE OR REPLACE FUNCTION btracker_backend.process_withdraw_vesting_operation(IN _operation_body JSONB, IN _is_hf01 BOOLEAN, IN _is_hf16 BOOLEAN)
+-- Rate follows hived's withdraw_vesting_evaluator: a non-zero power-down withdraws at
+-- least 1 VEST a week, and from HF21 on the rate is rounded up so the weekly
+-- installments cover the whole amount.
+CREATE OR REPLACE FUNCTION btracker_backend.process_withdraw_vesting_operation(IN _operation_body JSONB, IN _is_hf01 BOOLEAN, IN _is_hf16 BOOLEAN, IN _is_hf21 BOOLEAN)
 RETURNS btracker_backend.impacted_withdraws_return
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
 DECLARE
-  _pre_hf1  INT := btracker_backend.vests_precision_multiplier(_is_hf01);  -- pre-HF1 precision adjustment
-  _rate     INT := btracker_backend.withdrawal_rate_weeks(_is_hf16);       -- 104 weeks pre-HF16, 13 after
-  _withdraw BIGINT := GREATEST(((_operation_body)-> 'vesting_shares'->>'amount')::BIGINT, 0);
+  _pre_hf1   INT := btracker_backend.vests_precision_multiplier(_is_hf01);  -- pre-HF1 precision adjustment
+  _intervals INT := btracker_backend.withdrawal_rate_weeks(_is_hf16);       -- 104 weeks pre-HF16, 13 after
+  _withdraw  BIGINT := GREATEST(((_operation_body)-> 'vesting_shares'->>'amount')::BIGINT, 0) * _pre_hf1;
+  _rate      BIGINT := _withdraw / _intervals;
 BEGIN
+  IF _withdraw > 0 AND _rate = 0 THEN
+    _rate := 1;
+  END IF;
+
+  IF _is_hf21 AND _rate * _intervals < _withdraw THEN
+    _rate := _rate + 1;
+  END IF;
+
   RETURN (
     ((_operation_body)->>'account')::TEXT,
-    0,                                        -- resets withdrawn counter
-    ((_withdraw * _pre_hf1) / _rate)::BIGINT, -- weekly withdrawal rate
-    (_withdraw * _pre_hf1)::BIGINT            -- total to withdraw
+    0,          -- resets withdrawn counter
+    _rate,      -- weekly withdrawal rate
+    _withdraw   -- total to withdraw
   )::btracker_backend.impacted_withdraws_return;
 
 END

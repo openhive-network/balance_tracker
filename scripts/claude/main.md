@@ -165,6 +165,24 @@ Three things keep them all-visible (#69):
   Until HAF has it, the first insert-triggered autovacuum after finalize builds
   the visibility map.
 
+### One-off repairs of synced state
+
+A processing fix only corrects the rows it rewrites from then on. When rows an
+earlier version wrote must be corrected too, add a repair to
+`db/one_off_repairs.sql`: a function returning the number of rows it changed,
+listed in `run_one_off_repairs()`. `scripts/install_app.sh` calls
+`run_one_off_repairs()` on every install and upgrade; it applies each repair not
+yet in `one_off_repairs` and records it in the same transaction. A fresh install
+records every repair with 0 rows (its tables are empty). `one_off_repairs` is not
+registered with the context, so a fork rollback never re-runs a repair. A repair
+that updates a registered table must skip the UPDATE when nothing needs changing:
+HAF's statement-level triggers reject any edit on a forking context that has not
+processed a block yet.
+
+| Repair | Function | Corrects |
+|--------|----------|----------|
+| `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
+
 ## HAF Integration
 
 Balance Tracker uses HAF for:
