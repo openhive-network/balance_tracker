@@ -105,6 +105,49 @@ END
 $$;
 
 /**
+ * repair_power_downs_without_vests()
+ * ----------------------------------
+ * Ends the power-down of every account whose VESTS balance is 0 (vesting_withdraw_rate,
+ * to_withdraw and withdrawn reset to 0): hived ends a power-down at the payout that
+ * leaves the account with 0 VESTS, which earlier versions kept active. A power-down
+ * cannot start without VESTS, and only a payout takes an account's last VESTS, so
+ * every such power-down is one hived ended.
+ *
+ * Runs before repair_rc_delegation_overflow, which reads the power-down state.
+ *
+ * @returns number of power-downs ended
+ */
+CREATE OR REPLACE FUNCTION repair_power_downs_without_vests()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _nai_vests  INT := btracker_backend.nai_vests();
+  __accounts  INT[];
+  __repaired  INT;
+BEGIN
+  SELECT array_agg(aw.account)
+  INTO __accounts
+  FROM account_withdraws aw
+  LEFT JOIN current_account_balances cab ON cab.account = aw.account AND cab.nai = _nai_vests
+  WHERE (aw.vesting_withdraw_rate <> 0 OR aw.to_withdraw <> 0 OR aw.withdrawn <> 0)
+    AND COALESCE(cab.balance, 0) = 0;
+
+  IF __accounts IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  UPDATE account_withdraws aw
+  SET vesting_withdraw_rate = 0, to_withdraw = 0, withdrawn = 0
+  WHERE aw.account = ANY(__accounts);
+
+  GET DIAGNOSTICS __repaired = ROW_COUNT;
+  RETURN __repaired;
+END
+$$;
+
+/**
  * repair_rc_delegation_overflow()
  * -------------------------------
  * Applies hived's implicit RC delegation reduction (remove_rc_delegation_overflow,
@@ -118,7 +161,8 @@ $$;
  * stays as stored, since the vesting at that change is not kept. Those need a
  * resync to be corrected.
  *
- * Runs after repair_vesting_withdraw_rate, whose rate it reads.
+ * Runs after repair_vesting_withdraw_rate and repair_power_downs_without_vests,
+ * whose power-down state it reads.
  *
  * @returns number of RC delegations reduced or removed
  */
@@ -261,8 +305,9 @@ BEGIN
     SELECT r.name, r.function_name
     FROM (VALUES
       (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
-      (2, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
-      (3, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
+      (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
+      (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
+      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position
