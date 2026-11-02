@@ -47,6 +47,14 @@ BEGIN
 END;
 $$;
 
+-- HF21: Withdrawal rate rounded up when the amount does not divide evenly into the intervals
+CREATE OR REPLACE FUNCTION btracker_backend.hf_withdraw_rate_round_up()
+RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  RETURN 21;
+END;
+$$;
+
 -- HF24: Introduced delayed voting
 CREATE OR REPLACE FUNCTION btracker_backend.hf_delayed_voting()
 RETURNS INT LANGUAGE plpgsql IMMUTABLE AS $$

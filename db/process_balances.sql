@@ -172,6 +172,7 @@ $$
 DECLARE
  _result INT;
  _nai_hbd              SMALLINT := btracker_backend.nai_hbd();
+ _nai_vests            SMALLINT := btracker_backend.nai_vests();
  _hf_hbd_interest      INT      := btracker_backend.hf_hbd_interest();
  _hf_hbd_interest_block INT;
  _hbd_interest_interval INT     := btracker_backend.hbd_interest_compound_interval_sec();
@@ -182,6 +183,7 @@ DECLARE
  __balance_history_by_day INT;
  __balance_history_by_month INT;
  __hbd_interest INT;
+ __vests_changes INT;
  -- During MASSIVE sync (app indexes not yet created) the by_day/by_month rollups
  -- are deferred: maintaining them per batch costs window sorts + two upserts on
  -- every batch, while finalize_massive_sync() can rebuild both tables in one
@@ -202,7 +204,25 @@ WHERE hardfork_num = 1;
 
 -- Staging table for the HBD interest accumulator (consumed by
 -- btracker_backend.accumulate_hbd_interest after the main statement below).
-PERFORM btracker_backend.create_hbd_batch_rows();
+DROP TABLE IF EXISTS _hbd_batch_rows;
+CREATE TEMP TABLE _hbd_batch_rows(
+  account_id      INT,
+  balance         BIGINT,
+  source_op       BIGINT,
+  source_op_block INT,
+  balance_seq_no  BIGINT,
+  trx_in_block    SMALLINT
+);
+-- The batch's VESTS changes, one row per (account, operation) emission: the
+-- vesting each account had at any operation of the batch is its
+-- current_account_balances VESTS balance minus the changes after it. Read by
+-- process_block_range_rc_delegations, which runs next.
+DROP TABLE IF EXISTS _btracker_vests_batch;
+CREATE TEMP TABLE _btracker_vests_batch(
+  account_id INT,
+  source_op  BIGINT,
+  balance    BIGINT  -- the change, not the resulting balance
+);
 --RAISE NOTICE 'Processing balances';
 
 /*
@@ -986,6 +1006,14 @@ stage_hbd_rows AS (
   WHERE rls.nai = _nai_hbd
     AND (_hf_hbd_interest_block IS NULL OR rls.source_op_block <= _hf_hbd_interest_block)
   RETURNING 1
+),
+
+stage_vests_rows AS (
+  INSERT INTO _btracker_vests_batch (account_id, source_op, balance)
+  SELECT oir.account_id, oir.source_op, oir.balance
+  FROM ops_in_range oir
+  WHERE oir.nai = _nai_vests
+  RETURNING 1
 )
 
 /*
@@ -1007,9 +1035,10 @@ SELECT
   (SELECT count(*) FROM update_balance_totals) AS balance_totals,
   (SELECT count(*) FROM insert_account_balance_history_by_day) as balance_history_by_day,
   (SELECT count(*) FROM insert_account_balance_history_by_month) AS balance_history_by_month,
-  (SELECT count(*) FROM stage_hbd_rows) AS hbd_interest
+  (SELECT count(*) FROM stage_hbd_rows) AS hbd_interest,
+  (SELECT count(*) FROM stage_vests_rows) AS vests_changes
 INTO __balance_history, __current_balances, __balance_totals, __balance_history_by_day,
-     __balance_history_by_month, __hbd_interest;
+     __balance_history_by_month, __hbd_interest, __vests_changes;
 
 -- Single-pass fold over the staged rows (replaces the in-statement recursive CTE).
 __hbd_interest := btracker_backend.accumulate_hbd_interest( _from, _to, _hbd_interest_interval );

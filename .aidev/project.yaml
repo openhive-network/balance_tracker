@@ -58,6 +58,16 @@ sandbox:
     - name: haf
       provider: "haf/haf"
 
+# Every test dispatch (full, canary, baseline, promote canary, post-promote
+# verification) is offered first to steem-18, the host of that shared HAF, as
+# the sync step's round trips to it dominate the suites (see the timings under
+# `verification`). `prefer`, not `require`: when steem-18 does not claim the
+# work within its 120s window, any admitted host runs it, so a busy or drained
+# steem-18 slows a run rather than failing it.
+dispatch:
+  hosts: [steem-18.syncad.com]
+  mode: prefer
+
 # Verification slots. Each binding is what this project genuinely runs for
 # that slot — never one selection repeated under seven names, which makes
 # seven gates report on the same evidence while claiming to check seven
@@ -72,13 +82,17 @@ sandbox:
 # bound; see .aidev/README.md.
 #
 # `full` and `canary` declare a 1800s wall: without one the 900s default
-# applies, and the sync step alone swings from about 250s to about 600s with
-# host load. Recorded runs on 2026-10-21: full 477s (sync 256s, regression
-# 79s), a promote canary 594s (sync 315s, regression 137s), and a canary
-# killed at 900s with every case passing after a 591s sync. Scaling the 477s
-# run by that worst sync's 2.3x gives about 1100s; 1800s leaves room past it
-# and stays inside full's 2100s activity ceiling. `system` is unbound, so it
-# has no wall to declare.
+# applies, and the sync step's time follows the dispatch host's round trip to
+# the shared HAF on steem-18, not its load. Measured in 2026-10: sync 146s on
+# steem-20 (0.37 ms away), 256s to 457s on steem-3, steem-9 and steem-11
+# (38-42 ms), and up to 591s on session24 (135 ms); one tree's full run took
+# 182s on steem-20 and 561s on steem-3. Recorded runs on 2026-10-21: full 477s
+# (sync 256s, regression 79s), a promote canary 594s (sync 315s, regression
+# 137s), and a canary killed at 900s with every case passing after a 591s
+# sync. 1800s covers the farthest fallback host's worst run with room to
+# spare and stays inside full's 2100s activity ceiling; it is to be
+# re-derived from steem-18's own timings once `dispatch` below has placed a
+# few runs there. `system` is unbound, so it has no wall to declare.
 verification:
   quick:
     adapter: command

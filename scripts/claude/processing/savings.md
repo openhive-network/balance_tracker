@@ -72,7 +72,7 @@ When a user cancels a withdrawal, we need the original amount (not in the cancel
 
 **Same Batch** (optimized path):
 ```sql
-join_canceled_transfers_in_query AS (
+join_canceled_transfers_in_query AS MATERIALIZED (
   SELECT ...
     (SELECT tf.source_op FROM transfers_from tf
      WHERE tf.account_id = cpo.account_id
@@ -82,6 +82,12 @@ join_canceled_transfers_in_query AS (
   FROM cancel_and_fill_transfers cpo
 )
 ```
+
+Keep this CTE `MATERIALIZED` even though it is referenced once: inlined, the correlated
+subquery lands in `prepare_canceled_transfers_in_query`'s `LEFT JOIN ... ON tf.source_op =
+jct.last_transfer_id` and runs per join pair (nested loop, cubic in withdraw/cancel pairs) or
+per hash collision (HAF op ids collide heavily under `hashint8`). This cost ~2 h in massive sync
+over the 2018 savings spam in blocks 24.69M-25.56M.
 
 **Previous Batch** (requires table lookup):
 ```sql
@@ -103,6 +109,18 @@ If a withdrawal is created and cancelled in the same batch, skip persistence:
   WHERE cti.last_transfer_id = cp.source_op
 )) AS insert_transfer_id_to_table
 ```
+
+### HF23 Cleared Accounts
+
+At HF23 hived removed the pending withdrawals of the cleared accounts without a
+fill or cancel operation. `btracker_backend.process_hf_23()`
+(`backend/operation_parsers/hardforks.sql`) zeroes their `account_savings` and
+deletes their `transfer_saving_id` rows; the accounts come from
+`btracker_backend.hf_23_cleared_accounts()`. Installs synced before this fix are
+corrected by the one-off repair `hf_23_cleared_withdraw_requests` (see main.md).
+Withdrawals *to* a cleared account from another sender, which hived also removed,
+are not handled: `transfer_saving_id` does not store the recipient, and mainnet
+has none.
 
 ### Interest Operation Filtering
 

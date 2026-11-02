@@ -4,6 +4,8 @@ SET ROLE btracker_owner;
  * process_block_range_withdrawals - Squash withdrawal operations into final state for fast sync.
  * Processes: withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw,
  *            hardfork_hive (HF23 reset), transfer_to_vesting_completed, delayed_voting (HF24+)
+ * Runs after process_block_range_balances: it reads current_account_balances as of
+ * _to and the batch's VESTS changes that step stages in _btracker_vests_batch.
  */
 CREATE OR REPLACE FUNCTION process_block_range_withdrawals(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
@@ -21,13 +23,16 @@ DECLARE
   _op_transfer_to_vesting_completed   INT := btracker_backend.op_transfer_to_vesting_completed();
   _op_delayed_voting                  INT := btracker_backend.op_delayed_voting();
   _op_hardfork_hive                   INT := btracker_backend.op_hardfork_hive();
+  _nai_vests                          INT := btracker_backend.nai_vests();
   -- Hardfork numbers (protocol constants)
   _hf_vests_precision                 INT := btracker_backend.hf_vests_precision();
   _hf_withdraw_rate                   INT := btracker_backend.hf_withdraw_rate();
+  _hf_withdraw_rate_round_up          INT := btracker_backend.hf_withdraw_rate_round_up();
   _hf_delayed_voting                  INT := btracker_backend.hf_delayed_voting();
   -- Hardfork blocks (looked up from hafd.applied_hardforks)
   _hf_vests_precision_block           INT;
   _hf_withdraw_rate_block             INT;
+  _hf_withdraw_rate_round_up_block    INT;
   _hf_delayed_voting_block            INT;
   -- Counter variables (prefixed with __) are for debugging/logging purposes.
   -- They capture row counts from various operations to help diagnose sync issues.
@@ -40,16 +45,17 @@ DECLARE
   __reset_filled_withdrawals          INT;
 BEGIN
 -- Look up hardfork blocks once at the start
--- HF16/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
+-- HF16/HF21/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
 -- with NULL return NULL (falsy), so pre-hardfork logic applies automatically:
 --   block_num > NULL => NULL => pre-hardfork behavior used
 SELECT
   MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
+  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate_round_up THEN block_num END),
   MAX(CASE WHEN hardfork_num = _hf_delayed_voting THEN block_num END)
-INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_delayed_voting_block
+INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block, _hf_delayed_voting_block
 FROM hafd.applied_hardforks
-WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_delayed_voting);
+WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_withdraw_rate_round_up, _hf_delayed_voting);
 
 ------------------------------------------------------------------------------
 -- SECTION 1: WITHDRAWALS (withdraw_vesting_operation, hardfork_hive_operation)
@@ -68,7 +74,7 @@ process_block_range_data_b AS MATERIALIZED
   -- LATERAL + CASE pattern: Parse each operation with appropriate helper based on op_type_id.
   -- Alternative would be separate queries per op_type, requiring multiple table scans.
   -- Hardfork boolean flags passed to helper - determines VESTS precision multiplier and
-  -- withdrawal rate (104 weeks pre-HF16, 13 weeks post-HF16).
+  -- withdrawal rate (104 weeks pre-HF16, 13 weeks post-HF16, rounded up post-HF21).
   SELECT
     result.account_name,
     result.withdrawn,
@@ -83,7 +89,8 @@ process_block_range_data_b AS MATERIALIZED
           THEN btracker_backend.process_withdraw_vesting_operation(
             o.body,
             o.block_num > _hf_vests_precision_block,  -- HF1: VESTS precision change
-            o.block_num > _hf_withdraw_rate_block     -- HF16: 104->13 week withdrawal
+            o.block_num > _hf_withdraw_rate_block,    -- HF16: 104->13 week withdrawal
+            o.block_num > _hf_withdraw_rate_round_up_block  -- HF21: rate rounded up
           )
         WHEN o.op_type_id = _op_hardfork_hive
           -- HF23: Reset withdrawal state to 0 for affected accounts (Steemit Inc accounts)
@@ -390,6 +397,8 @@ INTO __delete_hf23_routes_count, __delete_hf23_routes;
 -- SECTION 3: FILL WITHDRAWS (fill_vesting_withdraw_operation)
 -- Virtual operation emitted weekly when withdrawal portion is paid out.
 -- Tracks progress: withdrawn += fill_amount. When withdrawn >= to_withdraw, withdrawal completes.
+-- As in hived's process_vesting_withdrawals, a payout that leaves the account with
+-- 0 VESTS also ends it.
 ------------------------------------------------------------------------------
 WITH ops_fill AS MATERIALIZED (
   SELECT ov.body_value AS body, ov.id, ov.block_num
@@ -404,7 +413,8 @@ process_block_range_data_raw AS MATERIALIZED
   SELECT
     result.account_name,
     result.withdrawn,
-    o.id AS source_op
+    o.id AS source_op,
+    o.block_num
   FROM ops_fill o
   CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation_for_withdrawals(o.body,o.block_num > _hf_vests_precision_block) AS result
 ),
@@ -420,7 +430,8 @@ process_block_range_data_b AS (
   SELECT
     ai.account_id,
     pr.withdrawn,
-    pr.source_op
+    pr.source_op,
+    pr.block_num
   FROM process_block_range_data_raw pr
   JOIN account_ids_fill ai ON ai.account_name = pr.account_name
 ),
@@ -428,6 +439,44 @@ process_block_range_data_b AS (
 group_by_account AS MATERIALIZED (
   SELECT DISTINCT account_id
   FROM process_block_range_data_b
+),
+-- A payout is all fills of an account in one block (one per route); hived checks
+-- the account's VESTS once, after the last of them.
+payouts AS MATERIALIZED (
+  SELECT account_id, MAX(source_op) AS source_op
+  FROM process_block_range_data_b
+  GROUP BY account_id, block_num
+),
+-- The VESTS balance right after a payout is the current_account_balances balance
+-- (process_block_range_balances already applied the batch) minus the batch's later
+-- changes staged in _btracker_vests_batch. A running sum over the account's changes
+-- with the payouts merged in as zero changes gives those later changes in one pass.
+vests_changes_and_payouts AS (
+  SELECT vb.account_id, vb.source_op, vb.balance, FALSE AS is_payout
+  FROM _btracker_vests_batch vb
+  WHERE vb.account_id IN (SELECT account_id FROM group_by_account)
+
+  UNION ALL
+
+  SELECT account_id, source_op, 0, TRUE
+  FROM payouts
+),
+payout_later_changes AS (
+  SELECT
+    account_id,
+    source_op,
+    is_payout,
+    SUM(balance) OVER w_account - SUM(balance) OVER w_account_asc AS later_changes
+  FROM vests_changes_and_payouts
+  WINDOW
+    w_account AS (PARTITION BY account_id),
+    w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
+),
+payouts_leaving_no_vests AS MATERIALIZED (
+  SELECT plc.account_id, plc.source_op
+  FROM payout_later_changes plc
+  LEFT JOIN current_account_balances cab ON cab.account = plc.account_id AND cab.nai = _nai_vests
+  WHERE plc.is_payout AND COALESCE(cab.balance, 0) = plc.later_changes
 ),
 join_current_withdraw AS (
   -- Fetch CURRENT withdrawal state from account_withdraws.
@@ -456,12 +505,17 @@ get_fills_concerning_current_withdrawal AS MATERIALIZED (
   -- SUM(cp.withdrawn) = total filled in this block range
   -- + aw.withdrawn = previously filled amount (from earlier block range syncs)
   -- = new total withdrawn
+  --
+  -- ended: one of these payouts left the account with 0 VESTS. No fill of the same
+  -- withdrawal can follow it: only a new withdraw_vesting (a later aw.source_op) does.
   SELECT
     cp.account_id,
     SUM(cp.withdrawn) + aw.withdrawn AS withdrawn,
-    MAX(aw.to_withdraw) AS to_withdraw
+    MAX(aw.to_withdraw) AS to_withdraw,
+    BOOL_OR(pn.account_id IS NOT NULL) AS ended
   FROM process_block_range_data_b cp
   JOIN join_current_withdraw aw ON aw.account = cp.account_id
+  LEFT JOIN payouts_leaving_no_vests pn ON pn.account_id = cp.account_id AND pn.source_op = cp.source_op
   WHERE cp.source_op > aw.source_op
   GROUP BY cp.account_id, aw.withdrawn
 ),
@@ -473,14 +527,15 @@ insert_not_yet_filled_withdrawals AS (
     gf.account_id,
     gf.withdrawn
   FROM get_fills_concerning_current_withdrawal gf
-  WHERE gf.to_withdraw > gf.withdrawn
+  WHERE gf.to_withdraw > gf.withdrawn AND NOT gf.ended
   ON CONFLICT ON CONSTRAINT pk_account_withdraws
   DO UPDATE SET
     withdrawn = EXCLUDED.withdrawn
   RETURNING account
 ),
 reset_filled_withdrawals AS (
-  -- COMPLETE withdrawals: withdrawn >= to_withdraw. Reset withdrawal state to 0.
+  -- COMPLETE withdrawals: withdrawn >= to_withdraw, or ended by a payout that left
+  -- 0 VESTS. Reset withdrawal state to 0 (hived resets the same three fields).
   -- This signals "no active withdrawal" and prepares for next withdraw_vesting_operation.
   -- NOTE: Only resets vesting_withdraw_rate, to_withdraw, withdrawn. Other columns
   -- (withdraw_routes, delayed_vests) are NOT touched - routing rules persist after completion.
@@ -492,7 +547,7 @@ reset_filled_withdrawals AS (
     0,
     0
   FROM get_fills_concerning_current_withdrawal gf
-  WHERE gf.to_withdraw <= gf.withdrawn
+  WHERE gf.to_withdraw <= gf.withdrawn OR gf.ended
   ON CONFLICT ON CONSTRAINT pk_account_withdraws
   DO UPDATE SET
     vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,

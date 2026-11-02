@@ -43,6 +43,45 @@ a shared HAF whose `hive.app_remove_context` lets a non-admin context owner remo
 index dependencies (hive/haf#371); an older one fails it with `permission denied for
 table indexes_constraints`.
 
+## Checking a change while implementing it
+
+Run only the steps the change touches, and leave the whole suite to the workflow: the
+`full` gate runs every step after implementation anyway, so a `full` run of your own
+(`aidev test run --slot full`, or `aidev test affected`, which adds `full` for any diff
+it does not confine to `quick`, even one to `.aidev/README.md` alone) only repeats it,
+takes 8 to 10 minutes and outlives the Bash tool's 600 s limit. Use `aidev test run
+--slot quick` for the `quick` steps instead. Arguments after `aidev test run --slot full
+--` don't narrow it: they are appended after the slot's own step list, so the whole
+suite still runs.
+
+| The change | Steps | About |
+|---|---|---|
+| a shell script | `shellcheck` (`aidev test run --slot quick`) | seconds |
+| a `.sql` file added, removed or renamed | `sql-registered` (`aidev test run --slot quick`) | seconds |
+| SQL that only has to install: a type, a table, an endpoint's or helper's definition | `install` | 10 s |
+| the install or upgrade path: `scripts/install_app.sh`, a schema change, reloptions | `install reinstall`, and `install uninstall` for `scripts/uninstall_app.sh` | under a minute |
+| `tests/parity`, or the impacted-balances port it checks (`backend/operation_parsers/`) | `install parity` | under a minute |
+| block processing: `db/process_*.sql`, an operation parser | `install sync regression` | 5 to 7 minutes |
+| what a query returns: `endpoints/`, `backend/endpoint_helpers/` | `install sync tavern` | 5 to 7 minutes |
+| the history tables, their vacuum requests or `finalize_massive_sync` | `install sync maintenance` | 5 to 7 minutes |
+
+`sync` is the cost: about 4 minutes on a quiet host and up to 10 under load, while
+`install`, `parity`, `reinstall` and `uninstall` take seconds to a minute each and
+`regression` 1 to 2 minutes. `sync` needs `install`; `parity`, `reinstall` and
+`uninstall` need only `install`; `regression`, `maintenance` and `tavern` need `sync`.
+Put every step you want from one sync into one run rather than syncing twice. The steps
+after `shellcheck` and `sql-registered` need the shared HAF: run them in the test image
+as in [the shared HAF](#the-shared-haf-sandboxexternal) section below, naming the steps,
+e.g. `.aidev/run-checks.sh dev install sync regression`; `aidev fixture list` names the
+shared HAF's host and port. The result is in `test-results/dev/` (`cases.tsv`, one line
+per step with its seconds; `<step>.log`).
+
+A run that includes `sync` can exceed the Bash tool's 600 s limit: start it in the
+background (`run_in_background`, output to `$TMPDIR`) and read
+`test-results/dev/cases.tsv` when it reports back, rather than waiting it out in one
+foreground call or polling it with long `sleep`s. A run the tool kills reports nothing,
+and may leave its clone for the provider to reap.
+
 ## What the checks cannot see
 
 The checks have the chain up to block 5,000,000 and nothing else. Not covered, and left

@@ -25,6 +25,61 @@ END IF;
 | Operation | Effect |
 |-----------|--------|
 | `custom_json_operation` with `id='rc'` containing `delegate_rc_operation` | Create/modify/remove RC delegation |
+| `withdraw_vesting`, `fill_vesting_withdraw` (weekly payout), `delegate_vesting_shares` (delegator and delegatee) of an account with RC delegations | hived's implicit reduction when the account's vesting falls below what it delegated (no operation is emitted) |
+
+## Implicit Reductions (hived's RC delegation overflow)
+
+hived (`resource_credits::update_account_after_vest_change` with the overflow check,
+`libraries/chain/rc/rc_utility.cpp`) checks an account's RC delegations after a
+`withdraw_vesting`, after a `delegate_vesting_shares` (delegator and delegatee) and
+after each weekly power-down payout (once, after the payout's last
+`fill_vesting_withdraw`). When
+
+```
+overflow = delegated_rc - (vesting_shares - delegated_vesting_shares
+                           + received_vesting_shares - next_vesting_withdrawal) > 0
+```
+
+(`next_vesting_withdrawal = min(vesting_withdraw_rate, to_withdraw - withdrawn)`
+while powering down, else 0), `remove_delegations` takes the overflow from the
+account's delegations in delegatee account id order: each is reduced by what is
+left of the overflow, removed when that consumes it. No operation is emitted.
+
+btracker reproduces it in `process_rc_delegation_range`:
+
+- `rc_delegation_vest_checks(_batch_from, _from, _to)` lists the checks of the range
+  for accounts with RC delegations (before the batch or delegated in it) and each
+  one's effective vests, replayed set-based: vesting delegations and power-down
+  state from `account_delegations`, `current_accounts_delegations` and
+  `account_withdraws` as they were before the batch plus the batch's
+  `delegate_vesting_shares` / `return_vesting_delegation` / `withdraw_vesting` /
+  `fill_vesting_withdraw` operations up to the check; the VESTS balance as
+  `current_account_balances` minus the batch's later changes (`_btracker_vests_batch`,
+  staged by `process_block_range_balances`). This is why the step runs between
+  balances and withdrawals.
+- For those accounts, their `delegate_rc` ops and the checks are applied one by one
+  in operation order (`set_rc_delegation`, `remove_rc_delegation_overflow`), so a
+  reduction lands at the operation that caused it (it becomes the pair's
+  `source_op`) and a later `delegate_rc` acts on the reduced delegations. Every
+  other delegator's `delegate_rc` ops are squashed set-based as before.
+- hived removes at most `get_remove_threshold()` delegations per block and finishes
+  the rest in later blocks (`rc_expired_delegation_object`, during which it rejects
+  the account's `delegate_rc`). btracker applies the whole reduction at the
+  triggering operation, which leaves the same delegations.
+- The delegatee order is the HAF account id, which follows hived's account
+  creation order like its `account_id_type`.
+- A payout that leaves the account with 0 VESTS ends its power-down (as hived's
+  `process_vesting_withdrawals` does): the check at that payout and every later
+  check of the same power-down use a next withdrawal of 0, before the withdrawals
+  step stores the ended power-down.
+
+Existing installs: `repair_rc_delegation_overflow()` (`db/one_off_repairs.sql`)
+applies the reduction once to every delegator over its effective vests now. A
+delegation hived reduced at an earlier vest change, after which the delegator's
+vesting grew back, is not visible in btracker's tables and stays until a resync.
+Measured on steem-20 at block 111,303,569 against `rc_api.list_rc_direct_delegations`:
+before the repair 2,074 of 3,920 delegators matched hived exactly, after it 2,959;
+no delegator that matched stopped matching.
 
 ## Operation Format
 
@@ -148,6 +203,7 @@ WINDOW
 4. **Multiple delegatees**: One operation expands to multiple rows
 5. **Multiple changes**: Only keep final state per (delegator, delegatee) pair
 6. **Unknown accounts**: Filtered out during account ID resolution
+7. **Vesting below delegated RC**: implicit reduction in delegatee id order (see above)
 
 ## API Endpoint
 
@@ -160,6 +216,7 @@ Returns incoming and outgoing RC delegations for the specified account.
 ## Expansion Rules
 
 When modifying RC delegation processing:
+- Keep the step between balances and withdrawals/delegations in every processing path
 - Maintain HF26 check at function start
 - Use the C++ parser (don't parse JSON manually)
 - Update both `current_rc_delegations` AND `account_rc_delegations`

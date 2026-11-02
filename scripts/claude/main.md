@@ -165,6 +165,27 @@ Three things keep them all-visible (#69):
   Until HAF has it, the first insert-triggered autovacuum after finalize builds
   the visibility map.
 
+### One-off repairs of synced state
+
+A processing fix only corrects the rows it rewrites from then on. When rows an
+earlier version wrote must be corrected too, add a repair to
+`db/one_off_repairs.sql`: a function returning the number of rows it changed,
+listed in `run_one_off_repairs()`. `scripts/install_app.sh` calls
+`run_one_off_repairs()` on every install and upgrade; it applies each repair not
+yet in `one_off_repairs` and records it in the same transaction. A fresh install
+records every repair with 0 rows (its tables are empty). `one_off_repairs` is not
+registered with the context, so a fork rollback never re-runs a repair. A repair
+that edits a registered table must skip the UPDATE or DELETE when nothing needs changing:
+HAF's statement-level triggers reject any edit on a forking context that has not
+processed a block yet.
+
+| Repair | Function | Corrects |
+|--------|----------|----------|
+| `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
+| `power_downs_without_vests` | `repair_power_downs_without_vests()` | ends (`vesting_withdraw_rate`, `to_withdraw`, `withdrawn` = 0) the power-down of every account with 0 VESTS, which hived ended at the payout that took its last VESTS; runs before `rc_delegation_overflow` |
+| `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
+| `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
+
 ## HAF Integration
 
 Balance Tracker uses HAF for:
