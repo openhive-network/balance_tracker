@@ -204,7 +204,7 @@ Returns paginated leaderboard of top asset holders.
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | coin-type | nai_type | Yes | - | Asset type: HBD, HIVE, or VESTS |
-| balance-type | balance_type | No | 'balance' | 'balance' or 'savings_balance' |
+| balance-type | top_holders_balance_type | No | 'balance' | 'balance', 'savings_balance' or 'total' (liquid + savings); only 'balance' for VESTS |
 | page | INT | No | 1 | 1-based page number |
 | page-size | INT | No | 100 | Results per page (max 1000) |
 | min-balance | BIGINT | No | - | Inclusive lower balance bound (any coin-type), in the asset's smallest unit |
@@ -220,6 +220,22 @@ non-negative and `min-balance <= max-balance`. Omitting both preserves the
 unfiltered behavior; passing only `min-balance` gives an open-ended top bracket.
 For an HP distribution bracket, pass converted VESTS values with
 `coin-type=VESTS` (HP-to-VESTS conversion remains the client's responsibility).
+
+`balance-type=total` (#63) ranks HBD or HIVE holders by liquid + savings. Only
+accounts with a positive sum are counted and ranked, and the range bounds apply to
+the sum. The two balances live in different tables, so no index orders the sum:
+each request builds it once with a FULL JOIN of `current_account_balances_view`
+and `account_savings_view`, and reads the count, the rank offset and the page from
+that one materialized result. Names (the tie-break) are looked up only for accounts
+whose total falls within the page's highest and lowest total. Measured on a synced
+node (HIVE: ~586k holders with a positive sum): 0.33-0.75 s per page, including the
+last page. A page inside a large tie group has to name every tied holder: HIVE has
+271,611 holders at exactly 0.001 HIVE (ranks 314,742-586,352), and pages there take
+~1.0-1.6 s, the same order as the existing liquid branch at that depth (0.4-1.9 s on
+testapi). No JMeter/k6 scenario covers `total` yet. `total` uses its own enum,
+`top_holders_balance_type`, because the shared `balance_type` also drives balance
+history, which has no combined view. The ranking inherits #61: `steem.dao` and
+`null` still carry balances hived reports as zero.
 
 #### Returns: `btracker_backend.top_holders`
 
@@ -247,6 +263,9 @@ SELECT * FROM btracker_endpoints.get_top_holders('HIVE', 'balance', 1, 100);
 ```bash
 # REST: Top HBD savings holders
 curl 'http://localhost:3000/balance-api/top-holders?coin-type=HBD&balance-type=savings_balance'
+
+# REST: Top HBD holders by liquid + savings
+curl 'http://localhost:3000/balance-api/top-holders?coin-type=HBD&balance-type=total'
 
 # REST: VESTS holders in [20,000,000, 200,000,000)
 curl 'http://localhost:3000/balance-api/top-holders?coin-type=VESTS&min-balance=20000000&max-balance=200000000'

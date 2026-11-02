@@ -123,6 +123,14 @@ declare
           "savings_balance"
         ]
       },
+      "btracker_backend.top_holders_balance_type": {
+        "type": "string",
+        "enum": [
+          "balance",
+          "savings_balance",
+          "total"
+        ]
+      },
       "btracker_backend.sort_direction": {
         "type": "string",
         "enum": [
@@ -1586,10 +1594,10 @@ declare
             "name": "balance-type",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/btracker_backend.balance_type",
+              "$ref": "#/components/schemas/btracker_backend.top_holders_balance_type",
               "default": "balance"
             },
-            "description": "`balance` or `savings_balance`\n(`savings_balance` not allowed with `VESTS`).\n"
+            "description": "`balance` (liquid), `savings_balance`, or `total` (liquid + savings, ranked by the sum).\n`savings_balance` and `total` are not allowed with `VESTS`.\nWith `total`, `min-balance` and `max-balance` apply to the sum.\n"
           },
           {
             "in": "query",

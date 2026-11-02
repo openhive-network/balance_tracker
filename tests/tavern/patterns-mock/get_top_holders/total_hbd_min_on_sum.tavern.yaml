@@ -1,0 +1,21 @@
+---
+test_name: btracker PostgREST
+marks:
+  - patterntest
+includes:
+  - !include ../../common.yaml
+
+stages:
+  - name: "min-balance applies to the sum: blocktrades liquid 77,255,992 is below 77,260,000, its total 77,264,092 is not"
+    request:
+      url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_top_holders"
+      method: GET
+      params:
+        coin-type: HBD
+        balance-type: total
+        min-balance: 77260000
+        page-size: 10
+    response:
+      status_code: 200
+      verify_response_with:
+        function: validate_response:compare_rest_response_with_pattern

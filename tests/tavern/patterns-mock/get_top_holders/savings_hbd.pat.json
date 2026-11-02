@@ -1,0 +1,9 @@
+{
+  "total_accounts": 3,
+  "total_pages": 1,
+  "holders_result": [
+    { "rank": 1, "account": "alpaca", "value": "60000000" },
+    { "rank": 2, "account": "blocktrades", "value": "8100" },
+    { "rank": 3, "account": "steem", "value": "500" }
+  ]
+}

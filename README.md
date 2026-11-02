@@ -263,6 +263,16 @@ postgrest
 
 The API is now available at `http://localhost:3000`.
 
+**Values that start with a PostgREST operator prefix** (`not.`, `eq.`, `in.`, `like.`, `is.`,
+`fts.`, ...): a GET straight to PostgREST reads such an argument as a filter, not as an argument
+(`400 PGRST100`, or the argument is dropped and `404 PGRST202`). Direct PostgREST callers with
+such values must POST them, as JSON or form-encoded. The public REST paths are not affected: the
+postgrest-rewriter (`docker/balance_tracker_nginx.conf.template`) forwards every GET of a
+function to PostgREST as a form-encoded POST, keeping PostgREST's own parameters in the URL:
+`select`, `columns`, `on_conflict`, and any name whose last dot-separated part is `limit`,
+`offset`, `order`, `and` or `or` (`child.limit`, `not.or`; `page-limit` is an ordinary
+argument). So an endpoint function cannot take an argument with one of those names.
+
 ### Uninstall
 
 ```bash
@@ -403,7 +413,7 @@ Returns ranked leaderboard of top asset holders.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | coin-type | TEXT | Yes | - | HBD, HIVE, or VESTS |
-| balance-type | TEXT | No | 'balance' | 'balance' or 'savings_balance' |
+| balance-type | TEXT | No | 'balance' | 'balance', 'savings_balance' or 'total' (liquid + savings, HBD/HIVE only) |
 | page | INT | No | 1 | Page number |
 | page-size | INT | No | 100 | Results per page |
 | min-balance | BIGINT | No | - | Inclusive lower balance bound (any coin-type), in the asset's smallest unit |

@@ -35,11 +35,12 @@ SET ROLE btracker_owner;
         name: balance-type
         required: false
         schema:
-          $ref: '#/components/schemas/btracker_backend.balance_type'
+          $ref: '#/components/schemas/btracker_backend.top_holders_balance_type'
           default: balance
         description: |
-          `balance` or `savings_balance`
-          (`savings_balance` not allowed with `VESTS`).
+          `balance` (liquid), `savings_balance`, or `total` (liquid + savings, ranked by the sum).
+          `savings_balance` and `total` are not allowed with `VESTS`.
+          With `total`, `min-balance` and `max-balance` apply to the sum.
 
       - in: query
         name: page
@@ -93,7 +94,7 @@ SET ROLE btracker_owner;
 DROP FUNCTION IF EXISTS btracker_endpoints.get_top_holders;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_top_holders(
     "coin-type" btracker_backend.nai_type,
-    "balance-type" btracker_backend.balance_type = 'balance',
+    "balance-type" btracker_backend.top_holders_balance_type = 'balance',
     "page" INT = 1,
     "page-size" INT = 100,
     "min-balance" BIGINT = NULL,
@@ -119,7 +120,8 @@ PURPOSE:
 
 PARAMETERS:
   - coin-type: Asset to rank (HBD, HIVE, or VESTS)
-  - balance-type: 'balance' (liquid) or 'savings_balance' (savings accounts)
+  - balance-type: 'balance' (liquid), 'savings_balance' (savings accounts) or
+                  'total' (liquid + savings, ranked by the sum; #63)
   - page: 1-based page number
   - page-size: Results per page (max 1000)
   - min-balance: Optional inclusive lower balance bound (any coin-type)
@@ -138,13 +140,14 @@ RANKING LOGIC:
   - Rank is global (not per-page) - page 2 starts at rank 101 if page-size=100
   - Rank stays global under a balance range: a filtered holder keeps its
     position in the full leaderboard (the top of a mid bracket is not rank 1)
-  - Only accounts with balance > 0 are included
+  - Only accounts with balance > 0 are included (for 'total', a sum > 0)
   - Balance ranges use min-balance <= balance < max-balance
 
 DATA SOURCES:
   - current_account_balances (via view) for liquid balances; balance_totals for
     their unfiltered holder count
   - account_savings (via view) for savings balances
+  - both, FULL JOINed per request, for 'total'
 
 PERFORMANCE CONSIDERATIONS:
   - Uses OFFSET/LIMIT pagination - efficient for first few pages
@@ -156,7 +159,7 @@ PERFORMANCE CONSIDERATIONS:
 VALIDATION:
   - page-size capped at 1000
   - page must be >= 1
-  - VESTS + savings_balance is invalid (no such thing as VESTS savings)
+  - VESTS + savings_balance or total is invalid (no such thing as VESTS savings)
   - balance range bounds must be non-negative and min-balance must be <= max-balance
 
 USE CASES:
@@ -180,8 +183,8 @@ BEGIN
   PERFORM btracker_backend.validate_negative_page("page");
   PERFORM btracker_backend.validate_negative_limit("page-size");
   PERFORM btracker_backend.validate_limit("page-size", 1000);
-  -- VESTS cannot have savings_balance (savings only holds HBD/HIVE)
-  PERFORM btracker_backend.validate_balance_history("balance-type", "coin-type");
+  -- VESTS cannot have savings_balance or total (savings only holds HBD/HIVE)
+  PERFORM btracker_backend.validate_top_holders_balance_type("balance-type", "coin-type");
 
   -- Balance range is a generic [min, max) bound applied to whichever coin-type
   -- is requested; both bounds are optional and may be open-ended on either side.

@@ -1,0 +1,9 @@
+{
+  "total_accounts": 3061,
+  "total_pages": 1021,
+  "holders_result": [
+    { "rank": 10, "account": "steem", "value": "29315310" },
+    { "rank": 11, "account": "imadev", "value": "23787999" },
+    { "rank": 12, "account": "smooth", "value": "20998219" }
+  ]
+}

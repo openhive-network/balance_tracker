@@ -15,6 +15,7 @@
  * Dependencies:
  * -------------
  * - btracker_backend.balance_type: ENUM ('balance', 'savings_balance')
+ * - btracker_backend.top_holders_balance_type: ENUM ('balance', 'savings_balance', 'total')
  * - btracker_backend.nai_type: ENUM ('HBD', 'HIVE', 'VESTS')
  * - btracker_backend.rest_raise_missing_account(): Exception function
  * - btracker_backend.rest_raise_vest_saving_balance(): Exception function
@@ -69,6 +70,30 @@ $$
 BEGIN
   IF (_required AND _account_id IS NULL) OR (NOT _required AND _account_name IS NOT NULL AND _account_id IS NULL) THEN
     PERFORM btracker_backend.rest_raise_missing_account(_account_name);
+  END IF;
+END
+$$;
+
+/**
+ * validate_top_holders_balance_type()
+ * -----------------------------------
+ * VESTS has no savings, so its only top-holders ranking is the liquid one:
+ * 'savings_balance' and 'total' (liquid + savings) are rejected with the same
+ * message validate_balance_history gives for VESTS savings.
+ */
+CREATE OR REPLACE FUNCTION btracker_backend.validate_top_holders_balance_type(
+    _balance_type btracker_backend.top_holders_balance_type,
+    _coin_type btracker_backend.nai_type
+)
+RETURNS VOID
+LANGUAGE plpgsql
+IMMUTABLE
+AS
+$$
+BEGIN
+  IF _coin_type = 'VESTS' AND _balance_type <> 'balance' THEN
+    RAISE EXCEPTION 'The selected balance type ''%'' does not support ''%'' option. Please choose a different balance type.',
+      _balance_type::TEXT, _coin_type::TEXT;
   END IF;
 END
 $$;

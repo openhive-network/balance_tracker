@@ -44,6 +44,10 @@ This fixture tests Balance Tracker's handling of savings-related operations.
 
 ### Block 90000005
 - `fill_transfer_from_savings_operation` (blocktrades, id:321)
+- `transfer_to_savings_operation` (alittle -> alpaca, HBD, 60000000): alpaca holds no
+  liquid HBD, so it is a savings-only holder that `/top-holders?balance-type=total`
+  must rank (#63); alittle's liquid HBD drops to 45,465,430. Neither account is
+  asserted on by any other mock test.
 
 ### Expected Final Balance (blocktrades)
 ```json

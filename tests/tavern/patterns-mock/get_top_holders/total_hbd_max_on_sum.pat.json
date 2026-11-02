@@ -1,0 +1,9 @@
+{
+  "total_accounts": 13418,
+  "total_pages": 4473,
+  "holders_result": [
+    { "rank": 8, "account": "steemit", "value": "70337438" },
+    { "rank": 9, "account": "alpaca", "value": "60000000" },
+    { "rank": 10, "account": "jamesc", "value": "53229187" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "total_accounts": 78,
+  "total_pages": 4,
+  "holders_result": [
+    { "rank": 9, "account": "blocktrades", "value": "29594875" },
+    { "rank": 10, "account": "steem", "value": "29315310" },
+    { "rank": 11, "account": "imadev", "value": "23787999" },
+    { "rank": 12, "account": "smooth", "value": "20998219" },
+    { "rank": 13, "account": "steemit60", "value": "20000000" },
+    { "rank": 14, "account": "taker", "value": "15014283" },
+    { "rank": 15, "account": "steemit1", "value": "10000205" },
+    { "rank": 16, "account": "ashold882015", "value": "9895158" },
+    { "rank": 17, "account": "neptun", "value": "9466033" },
+    { "rank": 18, "account": "azeroth", "value": "7900416" },
+    { "rank": 19, "account": "cryptoprometheus", "value": "6978756" },
+    { "rank": 20, "account": "gct", "value": "5801894" },
+    { "rank": 21, "account": "witness.svk", "value": "5452994" },
+    { "rank": 22, "account": "lukewearechange", "value": "4645964" },
+    { "rank": 23, "account": "fufubar1", "value": "4629629" },
+    { "rank": 24, "account": "hitbtc-exchange", "value": "4367855" },
+    { "rank": 25, "account": "arhag", "value": "4245030" },
+    { "rank": 26, "account": "ashleigh", "value": "3956898" },
+    { "rank": 27, "account": "sveokla", "value": "3889968" },
+    { "rank": 28, "account": "anastacia", "value": "3834919" }
+  ]
+}

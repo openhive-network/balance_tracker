@@ -32,3 +32,4 @@ docker-compose.override.yml
 # AIDEV check reports (.aidev/run-checks.sh)
 /test-results/
 /.aidev/__pycache__/
+__pycache__/
