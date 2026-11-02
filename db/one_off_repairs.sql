@@ -105,6 +105,51 @@ END
 $$;
 
 /**
+ * repair_rc_delegation_overflow()
+ * -------------------------------
+ * Applies hived's implicit RC delegation reduction (remove_rc_delegation_overflow,
+ * db/process_rc_delegations.sql) to every delegator whose stored RC delegations
+ * exceed its effective vests now:
+ *   VESTS balance - delegated vests + received vests - next power-down withdrawal
+ * Earlier versions never reduced them. A reduced delegation keeps its source_op.
+ *
+ * It corrects only the delegations still over their delegator's vesting: one hived
+ * reduced at an earlier vest change, after which the delegator's vesting grew back,
+ * stays as stored, since the vesting at that change is not kept. Those need a
+ * resync to be corrected.
+ *
+ * Runs after repair_vesting_withdraw_rate, whose rate it reads.
+ *
+ * @returns number of RC delegations reduced or removed
+ */
+CREATE OR REPLACE FUNCTION repair_rc_delegation_overflow()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _nai_vests          INT := btracker_backend.nai_vests();
+  __delegators        INT[];
+  __effective_vests   BIGINT[];
+BEGIN
+  SELECT array_agg(d.delegator), array_agg(
+    COALESCE(cab.balance, 0) - COALESCE(ad.delegated_vests, 0) + COALESCE(ad.received_vests, 0)
+    - CASE WHEN aw.to_withdraw > aw.withdrawn THEN LEAST(aw.vesting_withdraw_rate, aw.to_withdraw - aw.withdrawn) ELSE 0 END)
+  INTO __delegators, __effective_vests
+  FROM (SELECT DISTINCT crd.delegator FROM current_rc_delegations crd) d
+  LEFT JOIN current_account_balances cab ON cab.account = d.delegator AND cab.nai = _nai_vests
+  LEFT JOIN account_delegations ad ON ad.account = d.delegator
+  LEFT JOIN account_withdraws aw ON aw.account = d.delegator;
+
+  IF __delegators IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  RETURN remove_rc_delegation_overflow(__delegators, __effective_vests, array_fill(NULL::BIGINT, ARRAY[cardinality(__delegators)]));
+END
+$$;
+
+/**
  * run_one_off_repairs()
  * ---------------------
  * Applies, in list order, every repair not yet recorded in one_off_repairs, each
@@ -122,7 +167,8 @@ BEGIN
   FOR __repair IN
     SELECT r.name, r.function_name
     FROM (VALUES
-      (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate')
+      (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
+      (2, 'rc_delegation_overflow', 'repair_rc_delegation_overflow')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position

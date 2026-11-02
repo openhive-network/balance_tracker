@@ -10,11 +10,11 @@ Balance Tracker processes blockchain operations to maintain accurate account bal
 HAFBE (hafbe_app.sql)
   └─> btracker_process_blocks(_context, _block_range, _is_massif_sync)
       ├─> process_balances()        # Core HIVE/HBD/VESTS
-      ├─> process_delegations()     # Delegation pairs
-      ├─> process_block_range_rc_delegations()  # RC delegation pairs
-      ├─> process_rewards()         # Pending rewards
-      ├─> process_savings()         # Savings accounts
+      ├─> process_block_range_rc_delegations()  # RC delegation pairs (between balances and withdrawals, see below)
       ├─> process_withdrawals()     # Power-down state
+      ├─> process_savings()         # Savings accounts
+      ├─> process_rewards()         # Pending rewards
+      ├─> process_delegations()     # Delegation pairs
       ├─> process_block_range_recurrent_transfers()
       ├─> process_block_range_orders()
       ├─> process_block_range_converts()
@@ -42,7 +42,7 @@ hived replays").
 |----------|------|-------------------|----------------|
 | `process_balances` | `db/process_balances.sql` | All balance-affecting ops (deltas extracted by `btracker_backend.get_impacted_balances`, see `backend/operation_parsers/impacted_balances.sql`) | `current_account_balances`, `balance_totals`, `account_balance_history`, `balance_history_by_day/month`, `account_hbd_interest` |
 | `process_delegations` | `db/process_delegations.sql` | delegate_vesting_shares | `current_accounts_delegations`, `account_delegations` |
-| `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc) | `current_rc_delegations`, `account_rc_delegations` |
+| `process_block_range_rc_delegations` | `db/process_rc_delegations.sql` | custom_json (id='rc', delegate_rc); withdraw_vesting, fill_vesting_withdraw, delegate_vesting_shares of RC delegators (hived's implicit reduction) | `current_rc_delegations`, `account_rc_delegations` |
 | `process_rewards` | `db/process_rewards.sql` | author_reward, curation_reward, claim_reward_balance | `account_rewards` |
 | `process_savings` | `db/process_savings.sql` | transfer_to_savings, transfer_from_savings, fill_transfer_from_savings | `account_savings`, `account_savings_history`, `savings_withdraws` |
 | `process_withdrawals` | `db/process_withdrawals.sql` | withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw | `account_withdraws`, `withdraw_routes` |
@@ -151,6 +151,18 @@ Balance Tracker maintains two types of data:
 | **History** | Every change for audit/analysis | `account_balance_history`, `transfer_stats_by_hour` |
 
 ### Derived aggregates kept by processing
+
+### Step order and batch staging
+
+The RC delegation step runs right after `process_block_range_balances` and before
+`process_block_range_withdrawals` / `process_block_range_delegations`, in
+`btracker_massive_processing` (all three call sites) and `btracker_single_processing`.
+It replays each RC delegator's vesting at every operation of the batch from
+`account_withdraws`, `account_delegations` and `current_accounts_delegations` as they
+were before the batch, and from the batch's VESTS changes, which
+`process_block_range_balances` stages in the temp table `_btracker_vests_batch`
+(like `_hbd_batch_rows`). Moving it after either step would make it count that
+step's operations twice (see `scripts/claude/processing/rc_delegations.md`).
 
 `balance_totals` (one row per NAI: `holders` = accounts with `balance > 0`, `total` =
 `SUM(balance)`) is updated by `process_block_range_balances` in the same statement that

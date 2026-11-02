@@ -5,51 +5,37 @@ SET ROLE btracker_owner;
  *
  * OPERATIONS PROCESSED:
  *   - custom_json_operation with id='rc' containing delegate_rc_operation
+ *   - withdraw_vesting, fill_vesting_withdraw and delegate_vesting_shares of an
+ *     account with outgoing RC delegations: hived's implicit reduction of those
+ *     delegations when the account's vesting falls below what it delegated
+ *     (see process_rc_delegation_range)
  *
  * HARDFORK REQUIREMENT:
  *   RC delegations were formalized in HF26 (block ~68,676,505).
  *   This function skips processing for blocks before HF26.
  *
- * RC delegations are transmitted via custom_json_operation with:
- *   - id: "rc"
- *   - json: contains delegate_rc_operation structure
- *
- * The C++ parser function hive.parse_rc_delegation() extracts:
- *   - from_account TEXT: delegator account name
- *   - to_account TEXT: delegatee account name
- *   - max_rc BIGINT: amount of RC delegated (0 means remove delegation)
- *
- * This function follows the same "squashing" pattern as process_delegations.sql:
- *   1. Fetch all custom_json operations with id='rc' in block range
- *   2. Parse using hive.parse_rc_delegation()
- *   3. Resolve account names to IDs
- *   4. Calculate deltas using window functions
- *   5. UPSERT final state / DELETE zero delegations
- *   6. Update summary table
+ * ORDER IN THE BATCH:
+ *   Runs after process_block_range_balances (it reads the batch's VESTS changes
+ *   that step stages in _btracker_vests_batch, and current_account_balances as of
+ *   _to) and before process_block_range_withdrawals and
+ *   process_block_range_delegations (it reads account_withdraws,
+ *   account_delegations and current_accounts_delegations as of _from - 1).
  */
 CREATE OR REPLACE FUNCTION process_block_range_rc_delegations(IN _from INT, IN _to INT, IN _report_step INT = 1000)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
-SET from_collapse_limit = 16
-SET join_collapse_limit = 16
-SET jit = OFF
 AS
 $$
 DECLARE
-  -- Operation type ID (looked up dynamically from hafd.operation_types)
-  _op_custom_json INT := btracker_backend.op_custom_json();
   -- HF26 block (RC delegations were formalized in HF26)
   __hardfork_26_block INT;
-  -- Counters
-  __insert_current_rc_delegations INT;
-  __delete_canceled_rc_delegations INT;
-  __insert_rc_delegations INT;
 BEGIN
 ------------------------------------------------------------------------------
 -- HF26 CHECK: RC delegations were formalized in HF26
 --
 -- Skip processing if block range is entirely before HF26.
--- If range spans HF26, adjust _from to start at HF26 block.
+-- If range spans HF26, RC operations are processed from the HF26 block on,
+-- while the vesting state they are checked against is replayed from _from.
 ------------------------------------------------------------------------------
 SELECT block_num INTO __hardfork_26_block
 FROM hafd.applied_hardforks
@@ -60,16 +46,424 @@ IF __hardfork_26_block IS NULL OR _to < __hardfork_26_block THEN
   RETURN;
 END IF;
 
--- Adjust _from if range starts before HF26
-IF _from < __hardfork_26_block THEN
-  _from := __hardfork_26_block;
+PERFORM process_rc_delegation_range(_from, GREATEST(_from, __hardfork_26_block), _to);
+END
+$$;
+
+/**
+ * rc_delegation_vest_checks(_batch_from, _from, _to)
+ * --------------------------------------------------
+ * Every point in blocks _from.._to where hived checks an account's RC delegations
+ * against its vesting (resource_credits::update_account_after_vest_change with the
+ * overflow check), for the accounts that have outgoing RC delegations before the
+ * batch or delegate RC in it:
+ *   - withdraw_vesting: the account;
+ *   - delegate_vesting_shares: the delegator and the delegatee;
+ *   - a weekly power-down payout: the account, after its last fill_vesting_withdraw
+ *     of the block (hived checks once, after all the payout's routes).
+ *
+ * effective_vests is hived's get_effective_vesting_shares() right after that
+ * operation:
+ *   vesting_shares - delegated_vesting_shares + received_vesting_shares
+ *   - next_vesting_withdrawal (min(rate, to_withdraw - withdrawn) while powering down)
+ * replayed from the state before the batch (account_withdraws, account_delegations,
+ * current_accounts_delegations, which the withdrawals and delegations steps have not
+ * updated yet) through the batch's operations from _batch_from, and the VESTS
+ * balance at the operation (current_account_balances minus the batch's later
+ * changes staged in _btracker_vests_batch).
+ *
+ * Reads the temp table _rc_delegation_ops (the batch's parsed delegate_rc ops).
+ */
+CREATE OR REPLACE FUNCTION rc_delegation_vest_checks(IN _batch_from INT, IN _from INT, IN _to INT)
+RETURNS TABLE (account INT, source_op BIGINT, effective_vests BIGINT)
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+AS
+$$
+DECLARE
+  _op_withdraw_vesting             INT := btracker_backend.op_withdraw_vesting();
+  _op_fill_vesting_withdraw        INT := btracker_backend.op_fill_vesting_withdraw();
+  _op_delegate_vesting_shares      INT := btracker_backend.op_delegate_vesting_shares();
+  _op_return_vesting_delegation    INT := btracker_backend.op_return_vesting_delegation();
+  _nai_vests                       INT := btracker_backend.nai_vests();
+  _hf_vests_precision              INT := btracker_backend.hf_vests_precision();
+  _hf_withdraw_rate                INT := btracker_backend.hf_withdraw_rate();
+  _hf_withdraw_rate_round_up       INT := btracker_backend.hf_withdraw_rate_round_up();
+  _hf_vests_precision_block        INT;
+  _hf_withdraw_rate_block          INT;
+  _hf_withdraw_rate_round_up_block INT;
+BEGIN
+SELECT
+  MAX(CASE WHEN hardfork_num = _hf_vests_precision THEN block_num END),
+  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate THEN block_num END),
+  MAX(CASE WHEN hardfork_num = _hf_withdraw_rate_round_up THEN block_num END)
+INTO _hf_vests_precision_block, _hf_withdraw_rate_block, _hf_withdraw_rate_round_up_block
+FROM hafd.applied_hardforks
+WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_withdraw_rate_round_up);
+
+RETURN QUERY
+WITH vest_ops AS MATERIALIZED (
+  SELECT ov.id, ov.block_num, ov.op_type_id, ov.body_value AS body
+  FROM _btracker_ops_batch ov
+  WHERE
+    ov.op_type_id IN (_op_withdraw_vesting, _op_fill_vesting_withdraw, _op_delegate_vesting_shares, _op_return_vesting_delegation) AND
+    ov.block_num BETWEEN _batch_from AND _to
+),
+withdraws AS MATERIALIZED (
+  SELECT o.id AS source_op, o.block_num, w.account_name, w.vesting_withdraw_rate, w.to_withdraw
+  FROM vest_ops o
+  CROSS JOIN LATERAL btracker_backend.process_withdraw_vesting_operation(
+    o.body,
+    o.block_num > _hf_vests_precision_block,
+    o.block_num > _hf_withdraw_rate_block,
+    o.block_num > _hf_withdraw_rate_round_up_block
+  ) w
+  WHERE o.op_type_id = _op_withdraw_vesting
+),
+fills AS MATERIALIZED (
+  SELECT o.id AS source_op, o.block_num, f.account_name, f.withdrawn
+  FROM vest_ops o
+  CROSS JOIN LATERAL btracker_backend.process_fill_vesting_withdraw_operation_for_withdrawals(o.body, o.block_num > _hf_vests_precision_block) f
+  WHERE o.op_type_id = _op_fill_vesting_withdraw
+),
+delegations AS MATERIALIZED (
+  SELECT o.id AS source_op, o.block_num, d.delegator, d.delegatee, d.amount
+  FROM vest_ops o
+  CROSS JOIN LATERAL btracker_backend.process_delegate_vesting_shares_operation(o.body) d
+  WHERE o.op_type_id = _op_delegate_vesting_shares AND d.delegator <> d.delegatee
+),
+returns AS MATERIALIZED (
+  SELECT o.id AS source_op, r.delegator AS account_name, r.amount
+  FROM vest_ops o
+  CROSS JOIN LATERAL btracker_backend.process_return_vesting_shares_operation(o.body) r
+  WHERE o.op_type_id = _op_return_vesting_delegation
+),
+account_ids AS MATERIALIZED (
+  SELECT av.name AS account_name, av.id AS account_id
+  FROM accounts_view av
+  WHERE av.name IN (
+    SELECT account_name FROM withdraws
+    UNION SELECT account_name FROM fills
+    UNION SELECT delegator FROM delegations
+    UNION SELECT delegatee FROM delegations
+    UNION SELECT account_name FROM returns
+  )
+),
+------------------------------------------------------------------------------
+-- The checks hived makes in _from.._to, for every account
+------------------------------------------------------------------------------
+all_checks AS (
+  SELECT ai.account_id AS account, w.source_op
+  FROM withdraws w
+  JOIN account_ids ai ON ai.account_name = w.account_name
+  WHERE w.block_num >= _from
+
+  UNION ALL
+
+  SELECT ai.account_id, MAX(f.source_op)
+  FROM fills f
+  JOIN account_ids ai ON ai.account_name = f.account_name
+  WHERE f.block_num >= _from
+  GROUP BY ai.account_id, f.block_num
+
+  UNION ALL
+
+  SELECT ai.account_id, d.source_op
+  FROM delegations d
+  JOIN account_ids ai ON ai.account_name IN (d.delegator, d.delegatee)
+  WHERE d.block_num >= _from
+),
+-- Only an account with RC delegations can overflow them.
+rc_delegators AS MATERIALIZED (
+  SELECT DISTINCT ac.account
+  FROM all_checks ac
+  WHERE
+    EXISTS (SELECT 1 FROM current_rc_delegations crd WHERE crd.delegator = ac.account) OR
+    EXISTS (SELECT 1 FROM _rc_delegation_ops rdo WHERE rdo.delegator = ac.account)
+),
+checks AS MATERIALIZED (
+  SELECT DISTINCT ac.account, ac.source_op
+  FROM all_checks ac
+  JOIN rc_delegators rd ON rd.account = ac.account
+),
+------------------------------------------------------------------------------
+-- The vesting events of those accounts since _batch_from
+------------------------------------------------------------------------------
+delegation_pairs AS (
+  SELECT dr.account_id AS delegator, de.account_id AS delegatee, d.amount, d.source_op
+  FROM delegations d
+  JOIN account_ids dr ON dr.account_name = d.delegator
+  JOIN account_ids de ON de.account_name = d.delegatee
+  WHERE
+    dr.account_id IN (SELECT rd.account FROM rc_delegators rd) OR
+    de.account_id IN (SELECT rd.account FROM rc_delegators rd)
+),
+-- As process_block_range_delegations: the delegatee's received vests follow every
+-- change, the delegator's delegated vests only increases (a decrease comes back
+-- with return_vesting_delegation).
+delegation_deltas AS MATERIALIZED (
+  SELECT
+    dp.delegator,
+    dp.delegatee,
+    dp.source_op,
+    dp.amount - COALESCE(
+      LAG(dp.amount) OVER (PARTITION BY dp.delegator, dp.delegatee ORDER BY dp.source_op),
+      cad.balance,
+      0) AS delta
+  FROM delegation_pairs dp
+  LEFT JOIN current_accounts_delegations cad ON cad.delegator = dp.delegator AND cad.delegatee = dp.delegatee
+),
+events AS (
+  SELECT ai.account_id AS account, w.source_op, TRUE AS starts_withdrawal,
+         w.vesting_withdraw_rate, w.to_withdraw, 0::BIGINT AS filled, 0::BIGINT AS delegated, 0::BIGINT AS received
+  FROM withdraws w
+  JOIN account_ids ai ON ai.account_name = w.account_name
+  WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
+
+  UNION ALL
+
+  SELECT ai.account_id, f.source_op, FALSE, NULL, NULL, f.withdrawn, 0, 0
+  FROM fills f
+  JOIN account_ids ai ON ai.account_name = f.account_name
+  WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
+
+  UNION ALL
+
+  SELECT dd.delegator, dd.source_op, FALSE, NULL, NULL, 0, GREATEST(dd.delta, 0), 0
+  FROM delegation_deltas dd
+  WHERE dd.delegator IN (SELECT rd.account FROM rc_delegators rd)
+
+  UNION ALL
+
+  SELECT dd.delegatee, dd.source_op, FALSE, NULL, NULL, 0, 0, dd.delta
+  FROM delegation_deltas dd
+  WHERE dd.delegatee IN (SELECT rd.account FROM rc_delegators rd)
+
+  UNION ALL
+
+  SELECT ai.account_id, r.source_op, FALSE, NULL, NULL, 0, r.amount, 0
+  FROM returns r
+  JOIN account_ids ai ON ai.account_name = r.account_name
+  WHERE ai.account_id IN (SELECT rd.account FROM rc_delegators rd)
+),
+-- withdrawal_no numbers the power-downs started in the batch: 0 is the one stored
+-- in account_withdraws before it.
+running_events AS (
+  SELECT
+    e.*,
+    SUM(e.delegated) OVER w_account AS delegated_since,
+    SUM(e.received) OVER w_account AS received_since,
+    COUNT(*) FILTER (WHERE e.starts_withdrawal) OVER w_account AS withdrawal_no
+  FROM events e
+  WINDOW w_account AS (PARTITION BY e.account ORDER BY e.source_op)
+),
+event_states AS (
+  SELECT
+    re.account,
+    re.source_op,
+    re.delegated_since,
+    re.received_since,
+    re.withdrawal_no,
+    FIRST_VALUE(re.vesting_withdraw_rate) OVER w_withdrawal AS vesting_withdraw_rate,
+    FIRST_VALUE(re.to_withdraw) OVER w_withdrawal AS to_withdraw,
+    SUM(re.filled) OVER w_withdrawal AS filled_since
+  FROM running_events re
+  WINDOW w_withdrawal AS (PARTITION BY re.account, re.withdrawal_no ORDER BY re.source_op)
+),
+vests_after AS (
+  SELECT c.account, c.source_op, SUM(vb.balance) AS balance
+  FROM checks c
+  JOIN _btracker_vests_batch vb ON vb.account_id = c.account AND vb.source_op > c.source_op
+  GROUP BY c.account, c.source_op
+),
+check_states AS (
+  SELECT
+    c.account,
+    c.source_op,
+    COALESCE(cab.balance, 0) - COALESCE(va.balance, 0) AS vests,
+    COALESCE(ad.delegated_vests, 0) + COALESCE(es.delegated_since, 0) AS delegated_vests,
+    COALESCE(ad.received_vests, 0) + COALESCE(es.received_since, 0) AS received_vests,
+    CASE WHEN es.withdrawal_no > 0 THEN es.vesting_withdraw_rate ELSE COALESCE(aw.vesting_withdraw_rate, 0) END AS vesting_withdraw_rate,
+    CASE WHEN es.withdrawal_no > 0 THEN es.to_withdraw ELSE COALESCE(aw.to_withdraw, 0) END AS to_withdraw,
+    CASE WHEN es.withdrawal_no > 0 THEN 0 ELSE COALESCE(aw.withdrawn, 0) END + COALESCE(es.filled_since, 0) AS withdrawn
+  FROM checks c
+  JOIN event_states es ON es.account = c.account AND es.source_op = c.source_op
+  LEFT JOIN vests_after va ON va.account = c.account AND va.source_op = c.source_op
+  LEFT JOIN current_account_balances cab ON cab.account = c.account AND cab.nai = _nai_vests
+  LEFT JOIN account_delegations ad ON ad.account = c.account
+  LEFT JOIN account_withdraws aw ON aw.account = c.account
+)
+SELECT
+  cs.account,
+  cs.source_op,
+  (cs.vests - cs.delegated_vests + cs.received_vests
+   - CASE WHEN cs.to_withdraw > cs.withdrawn THEN LEAST(cs.vesting_withdraw_rate, cs.to_withdraw - cs.withdrawn) ELSE 0 END)::BIGINT
+FROM check_states cs;
+END
+$$;
+
+/**
+ * remove_rc_delegation_overflow(_delegators, _effective_vests, _source_ops)
+ * -------------------------------------------------------------------------
+ * hived's resource_credits::remove_delegations for each delegator whose RC
+ * delegations exceed its effective vests: the overflow (sum of its delegations
+ * minus _effective_vests) is taken from its delegations in delegatee account id
+ * order, each reduced by what remains of the overflow and removed when that
+ * consumes it, and account_rc_delegations follows on both sides. The arrays are
+ * parallel; a delegator must appear at most once. A reduced delegation's
+ * source_op becomes the delegator's _source_ops entry, or stays when it is NULL.
+ *
+ * hived removes at most get_remove_threshold() delegations per block and finishes
+ * the rest in later blocks (rc_expired_delegation_object); this applies the whole
+ * reduction at once, which leaves the same delegations.
+ *
+ * @returns number of delegations reduced or removed
+ */
+CREATE OR REPLACE FUNCTION remove_rc_delegation_overflow(IN _delegators INT[], IN _effective_vests BIGINT[], IN _source_ops BIGINT[])
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __delegators INT[];
+  __delegatees INT[];
+  __cuts       BIGINT[];
+  __removes    BOOLEAN[];
+  __source_ops BIGINT[];
+BEGIN
+SELECT array_agg(r.delegator), array_agg(r.delegatee), array_agg(r.cut), array_agg(r.cut = r.max_rc), array_agg(r.source_op)
+INTO __delegators, __delegatees, __cuts, __removes, __source_ops
+FROM (
+  SELECT
+    crd.delegator,
+    crd.delegatee,
+    crd.max_rc,
+    -- what is left of the overflow once the delegations before this one took theirs
+    LEAST(crd.max_rc, GREATEST(
+      SUM(crd.max_rc) OVER w_all - c.effective_vests - (SUM(crd.max_rc) OVER w_before - crd.max_rc),
+      0)) AS cut,
+    c.source_op
+  FROM unnest(_delegators, _effective_vests, _source_ops) AS c(delegator, effective_vests, source_op)
+  JOIN current_rc_delegations crd ON crd.delegator = c.delegator
+  WINDOW
+    w_all AS (PARTITION BY crd.delegator),
+    w_before AS (PARTITION BY crd.delegator ORDER BY crd.delegatee)
+) r
+WHERE r.cut > 0;
+
+-- HAF's statement-level triggers reject edits of registered tables in some states
+-- (see db/one_off_repairs.sql): issue none when there is nothing to change.
+IF __delegators IS NULL THEN
+  RETURN 0;
 END IF;
+
+UPDATE current_rc_delegations crd
+SET max_rc = crd.max_rc - c.cut, source_op = COALESCE(c.source_op, crd.source_op)
+FROM unnest(__delegators, __delegatees, __cuts, __removes, __source_ops) AS c(delegator, delegatee, cut, removes, source_op)
+WHERE crd.delegator = c.delegator AND crd.delegatee = c.delegatee AND NOT c.removes;
+
+DELETE FROM current_rc_delegations crd
+USING unnest(__delegators, __delegatees, __removes) AS c(delegator, delegatee, removes)
+WHERE crd.delegator = c.delegator AND crd.delegatee = c.delegatee AND c.removes;
+
+INSERT INTO account_rc_delegations AS ard (account, received_rc, delegated_rc)
+SELECT s.account, SUM(s.received_rc), SUM(s.delegated_rc)
+FROM (
+  SELECT c.delegatee AS account, -c.cut AS received_rc, 0 AS delegated_rc
+  FROM unnest(__delegatees, __cuts) AS c(delegatee, cut)
+  UNION ALL
+  SELECT c.delegator, 0, -c.cut
+  FROM unnest(__delegators, __cuts) AS c(delegator, cut)
+) s
+GROUP BY s.account
+ON CONFLICT ON CONSTRAINT pk_account_rc_delegations
+DO UPDATE SET
+  received_rc = ard.received_rc + EXCLUDED.received_rc,
+  delegated_rc = ard.delegated_rc + EXCLUDED.delegated_rc;
+
+RETURN cardinality(__delegators);
+END
+$$;
+
+/**
+ * set_rc_delegation(_delegator, _delegatee, _max_rc, _source_op)
+ * ---------------------------------------------------------------
+ * Applies one delegate_rc to one delegatee: sets the pair to _max_rc (removes it
+ * at 0) and moves account_rc_delegations of both sides by the change.
+ */
+CREATE OR REPLACE FUNCTION set_rc_delegation(IN _delegator INT, IN _delegatee INT, IN _max_rc BIGINT, IN _source_op BIGINT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __previous BIGINT;
+BEGIN
+SELECT crd.max_rc INTO __previous
+FROM current_rc_delegations crd
+WHERE crd.delegator = _delegator AND crd.delegatee = _delegatee;
+
+IF _max_rc > 0 THEN
+  INSERT INTO current_rc_delegations AS crd (delegator, delegatee, max_rc, source_op)
+  VALUES (_delegator, _delegatee, _max_rc, _source_op)
+  ON CONFLICT ON CONSTRAINT pk_current_rc_delegations
+  DO UPDATE SET max_rc = EXCLUDED.max_rc, source_op = EXCLUDED.source_op;
+ELSIF __previous IS NOT NULL THEN
+  DELETE FROM current_rc_delegations crd
+  WHERE crd.delegator = _delegator AND crd.delegatee = _delegatee;
+END IF;
+
+INSERT INTO account_rc_delegations AS ard (account, received_rc, delegated_rc)
+VALUES
+  (_delegator, 0, _max_rc - COALESCE(__previous, 0)),
+  (_delegatee, _max_rc - COALESCE(__previous, 0), 0)
+ON CONFLICT ON CONSTRAINT pk_account_rc_delegations
+DO UPDATE SET
+  received_rc = ard.received_rc + EXCLUDED.received_rc,
+  delegated_rc = ard.delegated_rc + EXCLUDED.delegated_rc;
+END
+$$;
+
+/**
+ * process_rc_delegation_range(_batch_from, _from, _to)
+ * ----------------------------------------------------
+ * The RC delegation changes of blocks _from.._to (all at or after HF26) of the
+ * batch that starts at _batch_from.
+ *
+ * An account that hived checks for RC delegation overflow in the range
+ * (rc_delegation_vest_checks) has its delegate_rc ops and those checks applied one
+ * by one in operation order, so a reduction lands at the operation that caused it
+ * and a later delegate_rc acts on the reduced delegations. Every other delegator's
+ * delegate_rc ops are squashed set-based (STEP 5 on).
+ */
+CREATE OR REPLACE FUNCTION process_rc_delegation_range(IN _batch_from INT, IN _from INT, IN _to INT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+SET from_collapse_limit = 16
+SET join_collapse_limit = 16
+SET jit = OFF
+AS
+$$
+DECLARE
+  -- Operation type ID (looked up dynamically from hafd.operation_types)
+  _op_custom_json INT := btracker_backend.op_custom_json();
+  __event RECORD;
+  -- Counters
+  __insert_current_rc_delegations INT;
+  __delete_canceled_rc_delegations INT;
+  __insert_rc_delegations INT;
+BEGIN
 ------------------------------------------------------------------------------
--- STEP 1: Fetch all custom_json operations with id='rc' in the block range
+-- STEPS 1-4: the range's delegate_rc ops, one row per delegatee
 --
--- We filter on op_type_id for custom_json_operation and then check if the
--- operation body has id='rc' to identify RC delegation operations.
+-- Fetch the custom_json operations with id='rc', parse them with the C++ parser
+-- hive.parse_rc_delegation (one row per delegatee; NULL for an invalid op) and
+-- resolve the account names to IDs.
 ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS _rc_delegation_ops;
+CREATE TEMP TABLE _rc_delegation_ops AS
 WITH ops AS MATERIALIZED (
   SELECT ov.body_value AS body, ov.id, ov.block_num
   FROM _btracker_ops_batch ov
@@ -78,16 +472,6 @@ WITH ops AS MATERIALIZED (
     ov.block_num BETWEEN _from AND _to AND
     (ov.body_value->>'id') = 'rc'
 ),
-------------------------------------------------------------------------------
--- STEP 2: Parse RC delegation operations using C++ parser
---
--- The hive.parse_rc_delegation function parses the JSON body and returns:
---   - from_account: delegator name
---   - to_account: delegatee name (can be multiple, parser returns one row per delegatee)
---   - max_rc: RC amount delegated
---
--- We filter out NULL results (invalid RC operations that the parser rejects).
-------------------------------------------------------------------------------
 parsed_rc_delegations AS MATERIALIZED (
   SELECT
     parsed.from_account,
@@ -99,12 +483,6 @@ parsed_rc_delegations AS MATERIALIZED (
   CROSS JOIN LATERAL hive.parse_rc_delegation((o.body->>'json')::text) AS parsed
   WHERE parsed.from_account IS NOT NULL
 ),
-------------------------------------------------------------------------------
--- STEP 3: Resolve account names to IDs
---
--- Collect all unique account names and look up their IDs in hive.accounts_view.
--- This is done once for efficiency rather than per-row subqueries.
-------------------------------------------------------------------------------
 all_account_names AS (
   SELECT DISTINCT from_account AS account_name FROM parsed_rc_delegations
   UNION
@@ -114,20 +492,56 @@ account_ids AS MATERIALIZED (
   SELECT av.name AS account_name, av.id AS account_id
   FROM hive.accounts_view av
   WHERE av.name IN (SELECT account_name FROM all_account_names)
-),
+)
+SELECT
+  delegator.account_id AS delegator,
+  delegatee.account_id AS delegatee,
+  p.max_rc,
+  p.source_op,
+  p.source_op_block
+FROM parsed_rc_delegations p
+JOIN account_ids delegator ON delegator.account_name = p.from_account
+JOIN account_ids delegatee ON delegatee.account_name = p.to_account;
+
+DROP TABLE IF EXISTS _rc_vest_checks;
+CREATE TEMP TABLE _rc_vest_checks AS
+SELECT * FROM rc_delegation_vest_checks(_batch_from, _from, _to);
+
 ------------------------------------------------------------------------------
--- STEP 4: Join parsed data with account IDs
+-- Accounts hived checks for overflow in the range: their delegate_rc ops and the
+-- checks, in operation order.
 ------------------------------------------------------------------------------
-rc_delegations_with_ids AS MATERIALIZED (
+FOR __event IN
+  SELECT FALSE AS is_check, rdo.delegator AS account, rdo.delegatee, rdo.max_rc, NULL::BIGINT AS effective_vests, rdo.source_op
+  FROM _rc_delegation_ops rdo
+  WHERE rdo.delegator IN (SELECT rvc.account FROM _rc_vest_checks rvc)
+
+  UNION ALL
+
+  SELECT TRUE, rvc.account, NULL, NULL, rvc.effective_vests, rvc.source_op
+  FROM _rc_vest_checks rvc
+
+  ORDER BY source_op
+LOOP
+  IF __event.is_check THEN
+    PERFORM remove_rc_delegation_overflow(ARRAY[__event.account], ARRAY[__event.effective_vests], ARRAY[__event.source_op]);
+  ELSE
+    PERFORM set_rc_delegation(__event.account, __event.delegatee, __event.max_rc, __event.source_op);
+  END IF;
+END LOOP;
+
+------------------------------------------------------------------------------
+-- Every other delegator: squash its delegate_rc ops.
+------------------------------------------------------------------------------
+WITH rc_delegations_with_ids AS MATERIALIZED (
   SELECT
-    delegator.account_id AS delegator,
-    delegatee.account_id AS delegatee,
-    p.max_rc,
-    p.source_op,
-    p.source_op_block
-  FROM parsed_rc_delegations p
-  JOIN account_ids delegator ON delegator.account_name = p.from_account
-  JOIN account_ids delegatee ON delegatee.account_name = p.to_account
+    rdo.delegator,
+    rdo.delegatee,
+    rdo.max_rc,
+    rdo.source_op,
+    rdo.source_op_block
+  FROM _rc_delegation_ops rdo
+  WHERE rdo.delegator NOT IN (SELECT rvc.account FROM _rc_vest_checks rvc)
 ),
 ------------------------------------------------------------------------------
 -- STEP 5: Get previous RC delegation balances for delta calculation
