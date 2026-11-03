@@ -53,25 +53,31 @@ CREATE TABLE IF NOT EXISTS :"schema".order_lifecycle
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_open ON :"schema".order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON :"schema".order_lifecycle(block_created) INCLUDE (outcome);
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON :"schema".order_lifecycle(owner_id, block_created) INCLUDE (outcome);
--- The rollups are seeded from order_lifecycle when created, as db/btracker_app.sql
--- does (10000: btracker_backend.order_stats_group_blocks()).
+-- The rollups are seeded from order_lifecycle's irreversible history when created,
+-- as db/btracker_app.sql does before registering them, since a fork never reverts
+-- rows inserted then (10000: btracker_backend.order_stats_group_blocks()). The
+-- shape registers no table and processes no block, so it has no reversible part to
+-- add; it holds no context row either, for which the history counted is none.
 SELECT to_regclass(format('%I.order_stats_by_block', :'schema')) IS NULL AS seed_by_block,
-       to_regclass(format('%I.order_stats_by_block_group', :'schema')) IS NULL AS seed_by_block_group \gset
+       to_regclass(format('%I.order_stats_by_block_group', :'schema')) IS NULL AS seed_by_block_group,
+       COALESCE((SELECT hive.app_get_irreversible_block(hc.name) FROM hafd.contexts hc WHERE hc.name = :'schema'), 0) AS irreversible \gset
 \if :seed_by_block
 CREATE TABLE :"schema".order_stats_by_block
   (block_created INT NOT NULL, created INT NOT NULL, filled INT NOT NULL, cancelled INT NOT NULL,
    CONSTRAINT pk_order_stats_by_block PRIMARY KEY (block_created));
 INSERT INTO :"schema".order_stats_by_block (block_created, created, filled, cancelled)
-SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
-FROM :"schema".order_lifecycle GROUP BY block_created;
+SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled' AND end_block <= :irreversible),
+       count(*) FILTER (WHERE outcome = 'cancelled' AND end_block <= :irreversible)
+FROM :"schema".order_lifecycle WHERE block_created <= :irreversible GROUP BY block_created;
 \endif
 \if :seed_by_block_group
 CREATE TABLE :"schema".order_stats_by_block_group
   (block_group INT NOT NULL, created INT NOT NULL, filled INT NOT NULL, cancelled INT NOT NULL,
    CONSTRAINT pk_order_stats_by_block_group PRIMARY KEY (block_group));
 INSERT INTO :"schema".order_stats_by_block_group (block_group, created, filled, cancelled)
-SELECT block_created / 10000, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
-FROM :"schema".order_lifecycle GROUP BY block_created / 10000;
+SELECT block_created / 10000, count(*), count(*) FILTER (WHERE outcome = 'filled' AND end_block <= :irreversible),
+       count(*) FILTER (WHERE outcome = 'cancelled' AND end_block <= :irreversible)
+FROM :"schema".order_lifecycle WHERE block_created <= :irreversible GROUP BY block_created / 10000;
 \endif
 RESET session_replication_role;
 GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
