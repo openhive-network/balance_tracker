@@ -8,7 +8,8 @@
  *   - after the massive sync: one row per limit_order_create(2) operation of the
  *     synced blocks, the open rows equal order_state, over the whole range
  *     created = filled + cancelled + open, and every row equals a replay of the
- *     synced order operations one at a time;
+ *     synced order operations one at a time (closing the HF23-cleared accounts'
+ *     open orders at HF23 when the synced blocks reach it);
  *   - synthetic order operations in the three blocks before the synced head: a
  *     two-block range processed as massive sync does, then the next block as a
  *     live block. Covers create -> fill, create -> partial fill -> cancel,
@@ -17,9 +18,12 @@
  *     its virtual limit_order_cancelled (also in the transaction of a fill), a
  *     dust cull (hived's limit_order_cancelled after a fill in its transaction,
  *     an order hived counts as filled) of an order created in the range and of
- *     one open from the earlier call, and an order id reused within a range and
- *     across the two. Every row, order_state
- *     against the open rows, and the endpoints' windows are checked;
+ *     one open from the earlier call, an order id reused within a range and
+ *     across the two, and an order id reused within one transaction (the owner
+ *     cancels it and re-creates it, which hived culls at once; hived culls it
+ *     and the owner re-creates and cancels it). Every row, order_state against
+ *     the open rows, the replay of the same operations, and the endpoints'
+ *     windows are checked;
  *   - after HAF rolls the context back (hive.context_back_from_fork) the
  *     synthetic rows are gone and the synced ones are back (skipped when the
  *     context is not forking);
@@ -31,6 +35,9 @@
  *     group, holding orders that closed after the window, a date window),
  *     while an inverted block or date window gets HAF's error from both
  *     endpoints;
+ *   - a pretend HF23 block clearing one synthetic account: process_hf_23 closes
+ *     its open orders as cancelled there, and the replay agrees, also when it
+ *     ends in that block.
  *   - an upgrade from a version without the rollups: both dropped and
  *     db/btracker_app.sql run again, they equal order_lifecycle's counts, and
  *     still do after a block that fills and cancels orders created before it.
@@ -288,49 +295,58 @@ BEGIN
 END
 $$;
 
--- The synced rows against a replay of the synced blocks' order operations one by
--- one, in operation order, reading the operation bodies directly. A virtual
--- limit_order_cancelled in a transaction, after a fill of the order in that
--- transaction and with no limit_order_cancel of it there, is hived's dust cull
--- of a fully filled order: the order ends filled, its dust left in remaining.
+-- A replay of the order operations in _replay_ops (id, block_num, trx_in_block,
+-- op_type_id, body) one by one, in operation order, reading the operation bodies
+-- directly, into replay_orders. A virtual limit_order_cancelled in a transaction
+-- whose last earlier event of the order in that transaction is a fill is hived's
+-- dust cull of a fully filled order: the order ends filled, its dust left in
+-- remaining. Once past block _hf23_block (when _last_block, the replayed range's
+-- last block, includes it), the open orders of the accounts its hardfork_hive
+-- operations clear end cancelled there: hived cancelled them without an operation.
+-- Returns the number of dust culls.
 CREATE TEMP TABLE replay_orders (
   create_op_id BIGINT PRIMARY KEY, owner TEXT NOT NULL, order_id BIGINT NOT NULL,
   remaining BIGINT NOT NULL, filled BIGINT NOT NULL, end_block INT, outcome TEXT);
 CREATE INDEX ON replay_orders (owner, order_id) WHERE end_block IS NULL;
+CREATE TEMP TABLE _replay_ops (id BIGINT, block_num INT, trx_in_block SMALLINT, op_type_id SMALLINT, body JSONB);
 
-DO
-$$
+CREATE FUNCTION pg_temp.replay_order_ops(_hf23_block INT, _last_block INT)
+RETURNS BIGINT LANGUAGE plpgsql
+AS $f$
 DECLARE
-  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
   __op RECORD;
   __side RECORD;
   __trx_block INT;
   __trx_in_block INT;
-  __trx_filled TEXT[];
-  __trx_user_cancelled TEXT[];
+  -- 'owner/order id' -> the order's last event in the current transaction.
+  __trx_last JSONB;
   __key TEXT;
+  __hf23_done BOOLEAN := _hf23_block IS NULL OR _hf23_block > _last_block;
   __dust_culls BIGINT := 0;
-  __mismatched BIGINT;
-  __example TEXT;
 BEGIN
+  TRUNCATE replay_orders;
   FOR __op IN
-    SELECT o.id, o.block_num, o.trx_in_block, o.op_type_id, o.body_value AS body
-    FROM operations_view o
+    SELECT o.id, o.block_num, o.trx_in_block, o.op_type_id, o.body
+    FROM _replay_ops o
     WHERE o.op_type_id IN (btracker_backend.op_limit_order_create(), btracker_backend.op_limit_order_create2(),
                            btracker_backend.op_fill_order(), btracker_backend.op_limit_order_cancel(),
                            btracker_backend.op_limit_order_cancelled())
-      AND o.block_num <= hive.app_get_current_block_num(__schema)
+      AND o.block_num <= _last_block
     ORDER BY o.id
   LOOP
+    IF NOT __hf23_done AND __op.block_num > _hf23_block THEN
+      PERFORM pg_temp.replay_hf23_close(_hf23_block);
+      __hf23_done := TRUE;
+    END IF;
     IF __op.trx_in_block < 0 OR __op.block_num IS DISTINCT FROM __trx_block OR __op.trx_in_block IS DISTINCT FROM __trx_in_block THEN
       __trx_block := __op.block_num;
       __trx_in_block := __op.trx_in_block;
-      __trx_filled := '{}';
-      __trx_user_cancelled := '{}';
+      __trx_last := '{}';
     END IF;
     IF __op.op_type_id IN (btracker_backend.op_limit_order_create(), btracker_backend.op_limit_order_create2()) THEN
       INSERT INTO replay_orders VALUES (__op.id, __op.body ->> 'owner', (__op.body ->> 'orderid')::BIGINT,
         (__op.body -> 'amount_to_sell' ->> 'amount')::BIGINT, 0, NULL, NULL);
+      __trx_last := __trx_last || jsonb_build_object((__op.body ->> 'owner') || '/' || (__op.body ->> 'orderid'), 'create');
     ELSIF __op.op_type_id = btracker_backend.op_fill_order() THEN
       FOR __side IN
         SELECT __op.body ->> 'open_owner' AS owner, (__op.body ->> 'open_orderid')::BIGINT AS order_id,
@@ -339,7 +355,8 @@ BEGIN
         SELECT __op.body ->> 'current_owner', (__op.body ->> 'current_orderid')::BIGINT,
                (__op.body -> 'current_pays' ->> 'amount')::BIGINT
       LOOP
-        __trx_filled := __trx_filled || (__side.owner || '/' || __side.order_id);
+        CONTINUE WHEN __side.owner IS NULL;
+        __trx_last := __trx_last || jsonb_build_object(__side.owner || '/' || __side.order_id, 'fill');
         UPDATE replay_orders r
            SET remaining = r.remaining - __side.pays, filled = r.filled + __side.pays,
                end_block = CASE WHEN r.remaining - __side.pays <= 0 THEN __op.block_num END,
@@ -348,11 +365,8 @@ BEGIN
       END LOOP;
     ELSE
       __key := COALESCE(__op.body ->> 'seller', __op.body ->> 'owner') || '/' || (__op.body ->> 'orderid');
-      IF __op.op_type_id = btracker_backend.op_limit_order_cancel() THEN
-        __trx_user_cancelled := __trx_user_cancelled || __key;
-      END IF;
       IF __op.op_type_id = btracker_backend.op_limit_order_cancelled() AND __op.trx_in_block >= 0
-         AND __key = ANY (__trx_filled) AND NOT __key = ANY (__trx_user_cancelled) THEN
+         AND __trx_last ->> __key IS NOT DISTINCT FROM 'fill' THEN
         UPDATE replay_orders r SET end_block = __op.block_num, outcome = 'filled'
          WHERE r.owner = COALESCE(__op.body ->> 'seller', __op.body ->> 'owner')
            AND r.order_id = (__op.body ->> 'orderid')::BIGINT AND r.end_block IS NULL;
@@ -362,23 +376,72 @@ BEGIN
          WHERE r.owner = COALESCE(__op.body ->> 'seller', __op.body ->> 'owner')
            AND r.order_id = (__op.body ->> 'orderid')::BIGINT AND r.end_block IS NULL;
       END IF;
+      __trx_last := __trx_last || jsonb_build_object(__key,
+        CASE WHEN __op.op_type_id = btracker_backend.op_limit_order_cancel() THEN 'cancel' ELSE 'cancelled' END);
     END IF;
   END LOOP;
+  IF NOT __hf23_done THEN
+    PERFORM pg_temp.replay_hf23_close(_hf23_block);
+  END IF;
+  RETURN __dust_culls;
+END
+$f$;
 
+CREATE FUNCTION pg_temp.replay_hf23_close(_hf23_block INT)
+RETURNS VOID LANGUAGE sql
+AS $f$
+  UPDATE replay_orders r SET end_block = _hf23_block, outcome = 'cancelled'
+  WHERE r.end_block IS NULL
+    AND r.owner IN (SELECT o.body ->> 'account' FROM _replay_ops o
+                    WHERE o.op_type_id = btracker_backend.op_hardfork_hive() AND o.block_num = _hf23_block)
+$f$;
+
+-- replay_orders against order_lifecycle, both ways; with _owner_ids, only the rows
+-- of those accounts.
+CREATE FUNCTION pg_temp.check_replay_equals_order_lifecycle(_when TEXT, _owner_ids INT[] = NULL)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+DECLARE
+  __mismatched BIGINT;
+  __example TEXT;
+BEGIN
   SELECT count(*), min(d::TEXT) INTO __mismatched, __example FROM (
+    WITH lifecycle AS (
+      SELECT ol.create_op_id, ol.remaining, ol.filled, ol.end_block, ol.outcome FROM order_lifecycle ol
+      WHERE _owner_ids IS NULL OR ol.owner_id = ANY (_owner_ids))
     (SELECT r.create_op_id, r.remaining, r.filled, r.end_block, r.outcome FROM replay_orders r
      EXCEPT
-     SELECT ol.create_op_id, ol.remaining, ol.filled, ol.end_block, ol.outcome FROM order_lifecycle ol)
+     SELECT * FROM lifecycle)
     UNION ALL
-    (SELECT ol.create_op_id, ol.remaining, ol.filled, ol.end_block, ol.outcome FROM order_lifecycle ol
+    (SELECT * FROM lifecycle
      EXCEPT
      SELECT r.create_op_id, r.remaining, r.filled, r.end_block, r.outcome FROM replay_orders r)) d;
   IF __mismatched <> 0 THEN
-    RAISE EXCEPTION '% order_lifecycle rows differ from the replay of the order operations, e.g. %', __mismatched, __example;
+    RAISE EXCEPTION '%: % order_lifecycle rows differ from the replay of the order operations, e.g. %', _when, __mismatched, __example;
   END IF;
-  RAISE NOTICE 'PASS: order_lifecycle equals the replay of the synced order operations (% orders: % filled, % cancelled, % open)',
-    (SELECT count(*) FROM replay_orders), (SELECT count(*) FROM replay_orders WHERE outcome = 'filled'),
+  RAISE NOTICE 'PASS: %: order_lifecycle equals the replay of the order operations (% orders: % filled, % cancelled, % open)',
+    _when, (SELECT count(*) FROM replay_orders), (SELECT count(*) FROM replay_orders WHERE outcome = 'filled'),
     (SELECT count(*) FROM replay_orders WHERE outcome = 'cancelled'), (SELECT count(*) FROM replay_orders WHERE outcome IS NULL);
+END
+$f$;
+
+-- The synced rows against a replay of the synced blocks' order operations.
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+  __head CONSTANT INT := hive.app_get_current_block_num(__schema);
+  __dust_culls BIGINT;
+BEGIN
+  INSERT INTO _replay_ops
+  SELECT o.id, o.block_num, o.trx_in_block, o.op_type_id, o.body_value AS body
+  FROM operations_view o
+  WHERE o.op_type_id IN (btracker_backend.op_limit_order_create(), btracker_backend.op_limit_order_create2(),
+                         btracker_backend.op_fill_order(), btracker_backend.op_limit_order_cancel(),
+                         btracker_backend.op_limit_order_cancelled(), btracker_backend.op_hardfork_hive())
+    AND o.block_num <= __head;
+  __dust_culls := pg_temp.replay_order_ops((SELECT ah.block_num FROM hafd.applied_hardforks ah WHERE ah.hardfork_num = 23), __head);
+  PERFORM pg_temp.check_replay_equals_order_lifecycle('the synced blocks');
   IF __dust_culls = 0 THEN
     RAISE NOTICE 'SKIP: the synced blocks have no dust cull, so the replay does not check them (the synthetic case below does)';
   ELSE
@@ -421,6 +484,7 @@ BEGIN
     RAISE EXCEPTION 'no fixture accounts: % %', __a, __b;
   END IF;
 
+  TRUNCATE _replay_ops;
   -- Operations past the blocks' own ones (op_pos from 10000), so their ids sort after them.
   PERFORM pg_temp.stage_ops(jsonb_build_array(
     pg_temp.op_create(__b1, 10001, __a, __n + 1, 1000, __hive),
@@ -438,13 +502,29 @@ BEGIN
     pg_temp.in_trx(4, pg_temp.op_fill(__b1, 10013, __b, __n + 10, 40, __hive)),
     pg_temp.in_trx(4, pg_temp.op_cancel(__b1, 10014, __b, __n + 10, FALSE)),
     pg_temp.in_trx(4, pg_temp.op_cancel(__b1, 10015, __b, __n + 10, TRUE)),
+    pg_temp.op_create(__b1, 10016, __a, __n + 11, 500, __hive),
+    pg_temp.op_create(__b1, 10017, __a, __n + 12, 400, __hive),
     pg_temp.op_create(__b2, 10001, __b, __n + 4, 200, __hive),
     pg_temp.op_create(__b2, 10002, __a, __n + 3, 500, __hive),
     pg_temp.op_create(__b2, 10003, __b, __n + 5, 100, __hbd),
     pg_temp.op_fill(__b2, 10004, __a, __n + 1, 1000, __hive),
     pg_temp.op_fill(__b2, 10005, __a, __n + 6, 200, __hive, __b, __n + 5, 40, __hbd),
     pg_temp.op_fill(__b2, 10006, __a, __n + 6, 300, __hive),
-    pg_temp.op_create(__b2, 10007, __b, __n + 9, 100, __hive)));
+    pg_temp.op_create(__b2, 10007, __b, __n + 9, 100, __hive),
+    -- One transaction: the owner cancels #11, re-creates it, and hived culls the new one.
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b2, 10008, __a, __n + 11, FALSE)),
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b2, 10009, __a, __n + 11, TRUE)),
+    pg_temp.in_trx(7, pg_temp.op_create(__b2, 10010, __a, __n + 11, 1000, __hive)),
+    pg_temp.in_trx(7, pg_temp.op_fill(__b2, 10011, __a, __n + 11, 998, __hive)),
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b2, 10012, __a, __n + 11, TRUE)),
+    -- One transaction: hived culls the new #11, the owner re-creates and cancels it.
+    pg_temp.in_trx(8, pg_temp.op_create(__b2, 10013, __b, __n + 11, 100, __hive)),
+    pg_temp.in_trx(8, pg_temp.op_fill(__b2, 10014, __b, __n + 11, 99, __hive)),
+    pg_temp.in_trx(8, pg_temp.op_cancel(__b2, 10015, __b, __n + 11, TRUE)),
+    pg_temp.in_trx(8, pg_temp.op_create(__b2, 10016, __b, __n + 11, 200, __hive)),
+    pg_temp.in_trx(8, pg_temp.op_cancel(__b2, 10017, __b, __n + 11, FALSE)),
+    pg_temp.in_trx(8, pg_temp.op_cancel(__b2, 10018, __b, __n + 11, TRUE))));
+  INSERT INTO _replay_ops SELECT id, block_num, trx_in_block, op_type_id, body_value FROM _btracker_ops_batch;
   PERFORM process_block_range_orders(__b1, __b2);
   PERFORM pg_temp.check_open_rows_equal_order_state('after a two-block range');
 
@@ -458,7 +538,14 @@ BEGIN
     pg_temp.in_trx(5, pg_temp.op_fill(__b3, 10007, __a, __n + 8, 999, __hive)),
     pg_temp.in_trx(5, pg_temp.op_cancel(__b3, 10008, __a, __n + 8, TRUE)),
     pg_temp.in_trx(6, pg_temp.op_fill(__b3, 10009, __b, __n + 9, 30, __hive)),
-    pg_temp.op_cancel(__b3, 10010, __b, __n + 9, TRUE)));
+    pg_temp.op_cancel(__b3, 10010, __b, __n + 9, TRUE),
+    -- The owner cancels #12, open from the earlier call, re-creates it, and hived culls the new one.
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b3, 10011, __a, __n + 12, FALSE)),
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b3, 10012, __a, __n + 12, TRUE)),
+    pg_temp.in_trx(7, pg_temp.op_create(__b3, 10013, __a, __n + 12, 600, __hive)),
+    pg_temp.in_trx(7, pg_temp.op_fill(__b3, 10014, __a, __n + 12, 597, __hive)),
+    pg_temp.in_trx(7, pg_temp.op_cancel(__b3, 10015, __a, __n + 12, TRUE))));
+  INSERT INTO _replay_ops SELECT id, block_num, trx_in_block, op_type_id, body_value FROM _btracker_ops_batch;
   PERFORM process_block_range_orders(__b3, __b3);
   PERFORM pg_temp.check_open_rows_equal_order_state('after the next block');
   PERFORM pg_temp.check_order_stats_rollup('after the next block');
@@ -478,15 +565,24 @@ BEGIN
     jsonb_build_array('a', 7, 0, 3, 997, 'filled', 0),         -- dust cull in the fill's transaction: filled
     jsonb_build_array('a', 8, 0, 1, 999, 'filled', 2),         -- open from the earlier call, then dust-culled
     jsonb_build_array('b', 10, 0, 60, 40, 'cancelled', 0),     -- the owner's cancel in the fill's transaction
+    jsonb_build_array('a', 11, 0, 500, 0, 'cancelled', 1),     -- cancelled, then re-created in its transaction
+    jsonb_build_array('a', 12, 0, 400, 0, 'cancelled', 2),     -- open from the earlier call, the same
     jsonb_build_array('b', 4, 1, 150, 50, NULL, NULL),         -- the id reused in the same range
     jsonb_build_array('a', 3, 1, 500, 0, 'cancelled', 2),      -- expired: limit_order_cancelled alone
     jsonb_build_array('b', 5, 1, 0, 100, 'filled', 2),         -- taker side of a fill, then filled
     jsonb_build_array('b', 9, 1, 70, 30, 'cancelled', 2),      -- expired in the block of a fill
-    jsonb_build_array('b', 5, 2, 70, 0, NULL, NULL));          -- the id reused in the block that closed it
+    jsonb_build_array('a', 11, 1, 2, 998, 'filled', 1),        -- re-created after the owner's cancel, dust-culled
+    jsonb_build_array('b', 11, 1, 1, 99, 'filled', 1),         -- dust-culled, then the id re-created and cancelled
+    jsonb_build_array('b', 11, 1, 200, 0, 'cancelled', 1),     -- the re-created id, cancelled by its owner
+    jsonb_build_array('b', 5, 2, 70, 0, NULL, NULL),           -- the id reused in the block that closed it
+    jsonb_build_array('a', 12, 2, 3, 597, 'filled', 2));       -- re-created after the owner's cancel, dust-culled
   IF __actual IS DISTINCT FROM __expected THEN
     RAISE EXCEPTION 'order_lifecycle: expected %, found %', __expected, __actual;
   END IF;
   RAISE NOTICE 'PASS: order_lifecycle keeps each order, reused ids apart, with its outcome';
+
+  PERFORM pg_temp.replay_order_ops(NULL, __b3);
+  PERFORM pg_temp.check_replay_equals_order_lifecycle('the synthetic blocks', ARRAY[__a_id, __b_id]);
 
   -- Windows on the creation block; outcomes after the window still count.
   __actual := jsonb_build_array(
@@ -496,9 +592,9 @@ BEGIN
     pg_temp.stats(btracker_endpoints.get_account_order_stats(__b, NULL, __b1::TEXT)),
     pg_temp.stats(btracker_endpoints.get_account_order_stats(__b, (__b3 + 1)::TEXT, NULL)));
   __expected := jsonb_build_array(
-    jsonb_build_object('created', 6, 'filled', 4, 'cancelled', 2, 'open', 0, 'fill_rate_pct', 66.67),
-    jsonb_build_object('created', 5, 'filled', 4, 'cancelled', 1, 'open', 0, 'fill_rate_pct', 80),
-    jsonb_build_object('created', 4, 'filled', 1, 'cancelled', 1, 'open', 2, 'fill_rate_pct', 25),
+    jsonb_build_object('created', 10, 'filled', 6, 'cancelled', 4, 'open', 0, 'fill_rate_pct', 60),
+    jsonb_build_object('created', 7, 'filled', 4, 'cancelled', 3, 'open', 0, 'fill_rate_pct', 57.14),
+    jsonb_build_object('created', 6, 'filled', 2, 'cancelled', 2, 'open', 2, 'fill_rate_pct', 33.33),
     jsonb_build_object('created', 2, 'filled', 0, 'cancelled', 2, 'open', 0, 'fill_rate_pct', 0),
     jsonb_build_object('created', 0, 'filled', 0, 'cancelled', 0, 'open', 0, 'fill_rate_pct', NULL));
   IF __actual IS DISTINCT FROM __expected THEN
@@ -506,12 +602,12 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: /accounts/{account-name}/order-stats counts the orders created in the window';
 
-  -- Network-wide: the synced orders of the window plus the twelve synthetic ones.
+  -- Network-wide: the synced orders of the window plus the eighteen synthetic ones.
   __actual := pg_temp.stats(btracker_endpoints.get_order_stats(__b1::TEXT, __b3::TEXT));
   __expected := jsonb_build_object(
-    'created', __window_before.created + 12, 'filled', __window_before.filled + 5,
-    'cancelled', __window_before.cancelled + 5, 'open', __window_before.open + 2,
-    'fill_rate_pct', round(100.0 * (__window_before.filled + 5) / (__window_before.created + 12), 2)::FLOAT);
+    'created', __window_before.created + 18, 'filled', __window_before.filled + 8,
+    'cancelled', __window_before.cancelled + 8, 'open', __window_before.open + 2,
+    'fill_rate_pct', round(100.0 * (__window_before.filled + 8) / (__window_before.created + 18), 2)::FLOAT);
   IF __actual IS DISTINCT FROM __expected THEN
     RAISE EXCEPTION '/order-stats: expected %, found %', __expected, __actual;
   END IF;
@@ -536,6 +632,96 @@ BEGIN
       pg_temp.stats(__window_before), pg_temp.stats(btracker_endpoints.get_order_stats(__b1::TEXT, __b3::TEXT));
   END IF;
   RAISE NOTICE 'PASS: a fork rollback reverts order_lifecycle and the order counts';
+END
+$$;
+ROLLBACK;
+
+-- HF23: the test HAF stops before it, so a session temp view named operations_view,
+-- which process_hf_23's unqualified reference resolves to first, adds a
+-- hardfork_hive operation clearing one synthetic account in a pretend HF23 block
+-- (the block before the synced head); the replay gets the same operation.
+BEGIN;
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+  __b3 CONSTANT INT := hive.app_get_current_block_num(__schema);
+  __hf CONSTANT INT := __b3 - 1;
+  __b1 CONSTANT INT := __b3 - 2;
+  __n CONSTANT BIGINT := 5000000000;
+  __hive CONSTANT SMALLINT := 21;
+  __a TEXT;
+  __b TEXT;
+  __a_id INT;
+  __b_id INT;
+  __actual JSONB;
+  __expected JSONB;
+BEGIN
+  SELECT av.name, av.id INTO __a, __a_id FROM hive.accounts_view av
+  WHERE NOT EXISTS (SELECT 1 FROM order_lifecycle ol WHERE ol.owner_id = av.id) ORDER BY av.id OFFSET 10 LIMIT 1;
+  SELECT av.name, av.id INTO __b, __b_id FROM hive.accounts_view av
+  WHERE NOT EXISTS (SELECT 1 FROM order_lifecycle ol WHERE ol.owner_id = av.id) ORDER BY av.id OFFSET 11 LIMIT 1;
+  IF __b IS NULL THEN
+    RAISE EXCEPTION 'no fixture accounts: % %', __a, __b;
+  END IF;
+
+  EXECUTE format($sql$
+    CREATE TEMP VIEW operations_view AS
+    SELECT ov.id, ov.block_num, ov.op_type_id, ov.body_value FROM %1$I.operations_view ov
+    UNION ALL
+    SELECT hafd.operation_id(%2$s, 10000), %2$s, btracker_backend.op_hardfork_hive()::SMALLINT,
+           jsonb_build_object('account', %3$L, 'treasury', 'steem.dao')
+  $sql$, __schema, __hf, __a);
+
+  TRUNCATE _replay_ops;
+  INSERT INTO _replay_ops VALUES (hafd.operation_id(__hf, 10000), __hf, -1, btracker_backend.op_hardfork_hive(),
+    jsonb_build_object('account', __a, 'treasury', 'steem.dao'));
+
+  PERFORM pg_temp.stage_ops(jsonb_build_array(
+    pg_temp.op_create(__b1, 10001, __a, __n + 1, 1000, __hive),
+    pg_temp.op_create(__b1, 10002, __a, __n + 2, 500, __hive),
+    pg_temp.op_fill(__b1, 10003, __a, __n + 2, 200, __hive),
+    pg_temp.op_create(__b1, 10004, __a, __n + 5, 100, __hive),
+    pg_temp.op_fill(__b1, 10005, __a, __n + 5, 100, __hive),
+    pg_temp.op_create(__b1, 10006, __b, __n + 1, 300, __hive),
+    pg_temp.op_create(__hf, 10001, __a, __n + 3, 100, __hive),
+    pg_temp.op_fill(__hf, 10002, __a, __n + 1, 100, __hive)));
+  INSERT INTO _replay_ops SELECT id, block_num, trx_in_block, op_type_id, body_value FROM _btracker_ops_batch;
+  PERFORM process_block_range_orders(__b1, __hf);
+  PERFORM btracker_backend.process_hf_23(__hf);
+
+  PERFORM pg_temp.stage_ops(jsonb_build_array(
+    pg_temp.op_create(__b3, 10001, __a, __n + 1, 50, __hive)));
+  INSERT INTO _replay_ops SELECT id, block_num, trx_in_block, op_type_id, body_value FROM _btracker_ops_batch;
+  PERFORM process_block_range_orders(__b3, __b3);
+  PERFORM pg_temp.check_open_rows_equal_order_state('after HF23');
+  PERFORM pg_temp.check_order_stats_rollup('after HF23');
+
+  SELECT jsonb_agg(jsonb_build_array(
+           CASE ol.owner_id WHEN __a_id THEN 'a' ELSE 'b' END, ol.order_id - __n,
+           ol.block_created - __b1, ol.remaining, ol.filled, ol.outcome, ol.end_block - __b1)
+         ORDER BY ol.create_op_id)
+  INTO __actual
+  FROM order_lifecycle ol WHERE ol.owner_id IN (__a_id, __b_id);
+  __expected := jsonb_build_array(
+    jsonb_build_array('a', 1, 0, 900, 100, 'cancelled', 1),    -- open at HF23: cancelled there
+    jsonb_build_array('a', 2, 0, 300, 200, 'cancelled', 1),    -- partially filled, open at HF23
+    jsonb_build_array('a', 5, 0, 0, 100, 'filled', 0),         -- filled before HF23: unchanged
+    jsonb_build_array('b', 1, 0, 300, 0, NULL, NULL),          -- an account HF23 does not clear
+    jsonb_build_array('a', 3, 1, 100, 0, 'cancelled', 1),      -- created in the HF23 block
+    jsonb_build_array('a', 1, 2, 50, 0, NULL, NULL));          -- the id reused after HF23
+  IF __actual IS DISTINCT FROM __expected THEN
+    RAISE EXCEPTION 'order_lifecycle after HF23: expected %, found %', __expected, __actual;
+  END IF;
+  RAISE NOTICE 'PASS: HF23 closes the cleared account''s open orders as cancelled';
+
+  PERFORM pg_temp.replay_order_ops(__hf, __b3);
+  PERFORM pg_temp.check_replay_equals_order_lifecycle('across HF23', ARRAY[__a_id, __b_id]);
+  PERFORM pg_temp.replay_order_ops(__hf, __hf);
+  IF (SELECT count(*) FROM replay_orders WHERE outcome = 'cancelled' AND end_block = __hf) <> 3 THEN
+    RAISE EXCEPTION 'replay ending at the HF23 block: expected its 3 open orders of % cancelled there', __a;
+  END IF;
+  RAISE NOTICE 'PASS: the replay closes the cleared account''s open orders at HF23, also when it ends there';
 END
 $$;
 ROLLBACK;

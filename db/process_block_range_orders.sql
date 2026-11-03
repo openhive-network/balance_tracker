@@ -184,8 +184,7 @@ BEGIN
             nai,
             (amount)::bigint AS fill_amount,
             op_id AS fill_op_id,
-            block_num AS fill_block,
-            trx_in_block
+            block_num AS fill_block
         FROM events
         WHERE op_type_id = _op_fill
     ),
@@ -199,9 +198,7 @@ BEGIN
             owner_id,
             order_id,
             op_id AS cancel_op_id,
-            block_num AS cancel_block,
-            trx_in_block,
-            op_type_id = _op_cancel AS is_user_cancel
+            block_num AS cancel_block
         FROM events
         WHERE op_type_id IN (_op_cancel, _op_cancelled)
     ),
@@ -547,9 +544,9 @@ BEGIN
      * Dust cull: when a fill leaves an order unable to buy anything, hived
      * (database::fill_order) cancels it with a virtual limit_order_cancelled in
      * the fill's transaction and counts it as fully filled. Such a cancel - in a
-     * transaction (expiry runs at block level, trx_in_block -1), after a fill of
-     * the order in that transaction, with no limit_order_cancel of the order
-     * there - closes the order as filled, its dust left in remaining.
+     * transaction (expiry runs at block level, trx_in_block -1), whose nearest
+     * earlier event of the order in that transaction is a fill (not the owner's
+     * limit_order_cancel) - closes the order as filled, its dust left in remaining.
      */
     lc_creates AS MATERIALIZED (
         /*
@@ -571,25 +568,33 @@ BEGIN
         FROM fills
         UNION ALL
         SELECT
-            c.owner_id,
-            c.order_id,
-            c.cancel_op_id,
-            c.cancel_block,
+            owner_id,
+            order_id,
+            op_id,
+            block_num,
             0,
             FALSE,
-            NOT c.is_user_cancel
-            AND c.trx_in_block >= 0
-            AND EXISTS (
-                SELECT 1 FROM fills f
-                WHERE (f.owner_id, f.order_id, f.fill_block, f.trx_in_block)
-                    = (c.owner_id, c.order_id, c.cancel_block, c.trx_in_block)
-                  AND f.fill_op_id < c.cancel_op_id)
-            AND NOT EXISTS (
-                SELECT 1 FROM cancels u
-                WHERE (u.owner_id, u.order_id, u.cancel_block, u.trx_in_block)
-                    = (c.owner_id, c.order_id, c.cancel_block, c.trx_in_block)
-                  AND u.is_user_cancel)
-        FROM cancels c
+            op_type_id = _op_cancelled
+            AND trx_in_block >= 0
+            AND prev_op_type_id IS NOT DISTINCT FROM _op_fill
+        FROM (
+            /*
+             * The order's previous event in its transaction decides: hived emits
+             * a transaction-level limit_order_cancelled right after the fill that
+             * culls the order or right after the owner's limit_order_cancel, so
+             * an order id reused within one transaction cannot flip the outcome.
+             */
+            SELECT
+                owner_id,
+                order_id,
+                op_id,
+                block_num,
+                trx_in_block,
+                op_type_id,
+                LAG(op_type_id) OVER (PARTITION BY owner_id, order_id, block_num, trx_in_block ORDER BY op_id) AS prev_op_type_id
+            FROM events
+        ) e
+        WHERE op_type_id IN (_op_cancel, _op_cancelled)
     ),
     lc_totals AS MATERIALIZED (
         /*
