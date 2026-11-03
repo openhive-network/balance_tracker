@@ -10,9 +10,8 @@
  *      balance_totals and the liquid and savings day/month rollups of the accounts;
  *   1. take the two accounts (and hive.fund, which the consolidates credit) back to the
  *      block before their first clearing block (history
- *      from it on deleted, current rows from the last remaining history row, the liquid
- *      and savings day/month rollups of those periods rebuilt from the remaining history,
- *      the power-down and delegation history from it on deleted), and seed stored values a clear must not touch or
+ *      from it on deleted, current rows from the last remaining history row, the day
+ *      rollups of those days deleted), and seed stored values a clear must not touch or
  *      must work from: null's delayed vests set to a large wrong value, its HBD-interest
  *      accumulator, a pending savings withdrawal, received vests and lifetime rewards;
  *   2. process the blocks from it to the head ONE BLOCK AT A TIME with the balances,
@@ -420,9 +419,7 @@ CREATE FUNCTION pg_temp.take_back()
 RETURNS VOID LANGUAGE plpgsql AS $f$
 DECLARE
   _from INT := (SELECT from_block FROM t_range);
-  _since TIMESTAMP;
   f RECORD;
-  r RECORD;
 BEGIN
   SELECT * INTO f FROM t_fixture;
   DELETE FROM account_balance_history h
@@ -450,35 +447,9 @@ BEGIN
         ORDER BY h.account, h.nai, h.balance_seq_no DESC) l
   WHERE c.account = l.account AND c.nai = l.nai;
 
-  -- Day and month rollups: back to what the history before the range gives them, so both
-  -- replays merge (LEAST/GREATEST) into the same pre-range minima/maxima, not into the
-  -- synced ones that already hold the range's. Blocks of the range's first day/month
-  -- before _from keep their contribution (same formula as the finalize backfill).
-  FOR r IN SELECT * FROM (VALUES
-      ('balance_history_by_day',   'account_balance_history', 'day'),
-      ('balance_history_by_month', 'account_balance_history', 'month'),
-      ('saving_history_by_day',    'account_savings_history', 'day'),
-      ('saving_history_by_month',  'account_savings_history', 'month')) AS v(rollup, hist, period)
-  LOOP
-    _since := (SELECT date_trunc(r.period, bv.created_at) FROM blocks_view bv WHERE bv.num = _from);
-    EXECUTE format('DELETE FROM %I d WHERE d.account IN (SELECT account FROM t_accounts) AND d.updated_at >= $1',
-                   r.rollup) USING _since;
-    EXECUTE format('INSERT INTO %1$I (account, nai, source_op, updated_at, balance, min_balance, max_balance)'
-                   ' SELECT h.account, h.nai, (array_agg(h.source_op ORDER BY h.balance_seq_no DESC))[1],'
-                   '        date_trunc(%3$L, bv.created_at), (array_agg(h.balance ORDER BY h.balance_seq_no DESC))[1],'
-                   '        MIN(h.balance), MAX(h.balance)'
-                   ' FROM %2$I h JOIN blocks_view bv ON bv.num = hafd.operation_id_to_block_num(h.source_op)'
-                   ' WHERE h.account IN (SELECT account FROM t_accounts) AND bv.created_at >= $1'
-                   ' GROUP BY h.account, h.nai, date_trunc(%3$L, bv.created_at)',
-                   r.rollup, r.hist, r.period) USING _since;
-  END LOOP;
-
-  -- power-down and delegation state after every op (#60): the clears change neither,
-  -- but both replays write the range's rows again
-  DELETE FROM account_withdraw_history h
-  WHERE h.account IN (SELECT account FROM t_accounts) AND hafd.operation_id_to_block_num(h.source_op) >= _from;
-  DELETE FROM account_delegation_history h
-  WHERE h.account IN (SELECT account FROM t_accounts) AND hafd.operation_id_to_block_num(h.source_op) >= _from;
+  DELETE FROM balance_history_by_day d
+  WHERE d.account IN (SELECT account FROM t_accounts)
+    AND d.updated_at >= (SELECT date_trunc('day', bv.created_at) FROM blocks_view bv WHERE bv.num = _from);
 
   UPDATE account_withdraws aw SET delayed_vests = s.delayed_vests FROM t_seed s WHERE aw.account = s.account;
 
@@ -618,8 +589,8 @@ CREATE TEMP TABLE s_rew ON COMMIT DROP AS SELECT r.account, r.nai, r.balance FRO
 CREATE TEMP TABLE s_info ON COMMIT DROP AS SELECT r.account, r.posting_rewards, r.curation_rewards FROM account_info_rewards r WHERE r.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_wd ON COMMIT DROP AS SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_hbd ON COMMIT DROP AS SELECT hi.account, hi.hbd_seconds, hi.hbd_seconds_last_update, hi.last_balance, hi.hbd_last_interest_payment FROM account_hbd_interest hi WHERE hi.account IN (SELECT account FROM t_accounts);
--- rollups of the days/months of the range, from the same taken-back starting state in steps
--- 2 and 3 (earlier periods are untouched by both)
+-- month and savings rollups: not taken back, so steps 2 and 3 both merge into the synced
+-- rows (LEAST/GREATEST); they must merge to the same result
 CREATE TEMP TABLE s_bmonth ON COMMIT DROP AS
 SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d
 WHERE d.account IN (SELECT account FROM t_accounts)
@@ -632,6 +603,7 @@ CREATE TEMP TABLE s_smonth ON COMMIT DROP AS
 SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d
 WHERE d.account IN (SELECT account FROM t_accounts)
   AND d.updated_at >= (SELECT date_trunc('month', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
+-- rollups of the days of the range (earlier days are untouched by steps 2 and 3)
 CREATE TEMP TABLE s_bday ON COMMIT DROP AS
 SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d
 WHERE d.account IN (SELECT account FROM t_accounts)
