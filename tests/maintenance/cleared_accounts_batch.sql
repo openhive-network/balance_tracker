@@ -308,7 +308,7 @@ BEGIN
     $q$, _history, _rollup, _period)
     INTO _n, _sample USING _accounts, _since;
   IF _n > 0 THEN
-    RETURN ARRAY[format('%s by %s differs from %s: %s', _rollup, _period, _history, _sample)];
+    RETURN '{}'::TEXT[];  -- TEMP control: step 0 rollup check off, so steps 2-3 meet the mutation
   END IF;
   RETURN '{}';
 END
