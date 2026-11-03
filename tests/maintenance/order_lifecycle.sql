@@ -30,7 +30,10 @@
  *     windows (unbounded, across group edges, inside one group, exactly one
  *     group, holding orders that closed after the window, a date window),
  *     while an inverted block or date window gets HAF's error from both
- *     endpoints.
+ *     endpoints;
+ *   - an upgrade from a version without the rollups: both dropped and
+ *     db/btracker_app.sql run again, they equal order_lifecycle's counts, and
+ *     still do after a block that fills and cancels orders created before it.
  *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Everything after the first check runs in a
@@ -533,6 +536,77 @@ BEGIN
       pg_temp.stats(__window_before), pg_temp.stats(btracker_endpoints.get_order_stats(__b1::TEXT, __b3::TEXT));
   END IF;
   RAISE NOTICE 'PASS: a fork rollback reverts order_lifecycle and the order counts';
+END
+$$;
+ROLLBACK;
+
+-- An install upgraded from a version with order_lifecycle but without its rollups:
+-- the rollups dropped, db/btracker_app.sql run again as scripts/install_app.sh
+-- runs it, then a block that fills one order created before the upgrade and
+-- cancels another.
+BEGIN;
+DROP TABLE order_stats_by_block, order_stats_by_block_group;
+SET search_path TO :"schema";
+\ir ../../db/btracker_app.sql
+SET search_path TO :"schema", public;
+DO
+$$
+DECLARE
+  __b3 CONSTANT INT := hive.app_get_current_block_num(current_setting('btracker_test.schema'));
+  __filled RECORD;
+  __cancelled RECORD;
+  __filled_before btracker_backend.order_stats;
+  __cancelled_before btracker_backend.order_stats;
+  __actual JSONB;
+  __expected JSONB;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM order_stats_by_block) THEN
+    RAISE EXCEPTION 'reinstalling over order_lifecycle (% rows) left order_stats_by_block empty', (SELECT count(*) FROM order_lifecycle);
+  END IF;
+  PERFORM pg_temp.check_order_stats_rollup('after reinstalling over order_lifecycle without the rollups');
+
+  SELECT ol.*, av.name INTO __filled FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.end_block IS NULL ORDER BY ol.create_op_id LIMIT 1;
+  SELECT ol.*, av.name INTO __cancelled FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.end_block IS NULL ORDER BY ol.create_op_id OFFSET 1 LIMIT 1;
+  IF __cancelled.create_op_id IS NULL THEN
+    RAISE EXCEPTION 'expected two open synced orders, found %', (SELECT count(*) FROM order_lifecycle WHERE end_block IS NULL);
+  END IF;
+  __filled_before := btracker_endpoints.get_order_stats(__filled.block_created::TEXT, __filled.block_created::TEXT);
+  __cancelled_before := btracker_endpoints.get_order_stats(__cancelled.block_created::TEXT, __cancelled.block_created::TEXT);
+
+  PERFORM pg_temp.stage_ops(jsonb_build_array(
+    pg_temp.op_fill(__b3, 10001, __filled.name, __filled.order_id, __filled.remaining, __filled.nai),
+    pg_temp.op_cancel(__b3, 10002, __cancelled.name, __cancelled.order_id, TRUE)));
+  PERFORM process_block_range_orders(__b3, __b3);
+  PERFORM pg_temp.check_open_rows_equal_order_state('after a block past the upgrade');
+  PERFORM pg_temp.check_order_stats_rollup('after a block past the upgrade');
+
+  -- Each order's creation block keeps it created, now closed instead of open.
+  __actual := jsonb_build_array(
+    pg_temp.stats(btracker_endpoints.get_order_stats(__filled.block_created::TEXT, __filled.block_created::TEXT)),
+    pg_temp.stats(btracker_endpoints.get_order_stats(__cancelled.block_created::TEXT, __cancelled.block_created::TEXT)));
+  IF __filled.block_created = __cancelled.block_created THEN
+    __expected := jsonb_build_object(
+      'created', __filled_before.created, 'filled', __filled_before.filled + 1,
+      'cancelled', __filled_before.cancelled + 1, 'open', __filled_before.open - 2,
+      'fill_rate_pct', round(100.0 * (__filled_before.filled + 1) / __filled_before.created, 2)::FLOAT);
+    __expected := jsonb_build_array(__expected, __expected);
+  ELSE
+    __expected := jsonb_build_array(
+      jsonb_build_object(
+        'created', __filled_before.created, 'filled', __filled_before.filled + 1,
+        'cancelled', __filled_before.cancelled, 'open', __filled_before.open - 1,
+        'fill_rate_pct', round(100.0 * (__filled_before.filled + 1) / __filled_before.created, 2)::FLOAT),
+      jsonb_build_object(
+        'created', __cancelled_before.created, 'filled', __cancelled_before.filled,
+        'cancelled', __cancelled_before.cancelled + 1, 'open', __cancelled_before.open - 1,
+        'fill_rate_pct', round(100.0 * __cancelled_before.filled / __cancelled_before.created, 2)::FLOAT));
+  END IF;
+  IF __actual IS DISTINCT FROM __expected THEN
+    RAISE EXCEPTION '/order-stats over the closed orders'' creation blocks: expected %, found %', __expected, __actual;
+  END IF;
+  RAISE NOTICE 'PASS: orders created before the upgrade and closed after it count as created and closed: %', __actual;
 END
 $$;
 ROLLBACK;

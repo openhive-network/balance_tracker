@@ -1830,8 +1830,14 @@ $$;
  * in the statement that writes order_lifecycle, an outcome to the creation
  * block's row when it lands, so for any creation-block window they count what
  * order_lifecycle does. The network-wide statistics read whole groups and, at
- * the window's edges, at most a group's worth of blocks. Created and left empty
- * on upgrade as order_lifecycle is.
+ * the window's edges, at most a group's worth of blocks. Each is seeded from
+ * order_lifecycle when it is created, so an install upgraded from a version
+ * that had order_lifecycle but not the rollups counts its earlier orders too:
+ * the additive upserts of later blocks need that base, or an outcome landing on
+ * an earlier order would count it closed but never created.
+ *
+ * Every writer of order_lifecycle must maintain both rollups in the same
+ * statement: today process_block_range_orders and btracker_backend.process_hf_23.
  */
 DO $$
 DECLARE
@@ -1871,6 +1877,10 @@ BEGIN
 
       CONSTRAINT pk_order_stats_by_block PRIMARY KEY (block_created)
     );
+    INSERT INTO order_stats_by_block (block_created, created, filled, cancelled)
+    SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+    FROM order_lifecycle
+    GROUP BY block_created;
     PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block', __schema_name );
   END IF;
 
@@ -1884,6 +1894,12 @@ BEGIN
 
       CONSTRAINT pk_order_stats_by_block_group PRIMARY KEY (block_group)
     );
+    -- 10000 is btracker_backend.order_stats_group_blocks(), installed after this
+    -- file: keep the two equal.
+    INSERT INTO order_stats_by_block_group (block_group, created, filled, cancelled)
+    SELECT block_created / 10000, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+    FROM order_lifecycle
+    GROUP BY block_created / 10000;
     PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block_group', __schema_name );
   END IF;
 
