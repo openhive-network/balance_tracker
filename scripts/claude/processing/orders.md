@@ -21,6 +21,21 @@ Processes limit order operations for the internal HIVE/HBD market. Notable for h
 | Table | Purpose |
 |-------|---------|
 | `order_state` | Open market orders with remaining amounts |
+| `order_lifecycle` | Every order with its outcome |
+| `order_stats_by_block` | Per creation block: orders created, and of them filled and cancelled |
+| `order_stats_by_block_group` | The same per group of `btracker_backend.order_stats_group_blocks()` (10000) blocks |
+
+### Order counts (PHASE 7)
+
+In the statement that writes `order_lifecycle`, the rows `lc_ins` inserts and the
+rows `lc_upd` closes are counted per creation block and added (upsert) to
+`order_stats_by_block` and `order_stats_by_block_group`: an insert adds to
+`created`, and to `filled`/`cancelled` when it already closed; an update that closes
+an order created earlier adds its outcome to that earlier block. `lc_upd` touches
+open rows only, so an outcome is counted once. Both tables are registered with HAF,
+so a fork rollback reverts them with `order_lifecycle`. Per creation block they
+always equal `order_lifecycle` grouped by `block_created`
+(`tests/maintenance/order_lifecycle.sql` checks it).
 
 ## Order Lifecycle
 
@@ -160,8 +175,9 @@ the virtual operation suppressed, so no `limit_order_cancelled` reaches
 btracker. `btracker_backend.process_hf_23()`
 (`backend/operation_parsers/hardforks.sql`) deletes those accounts'
 `order_state` rows and closes their open `order_lifecycle` rows as
-`cancelled` with `end_block` = the HF23 block, `remaining` kept. No one-off
-repair: installs synced before this pick it up on resync.
+`cancelled` with `end_block` = the HF23 block, `remaining` kept, and adds them
+to `cancelled` in `order_stats_by_block` and `order_stats_by_block_group`. No
+one-off repair: installs synced before this pick it up on resync.
 
 ## Debugging Tips
 
@@ -185,3 +201,4 @@ When modifying order processing:
 - Remember fill_order returns TWO events (handle with SETOF function)
 - Maintain fill_op_id > create_op_id ordering for reused order_ids
 - Update deletion sources if new cancellation types added
+- Anything else that writes an `outcome` to `order_lifecycle` must add it to both order count tables

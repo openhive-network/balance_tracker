@@ -4,7 +4,8 @@ SET ROLE btracker_owner;
  * Processes limit order events (create, fill, cancel) within a block range.
  * Maintains order_state table with current open orders and their remaining amounts.
  * Handles order lifecycle: create -> partial fills -> fully filled or cancelled.
- * Keeps every order with its outcome in order_lifecycle (PHASE 6).
+ * Keeps every order with its outcome in order_lifecycle (PHASE 6), and counts
+ * them per creation block and block group (PHASE 7).
  */
 CREATE OR REPLACE FUNCTION process_block_range_orders(
     IN _from INT,
@@ -31,6 +32,8 @@ DECLARE
     __upd_pre     INT := 0;
     __ins_lc      INT := 0;
     __upd_lc      INT := 0;
+    __stats       INT := 0;
+    __group_blocks CONSTANT INT := btracker_backend.order_stats_group_blocks();
 BEGIN
     WITH ops_in_range AS MATERIALIZED (
         /*
@@ -631,7 +634,7 @@ BEGIN
             END
         FROM lc_creates c
         LEFT JOIN lc_totals t ON t.create_op_id = c.create_op_id
-        RETURNING 1
+        RETURNING block_created, outcome
     ),
     lc_upd AS (
         /*
@@ -654,20 +657,68 @@ BEGIN
          WHERE t.create_op_id IS NULL
            AND (l.owner_id, l.order_id) = (t.owner_id, t.order_id)
            AND l.end_block IS NULL
+        RETURNING l.block_created, l.outcome
+    ),
+
+    /*
+     * =========================================================================
+     * PHASE 7: Count the orders per creation block and block group
+     * =========================================================================
+     *
+     * What this statement changed in order_lifecycle, added to the counts of the
+     * creation block (order_stats_by_block) and its group
+     * (order_stats_by_block_group): each inserted row is created there, and
+     * filled or cancelled when it already closed; each updated row that closed
+     * adds its outcome to the block it was created in, earlier. An updated row
+     * was open (end_block IS NULL), so no outcome is counted twice.
+     */
+    lc_stats AS MATERIALIZED (
+        SELECT
+            e.block_created,
+            COUNT(*) FILTER (WHERE e.is_create) AS created,
+            COUNT(*) FILTER (WHERE e.outcome = 'filled') AS filled,
+            COUNT(*) FILTER (WHERE e.outcome = 'cancelled') AS cancelled
+        FROM (
+            SELECT block_created, outcome, TRUE AS is_create FROM lc_ins
+            UNION ALL
+            SELECT block_created, outcome, FALSE FROM lc_upd WHERE outcome IS NOT NULL
+        ) e
+        GROUP BY e.block_created
+    ),
+    stats_by_block AS (
+        INSERT INTO order_stats_by_block AS s (block_created, created, filled, cancelled)
+        SELECT block_created, created, filled, cancelled
+        FROM lc_stats
+        ON CONFLICT (block_created) DO UPDATE
+          SET created   = s.created + EXCLUDED.created,
+              filled    = s.filled + EXCLUDED.filled,
+              cancelled = s.cancelled + EXCLUDED.cancelled
+        RETURNING 1
+    ),
+    stats_by_block_group AS (
+        INSERT INTO order_stats_by_block_group AS s (block_group, created, filled, cancelled)
+        SELECT block_created / __group_blocks, SUM(created), SUM(filled), SUM(cancelled)
+        FROM lc_stats
+        GROUP BY block_created / __group_blocks
+        ON CONFLICT (block_group) DO UPDATE
+          SET created   = s.created + EXCLUDED.created,
+              filled    = s.filled + EXCLUDED.filled,
+              cancelled = s.cancelled + EXCLUDED.cancelled
         RETURNING 1
     )
     /*
      * Collect row counts for diagnostics/logging.
      * These counters track: inserts/updates of new orders, deletions, pre-existing updates,
-     * and order_lifecycle inserts and updates.
+     * order_lifecycle inserts and updates, and the creation blocks and groups counted.
      */
     SELECT
         COALESCE((SELECT COUNT(*) FROM ins_new), 0),
         COALESCE((SELECT COUNT(*) FROM del_any), 0),
         COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
         COALESCE((SELECT COUNT(*) FROM lc_ins), 0),
-        COALESCE((SELECT COUNT(*) FROM lc_upd), 0)
-    INTO __ins_new, __del_any, __upd_pre, __ins_lc, __upd_lc;
+        COALESCE((SELECT COUNT(*) FROM lc_upd), 0),
+        COALESCE((SELECT COUNT(*) FROM stats_by_block), 0) + COALESCE((SELECT COUNT(*) FROM stats_by_block_group), 0)
+    INTO __ins_new, __del_any, __upd_pre, __ins_lc, __upd_lc, __stats;
 END;
 $func$;
 

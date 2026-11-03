@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS :"schema".order_lifecycle
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_open ON :"schema".order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON :"schema".order_lifecycle(block_created) INCLUDE (outcome);
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON :"schema".order_lifecycle(owner_id, block_created) INCLUDE (outcome);
+CREATE TABLE IF NOT EXISTS :"schema".order_stats_by_block
+  (block_created INT NOT NULL, created INT NOT NULL, filled INT NOT NULL, cancelled INT NOT NULL,
+   CONSTRAINT pk_order_stats_by_block PRIMARY KEY (block_created));
+CREATE TABLE IF NOT EXISTS :"schema".order_stats_by_block_group
+  (block_group INT NOT NULL, created INT NOT NULL, filled INT NOT NULL, cancelled INT NOT NULL,
+   CONSTRAINT pk_order_stats_by_block_group PRIMARY KEY (block_group));
 RESET session_replication_role;
 GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
 GRANT ALL ON SCHEMA :"schema" TO btracker_owner;

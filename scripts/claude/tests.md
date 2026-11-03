@@ -59,12 +59,12 @@ tests/
 │   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests
-│   ├── hf_23_orders.sql       # process_hf_23 removes cleared accounts' open orders from order_state and closes their order_lifecycle rows as cancelled at HF23
+│   ├── hf_23_orders.sql       # process_hf_23 removes cleared accounts' open orders from order_state and closes their order_lifecycle rows as cancelled at HF23, also in the order counts
 │   ├── delegation_withdraw_history.sql # delegation/power-down history per change (a first delegation of 0 too), balances at past blocks, fork rollback, at-block and /balances endpoints
 │   ├── indexes_created_per_schema.sql # isIndexesCreated() answers per schema when another schema holds an index of the same name
 │   ├── finalize_security_definer.sql # finalize functions: a caller's shadowing isIndexesCreated() is not called; PUBLIC/btracker_user cannot execute them
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
-│   ├── order_lifecycle.sql    # order_lifecycle after sync (one row per create, open rows = order_state, = an op-by-op replay); synthetic fill/cancel/expiry/dust-cull/id-reuse paths, both /order-stats endpoints' windows; fork rollback
+│   ├── order_lifecycle.sql    # order_lifecycle after sync (one row per create, open rows = order_state, = an op-by-op replay); synthetic fill/cancel/expiry/dust-cull/id-reuse paths, both /order-stats endpoints' windows; the order count tables = order_lifecycle and /order-stats = order_lifecycle's counts over block/date windows, inverted windows rejected; fork rollback
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer

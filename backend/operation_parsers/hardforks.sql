@@ -35,7 +35,8 @@ $$;
 -- - Savings balances and pending withdrawals (hived removes the withdrawals
 --   without a fill or cancel operation, so their transfer_saving_id rows go here)
 -- - Open limit orders (hived cancels them without a limit_order_cancelled
---   operation, so they leave order_state and are closed as cancelled here)
+--   operation, so they leave order_state and are closed as cancelled here,
+--   also in the counts of their creation block and its group)
 -- Delegations and withdrawals are handled by their respective process files.
 CREATE OR REPLACE FUNCTION btracker_backend.process_hf_23(__hardfork_23_block INT)
 RETURNS VOID
@@ -49,6 +50,8 @@ DECLARE
   __withdraw_requests INT;
   __orders INT;
   __order_lifecycle INT;
+  __order_stats INT;
+  __group_blocks CONSTANT INT := btracker_backend.order_stats_group_blocks();
 BEGIN
   -- Find all accounts affected by HF23 at the specific block
   WITH hardfork_hive_operation AS MATERIALIZED (
@@ -97,7 +100,31 @@ BEGIN
       outcome = 'cancelled'
     FROM hardfork_hive_operation hho
     WHERE ol.owner_id = hho.account_id AND ol.end_block IS NULL
-    RETURNING ol.owner_id AS cleaned_account_id
+    RETURNING ol.block_created
+  ),
+  -- The closed orders' creation blocks already count them as created.
+  closed_per_block AS MATERIALIZED (
+    SELECT block_created, count(*) AS closed
+    FROM close_order_lifecycle
+    GROUP BY block_created
+  ),
+  close_order_stats_by_block AS (
+    UPDATE order_stats_by_block s SET
+      cancelled = s.cancelled + c.closed
+    FROM closed_per_block c
+    WHERE s.block_created = c.block_created
+    RETURNING 1
+  ),
+  close_order_stats_by_block_group AS (
+    UPDATE order_stats_by_block_group s SET
+      cancelled = s.cancelled + c.closed
+    FROM (
+      SELECT block_created / __group_blocks AS block_group, sum(closed) AS closed
+      FROM closed_per_block
+      GROUP BY block_created / __group_blocks
+    ) c
+    WHERE s.block_group = c.block_group
+    RETURNING 1
   )
   SELECT
     (SELECT count(*) FROM update_balances) AS balances,
@@ -105,8 +132,9 @@ BEGIN
     (SELECT count(*) FROM update_savings) AS savings,
     (SELECT count(*) FROM delete_withdraw_requests) AS withdraw_requests,
     (SELECT count(*) FROM delete_orders) AS orders,
-    (SELECT count(*) FROM close_order_lifecycle) AS order_lifecycle
-  INTO __balances, __rewards, __savings, __withdraw_requests, __orders, __order_lifecycle;
+    (SELECT count(*) FROM close_order_lifecycle) AS order_lifecycle,
+    (SELECT count(*) FROM close_order_stats_by_block) + (SELECT count(*) FROM close_order_stats_by_block_group) AS order_stats
+  INTO __balances, __rewards, __savings, __withdraw_requests, __orders, __order_lifecycle, __order_stats;
 
 END
 $$;

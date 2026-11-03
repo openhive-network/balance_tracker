@@ -1,7 +1,7 @@
 # Order Endpoints
 
 How the limit orders of the internal HBD/HIVE market ended, from `order_lifecycle`
-(see [processing/orders.md](../processing/orders.md)).
+and its per-creation-block counts (see [processing/orders.md](../processing/orders.md)).
 
 ## Endpoint List
 
@@ -20,17 +20,22 @@ cancelled (or expired) counts once, as `cancelled`. `fill_rate_pct` is
 `100 * filled / created` rounded to 2 places, `null` when nothing was created.
 
 - Unknown account: 400 (`Account '...' does not exist`); `from-block`/`to-block` <= 0: 400.
+- `from-block` after `to-block` (blocks or dates): 400, raised by HAF's
+  `hive.convert_to_blocks_range` (`The starting block (...) must be less than or equal to
+  the ending block (...)`; also for two dates with no block between them).
 - Short cache (2 s) even for a past window: its orders can still fill or be cancelled.
-- One statement per branch (`btracker_backend.get_order_stats`): index-only scans of
-  `idx_order_lifecycle_owner_block_created` (account) or `idx_order_lifecycle_block_created`
-  (network), both `INCLUDE (outcome)`. A network-wide window over the whole chain reads
-  the whole creation-block index (one entry per order, ~18M on mainnet).
+- One statement per branch (`btracker_backend.get_order_stats`):
+  - account: index-only scan of `idx_order_lifecycle_owner_block_created` `INCLUDE (outcome)`;
+  - network: summed from `order_stats_by_block_group` for the whole groups of 10000
+    blocks inside the window and `order_stats_by_block` for the blocks before the first and
+    after the last of them, so at most 2 x 9999 block rows plus one row per 10000 blocks
+    (~10k on mainnet) whatever the window. `open` = `created - filled - cancelled`.
 
 ## Upgraded installs
 
-`order_lifecycle` is written by block processing only. An install upgraded from a version
-without it gets the table empty and counts only orders created after the upgrade until it
-is resynced. No upgrade step backfills it.
+`order_lifecycle` and the order count tables are written by block processing only. An
+install upgraded from a version without them gets them empty and counts only orders created
+after the upgrade until it is resynced. No upgrade step backfills them.
 
 ## Implementation
 

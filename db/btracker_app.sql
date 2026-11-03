@@ -56,6 +56,7 @@
  *    - convert_state: Pending HBD↔HIVE conversions
  *    - order_state: Open market limit orders
  *    - order_lifecycle: Every limit order with its outcome (filled, cancelled or open)
+ *    - order_stats_by_block/_block_group: order_lifecycle counted per creation block and block group
  *
  * 11. ESCROWS
  *    - escrow_state: Active escrow agreements
@@ -1821,6 +1822,16 @@ $$;
  * looks open orders up by owner and order id from the first block, so that
  * partial index is built with the table; the creation-block indexes the
  * statistics read follow the app index lifecycle.
+ *
+ * order_stats_by_block counts the orders created in each block and, of them,
+ * those that ended filled and cancelled; order_stats_by_block_group holds the
+ * same sums per group of btracker_backend.order_stats_group_blocks() blocks
+ * (block_group = block_created / that). process_block_range_orders adds to both
+ * in the statement that writes order_lifecycle, an outcome to the creation
+ * block's row when it lands, so for any creation-block window they count what
+ * order_lifecycle does. The network-wide statistics read whole groups and, at
+ * the window's edges, at most a group's worth of blocks. Created and left empty
+ * on upgrade as order_lifecycle is.
  */
 DO $$
 DECLARE
@@ -1848,6 +1859,32 @@ BEGIN
     );
     CREATE INDEX idx_order_lifecycle_open ON order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
     PERFORM hive.app_register_table( __schema_name, 'order_lifecycle', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.order_stats_by_block', __schema_name)) IS NULL THEN
+    CREATE TABLE order_stats_by_block
+    (
+      block_created INT NOT NULL,
+      created       INT NOT NULL, -- Orders created in the block
+      filled        INT NOT NULL, -- Of them, the ones that ended filled
+      cancelled     INT NOT NULL, -- Of them, the ones that ended cancelled
+
+      CONSTRAINT pk_order_stats_by_block PRIMARY KEY (block_created)
+    );
+    PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.order_stats_by_block_group', __schema_name)) IS NULL THEN
+    CREATE TABLE order_stats_by_block_group
+    (
+      block_group INT NOT NULL, -- block_created / btracker_backend.order_stats_group_blocks()
+      created     INT NOT NULL,
+      filled      INT NOT NULL,
+      cancelled   INT NOT NULL,
+
+      CONSTRAINT pk_order_stats_by_block_group PRIMARY KEY (block_group)
+    );
+    PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block_group', __schema_name );
   END IF;
 
   FOREACH __index IN ARRAY ARRAY[

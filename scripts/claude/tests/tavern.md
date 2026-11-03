@@ -80,8 +80,8 @@ tests/tavern/
 | `get_transfer_statistics` | `patterns-mainnet/get_transfer_statistics/` | Volume statistics |
 | `get_proposals_payments` | `patterns-mainnet/get_proposals_payments/` | Proposal payment totals (all zero below HF21), id-list validation |
 | `get_proposal_payments` | `patterns-mainnet/get_proposal_payments/` | Proposal payment history (empty below HF21), parameter validation |
-| `get_order_stats` | `patterns-mainnet/get_order_stats/` | Network order lifecycle counts: whole range, block and date windows, invalid bound |
-| `get_account_order_stats` | `patterns-mainnet/get_account_order_stats/` | Per-account order lifecycle counts: whole range, a window, unknown account |
+| `get_order_stats` | `patterns-mainnet/get_order_stats/` | Network order lifecycle counts: whole range, block and date windows, invalid bound, inverted block and date windows |
+| `get_account_order_stats` | `patterns-mainnet/get_account_order_stats/` | Per-account order lifecycle counts: whole range, a window, unknown account, inverted window |
 
 ## How to Add New Tavern Tests
 

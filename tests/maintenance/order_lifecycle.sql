@@ -22,7 +22,15 @@
  *     against the open rows, and the endpoints' windows are checked;
  *   - after HAF rolls the context back (hive.context_back_from_fork) the
  *     synthetic rows are gone and the synced ones are back (skipped when the
- *     context is not forking).
+ *     context is not forking);
+ *   - after the massive sync, after the synthetic blocks and after the fork
+ *     rollback: order_stats_by_block and order_stats_by_block_group count what
+ *     order_lifecycle holds per creation block and group, and /order-stats,
+ *     summed from them, equals order_lifecycle's counts over block and date
+ *     windows (unbounded, across group edges, inside one group, exactly one
+ *     group, holding orders that closed after the window, a date window),
+ *     while an inverted block or date window gets HAF's error from both
+ *     endpoints.
  *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Everything after the first check runs in a
@@ -126,6 +134,123 @@ AS $f$
   SELECT to_jsonb(_stats)
 $f$;
 
+-- The rollups against order_lifecycle, and /order-stats against order_lifecycle's
+-- counts over windows around the middle of the synced blocks and their end.
+CREATE FUNCTION pg_temp.check_order_stats_rollup(_when TEXT)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+DECLARE
+  __head CONSTANT INT := hive.app_get_current_block_num(current_setting('btracker_test.schema'));
+  __group_blocks CONSTANT INT := btracker_backend.order_stats_group_blocks();
+  __mid CONSTANT INT := __head / 2 / __group_blocks * __group_blocks;
+  __mid_at CONSTANT TIMESTAMP := (SELECT bv.created_at FROM hive.blocks_view bv WHERE bv.num = __mid);
+  __mismatched BIGINT;
+  __example TEXT;
+  __window RECORD;
+  __range hive.blocks_range;
+  __expected JSONB;
+  __actual JSONB;
+  __closed_after BIGINT := 0;
+  __windows INT := 0;
+BEGIN
+  SELECT count(*), min(d::TEXT) INTO __mismatched, __example FROM (
+    (SELECT block_created, created, filled, cancelled FROM order_stats_by_block
+     EXCEPT
+     SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+     FROM order_lifecycle GROUP BY block_created)
+    UNION ALL
+    (SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+     FROM order_lifecycle GROUP BY block_created
+     EXCEPT
+     SELECT block_created, created, filled, cancelled FROM order_stats_by_block)) d;
+  IF __mismatched <> 0 THEN
+    RAISE EXCEPTION '%: % order_stats_by_block rows differ from order_lifecycle per creation block, e.g. %', _when, __mismatched, __example;
+  END IF;
+
+  SELECT count(*), min(d::TEXT) INTO __mismatched, __example FROM (
+    (SELECT block_group, created, filled, cancelled FROM order_stats_by_block_group
+     EXCEPT
+     SELECT block_created / __group_blocks, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+     FROM order_lifecycle GROUP BY block_created / __group_blocks)
+    UNION ALL
+    (SELECT block_created / __group_blocks, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+     FROM order_lifecycle GROUP BY block_created / __group_blocks
+     EXCEPT
+     SELECT block_group, created, filled, cancelled FROM order_stats_by_block_group)) d;
+  IF __mismatched <> 0 THEN
+    RAISE EXCEPTION '%: % order_stats_by_block_group rows differ from order_lifecycle per block group, e.g. %', _when, __mismatched, __example;
+  END IF;
+  RAISE NOTICE 'PASS: %: order_stats_by_block (% blocks) and order_stats_by_block_group (% groups) count order_lifecycle',
+    _when, (SELECT count(*) FROM order_stats_by_block), (SELECT count(*) FROM order_stats_by_block_group);
+
+  FOR __window IN
+    SELECT w.from_block, w.to_block FROM (VALUES
+      (NULL::TEXT, NULL::TEXT),
+      (NULL, __mid::TEXT),
+      ((__mid + 1)::TEXT, NULL),
+      ((__mid / 2 + 7)::TEXT, (__mid + __mid / 2 - 3)::TEXT),
+      ((__mid - 5)::TEXT, (__mid + 5)::TEXT),
+      ((__mid + 3)::TEXT, (__mid + 8)::TEXT),
+      (__mid::TEXT, (__mid + __group_blocks - 1)::TEXT),
+      ((__mid - __group_blocks)::TEXT, (__mid + __group_blocks)::TEXT),
+      ((__head - 3 * __group_blocks + 1)::TEXT, __head::TEXT),
+      ((__mid_at - INTERVAL '10 days')::TEXT, __mid_at::TEXT)
+    ) AS w(from_block, to_block)
+  LOOP
+    __range := hive.convert_to_blocks_range(__window.from_block, __window.to_block);
+    SELECT jsonb_build_object(
+             'created', count(*),
+             'filled', count(*) FILTER (WHERE ol.outcome = 'filled'),
+             'cancelled', count(*) FILTER (WHERE ol.outcome = 'cancelled'),
+             'open', count(*) FILTER (WHERE ol.outcome IS NULL),
+             'fill_rate_pct', CASE WHEN count(*) > 0
+                                   THEN round(100.0 * count(*) FILTER (WHERE ol.outcome = 'filled') / count(*), 2)::FLOAT END),
+           count(*) FILTER (WHERE ol.end_block > __range.last_block)
+    INTO __expected, __mismatched
+    FROM order_lifecycle ol
+    WHERE ol.block_created BETWEEN COALESCE(__range.first_block, 0) AND COALESCE(__range.last_block, 2147483647);
+    __actual := pg_temp.stats(btracker_endpoints.get_order_stats(__window.from_block, __window.to_block));
+    IF __actual IS DISTINCT FROM __expected THEN
+      RAISE EXCEPTION '%: /order-stats from % to %: expected order_lifecycle''s %, found %',
+        _when, __window.from_block, __window.to_block, __expected, __actual;
+    END IF;
+    __closed_after := __closed_after + __mismatched;
+    __windows := __windows + 1;
+  END LOOP;
+  IF __closed_after = 0 THEN
+    RAISE EXCEPTION '%: no window holds an order that closed after it', _when;
+  END IF;
+  RAISE NOTICE 'PASS: %: /order-stats equals order_lifecycle''s counts over % windows (% orders closed after their window)',
+    _when, __windows, __closed_after;
+
+  FOR __window IN
+    SELECT w.from_block, w.to_block FROM (VALUES
+      ((__mid + 1)::TEXT, __mid::TEXT),
+      ((__mid_at + INTERVAL '1 day')::TEXT, __mid_at::TEXT)
+    ) AS w(from_block, to_block)
+  LOOP
+    BEGIN
+      PERFORM btracker_endpoints.get_order_stats(__window.from_block, __window.to_block);
+      RAISE EXCEPTION '%: /order-stats from % to % did not fail', _when, __window.from_block, __window.to_block;
+    EXCEPTION WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE 'The starting % must be % the ending %' THEN
+        RAISE;
+      END IF;
+    END;
+    BEGIN
+      PERFORM btracker_endpoints.get_account_order_stats(
+        (SELECT av.name FROM hive.accounts_view av ORDER BY av.id LIMIT 1), __window.from_block, __window.to_block);
+      RAISE EXCEPTION '%: /accounts/{account-name}/order-stats from % to % did not fail', _when, __window.from_block, __window.to_block;
+    EXCEPTION WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE 'The starting % must be % the ending %' THEN
+        RAISE;
+      END IF;
+    END;
+  END LOOP;
+  RAISE NOTICE 'PASS: %: both endpoints reject a window whose from-block is after its to-block', _when;
+END
+$f$;
+
 -- After the massive sync.
 DO
 $$
@@ -155,6 +280,8 @@ BEGIN
       pg_temp.stats(__stats), __rows, (SELECT count(*) FROM order_state);
   END IF;
   RAISE NOTICE 'PASS: /order-stats over the synced blocks: created = filled + cancelled + open: %', pg_temp.stats(__stats);
+
+  PERFORM pg_temp.check_order_stats_rollup('after the massive sync');
 END
 $$;
 
@@ -331,6 +458,7 @@ BEGIN
     pg_temp.op_cancel(__b3, 10010, __b, __n + 9, TRUE)));
   PERFORM process_block_range_orders(__b3, __b3);
   PERFORM pg_temp.check_open_rows_equal_order_state('after the next block');
+  PERFORM pg_temp.check_order_stats_rollup('after the next block');
 
   -- [owner, order id, created, remaining, filled, outcome, ended] per order, in creation order.
   SELECT jsonb_agg(jsonb_build_array(
@@ -399,7 +527,12 @@ BEGIN
     RAISE EXCEPTION 'order_lifecycle after the fork rollback: % rows, % synced', (SELECT count(*) FROM order_lifecycle), __synced_rows;
   END IF;
   PERFORM pg_temp.check_open_rows_equal_order_state('after the fork rollback');
-  RAISE NOTICE 'PASS: a fork rollback reverts order_lifecycle';
+  PERFORM pg_temp.check_order_stats_rollup('after the fork rollback');
+  IF pg_temp.stats(btracker_endpoints.get_order_stats(__b1::TEXT, __b3::TEXT)) IS DISTINCT FROM pg_temp.stats(__window_before) THEN
+    RAISE EXCEPTION '/order-stats after the fork rollback: expected %, found %',
+      pg_temp.stats(__window_before), pg_temp.stats(btracker_endpoints.get_order_stats(__b1::TEXT, __b3::TEXT));
+  END IF;
+  RAISE NOTICE 'PASS: a fork rollback reverts order_lifecycle and the order counts';
 END
 $$;
 ROLLBACK;

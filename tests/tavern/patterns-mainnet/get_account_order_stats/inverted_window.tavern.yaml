@@ -1,0 +1,29 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+    - negative
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # from-block after to-block.
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_account_order_stats"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          account-name: "fnait"
+          from-block: "4500000"
+          to-block: "4000000"
+      response:
+        status_code: 400
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern
+          extra_kwargs:
+            error_response: true

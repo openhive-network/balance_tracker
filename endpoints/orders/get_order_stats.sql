@@ -61,6 +61,8 @@ SET ROLE btracker_owner;
               "open": 31,
               "fill_rate_pct": 21.02
             }
+      '400':
+        description: A block or date that is not valid, or from-block after to-block
  */
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_order_stats;
