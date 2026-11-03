@@ -352,9 +352,9 @@ get_latest_balance AS (
  *
  * And balance_seq_no will be: 5, 6, 7, 8 (continuing the sequence)
  */
--- NOT MATERIALIZED: without it PostgreSQL may write every row of the batch to a tuplestore
--- (apply_account_clears used to read it twice). Inlined, apply_account_clears' filter on
--- the uncleared accounts is applied inside both branches.
+-- NOT MATERIALIZED: read once, by apply_account_clears' uncleared branch; inlined, its
+-- filter on the uncleared accounts is applied inside both branches here instead of after
+-- writing every row of the batch to a tuplestore.
 union_latest_balance_with_impacted_balances AS NOT MATERIALIZED (
   SELECT
     cp.account_id,
@@ -432,21 +432,12 @@ cleared_input AS (
   CROSS JOIN (VALUES (13), (21), (37)) AS n(nai)
   LEFT JOIN current_account_balances cab ON cab.account = a.account_id AND cab.nai = n.nai
 ),
-apply_account_clears AS (
-  SELECT
-    u.account_id, u.nai, u.balance, u.balance_seq_no, u.source_op, u.op_type_id,
-    u.source_op_block, u.trx_in_block
-  FROM union_latest_balance_with_impacted_balances u
-  -- IS NULL first: a row with a NULL account must keep failing loudly at the insert, and
-  -- <> ALL alone would drop it
-  WHERE u.account_id IS NULL
-     OR u.account_id <> ALL ((SELECT c.ids FROM cleared_accounts c)::INT[])
-
-  UNION ALL
-
+-- The cleared accounts' rows after the clears: each marker is now its debit (is_clear
+-- still marks it). Read by apply_account_clears and stage_vests_rows.
+cleared_rows AS (
   SELECT
     r.account_id, r.nai, r.balance, r.balance_seq_no, r.source_op, r.op_type_id,
-    r.source_op_block, r.trx_in_block
+    r.source_op_block, r.trx_in_block, r.is_clear
   FROM (
     SELECT
       d.*,
@@ -471,6 +462,23 @@ apply_account_clears AS (
   ) r
   WHERE (NOT r.is_clear OR r.balance <> 0)
     AND r.real_rows > 0
+),
+apply_account_clears AS (
+  SELECT
+    u.account_id, u.nai, u.balance, u.balance_seq_no, u.source_op, u.op_type_id,
+    u.source_op_block, u.trx_in_block
+  FROM union_latest_balance_with_impacted_balances u
+  -- IS NULL first: a row with a NULL account must keep failing loudly at the insert, and
+  -- <> ALL alone would drop it
+  WHERE u.account_id IS NULL
+     OR u.account_id <> ALL ((SELECT c.ids FROM cleared_accounts c)::INT[])
+
+  UNION ALL
+
+  SELECT
+    c.account_id, c.nai, c.balance, c.balance_seq_no, c.source_op, c.op_type_id,
+    c.source_op_block, c.trx_in_block
+  FROM cleared_rows c
 ),
 
 /*
@@ -982,6 +990,11 @@ stage_vests_rows AS (
   SELECT oir.account_id, oir.source_op, oir.balance
   FROM ops_in_range oir
   WHERE oir.nai = _nai_vests
+    AND NOT oir.is_clear  -- #61: a clear's VESTS change is its debit, from cleared_rows
+  UNION ALL
+  SELECT c.account_id, c.source_op, c.balance
+  FROM cleared_rows c
+  WHERE c.nai = _nai_vests AND c.is_clear
   RETURNING 1
 )
 

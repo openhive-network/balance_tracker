@@ -114,8 +114,8 @@ $$;
 --     savings and rewards.
 --
 -- Returns one row per op. Reads operations_view through HAF's (op_type_id, block_num)
--- index rather than the prefetched _btracker_ops_batch: the stages call it once each, and
--- a scan of the batch (a temp table without indexes) cost 0.5-0.7 s per call on a 10k
+-- index rather than the prefetched _btracker_ops_batch: it is called five times per batch
+-- (balances, withdrawals, savings, and twice in rewards), and a scan of the batch (a temp table without indexes) cost 0.5-0.7 s per call on a 10k
 -- batch, clears or not; the index probe costs milliseconds.
 CREATE OR REPLACE FUNCTION btracker_backend.account_clears_in_range(_from INT, _to INT)
 RETURNS TABLE (
