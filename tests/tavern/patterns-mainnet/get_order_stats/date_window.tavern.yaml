@@ -1,0 +1,25 @@
+---
+  test_name: btracker PostgREST
+
+  marks:
+    - patterntest
+
+  includes:
+    - !include ../../common.yaml
+
+  stages:
+    - name: test
+      # Orders created in August 2016 (block-or-date bounds as timestamps).
+      request:
+        url: "{service.proto:s}://{service.server:s}:{service.port}/rpc/get_order_stats"
+        method: POST
+        headers:
+          content-type: application/json
+          accept: application/json
+        json:
+          from-block: "2016-08-01 00:00:00"
+          to-block: "2016-08-31 23:59:59"
+      response:
+        status_code: 200
+        verify_response_with:
+          function: validate_response:compare_rest_response_with_pattern

@@ -30,6 +30,7 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 | **Transfers** | [endpoints/transfers.md](endpoints/transfers.md) | Transfer statistics, recurrent transfers |
 | **Vesting** | [endpoints/vesting.md](endpoints/vesting.md) | Power-up / power-down history & statistics |
 | **Proposals** | [endpoints/proposals.md](endpoints/proposals.md) | DHF payments per proposal |
+| **Orders** | [endpoints/orders.md](endpoints/orders.md) | Limit order lifecycle counts and fill rate |
 | **Utility** | [endpoints/utility.md](endpoints/utility.md) | Version, sync status, TVL |
 
 ## Endpoint Summary
@@ -49,6 +50,8 @@ REST Client → PostgREST → btracker_endpoints.* functions → btracker_backen
 | `/accounts/{name}/vesting-stats` | GET | Per-account power-up / power-down aggregates |
 | `/proposals/payments` | GET | HBD paid so far per DHF proposal, many proposals per call |
 | `/proposals/{id}/payments` | GET | Paginated payments of one DHF proposal |
+| `/accounts/{name}/order-stats` | GET | Created / filled / cancelled / open limit orders of an account, fill rate |
+| `/order-stats` | GET | The same over every account |
 | `/version` | GET | Git commit hash |
 | `/last-synced-block` | GET | Sync status |
 | `/total-value-locked` | GET | TVL metrics |

@@ -46,6 +46,13 @@ CREATE TABLE IF NOT EXISTS :"schema".proposal_payment_totals
 CREATE TABLE IF NOT EXISTS :"schema".proposal_payments
   (proposal_id INT NOT NULL, payment_seq_no INT NOT NULL, amount BIGINT NOT NULL, source_op BIGINT NOT NULL,
    CONSTRAINT pk_proposal_payments PRIMARY KEY (proposal_id, payment_seq_no));
+CREATE TABLE IF NOT EXISTS :"schema".order_lifecycle
+  (create_op_id BIGINT NOT NULL, order_id BIGINT NOT NULL, remaining BIGINT NOT NULL, filled BIGINT NOT NULL,
+   owner_id INT NOT NULL, block_created INT NOT NULL, end_block INT, nai SMALLINT NOT NULL, outcome TEXT,
+   CONSTRAINT pk_order_lifecycle PRIMARY KEY (create_op_id));
+CREATE INDEX IF NOT EXISTS idx_order_lifecycle_open ON :"schema".order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
+CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON :"schema".order_lifecycle(block_created) INCLUDE (outcome);
+CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON :"schema".order_lifecycle(owner_id, block_created) INCLUDE (outcome);
 RESET session_replication_role;
 GRANT CREATE, CONNECT ON DATABASE :"db" TO btracker_owner, btracker_user;
 GRANT ALL ON SCHEMA :"schema" TO btracker_owner;

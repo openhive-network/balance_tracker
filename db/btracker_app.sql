@@ -55,6 +55,7 @@
  * 10. MARKET & CONVERSIONS
  *    - convert_state: Pending HBD↔HIVE conversions
  *    - order_state: Open market limit orders
+ *    - order_lifecycle: Every limit order with its outcome (filled, cancelled or open)
  *
  * 11. ESCROWS
  *    - escrow_state: Active escrow agreements
@@ -1792,6 +1793,66 @@ BEGIN
   FOREACH __index IN ARRAY ARRAY[
     format('CREATE INDEX IF NOT EXISTS idx_account_delegation_history_account_block_num ON %I.account_delegation_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name),
     format('CREATE INDEX IF NOT EXISTS idx_account_withdraw_history_account_block_num ON %I.account_withdraw_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name)
+  ]
+  LOOP
+    IF isIndexesCreated() THEN
+      EXECUTE __index;
+    END IF;
+    PERFORM hive.app_register_index_dependency(__schema_name, __index);
+  END LOOP;
+END
+$$;
+
+/**
+ * Order lifecycle
+ * ---------------
+ * order_lifecycle holds every limit order, one row per creating operation
+ * (create_op_id): owners reuse an order id once the order closed, so
+ * (owner_id, order_id) names one row only among the open ones. Written by
+ * process_block_range_orders next to order_state: a fill reduces remaining and
+ * adds to filled; an order cancelled (by its owner or on expiry) or fully filled
+ * gets its outcome and end_block, and stays. end_block IS NULL marks an open
+ * order; the open rows equal order_state.
+ *
+ * Created outside the context's creation, as the delegation and power-down
+ * history above, so an upgraded install gets it, though empty: only block
+ * processing fills it, so an install synced before it existed must resync for
+ * the order statistics to count orders created before the upgrade. Processing
+ * looks open orders up by owner and order id from the first block, so that
+ * partial index is built with the table; the creation-block indexes the
+ * statistics read follow the app index lifecycle.
+ */
+DO $$
+DECLARE
+  __schema_name VARCHAR;
+  __index TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  IF to_regclass(format('%I.order_lifecycle', __schema_name)) IS NULL THEN
+    CREATE TABLE order_lifecycle
+    (
+      create_op_id  BIGINT   NOT NULL, -- The limit_order_create(2) operation
+      order_id      BIGINT   NOT NULL, -- Per-owner id, reused after the order closes
+      remaining     BIGINT   NOT NULL, -- Satoshis still for sale; at cancellation, the amount returned
+      filled        BIGINT   NOT NULL, -- Satoshis sold by fills
+      owner_id      INT      NOT NULL, -- hive.accounts_view.id
+      block_created INT      NOT NULL,
+      end_block     INT,               -- Block the order was filled or cancelled in; NULL while open
+      nai           SMALLINT NOT NULL, -- Asset sold: 13=HBD, 21=HIVE
+      outcome       TEXT,              -- 'filled' or 'cancelled'; NULL while open
+
+      CONSTRAINT pk_order_lifecycle PRIMARY KEY (create_op_id),
+      CONSTRAINT ck_order_lifecycle_outcome CHECK (
+        (end_block IS NULL AND outcome IS NULL) OR (end_block IS NOT NULL AND outcome IN ('filled', 'cancelled')))
+    );
+    CREATE INDEX idx_order_lifecycle_open ON order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
+    PERFORM hive.app_register_table( __schema_name, 'order_lifecycle', __schema_name );
+  END IF;
+
+  FOREACH __index IN ARRAY ARRAY[
+    format('CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON %I.order_lifecycle(block_created) INCLUDE (outcome)', __schema_name),
+    format('CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON %I.order_lifecycle(owner_id, block_created) INCLUDE (outcome)', __schema_name)
   ]
   LOOP
     IF isIndexesCreated() THEN

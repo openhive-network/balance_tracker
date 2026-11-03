@@ -47,7 +47,7 @@ hived replays").
 | `process_savings` | `db/process_savings.sql` | transfer_to_savings, transfer_from_savings, fill_transfer_from_savings | `account_savings`, `account_savings_history`, `savings_withdraws` |
 | `process_withdrawals` | `db/process_withdrawals.sql` | withdraw_vesting, set_withdraw_vesting_route, fill_vesting_withdraw | `account_withdraws`, `withdraw_routes`, `account_withdraw_history` |
 | `process_block_range_recurrent_transfers` | `db/process_recurrent_transfers.sql` | recurrent_transfer, fill_recurrent_transfer, failed_recurrent_transfer | `recurrent_transfers` |
-| `process_block_range_orders` | `db/process_block_range_orders.sql` | limit_order_create/create2, fill_order, limit_order_cancel/cancelled | `order_state` |
+| `process_block_range_orders` | `db/process_block_range_orders.sql` | limit_order_create/create2, fill_order, limit_order_cancel/cancelled | `order_state`, `order_lifecycle` |
 | `process_block_range_converts` | `db/process_block_range_converts.sql` | convert, fill_convert_request | `convert_state` |
 | `process_block_range_escrows` | `db/process_block_range_escrows.sql` | escrow_transfer, escrow_release, escrow_approved, escrow_rejected, escrow_dispute | `escrow_state`, `escrow_fees` |
 | `process_transfer_stats` | `db/process_transfer_stats.sql` | transfer, fill_recurrent_transfer, escrow_transfer | `transfer_stats_by_hour/day/month` |
@@ -148,7 +148,7 @@ Balance Tracker maintains two types of data:
 | Type | Purpose | Examples |
 |------|---------|----------|
 | **Current State** | Latest values for fast queries | `current_account_balances`, `order_state`, `recurrent_transfers` |
-| **History** | Every change for audit/analysis | `account_balance_history`, `transfer_stats_by_hour` |
+| **History** | Every change for audit/analysis | `account_balance_history`, `transfer_stats_by_hour`, `order_lifecycle` |
 
 ### Derived aggregates kept by processing
 

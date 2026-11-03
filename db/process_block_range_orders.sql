@@ -4,6 +4,7 @@ SET ROLE btracker_owner;
  * Processes limit order events (create, fill, cancel) within a block range.
  * Maintains order_state table with current open orders and their remaining amounts.
  * Handles order lifecycle: create -> partial fills -> fully filled or cancelled.
+ * Keeps every order with its outcome in order_lifecycle (PHASE 6).
  */
 CREATE OR REPLACE FUNCTION process_block_range_orders(
     IN _from INT,
@@ -28,6 +29,8 @@ DECLARE
     __ins_new     INT := 0;
     __del_any     INT := 0;
     __upd_pre     INT := 0;
+    __ins_lc      INT := 0;
+    __upd_lc      INT := 0;
 BEGIN
     WITH ops_in_range AS MATERIALIZED (
         /*
@@ -512,16 +515,128 @@ BEGIN
            AND pc.new_remaining > 0
            AND s.remaining <> pc.new_remaining
         RETURNING 1
+    ),
+
+    /*
+     * =========================================================================
+     * PHASE 6: Keep every order with its outcome in order_lifecycle
+     * =========================================================================
+     *
+     * order_lifecycle has one row per create, so unlike order_state each fill
+     * and cancel must be attributed to one incarnation of its order id: the
+     * latest create of the same (owner_id, order_id) before it in this range,
+     * or, when there is none, the order still open from an earlier range.
+     *
+     * Example (one range):
+     *   op 100: Alice's order #5, open since an earlier range, fills 50
+     *   op 101: Alice cancels #5             -> earlier row: cancelled
+     *   op 102: Alice creates #5 for 1000    -> new row
+     *   op 103: #5 fills 1000                -> new row: filled
+     *
+     * An order counts as cancelled when it was cancelled, however much of it
+     * filled before; as filled when fills consumed it; otherwise it stays open.
+     */
+    lc_creates AS MATERIALIZED (
+        /*
+         * Creates in this range, each with the next create of the same order id,
+         * which ends the span of operations belonging to it.
+         */
+        SELECT
+            owner_id,
+            order_id,
+            nai,
+            create_amount,
+            create_block,
+            create_op_id,
+            LEAD(create_op_id) OVER (PARTITION BY owner_id, order_id ORDER BY create_op_id) AS next_create_op_id
+        FROM creates
+    ),
+    lc_closing AS (
+        SELECT owner_id, order_id, fill_op_id AS op_id, fill_block AS block_num, fill_amount, TRUE AS is_fill
+        FROM fills
+        UNION ALL
+        SELECT owner_id, order_id, cancel_op_id, cancel_block, 0, FALSE
+        FROM cancels
+    ),
+    lc_totals AS MATERIALIZED (
+        /*
+         * Fills and cancels per incarnation; create_op_id is NULL for an order
+         * created before this range.
+         */
+        SELECT
+            e.owner_id,
+            e.order_id,
+            c.create_op_id,
+            COALESCE(SUM(e.fill_amount), 0)::bigint AS sum_fill,
+            MAX(e.block_num) FILTER (WHERE e.is_fill) AS last_fill_block,
+            MIN(e.block_num) FILTER (WHERE NOT e.is_fill) AS cancel_block
+        FROM lc_closing e
+        LEFT JOIN lc_creates c
+          ON (c.owner_id, c.order_id) = (e.owner_id, e.order_id)
+         AND e.op_id > c.create_op_id
+         AND (c.next_create_op_id IS NULL OR e.op_id < c.next_create_op_id)
+        GROUP BY e.owner_id, e.order_id, c.create_op_id
+    ),
+    lc_ins AS (
+        /*
+         * Orders created in this range, in their state at its end.
+         */
+        INSERT INTO order_lifecycle (create_op_id, order_id, remaining, filled, owner_id, block_created, end_block, nai, outcome)
+        SELECT
+            c.create_op_id,
+            c.order_id,
+            GREATEST(c.create_amount - COALESCE(t.sum_fill, 0), 0)::bigint,
+            COALESCE(t.sum_fill, 0),
+            c.owner_id,
+            c.create_block,
+            CASE
+                WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
+                WHEN t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0 THEN t.last_fill_block
+            END,
+            c.nai,
+            CASE
+                WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
+                WHEN t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0 THEN 'filled'
+            END
+        FROM lc_creates c
+        LEFT JOIN lc_totals t ON t.create_op_id = c.create_op_id
+        RETURNING 1
+    ),
+    lc_upd AS (
+        /*
+         * Orders open from an earlier range that were filled or cancelled in this one.
+         * Does not see the rows lc_ins adds (same statement snapshot), so a
+         * reused order id never updates its new incarnation.
+         */
+        UPDATE order_lifecycle l
+           SET remaining = GREATEST(l.remaining - t.sum_fill, 0),
+               filled    = l.filled + t.sum_fill,
+               end_block = CASE
+                               WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
+                               WHEN t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0 THEN t.last_fill_block
+                           END,
+               outcome   = CASE
+                               WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
+                               WHEN t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0 THEN 'filled'
+                           END
+          FROM lc_totals t
+         WHERE t.create_op_id IS NULL
+           AND (l.owner_id, l.order_id) = (t.owner_id, t.order_id)
+           AND l.end_block IS NULL
+        RETURNING 1
     )
     /*
      * Collect row counts for diagnostics/logging.
-     * These counters track: inserts/updates of new orders, deletions, pre-existing updates.
+     * These counters track: inserts/updates of new orders, deletions, pre-existing updates,
+     * and order_lifecycle inserts and updates.
      */
     SELECT
         COALESCE((SELECT COUNT(*) FROM ins_new), 0),
         COALESCE((SELECT COUNT(*) FROM del_any), 0),
-        COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
-    INTO __ins_new, __del_any, __upd_pre;
+        COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
+        COALESCE((SELECT COUNT(*) FROM lc_ins), 0),
+        COALESCE((SELECT COUNT(*) FROM lc_upd), 0)
+    INTO __ins_new, __del_any, __upd_pre, __ins_lc, __upd_lc;
 END;
 $func$;
 
