@@ -12,7 +12,7 @@
  *      block before their first clearing block (history
  *      from it on deleted, current rows from the last remaining history row, the liquid
  *      and savings day/month rollups of those periods rebuilt from the remaining history,
- *      the power-down and delegation history from it on deleted), and seed stored values a clear must not touch or
+ *      the power-down history from it on deleted), and seed stored values a clear must not touch or
  *      must work from: null's delayed vests set to a large wrong value, its HBD-interest
  *      accumulator, a pending savings withdrawal, received vests and lifetime rewards;
  *   2. process the blocks from it to the head ONE BLOCK AT A TIME with the balances,
@@ -473,11 +473,9 @@ BEGIN
                    r.rollup, r.hist, r.period) USING _since;
   END LOOP;
 
-  -- power-down and delegation state after every op (#60): the clears change neither,
-  -- but both replays write the range's rows again
+  -- power-down state after every op (#60): the clears do not change it, but both replays
+  -- write the range's rows again (delegations are not replayed)
   DELETE FROM account_withdraw_history h
-  WHERE h.account IN (SELECT account FROM t_accounts) AND hafd.operation_id_to_block_num(h.source_op) >= _from;
-  DELETE FROM account_delegation_history h
   WHERE h.account IN (SELECT account FROM t_accounts) AND hafd.operation_id_to_block_num(h.source_op) >= _from;
 
   UPDATE account_withdraws aw SET delayed_vests = s.delayed_vests FROM t_seed s WHERE aw.account = s.account;
@@ -649,6 +647,13 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM s_hist WHERE op_type_id IN (btracker_backend.op_clear_null_account_balance(),
                                                            btracker_backend.op_consolidate_treasury_balance())) THEN
     RAISE EXCEPTION 'cleared_accounts_batch: block-by-block processing wrote no clear row';
+  END IF;
+  -- and the liquid month and savings rollups must hold a period whose balance moved across
+  -- blocks (min <> max), or the step 3 comparison could not tell a wrong min/max apart
+  IF NOT EXISTS (SELECT 1 FROM s_bmonth WHERE min_balance <> max_balance)
+     OR NOT EXISTS (SELECT 1 FROM s_sday WHERE min_balance <> max_balance)
+     OR NOT EXISTS (SELECT 1 FROM s_smonth WHERE min_balance <> max_balance) THEN
+    RAISE EXCEPTION 'cleared_accounts_batch: no liquid-month or savings rollup of the range moved; their comparison is vacuous';
   END IF;
 END
 $$;
