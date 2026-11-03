@@ -1178,6 +1178,30 @@ BEGIN
 END
 $$;
 
+/*
+ * The two finalize functions run as btracker_owner (SECURITY DEFINER) and use
+ * unqualified names, so they must not resolve them through the caller's
+ * search_path: a caller could put a schema of its own first and shadow
+ * isIndexesCreated() or a table with its own code. Pin it to the schema they are
+ * installed in, named at install time as isIndexesCreated() names it, which also
+ * holds for a standalone install and for haf_block_explorer's hafbe_bal. pg_temp
+ * last, or it would be searched first for relations. Functions they call inherit
+ * the pinned path. EXECUTE is revoked from PUBLIC by scripts/install_app.sh.
+ * After CREATE OR REPLACE above, which drops a function's SET clauses.
+ */
+DO $$
+DECLARE
+  __schema_name TEXT;
+  __search_path TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+  __search_path := format('%I, hive, hafd, btracker_backend, pg_catalog, pg_temp', __schema_name);
+
+  EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync_before_forking(hive.context_name) SET search_path = %s', __schema_name, __search_path);
+  EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync(hive.context_name) SET search_path = %s', __schema_name, __search_path);
+END
+$$;
+
 -- ============================================================================
 -- BLOCK PROCESSING FUNCTIONS
 -- ============================================================================

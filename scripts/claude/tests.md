@@ -61,6 +61,7 @@ tests/
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests
 │   ├── delegation_withdraw_history.sql # delegation/power-down history per change (a first delegation of 0 too), balances at past blocks, fork rollback, at-block and /balances endpoints
 │   ├── indexes_created_per_schema.sql # isIndexesCreated() answers per schema when another schema holds an index of the same name
+│   ├── finalize_security_definer.sql # finalize functions: a caller's shadowing isIndexesCreated() is not called; PUBLIC/btracker_user cannot execute them
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
 ├── mocks/                     # Mock data infrastructure

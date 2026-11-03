@@ -123,6 +123,15 @@ false; the HAF vacuum request it used to make there ran as `VACUUM FULL ANALYZE`
 under ACCESS EXCLUSIVE and turned each post-restart catch-up into a multi-minute
 outage (#64).
 
+`finalize_massive_sync()` and `finalize_massive_sync_before_forking()` are
+`SECURITY DEFINER` (they run as btracker_owner). The install pins their
+`search_path` to the schema they are installed in (plus `hive`, `hafd`,
+`btracker_backend`, `pg_catalog`, `pg_temp` last) with `ALTER FUNCTION ... SET`
+after their `CREATE OR REPLACE`, so a caller's own schema cannot shadow
+`isIndexesCreated()` or a table, and `scripts/install_app.sh` revokes EXECUTE from
+PUBLIC and grants it to btracker_owner (haf_block_explorer's hafbe_owner is a
+member). A new SECURITY DEFINER function needs the same two steps.
+
 ### Processing while hived replays
 
 The install opts the context into HAF's early block processing
