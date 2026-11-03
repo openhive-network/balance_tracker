@@ -40,7 +40,12 @@
  *     ends in that block.
  *   - an upgrade from a version without the rollups: both dropped and
  *     db/btracker_app.sql run again, they equal order_lifecycle's counts, and
- *     still do after a block that fills and cancels orders created before it.
+ *     still do after a block that fills and cancels orders created before it;
+ *   - the same upgrade with three processed blocks past the context's
+ *     irreversible block (skipped when the context is not forking): the rollups
+ *     equal order_lifecycle's counts after it, after a fork back to the first of
+ *     those blocks, after a fork back to the irreversible block, and after a
+ *     different chain processed past it.
  *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Everything after the first check runs in a
@@ -796,3 +801,145 @@ BEGIN
 END
 $$;
 ROLLBACK;
+
+-- The same upgrade over reversible blocks: three blocks past the synced head, past
+-- the context's irreversible block (lowered to that head), processed one at a time
+-- as live blocks (each change recorded at its block), creating orders and closing
+-- them and two synced ones; then the rollups dropped and db/btracker_app.sql run
+-- again. A fork back to the first of them, then to the irreversible block, and a
+-- different chain processed after it.
+CREATE FUNCTION pg_temp.process_live_block(_block INT, _ops JSONB)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+BEGIN
+  UPDATE hafd.contexts SET current_block_num = _block WHERE name = current_setting('btracker_test.schema');
+  PERFORM pg_temp.stage_ops(_ops);
+  PERFORM process_block_range_orders(_block, _block);
+END
+$f$;
+
+SELECT hc.is_forking AS context_is_forking FROM hafd.contexts hc WHERE hc.name = :'schema' \gset
+\if :context_is_forking
+BEGIN;
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+  __h CONSTANT INT := hive.app_get_current_block_num(__schema);
+  __n CONSTANT BIGINT := 5000000000;
+  __hive CONSTANT SMALLINT := 21;
+  __a TEXT;
+  __b TEXT;
+  __o1 RECORD;
+  __o2 RECORD;
+BEGIN
+  SELECT av.name INTO __a FROM hive.accounts_view av
+  WHERE NOT EXISTS (SELECT 1 FROM order_lifecycle ol WHERE ol.owner_id = av.id) ORDER BY av.id OFFSET 10 LIMIT 1;
+  SELECT av.name INTO __b FROM hive.accounts_view av
+  WHERE NOT EXISTS (SELECT 1 FROM order_lifecycle ol WHERE ol.owner_id = av.id) ORDER BY av.id OFFSET 11 LIMIT 1;
+  SELECT ol.*, av.name INTO __o1 FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.end_block IS NULL ORDER BY ol.create_op_id LIMIT 1;
+  SELECT ol.*, av.name INTO __o2 FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.end_block IS NULL ORDER BY ol.create_op_id OFFSET 1 LIMIT 1;
+  IF __b IS NULL OR __o2.create_op_id IS NULL THEN
+    RAISE EXCEPTION 'no fixture accounts (% %) or fewer than two open synced orders', __a, __b;
+  END IF;
+  PERFORM set_config('btracker_test.h', __h::TEXT, false);
+  PERFORM set_config('btracker_test.a', __a, false);
+  PERFORM set_config('btracker_test.b', __b, false);
+  PERFORM set_config('btracker_test.o1', __o1.create_op_id::TEXT, false);
+  PERFORM set_config('btracker_test.o2', __o2.create_op_id::TEXT, false);
+
+  UPDATE hafd.contexts SET irreversible_block = __h WHERE name = __schema;
+
+  PERFORM pg_temp.process_live_block(__h + 1, jsonb_build_array(
+    pg_temp.op_create(__h + 1, 10001, __a, __n + 1, 1000, __hive),
+    pg_temp.op_create(__h + 1, 10002, __a, __n + 2, 500, __hive),
+    pg_temp.op_create(__h + 1, 10003, __b, __n + 1, 100, __hive),
+    pg_temp.op_fill(__h + 1, 10004, __o1.name, __o1.order_id, __o1.remaining, __o1.nai)));
+  PERFORM pg_temp.process_live_block(__h + 2, jsonb_build_array(
+    pg_temp.op_fill(__h + 2, 10001, __a, __n + 1, 1000, __hive),
+    pg_temp.op_cancel(__h + 2, 10002, __b, __n + 1, FALSE),
+    pg_temp.op_cancel(__h + 2, 10003, __b, __n + 1, TRUE),
+    pg_temp.op_create(__h + 2, 10004, __b, __n + 2, 100, __hive)));
+  PERFORM pg_temp.process_live_block(__h + 3, jsonb_build_array(
+    pg_temp.op_cancel(__h + 3, 10001, __o2.name, __o2.order_id, TRUE),
+    pg_temp.op_fill(__h + 3, 10002, __a, __n + 2, 200, __hive)));
+  PERFORM pg_temp.check_order_stats_rollup('after three reversible blocks');
+END
+$$;
+-- One table per statement: HAF unregisters only one table a DROP TABLE drops, and
+-- would keep the other's registration and the shadow rows of these blocks.
+DROP TABLE order_stats_by_block;
+DROP TABLE order_stats_by_block_group;
+SET search_path TO :"schema";
+\ir ../../db/btracker_app.sql
+SET search_path TO :"schema", public;
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+  __h CONSTANT INT := current_setting('btracker_test.h')::INT;
+  __a CONSTANT TEXT := current_setting('btracker_test.a');
+  __b CONSTANT TEXT := current_setting('btracker_test.b');
+  __n CONSTANT BIGINT := 5000000000;
+  __hive CONSTANT SMALLINT := 21;
+  __o1 RECORD;
+  __o2 RECORD;
+  __actual JSONB;
+BEGIN
+  IF hive.app_get_current_block_num(__schema) <> __h + 3 THEN
+    RAISE EXCEPTION 'seeding over reversible blocks left the context at block %, expected %', hive.app_get_current_block_num(__schema), __h + 3;
+  END IF;
+  PERFORM pg_temp.check_order_stats_rollup('after seeding over reversible blocks');
+
+  -- Keeps the first reversible block: its creations and o1's fill stay counted,
+  -- the later blocks' changes are gone from order_lifecycle and the rollups alike.
+  PERFORM hive.context_back_from_fork(__schema, __h + 1);
+  SELECT jsonb_build_array(
+           (SELECT count(*) FROM order_lifecycle WHERE block_created > __h),
+           (SELECT count(*) FROM order_lifecycle WHERE end_block > __h),
+           (SELECT outcome FROM order_lifecycle WHERE create_op_id = current_setting('btracker_test.o1')::BIGINT))
+  INTO __actual;
+  IF __actual IS DISTINCT FROM jsonb_build_array(3, 1, 'filled') THEN
+    RAISE EXCEPTION 'order_lifecycle after a fork back to the first reversible block: expected [3, 1, "filled"] (created, closed past the irreversible block, o1), found %', __actual;
+  END IF;
+  PERFORM pg_temp.check_open_rows_equal_order_state('after a fork back to the first reversible block');
+  PERFORM pg_temp.check_order_stats_rollup('after a fork back to the first reversible block');
+
+  -- Leaves the irreversible history alone, what the seed inserted unrecorded.
+  PERFORM hive.context_back_from_fork(__schema, __h);
+  IF EXISTS (SELECT 1 FROM order_lifecycle WHERE block_created > __h OR end_block > __h) THEN
+    RAISE EXCEPTION 'order_lifecycle after a fork back to the irreversible block still holds rows past block %', __h;
+  END IF;
+  PERFORM pg_temp.check_open_rows_equal_order_state('after a fork back to the irreversible block');
+  PERFORM pg_temp.check_order_stats_rollup('after a fork back to the irreversible block');
+
+  SELECT ol.*, av.name INTO __o1 FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.create_op_id = current_setting('btracker_test.o1')::BIGINT;
+  SELECT ol.*, av.name INTO __o2 FROM order_lifecycle ol JOIN hive.accounts_view av ON av.id = ol.owner_id
+  WHERE ol.create_op_id = current_setting('btracker_test.o2')::BIGINT;
+  PERFORM pg_temp.process_live_block(__h + 1, jsonb_build_array(
+    pg_temp.op_create(__h + 1, 10001, __a, __n + 1, 700, __hive),
+    pg_temp.op_cancel(__h + 1, 10002, __o1.name, __o1.order_id, TRUE)));
+  PERFORM pg_temp.process_live_block(__h + 2, jsonb_build_array(
+    pg_temp.op_fill(__h + 2, 10001, __o2.name, __o2.order_id, __o2.remaining, __o2.nai),
+    pg_temp.op_create(__h + 2, 10002, __b, __n + 1, 300, __hive),
+    pg_temp.op_fill(__h + 2, 10003, __b, __n + 1, 100, __hive)));
+  SELECT jsonb_build_array(
+           (SELECT count(*) FROM order_lifecycle WHERE block_created > __h),
+           (SELECT outcome FROM order_lifecycle WHERE create_op_id = __o1.create_op_id),
+           (SELECT outcome FROM order_lifecycle WHERE create_op_id = __o2.create_op_id))
+  INTO __actual;
+  IF __actual IS DISTINCT FROM jsonb_build_array(2, 'cancelled', 'filled') THEN
+    RAISE EXCEPTION 'order_lifecycle after a different chain: expected [2, "cancelled", "filled"] (created, o1, o2), found %', __actual;
+  END IF;
+  PERFORM pg_temp.check_open_rows_equal_order_state('after a different chain past the fork');
+  PERFORM pg_temp.check_order_stats_rollup('after a different chain past the fork');
+  RAISE NOTICE 'PASS: seeding over reversible blocks counts them so that a fork reverts them and a different chain counts its own';
+END
+$$;
+ROLLBACK;
+\else
+\echo 'SKIP: seeding over reversible blocks: the context is not forking'
+\endif
