@@ -841,10 +841,10 @@ aggregated_balance_history AS MATERIALIZED (
     by_month,
     ROW_NUMBER() OVER w_day_desc AS rn_by_day,
     ROW_NUMBER() OVER w_month_desc AS rn_by_month,
-    MIN(balance) OVER w_day_all AS min_balance_day,
-    MAX(balance) OVER w_day_all AS max_balance_day,
-    MIN(balance) OVER w_month_all AS min_balance_month,
-    MAX(balance) OVER w_month_all AS max_balance_month
+    MIN(balance) OVER w_day_desc AS min_balance_day,
+    MAX(balance) OVER w_day_desc AS max_balance_day,
+    MIN(balance) OVER w_month_desc AS min_balance_month,
+    MAX(balance) OVER w_month_desc AS max_balance_month
   FROM join_created_at_to_balance_history
   -- One-time filter: during MASSIVE sync the rollups are deferred to
   -- finalize_massive_sync() (see __maintain_period_rollups above); emptying this
