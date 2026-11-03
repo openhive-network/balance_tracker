@@ -43,8 +43,10 @@
  * what the real sync left, whichever path it took.
  *
  * Expects psql variable `schema`. With `-v require_clears=1` it fails when the chain has no
- * clearing op or is not the account_clears fixture; otherwise it skips (all, or the fixture
- * values) with a notice.
+ * clearing op or is not the account_clears fixture. Otherwise, with a notice, a chain without
+ * clearing ops skips everything, and any other chain (a real node) runs only step 0's
+ * checks that need no fixture (finalized, balance_totals): steps 1-3 replay every account
+ * of the range block by block and run only on the fixture's few blocks.
  */
 
 \set ON_ERROR_STOP on
@@ -212,12 +214,14 @@ BEGIN
   _o := _o || pg_temp.expect('null current HBD', pg_temp.current(FALSE, f.null_id, 13), '0');
   _o := _o || pg_temp.expect('null current VESTS', pg_temp.current(FALSE, f.null_id, 37), '2000000000');
 
-  -- null, savings: +2 HIVE and +4 HBD in ...58, then the clear; nothing later
+  -- null, savings: +2 HIVE and +4 HBD in ...58, then the clear; +5 HIVE (from hive.fund)
+  -- in ...60, after it, and the clear in ...61, a block without a savings op (block by
+  -- block it debits the stored savings balance)
   _o := _o || pg_temp.expect('null HIVE savings from ...58 (after the first)',
-                             ((pg_temp.hist(TRUE, f.null_id, 21, 90000058))::BIGINT[])[2:]::TEXT, '{0}');
+                             ((pg_temp.hist(TRUE, f.null_id, 21, 90000058))::BIGINT[])[2:]::TEXT, '{0,5,0}');
   _o := _o || pg_temp.expect('null HBD savings from ...58 (after the first)',
                              ((pg_temp.hist(TRUE, f.null_id, 13, 90000058))::BIGINT[])[2:]::TEXT, '{0}');
-  _o := _o || pg_temp.expect('null HIVE savings clear blocks', pg_temp.clear_blocks(TRUE, f.null_id, 21), '{90000058}');
+  _o := _o || pg_temp.expect('null HIVE savings clear blocks', pg_temp.clear_blocks(TRUE, f.null_id, 21), '{90000058,90000061}');
   _o := _o || pg_temp.expect('null HBD savings clear blocks', pg_temp.clear_blocks(TRUE, f.null_id, 13), '{90000058}');
   _o := _o || pg_temp.expect('null current HIVE savings', pg_temp.current(TRUE, f.null_id, 21), '0');
   _o := _o || pg_temp.expect('null current HBD savings', pg_temp.current(TRUE, f.null_id, 13), '0');
@@ -226,6 +230,8 @@ BEGIN
   _o := _o || pg_temp.expect('steem.dao HIVE', pg_temp.hist(FALSE, f.dao_id, 21, 0), '{2000,0}');
   _o := _o || pg_temp.expect('steem.dao HBD', pg_temp.hist(FALSE, f.dao_id, 13, 0), '{300,0}');
   _o := _o || pg_temp.expect('steem.dao VESTS', pg_temp.hist(FALSE, f.dao_id, 37, 0), '{}');
+  -- its VESTS markers debit nothing: no current row either (not a 0 row at source_op 0)
+  _o := _o || pg_temp.expect('steem.dao current VESTS row', pg_temp.current(FALSE, f.dao_id, 37), NULL);
   _o := _o || pg_temp.expect('steem.dao HIVE savings', pg_temp.hist(TRUE, f.dao_id, 21, 0), '{3,0}');
   _o := _o || pg_temp.expect('steem.dao HIVE clear blocks', pg_temp.clear_blocks(FALSE, f.dao_id, 21), '{90000058}');
   _o := _o || pg_temp.expect('steem.dao current HIVE', pg_temp.current(FALSE, f.dao_id, 21), '0');
@@ -233,8 +239,8 @@ BEGIN
   _o := _o || pg_temp.expect('steem.dao current HIVE savings', pg_temp.current(TRUE, f.dao_id, 21), '0');
 
   -- pending rewards: only those after null's last clear (...63 op 1): benefactor 4 HIVE,
-  -- 5 HBD, 3 VESTS; curation 1 VESTS; author 2 HIVE, 1 HBD, 1 VESTS. The four before it
-  -- (...58, 60, 61, 63 op 0) are emptied.
+  -- 5 HBD, 3 VESTS; curation 1 VESTS; author 2 HIVE, 1 HBD, 1 VESTS. Those before it
+  -- (...58, the benefactor and curation rewards in ...60, ...61, ...63 op 0) are emptied.
   _o := _o || pg_temp.expect('null pending rewards (HBD, HIVE, VESTS)',
                              (SELECT array_agg(coalesce(r.balance, 0) ORDER BY n.nai)
                               FROM (VALUES (13), (21), (37)) n(nai)
@@ -251,11 +257,12 @@ BEGIN
                              (SELECT coalesce(sum(w.delayed_vests), 0) FROM account_withdraws w WHERE w.account = f.dao_id)::TEXT, '0');
 
   -- unaffected: hive.fund keeps what the consolidate moved (as HAF's collector emits it:
-  -- one liquid credit per asset at the consolidate, nothing taken away), and poloniex,
-  -- which paid null and steem.dao, has no row at a clearing op
-  _o := _o || pg_temp.expect('hive.fund HIVE', pg_temp.hist(FALSE, f.fund_id, 21, 0), '{2003}');
+  -- one liquid credit per asset at the consolidate, nothing taken away) less the 5 HIVE it
+  -- puts in null's savings in ...60, and poloniex, which paid null and steem.dao, has no
+  -- row at a clearing op
+  _o := _o || pg_temp.expect('hive.fund HIVE', pg_temp.hist(FALSE, f.fund_id, 21, 0), '{2003,1998}');
   _o := _o || pg_temp.expect('hive.fund HBD', pg_temp.hist(FALSE, f.fund_id, 13, 0), '{300}');
-  _o := _o || pg_temp.expect('hive.fund current HIVE', pg_temp.current(FALSE, f.fund_id, 21), '2003');
+  _o := _o || pg_temp.expect('hive.fund current HIVE', pg_temp.current(FALSE, f.fund_id, 21), '1998');
   _o := _o || pg_temp.expect('hive.fund current HBD', pg_temp.current(FALSE, f.fund_id, 13), '300');
   _o := _o || pg_temp.expect('poloniex rows at a clearing op',
                              (SELECT count(*) FROM (SELECT account, op_type_id FROM account_balance_history
@@ -366,6 +373,12 @@ BEGIN
                                 FROM balance_history_by_day d
                                 WHERE d.account = f.null_id AND d.nai = 37 AND d.updated_at >= date_trunc('day', f.t58))::TEXT,
                                '{{2000000000,0,4000000000},{2000000000,0,2000000000}}');
+    -- lifetime rewards keep every reward: the 3000 VESTS curation reward in ...60 is
+    -- 999 HIVE-equivalent (at ...60's vesting ratio), though the clear in ...61 empties it
+    -- from the pending rewards (the one in ...63 rounds to 0)
+    _m := _m || pg_temp.expect('null lifetime rewards (posting, curation)',
+                               (SELECT ROW(r.posting_rewards, r.curation_rewards)::TEXT FROM account_info_rewards r WHERE r.account = f.null_id),
+                               '(0,999)');
   END IF;
 
   IF cardinality(_m) > 0 THEN
@@ -375,6 +388,17 @@ BEGIN
     CASE WHEN f.is_fixture THEN ' and the account_clears fixture values' ELSE '' END;
 END
 $$;
+
+-- Steps 1-3 reprocess every account of the range block by block in one transaction: only
+-- on the fixture's few blocks, never on a real node (where the range starts at null's
+-- first clear, millions of blocks back).
+SELECT is_fixture FROM t_fixture \gset
+\if :is_fixture
+\else
+  DO $$ BEGIN RAISE NOTICE 'cleared_accounts_batch: not the account_clears fixture - steps 1-3 (replay) skipped'; END $$;
+  ROLLBACK;
+  \quit
+\endif
 
 -- null's delayed vests as the sync left them; every start below uses this + 4e9. Only
 -- null's existing row: a row created for steem.dao, which has none, would be compared
@@ -480,8 +504,35 @@ BEGIN
   PERFORM pg_temp.take_back();
   INSERT INTO t_hbd_start
   SELECT hi.last_balance FROM account_hbd_interest hi WHERE hi.account = (SELECT null_id FROM t_fixture);
+  IF (SELECT count(*) FROM t_hbd_start WHERE balance IS NOT NULL) <> 1 THEN
+    RAISE EXCEPTION 'cleared_accounts_batch: no seeded HBD-interest row for null';
+  END IF;
   FOR _b IN _from.._to LOOP
     PERFORM pg_temp.process(_b, _b);
+    -- block ...59: a clear of null and no reward op of it; the pending rewards ...58
+    -- credited after its clear are emptied all the same
+    IF _b = 90000059 AND EXISTS (SELECT 1 FROM account_rewards r
+                                 WHERE r.account = (SELECT null_id FROM t_fixture) AND r.balance <> 0) THEN
+      RAISE EXCEPTION 'cleared_accounts_batch: block ...59 left null pending rewards: %',
+        (SELECT array_agg(ROW(r.nai, r.balance)::TEXT) FROM account_rewards r WHERE r.account = (SELECT null_id FROM t_fixture));
+    END IF;
+    -- block ...61: +4000 VESTS power-up (delayed) at op 1, the clear at op 2: the reset is
+    -- at the op, so nothing is left (4000 VESTS if it were applied at the block's start)
+    IF _b = 90000061 AND (SELECT w.delayed_vests FROM account_withdraws w WHERE w.account = (SELECT null_id FROM t_fixture)) <> 0 THEN
+      RAISE EXCEPTION 'cleared_accounts_batch: block ...61 left null delayed vests %',
+        (SELECT w.delayed_vests FROM account_withdraws w WHERE w.account = (SELECT null_id FROM t_fixture));
+    END IF;
+    -- the batch's VESTS changes, which process_rc_delegations and process_withdrawals
+    -- replay vesting from, hold the clear's debit (not the marker's 0): block ...63 clears
+    -- null's stored 2000 VESTS
+    IF _b = 90000063 THEN
+      IF NOT EXISTS (SELECT 1 FROM _btracker_vests_batch v
+                     WHERE v.account_id = (SELECT null_id FROM t_fixture) AND v.balance = -2000000000
+                       AND hafd.operation_id_to_block_num(v.source_op) = 90000063) THEN
+        RAISE EXCEPTION 'cleared_accounts_batch: block ...63 staged no -2000 VESTS clear debit for null: %',
+          (SELECT array_agg(ROW(v.account_id, v.source_op, v.balance)::TEXT) FROM _btracker_vests_batch v);
+      END IF;
+    END IF;
   END LOOP;
 END
 $$;
@@ -513,11 +564,11 @@ BEGIN
                              (SELECT s.savings_withdraw_requests FROM account_savings s WHERE s.account = f.null_id AND s.nai = 21)::TEXT, '1');
   _m := _m || pg_temp.expect('null received vests',
                              (SELECT d.received_vests FROM account_delegations d WHERE d.account = f.null_id)::TEXT, '7');
-  IF NOT EXISTS (SELECT 1 FROM account_info_rewards r
-                 WHERE r.account = f.null_id AND r.posting_rewards >= 100 AND r.curation_rewards >= 200) THEN
-    _m := _m || format('null lifetime rewards: %s, want at least the seeded 100/200',
-                       (SELECT ROW(r.posting_rewards, r.curation_rewards)::TEXT FROM account_info_rewards r WHERE r.account = f.null_id));
-  END IF;
+  -- lifetime rewards: the seeded 100/200 plus the 999 of the curation reward in ...60,
+  -- which the clear in ...61 empties from the pending rewards only
+  _m := _m || pg_temp.expect('null lifetime rewards (posting, curation)',
+                             (SELECT ROW(r.posting_rewards, r.curation_rewards)::TEXT FROM account_info_rewards r WHERE r.account = f.null_id),
+                             '(100,1199)');
 
   IF cardinality(_m) > 0 THEN
     RAISE EXCEPTION 'cleared_accounts_batch: block-by-block processing is wrong: %', _m;
@@ -538,6 +589,20 @@ CREATE TEMP TABLE s_rew ON COMMIT DROP AS SELECT r.account, r.nai, r.balance FRO
 CREATE TEMP TABLE s_info ON COMMIT DROP AS SELECT r.account, r.posting_rewards, r.curation_rewards FROM account_info_rewards r WHERE r.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_wd ON COMMIT DROP AS SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts);
 CREATE TEMP TABLE s_hbd ON COMMIT DROP AS SELECT hi.account, hi.hbd_seconds, hi.hbd_seconds_last_update, hi.last_balance, hi.hbd_last_interest_payment FROM account_hbd_interest hi WHERE hi.account IN (SELECT account FROM t_accounts);
+-- month and savings rollups: not taken back, so steps 2 and 3 both merge into the synced
+-- rows (LEAST/GREATEST); they must merge to the same result
+CREATE TEMP TABLE s_bmonth ON COMMIT DROP AS
+SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d
+WHERE d.account IN (SELECT account FROM t_accounts)
+  AND d.updated_at >= (SELECT date_trunc('month', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
+CREATE TEMP TABLE s_sday ON COMMIT DROP AS
+SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_day d
+WHERE d.account IN (SELECT account FROM t_accounts)
+  AND d.updated_at >= (SELECT date_trunc('day', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
+CREATE TEMP TABLE s_smonth ON COMMIT DROP AS
+SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d
+WHERE d.account IN (SELECT account FROM t_accounts)
+  AND d.updated_at >= (SELECT date_trunc('month', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range));
 -- rollups of the days of the range (earlier days are untouched by steps 2 and 3)
 CREATE TEMP TABLE s_bday ON COMMIT DROP AS
 SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d
@@ -577,6 +642,9 @@ BEGIN
     ('account_info_rewards', 'SELECT r.account, r.posting_rewards, r.curation_rewards FROM account_info_rewards r WHERE r.account IN (SELECT account FROM t_accounts)', 's_info'),
     ('account_withdraws.delayed_vests', 'SELECT w.account, w.delayed_vests FROM account_withdraws w WHERE w.account IN (SELECT account FROM t_accounts)', 's_wd'),
     ('account_hbd_interest', 'SELECT hi.account, hi.hbd_seconds, hi.hbd_seconds_last_update, hi.last_balance, hi.hbd_last_interest_payment FROM account_hbd_interest hi WHERE hi.account IN (SELECT account FROM t_accounts)', 's_hbd'),
+    ('balance_history_by_month', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts) AND d.updated_at >= (SELECT date_trunc(''month'', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range))', 's_bmonth'),
+    ('saving_history_by_day', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts) AND d.updated_at >= (SELECT date_trunc(''day'', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range))', 's_sday'),
+    ('saving_history_by_month', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM saving_history_by_month d WHERE d.account IN (SELECT account FROM t_accounts) AND d.updated_at >= (SELECT date_trunc(''month'', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range))', 's_smonth'),
     ('balance_history_by_day', 'SELECT d.account, d.nai, d.updated_at, d.balance, d.min_balance, d.max_balance, d.source_op FROM balance_history_by_day d WHERE d.account IN (SELECT account FROM t_accounts) AND d.updated_at >= (SELECT date_trunc(''day'', bv.created_at) FROM blocks_view bv WHERE bv.num = (SELECT from_block FROM t_range))', 's_bday')
   ) AS v(label, live, snap)
   LOOP

@@ -119,6 +119,14 @@ WITH RECURSIVE calculated_delays AS (
 )
 ```
 
+### Balance-clearing operations (#61)
+
+hived empties the delayed votes of `null` / `steem.dao` with their vesting shares. Section
+4 adds a marker at the account's LAST clearing op of the batch (`union_delays`) that sets
+the clamped running value to 0; later delayed ops continue from 0. The last clear is
+enough: the fold keeps only the final value, and the last reset makes earlier ones
+irrelevant. Only for an account with delayed ops in the batch or stored `delayed_vests`.
+
 ## Hardfork Handling
 
 | Hardfork | Block Lookup | Effect |

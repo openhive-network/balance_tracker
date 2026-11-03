@@ -122,6 +122,14 @@ Withdrawals *to* a cleared account from another sender, which hived also removed
 are not handled: `transfer_saving_id` does not store the recipient, and mainnet
 has none.
 
+### Balance-clearing operations (#61)
+
+The clears of `null` / `steem.dao` empty their savings too. `union_operations` adds a
+marker per savings asset at each clearing op, and `apply_savings_clears` turns it into
+the debit of the running savings balance, as `process_balances` does for liquid balances.
+The pending-withdrawal count and `transfer_saving_id` are untouched (the markers carry 0
+and both request flags false): hived's clear does not cancel savings withdrawals.
+
 ### Interest Operation Filtering
 
 HBD interest can go to regular balance OR stay in savings:

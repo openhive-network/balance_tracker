@@ -21,7 +21,7 @@
           balance-type: "savings_balance"
           page-size: 20
           from-block: "90000058"
-          to-block: "90000060"
+          to-block: "90000061"
       response:
         status_code: 200
         verify_response_with:

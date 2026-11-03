@@ -282,6 +282,45 @@
       }
     },
     {
+      "block_num": 90000060,
+      "op_type_id": 32,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "hive.fund",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "5",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000060,
+      "op_type_id": 52,
+      "op_pos": 2,
+      "trx_in_block": -1,
+      "body": {
+        "type": "curation_reward_operation",
+        "value": {
+          "curator": "null",
+          "reward": {
+            "nai": "@@000000037",
+            "amount": "3000000000",
+            "precision": 6
+          },
+          "author": "poloniex",
+          "permlink": "clear-test-2",
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
       "block_num": 90000061,
       "op_type_id": 3,
       "op_pos": 0,

@@ -114,6 +114,20 @@ CROSS JOIN hive.get_impacted_balances(
 
 Pre-HF1 operations may need different interpretation.
 
+### Balance-clearing operations (#61)
+
+At each `clear_null_account_balance` / `consolidate_treasury_balance` op, hived empties
+`null` / `steem.dao`; HAF's collector emits no debit for it. `ops_in_range` adds a marker
+row per liquid asset at the op (`is_clear`, delta 0, from
+`btracker_backend.account_clears_in_range`), and `cleared_rows` turns each marker into a
+debit of exactly the running balance there: `grp` numbers the stretches between clears,
+and a marker debits the sum of its stretch. A marker that debits nothing is dropped; a
+partition touched only by markers is dropped whole. Only the cleared accounts take this
+window path (`cleared_accounts`, an array); `apply_account_clears` passes every other row
+straight through. The debit rows reach the history (op type 65/71), the rollups,
+`balance_totals`, the HBD-interest staging and `_btracker_vests_batch` like any change.
+See `scripts/claude/processing.md` (Balance-clearing operations).
+
 ## How to Modify
 
 ### Adding a New Operation Type
