@@ -58,19 +58,12 @@ sandbox:
     - name: haf
       provider: "haf/haf"
 
-# Every test dispatch (full, canary, baseline, promote canary, post-promote
-# verification) is offered first to steem-18, the host of that shared HAF, and
-# to steem-20, as the sync step's round trips to it dominate the suites (see the
-# timings under `verification`). steem-20 is 0.37 ms from the shared HAF, and
-# measured sync 146s and one full run 182s there against 561s on steem-3. It is
-# listed alongside steem-18 because a blocked host claims no new work: under an
-# operator block on steem-18 alone, every dispatch waited out the 120s window
-# before falling back. `prefer`, not `require`: when neither host claims the
-# work within its 120s window, any admitted host runs it, so a busy, blocked or
-# drained pair slows a run rather than failing it.
-dispatch:
-  hosts: [steem-18.syncad.com, steem-20.syncad.com]
-  mode: prefer
+# No `dispatch` host preference until aidev#17496 is fixed: a preferred host
+# has never claimed a balance_tracker dispatch within its 120s window, so the
+# preference only added that wait before the run landed on any admitted host.
+# The shared HAF is on steem-18 and steem-20 is 0.37 ms from it; re-adding
+# `dispatch: {hosts: [steem-20.syncad.com], mode: prefer}` (steem-18 too, once
+# unblocked) is the follow-up and aidev#17496's live check.
 
 # Verification slots. Each binding is what this project genuinely runs for
 # that slot — never one selection repeated under seven names, which makes
@@ -95,8 +88,8 @@ dispatch:
 # 137s), and a canary killed at 900s with every case passing after a 591s
 # sync. 1800s covers the farthest fallback host's worst run with room to
 # spare and stays inside full's 2100s activity ceiling; it is to be
-# re-derived from the preferred hosts' own timings once `dispatch` below has
-# placed a few runs there. Further evidence for that: on 2026-11-02 a full run
+# re-derived from the preferred hosts' own timings once a re-added `dispatch`
+# has placed a few runs there. Further evidence for that: on 2026-11-02 a full run
 # took 218s and a post-merge canary 193s, both on steem-20. `system` is
 # unbound, so it has no wall to declare.
 verification:
