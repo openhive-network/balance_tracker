@@ -59,6 +59,7 @@ tests/
 │   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests
+│   ├── hf_23_orders.sql       # process_hf_23 removes cleared accounts' open orders from order_state and closes their order_lifecycle rows as cancelled at HF23
 │   ├── delegation_withdraw_history.sql # delegation/power-down history per change (a first delegation of 0 too), balances at past blocks, fork rollback, at-block and /balances endpoints
 │   ├── indexes_created_per_schema.sql # isIndexesCreated() answers per schema when another schema holds an index of the same name
 │   ├── finalize_security_definer.sql # finalize functions: a caller's shadowing isIndexesCreated() is not called; PUBLIC/btracker_user cannot execute them
