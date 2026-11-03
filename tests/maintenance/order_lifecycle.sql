@@ -41,6 +41,10 @@
  *   - an upgrade from a version without the rollups: both dropped and
  *     db/btracker_app.sql run again, they equal order_lifecycle's counts, and
  *     still do after a block that fills and cancels orders created before it;
+ *   - the same upgrade on a detached context whose stored irreversible block
+ *     is 0: the rollups equal order_lifecycle's counts, all of them from the
+ *     base seed (no block-by-block pass), and the context's current block is
+ *     unchanged;
  *   - the same upgrade with three processed blocks past the context's
  *     irreversible block (skipped when the context is not forking): the rollups
  *     equal order_lifecycle's counts after it, after a fork back to the first of
@@ -798,6 +802,64 @@ BEGIN
     RAISE EXCEPTION '/order-stats over the closed orders'' creation blocks: expected %, found %', __expected, __actual;
   END IF;
   RAISE NOTICE 'PASS: orders created before the upgrade and closed after it count as created and closed: %', __actual;
+END
+$$;
+ROLLBACK;
+
+-- The same upgrade on a detached context (massive sync, catching up) whose stored
+-- irreversible block is 0, as a context's is until it first attaches: the seed
+-- counts the whole processed history in its unrecorded base rows, adds nothing
+-- block by block (which would draw the rollups' row id sequences past them), and
+-- leaves the context's current block where it was.
+BEGIN;
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM order_lifecycle) THEN
+    RAISE EXCEPTION 'the synced blocks hold no orders to seed the rollups from';
+  END IF;
+  IF hive.app_context_is_attached(__schema) THEN
+    PERFORM hive.app_context_detach(__schema);
+  END IF;
+  UPDATE hafd.contexts SET irreversible_block = 0 WHERE name = __schema;
+  PERFORM set_config('btracker_test.detached_block',
+    (SELECT hc.current_block_num FROM hafd.contexts hc WHERE hc.name = __schema)::TEXT, false);
+END
+$$;
+DROP TABLE order_stats_by_block;
+DROP TABLE order_stats_by_block_group;
+SET search_path TO :"schema";
+\ir ../../db/btracker_app.sql
+SET search_path TO :"schema", public;
+DO
+$$
+DECLARE
+  __schema CONSTANT TEXT := current_setting('btracker_test.schema');
+  __block_before CONSTANT INT := current_setting('btracker_test.detached_block')::INT;
+  __block_after INT;
+  __table TEXT;
+  __rows BIGINT;
+  __max_rowid BIGINT;
+  __drawn BOOLEAN;
+BEGIN
+  SELECT hc.current_block_num INTO __block_after FROM hafd.contexts hc WHERE hc.name = __schema;
+  IF __block_after IS DISTINCT FROM __block_before THEN
+    RAISE EXCEPTION 'seeding on a detached context moved its current block from % to %', __block_before, __block_after;
+  END IF;
+  PERFORM pg_temp.check_order_stats_rollup('after seeding on a detached context with irreversible block 0');
+
+  FOREACH __table IN ARRAY ARRAY['order_stats_by_block', 'order_stats_by_block_group']
+  LOOP
+    EXECUTE format('SELECT count(*), max(hive_rowid) FROM %I', __table) INTO __rows, __max_rowid;
+    EXECUTE format('SELECT is_called FROM %s', pg_get_serial_sequence(__table, 'hive_rowid')) INTO __drawn;
+    IF __drawn OR __max_rowid IS DISTINCT FROM __rows THEN
+      RAISE EXCEPTION 'seeding % on a detached context added rows past its base seed (% rows, max hive_rowid %, row id sequence drawn: %)',
+        __table, __rows, __max_rowid, __drawn;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'PASS: seeding on a detached context counts its whole history in the base seed and keeps it at block %', __block_after;
 END
 $$;
 ROLLBACK;

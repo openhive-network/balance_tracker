@@ -1854,6 +1854,7 @@ DECLARE
   __irreversible INT;
   __current_block INT;
   __event_block INT;
+  __reversible RECORD;
   __seed_by_block BOOLEAN;
   __seed_by_block_group BOOLEAN;
 BEGIN
@@ -1888,7 +1889,20 @@ BEGIN
   -- one: HAF reverts an update by hive_rowid, so a fork reverting a later block's
   -- update of one seeded row would rewrite them all. The row id sequence
   -- registration creates is then moved past them.
+  -- A detached context's irreversible block is frozen (only attach moves it) and
+  -- may be 0, but everything it processed up to HAF's consistent block is
+  -- irreversible and it records no change for a fork to revert: the seed counts
+  -- all of it, so its reversible part below is empty.
+  -- The context's row stays locked to the end of the transaction, so the app
+  -- cannot move its current block between the reads of it here and below and the
+  -- restore of it, and order_lifecycle holds exactly the blocks up to it.
+  PERFORM 1 FROM hafd.contexts WHERE name = __schema_name FOR UPDATE;
   __irreversible := hive.app_get_irreversible_block(__schema_name);
+  IF NOT hive.app_context_is_attached(__schema_name) THEN
+    __irreversible := GREATEST(__irreversible, LEAST(
+      hive.app_get_current_block_num(__schema_name),
+      (SELECT hs.consistent_block FROM hafd.hive_state hs)));
+  END IF;
   __seed_by_block := to_regclass(format('%I.order_stats_by_block', __schema_name)) IS NULL;
   __seed_by_block_group := to_regclass(format('%I.order_stats_by_block_group', __schema_name)) IS NULL;
 
@@ -1963,14 +1977,17 @@ BEGIN
     WHERE e.event_block > __irreversible
     GROUP BY e.event_block, ol.block_created;
 
-    FOR __event_block IN SELECT DISTINCT event_block FROM _order_stats_reversible ORDER BY event_block
+    -- One ordered walk over the rows, moving the current block at each new
+    -- event block: linear in the rows, however many blocks they span.
+    FOR __reversible IN SELECT * FROM _order_stats_reversible ORDER BY event_block
     LOOP
-      UPDATE hafd.contexts SET current_block_num = __event_block WHERE name = __schema_name;
+      IF __reversible.event_block IS DISTINCT FROM __event_block THEN
+        __event_block := __reversible.event_block;
+        UPDATE hafd.contexts SET current_block_num = __event_block WHERE name = __schema_name;
+      END IF;
       IF __seed_by_block THEN
         INSERT INTO order_stats_by_block AS s (block_created, created, filled, cancelled)
-        SELECT block_created, created, filled, cancelled
-        FROM _order_stats_reversible
-        WHERE event_block = __event_block
+        VALUES (__reversible.block_created, __reversible.created, __reversible.filled, __reversible.cancelled)
         ON CONFLICT (block_created) DO UPDATE
           SET created   = s.created + EXCLUDED.created,
               filled    = s.filled + EXCLUDED.filled,
@@ -1978,10 +1995,7 @@ BEGIN
       END IF;
       IF __seed_by_block_group THEN
         INSERT INTO order_stats_by_block_group AS s (block_group, created, filled, cancelled)
-        SELECT block_created / 10000, SUM(created), SUM(filled), SUM(cancelled)
-        FROM _order_stats_reversible
-        WHERE event_block = __event_block
-        GROUP BY block_created / 10000
+        VALUES (__reversible.block_created / 10000, __reversible.created, __reversible.filled, __reversible.cancelled)
         ON CONFLICT (block_group) DO UPDATE
           SET created   = s.created + EXCLUDED.created,
               filled    = s.filled + EXCLUDED.filled,

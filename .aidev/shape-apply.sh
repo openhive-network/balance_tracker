@@ -57,10 +57,16 @@ CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON :"schema".
 -- as db/btracker_app.sql does before registering them, since a fork never reverts
 -- rows inserted then (10000: btracker_backend.order_stats_group_blocks()). The
 -- shape registers no table and processes no block, so it has no reversible part to
--- add; it holds no context row either, for which the history counted is none.
+-- add, and no app runs on it to lock its context out; it holds no context row
+-- either, for which the history counted is none. A detached
+-- context's history counts up to its current block, bounded by HAF's consistent
+-- block, as db/btracker_app.sql counts it.
 SELECT to_regclass(format('%I.order_stats_by_block', :'schema')) IS NULL AS seed_by_block,
        to_regclass(format('%I.order_stats_by_block_group', :'schema')) IS NULL AS seed_by_block_group,
-       COALESCE((SELECT hive.app_get_irreversible_block(hc.name) FROM hafd.contexts hc WHERE hc.name = :'schema'), 0) AS irreversible \gset
+       COALESCE((SELECT CASE WHEN hive.app_context_is_attached(hc.name) THEN hive.app_get_irreversible_block(hc.name)
+                             ELSE GREATEST(hive.app_get_irreversible_block(hc.name),
+                                           LEAST(hc.current_block_num, (SELECT hs.consistent_block FROM hafd.hive_state hs))) END
+                 FROM hafd.contexts hc WHERE hc.name = :'schema'), 0) AS irreversible \gset
 \if :seed_by_block
 CREATE TABLE :"schema".order_stats_by_block
   (block_created INT NOT NULL, created INT NOT NULL, filled INT NOT NULL, cancelled INT NOT NULL,
