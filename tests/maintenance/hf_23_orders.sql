@@ -4,8 +4,10 @@
  * The open limit orders of the accounts cleared at HF23, which hived cancelled
  * without a limit_order_cancelled operation: process_hf_23 deletes a cleared
  * account's order_state rows and closes its open order_lifecycle rows as
- * cancelled at the HF23 block with their remaining kept, and leaves an order it
- * closed earlier and every order of an account it does not clear unchanged.
+ * cancelled at the HF23 block with their remaining kept, also in the counts of
+ * their creation blocks (order_stats_by_block, order_stats_by_block_group), and
+ * leaves an order it closed earlier and every order of an account it does not
+ * clear unchanged.
  *
  * The test HAF stops at block 5,000,000, before HF23: a session temp view named
  * operations_view, which the application's unqualified references resolve to
@@ -56,6 +58,9 @@ DECLARE
   __f RECORD;
   __changes TEXT;
   __expected TEXT;
+  __stats_before btracker_backend.order_stats;
+  __stats_after btracker_backend.order_stats;
+  __group_cancelled_before BIGINT;
 BEGIN
   SELECT * INTO __f FROM _hf23_fixture;
 
@@ -79,10 +84,26 @@ BEGIN
   SELECT owner_id, order_id, nai, remaining, block_created FROM order_lifecycle
   WHERE owner_id IN (__f.account, __f.other_account) AND end_block IS NULL;
 
+  -- The fixture orders in the counts, as block processing would have added them.
+  INSERT INTO order_stats_by_block AS s (block_created, created, filled, cancelled)
+  SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+  FROM order_lifecycle WHERE owner_id IN (__f.account, __f.other_account) GROUP BY block_created
+  ON CONFLICT (block_created) DO UPDATE
+    SET created = s.created + EXCLUDED.created, filled = s.filled + EXCLUDED.filled, cancelled = s.cancelled + EXCLUDED.cancelled;
+  INSERT INTO order_stats_by_block_group AS s (block_group, created, filled, cancelled)
+  SELECT block_created / btracker_backend.order_stats_group_blocks(), count(*),
+         count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+  FROM order_lifecycle WHERE owner_id IN (__f.account, __f.other_account) GROUP BY 1
+  ON CONFLICT (block_group) DO UPDATE
+    SET created = s.created + EXCLUDED.created, filled = s.filled + EXCLUDED.filled, cancelled = s.cancelled + EXCLUDED.cancelled;
+  __stats_before := btracker_endpoints.get_order_stats((__f.hf_block - 6)::TEXT, __f.hf_block::TEXT);
+  __group_cancelled_before := (SELECT sum(cancelled) FROM order_stats_by_block_group);
+
   CREATE TEMP TABLE _order_state_before ON COMMIT DROP AS SELECT * FROM order_state;
   CREATE TEMP TABLE _order_lifecycle_before ON COMMIT DROP AS SELECT * FROM order_lifecycle;
 
   PERFORM btracker_backend.process_hf_23(__f.hf_block);
+  __stats_after := btracker_endpoints.get_order_stats((__f.hf_block - 6)::TEXT, __f.hf_block::TEXT);
 
   SELECT string_agg(format('%s (%s, %s)', c.change, c.owner_id, c.order_id), ', ' ORDER BY c.change, c.owner_id, c.order_id)
   INTO __changes
@@ -122,6 +143,17 @@ BEGIN
     RAISE EXCEPTION 'process_hf_23: the open order_lifecycle rows differ from order_state';
   END IF;
   RAISE NOTICE 'PASS: after process_hf_23 the open order_lifecycle rows equal order_state';
+
+  IF (__stats_after.created, __stats_after.filled, __stats_after.cancelled, __stats_after.open)
+     IS DISTINCT FROM (__stats_before.created, __stats_before.filled, __stats_before.cancelled + 2, __stats_before.open - 2) THEN
+    RAISE EXCEPTION 'process_hf_23 /order-stats over the fixture blocks: expected the two closed orders moved from open to cancelled in %, found %',
+      to_jsonb(__stats_before), to_jsonb(__stats_after);
+  END IF;
+  IF (SELECT sum(cancelled) FROM order_stats_by_block_group) IS DISTINCT FROM __group_cancelled_before + 2 THEN
+    RAISE EXCEPTION 'process_hf_23 order_stats_by_block_group: expected % cancelled, found %',
+      __group_cancelled_before + 2, (SELECT sum(cancelled) FROM order_stats_by_block_group);
+  END IF;
+  RAISE NOTICE 'PASS: process_hf_23 counts the orders it closes as cancelled in /order-stats and the block groups';
 END
 $$;
 ROLLBACK;

@@ -2213,8 +2213,8 @@ declare
               }
             }
           },
-          "404": {
-            "description": "No such account in the database"
+          "400": {
+            "description": "No such account, a block or date that is not valid, or from-block\nafter to-block\n"
           }
         }
       }
@@ -2266,6 +2266,9 @@ declare
                 }
               }
             }
+          },
+          "400": {
+            "description": "A block or date that is not valid, or from-block after to-block"
           }
         }
       }

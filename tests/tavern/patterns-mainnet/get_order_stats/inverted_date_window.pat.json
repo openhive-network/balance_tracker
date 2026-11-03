@@ -1,0 +1,6 @@
+{
+  "code": "P0001",
+  "details": null,
+  "hint": null,
+  "message": "The starting timestamp (2016-08-31 23:59:59) must be earlier or equal to the ending timestamp (2016-08-01 00:00:00)."
+}

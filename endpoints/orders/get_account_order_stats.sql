@@ -69,8 +69,10 @@ SET ROLE btracker_owner;
               "open": 9,
               "fill_rate_pct": 97.6
             }
-      '404':
-        description: No such account in the database
+      '400':
+        description: |
+          No such account, a block or date that is not valid, or from-block
+          after to-block
  */
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_account_order_stats;
