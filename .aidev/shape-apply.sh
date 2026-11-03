@@ -8,7 +8,7 @@
 #
 # A shape holds no rows, only the source's schema and statistics, so the files
 # that create the application's tables and HAF context (db/btracker_app.sql,
-# db/builtin_roles.sql) and the block-processing code (db/process_*.sql) are not
+# db/order_stats_rollups.sql, db/builtin_roles.sql) and the block-processing code (db/process_*.sql) are not
 # run: they would replace the shape's tables, and with them their statistics,
 # and nothing an API query plans with lives in them. Every other file
 # install_app.sh feeds to psql is run, in its order, through
@@ -54,13 +54,13 @@ CREATE INDEX IF NOT EXISTS idx_order_lifecycle_open ON :"schema".order_lifecycle
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON :"schema".order_lifecycle(block_created) INCLUDE (outcome);
 CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON :"schema".order_lifecycle(owner_id, block_created) INCLUDE (outcome);
 -- The rollups are seeded from order_lifecycle's irreversible history when created,
--- as db/btracker_app.sql does before registering them, since a fork never reverts
--- rows inserted then (10000: btracker_backend.order_stats_group_blocks()). The
--- shape registers no table and processes no block, so it has no reversible part to
--- add, and no app runs on it to lock its context out; it holds no context row
--- either, for which the history counted is none. A detached
--- context's history counts up to its current block, bounded by HAF's consistent
--- block, as db/btracker_app.sql counts it.
+-- as db/order_stats_rollups.sql does before registering them, since a fork never
+-- reverts rows inserted then (10000: btracker_backend.order_stats_group_blocks()).
+-- The shape registers no table and processes no block, so it has no reversible
+-- part to add, and no app runs on it to lock its context out, so it takes no lock;
+-- it holds no context row either, for which the history counted is none. A
+-- detached context's history counts up to its current block, bounded by HAF's
+-- consistent block, as db/order_stats_rollups.sql counts it.
 SELECT to_regclass(format('%I.order_stats_by_block', :'schema')) IS NULL AS seed_by_block,
        to_regclass(format('%I.order_stats_by_block_group', :'schema')) IS NULL AS seed_by_block_group,
        COALESCE((SELECT CASE WHEN hive.app_context_is_attached(hc.name) THEN hive.app_get_irreversible_block(hc.name)
@@ -106,7 +106,7 @@ seed="$(awk '/INSERT INTO asset_table/,/;/' db/btracker_app.sql)"
 # shellcheck disable=SC2016  # $SCRIPTPATH is matched literally in install_app.sh's text
 mapfile -t files < <(grep -oE '"\$SCRIPTPATH/\.\./[^"]+\.sql"' scripts/install_app.sh \
     | sed -E 's#^"\$SCRIPTPATH/\.\./##; s#"$##' \
-    | grep -vE '^db/(btracker_app|builtin_roles|process_[a-z_]+)\.sql$')
+    | grep -vE '^db/(btracker_app|builtin_roles|order_stats_rollups|process_[a-z_]+)\.sql$')
 [ "${#files[@]}" -gt 0 ] || { echo "shape-apply.sh: no SQL files found in scripts/install_app.sh" >&2; exit 2; }
 
 for f in "${files[@]}"; do

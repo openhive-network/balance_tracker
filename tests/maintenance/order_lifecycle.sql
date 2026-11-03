@@ -38,13 +38,18 @@
  *   - a pretend HF23 block clearing one synthetic account: process_hf_23 closes
  *     its open orders as cancelled there, and the replay agrees, also when it
  *     ends in that block.
+ *   - db/order_stats_rollups.sql run again over both rollups: it locks
+ *     nothing (no transaction id assigned) and leaves them equal to
+ *     order_lifecycle's counts;
  *   - an upgrade from a version without the rollups: both dropped and
- *     db/btracker_app.sql run again, they equal order_lifecycle's counts, and
- *     still do after a block that fills and cancels orders created before it;
+ *     db/order_stats_rollups.sql run again, they equal order_lifecycle's
+ *     counts, and still do after a block that fills and cancels orders created
+ *     before it;
  *   - the same upgrade on a detached context whose stored irreversible block
- *     is 0: the rollups equal order_lifecycle's counts, all of them from the
- *     base seed (no block-by-block pass), and the context's current block is
- *     unchanged;
+ *     is 0 (skipped when the context is not forking, whose irreversible block
+ *     HAF reports as its head): the rollups equal order_lifecycle's counts, all
+ *     of them from the base seed (no block-by-block pass), and the context's
+ *     current block is unchanged;
  *   - the same upgrade with three processed blocks past the context's
  *     irreversible block (skipped when the context is not forking): the rollups
  *     equal order_lifecycle's counts after it, after a fork back to the first of
@@ -735,14 +740,33 @@ END
 $$;
 ROLLBACK;
 
+-- Every install after the first: with both rollups in place the seed neither
+-- seeds nor locks the context row, which a running app holds for whole batches
+-- (a row lock would assign this transaction an id).
+BEGIN;
+SET search_path TO :"schema";
+\ir ../../db/order_stats_rollups.sql
+SET search_path TO :"schema", public;
+DO
+$$
+BEGIN
+  IF pg_current_xact_id_if_assigned() IS NOT NULL THEN
+    RAISE EXCEPTION 're-running the seed over existing rollups wrote or locked a row (transaction id % assigned)', pg_current_xact_id_if_assigned();
+  END IF;
+  PERFORM pg_temp.check_order_stats_rollup('after re-running the seed over existing rollups');
+  RAISE NOTICE 'PASS: re-running the seed over existing rollups takes no lock and leaves them unchanged';
+END
+$$;
+ROLLBACK;
+
 -- An install upgraded from a version with order_lifecycle but without its rollups:
--- the rollups dropped, db/btracker_app.sql run again as scripts/install_app.sh
--- runs it, then a block that fills one order created before the upgrade and
+-- the rollups dropped, db/order_stats_rollups.sql run again as
+-- scripts/install_app.sh runs it, then a block that fills one order created before the upgrade and
 -- cancels another.
 BEGIN;
 DROP TABLE order_stats_by_block, order_stats_by_block_group;
 SET search_path TO :"schema";
-\ir ../../db/btracker_app.sql
+\ir ../../db/order_stats_rollups.sql
 SET search_path TO :"schema", public;
 DO
 $$
@@ -810,7 +834,11 @@ ROLLBACK;
 -- irreversible block is 0, as a context's is until it first attaches: the seed
 -- counts the whole processed history in its unrecorded base rows, adds nothing
 -- block by block (which would draw the rollups' row id sequences past them), and
--- leaves the context's current block where it was.
+-- leaves the context's current block where it was. HAF reports a non-forking
+-- context's irreversible block as its head, where the seed has nothing to walk
+-- anyway, so this needs a forking one.
+SELECT hc.is_forking AS context_is_forking FROM hafd.contexts hc WHERE hc.name = :'schema' \gset
+\if :context_is_forking
 BEGIN;
 DO
 $$
@@ -824,6 +852,11 @@ BEGIN
     PERFORM hive.app_context_detach(__schema);
   END IF;
   UPDATE hafd.contexts SET irreversible_block = 0 WHERE name = __schema;
+  -- A seed counting only up to this block would walk the whole history block by
+  -- block, which the checks after the seed would see.
+  IF hive.app_get_irreversible_block(__schema) <> 0 THEN
+    RAISE EXCEPTION 'context %: irreversible block reported as %, not the stored 0', __schema, hive.app_get_irreversible_block(__schema);
+  END IF;
   PERFORM set_config('btracker_test.detached_block',
     (SELECT hc.current_block_num FROM hafd.contexts hc WHERE hc.name = __schema)::TEXT, false);
 END
@@ -831,7 +864,7 @@ $$;
 DROP TABLE order_stats_by_block;
 DROP TABLE order_stats_by_block_group;
 SET search_path TO :"schema";
-\ir ../../db/btracker_app.sql
+\ir ../../db/order_stats_rollups.sql
 SET search_path TO :"schema", public;
 DO
 $$
@@ -863,12 +896,15 @@ BEGIN
 END
 $$;
 ROLLBACK;
+\else
+\echo 'SKIP: seeding on a detached context with irreversible block 0: the context is not forking'
+\endif
 
 -- The same upgrade over reversible blocks: three blocks past the synced head, past
 -- the context's irreversible block (lowered to that head), processed one at a time
 -- as live blocks (each change recorded at its block), creating orders and closing
--- them and two synced ones; then the rollups dropped and db/btracker_app.sql run
--- again. A fork back to the first of them, then to the irreversible block, and a
+-- them and two synced ones; then the rollups dropped and db/order_stats_rollups.sql
+-- run again. A fork back to the first of them, then to the irreversible block, and a
 -- different chain processed after it.
 CREATE FUNCTION pg_temp.process_live_block(_block INT, _ops JSONB)
 RETURNS VOID LANGUAGE plpgsql
@@ -880,7 +916,6 @@ BEGIN
 END
 $f$;
 
-SELECT hc.is_forking AS context_is_forking FROM hafd.contexts hc WHERE hc.name = :'schema' \gset
 \if :context_is_forking
 BEGIN;
 DO
@@ -935,7 +970,7 @@ $$;
 DROP TABLE order_stats_by_block;
 DROP TABLE order_stats_by_block_group;
 SET search_path TO :"schema";
-\ir ../../db/btracker_app.sql
+\ir ../../db/order_stats_rollups.sql
 SET search_path TO :"schema", public;
 DO
 $$
