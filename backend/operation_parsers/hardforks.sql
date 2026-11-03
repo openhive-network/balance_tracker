@@ -4,7 +4,8 @@ Called by: Multiple process files (process_balances.sql, process_delegations.sql
 
 Handles HF23 (Hive fork from Steem) balance resets:
 - Steemit Inc accounts had all balances zeroed
-- Affected: main balances, rewards, savings (with pending withdrawals), delegations, withdrawals
+- Affected: main balances, rewards, savings (with pending withdrawals), open limit orders,
+  delegations, withdrawals
 
 This function processes hardfork_hive_operation at the specific HF23 block,
 resetting all financial state for impacted accounts to zero.
@@ -33,6 +34,8 @@ $$;
 -- - Pending rewards
 -- - Savings balances and pending withdrawals (hived removes the withdrawals
 --   without a fill or cancel operation, so their transfer_saving_id rows go here)
+-- - Open limit orders (hived cancels them without a limit_order_cancelled
+--   operation, so they leave order_state and are closed as cancelled here)
 -- Delegations and withdrawals are handled by their respective process files.
 CREATE OR REPLACE FUNCTION btracker_backend.process_hf_23(__hardfork_23_block INT)
 RETURNS VOID
@@ -44,6 +47,8 @@ DECLARE
   __rewards INT;
   __savings INT;
   __withdraw_requests INT;
+  __orders INT;
+  __order_lifecycle INT;
 BEGIN
   -- Find all accounts affected by HF23 at the specific block
   WITH hardfork_hive_operation AS MATERIALIZED (
@@ -79,13 +84,29 @@ BEGIN
     USING hardfork_hive_operation hho
     WHERE tsi.account = hho.account_id
     RETURNING tsi.account AS cleaned_account_id
+  ),
+  delete_orders AS (
+    DELETE FROM order_state os
+    USING hardfork_hive_operation hho
+    WHERE os.owner_id = hho.account_id
+    RETURNING os.owner_id AS cleaned_account_id
+  ),
+  close_order_lifecycle AS (
+    UPDATE order_lifecycle ol SET
+      end_block = __hardfork_23_block,
+      outcome = 'cancelled'
+    FROM hardfork_hive_operation hho
+    WHERE ol.owner_id = hho.account_id AND ol.end_block IS NULL
+    RETURNING ol.owner_id AS cleaned_account_id
   )
   SELECT
     (SELECT count(*) FROM update_balances) AS balances,
     (SELECT count(*) FROM update_rewards) AS rewards,
     (SELECT count(*) FROM update_savings) AS savings,
-    (SELECT count(*) FROM delete_withdraw_requests) AS withdraw_requests
-  INTO __balances, __rewards, __savings, __withdraw_requests;
+    (SELECT count(*) FROM delete_withdraw_requests) AS withdraw_requests,
+    (SELECT count(*) FROM delete_orders) AS orders,
+    (SELECT count(*) FROM close_order_lifecycle) AS order_lifecycle
+  INTO __balances, __rewards, __savings, __withdraw_requests, __orders, __order_lifecycle;
 
 END
 $$;

@@ -153,6 +153,16 @@ del_keys AS (
 )
 ```
 
+### HF23 Cleared Accounts
+
+At HF23 hived's `clear_account` cancelled the cleared accounts' open orders with
+the virtual operation suppressed, so no `limit_order_cancelled` reaches
+btracker. `btracker_backend.process_hf_23()`
+(`backend/operation_parsers/hardforks.sql`) deletes those accounts'
+`order_state` rows and closes their open `order_lifecycle` rows as
+`cancelled` with `end_block` = the HF23 block, `remaining` kept. No one-off
+repair: installs synced before this pick it up on resync.
+
 ## Debugging Tips
 
 Check open orders:
