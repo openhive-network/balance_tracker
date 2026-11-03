@@ -21,6 +21,8 @@ tags:
     description: Information about transfers and their history
   - name: Proposals
     description: Payments from the Decentralized Hive Fund to its proposals
+  - name: Orders
+    description: Limit orders on the internal HBD/HIVE market
   - name: Other
     description: General API information
 servers:
@@ -71,6 +73,10 @@ declare
     {
       "name": "Proposals",
       "description": "Payments from the Decentralized Hive Fund to its proposals"
+    },
+    {
+      "name": "Orders",
+      "description": "Limit orders on the internal HBD/HIVE market"
     },
     {
       "name": "Other",
@@ -950,6 +956,31 @@ declare
           "savings_hbd": {
             "type": "string",
             "description": "Total number of HIVE backed dollars the chain has in savings"
+          }
+        }
+      },
+      "btracker_backend.order_stats": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "description": "limit orders created in the block range"
+          },
+          "filled": {
+            "type": "integer",
+            "description": "of those, orders fully filled, whenever that happened"
+          },
+          "cancelled": {
+            "type": "integer",
+            "description": "of those, orders cancelled by their owner or on expiration, whenever that\nhappened, including orders partially filled before\n"
+          },
+          "open": {
+            "type": "integer",
+            "description": "of those, orders still open"
+          },
+          "fill_rate_pct": {
+            "type": "number",
+            "description": "filled / created in percent, rounded to 2 decimal places; null when no order was created"
           }
         }
       },
@@ -2118,6 +2149,120 @@ declare
                       "timestamp": "2023-05-22T23:35:48"
                     }
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account-name}/order-stats": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Lifecycle of the limit orders of one account",
+        "description": "How the internal-market limit orders the account created in a block range\nended: fully filled, cancelled (by the owner or on expiration, including\norders partially filled first) or still open, with the fill rate. Outcomes\ncount whenever they happened, also after the range, so\n`created` = `filled` + `cancelled` + `open`.\n\nOrder history is written by block processing only: on an install upgraded\nfrom a version without it, orders created before the upgrade are counted\nonly after a resync.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_order_stats(''enki'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_order_stats(''enki'', ''4000000'', ''4500000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/enki/order-stats''`\n\n* `GET ''https://%1$s/balance-api/accounts/enki/order-stats?from-block=4000000&to-block=4500000''`\n",
+        "operationId": "btracker_endpoints.get_account_order_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "First block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, from the first block.\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Last block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, up to the head block.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order lifecycle counts\n\n* Returns `btracker_backend.order_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                },
+                "example": {
+                  "created": 11486,
+                  "filled": 11210,
+                  "cancelled": 267,
+                  "open": 9,
+                  "fill_rate_pct": 97.6
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/order-stats": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Lifecycle of all limit orders",
+        "description": "How the internal-market limit orders created in a block range, by every\naccount, ended: fully filled, cancelled (by the owner or on expiration,\nincluding orders partially filled first) or still open, with the fill rate.\nOutcomes count whenever they happened, also after the range, so\n`created` = `filled` + `cancelled` + `open`.\n\nOrder history is written by block processing only: on an install upgraded\nfrom a version without it, orders created before the upgrade are counted\nonly after a resync.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_order_stats(''4000000'', ''4500000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/order-stats?from-block=4000000&to-block=4500000''`\n\n* `GET ''https://%1$s/balance-api/order-stats?from-block=2016-09-01 00:00:00&to-block=2016-09-30 23:59:59''`\n",
+        "operationId": "btracker_endpoints.get_order_stats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "First block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, from the first block.\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Last block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, up to the head block.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order lifecycle counts\n\n* Returns `btracker_backend.order_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                },
+                "example": {
+                  "created": 39382,
+                  "filled": 8280,
+                  "cancelled": 31071,
+                  "open": 31,
+                  "fill_rate_pct": 21.02
                 }
               }
             }

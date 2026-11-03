@@ -63,6 +63,7 @@ tests/
 │   ├── indexes_created_per_schema.sql # isIndexesCreated() answers per schema when another schema holds an index of the same name
 │   ├── finalize_security_definer.sql # finalize functions: a caller's shadowing isIndexesCreated() is not called; PUBLIC/btracker_user cannot execute them
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
+│   ├── order_lifecycle.sql    # order_lifecycle after sync (one row per create, open rows = order_state, = an op-by-op replay); synthetic fill/cancel/expiry/id-reuse paths, both /order-stats endpoints' windows; fork rollback
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer
