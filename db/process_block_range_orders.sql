@@ -44,7 +44,7 @@ BEGIN
          *   - limit_order_cancel: User manually cancels their order
          *   - limit_order_cancelled: System auto-cancels (e.g., expired order)
          */
-        SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body_value AS body
+        SELECT ov.id AS op_id, ov.block_num, ov.trx_in_block, ov.op_type_id, ov.body_value AS body
         FROM _btracker_ops_batch ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
@@ -78,6 +78,7 @@ BEGIN
             e.amount,
             o.op_id,
             o.block_num,
+            o.trx_in_block,
             o.op_type_id
         FROM ops_in_range o
         CROSS JOIN LATERAL (
@@ -137,6 +138,7 @@ BEGIN
             er.amount,
             er.op_id,
             er.block_num,
+            er.trx_in_block,
             er.op_type_id
         FROM events_raw er
         JOIN account_ids ai ON ai.account_name = er.owner
@@ -179,7 +181,8 @@ BEGIN
             nai,
             (amount)::bigint AS fill_amount,
             op_id AS fill_op_id,
-            block_num AS fill_block
+            block_num AS fill_block,
+            trx_in_block
         FROM events
         WHERE op_type_id = _op_fill
     ),
@@ -193,7 +196,9 @@ BEGIN
             owner_id,
             order_id,
             op_id AS cancel_op_id,
-            block_num AS cancel_block
+            block_num AS cancel_block,
+            trx_in_block,
+            op_type_id = _op_cancel AS is_user_cancel
         FROM events
         WHERE op_type_id IN (_op_cancel, _op_cancelled)
     ),
@@ -535,6 +540,13 @@ BEGIN
      *
      * An order counts as cancelled when it was cancelled, however much of it
      * filled before; as filled when fills consumed it; otherwise it stays open.
+     *
+     * Dust cull: when a fill leaves an order unable to buy anything, hived
+     * (database::fill_order) cancels it with a virtual limit_order_cancelled in
+     * the fill's transaction and counts it as fully filled. Such a cancel - in a
+     * transaction (expiry runs at block level, trx_in_block -1), after a fill of
+     * the order in that transaction, with no limit_order_cancel of the order
+     * there - closes the order as filled, its dust left in remaining.
      */
     lc_creates AS MATERIALIZED (
         /*
@@ -552,11 +564,29 @@ BEGIN
         FROM creates
     ),
     lc_closing AS (
-        SELECT owner_id, order_id, fill_op_id AS op_id, fill_block AS block_num, fill_amount, TRUE AS is_fill
+        SELECT owner_id, order_id, fill_op_id AS op_id, fill_block AS block_num, fill_amount, TRUE AS is_fill, FALSE AS is_dust_cull
         FROM fills
         UNION ALL
-        SELECT owner_id, order_id, cancel_op_id, cancel_block, 0, FALSE
-        FROM cancels
+        SELECT
+            c.owner_id,
+            c.order_id,
+            c.cancel_op_id,
+            c.cancel_block,
+            0,
+            FALSE,
+            NOT c.is_user_cancel
+            AND c.trx_in_block >= 0
+            AND EXISTS (
+                SELECT 1 FROM fills f
+                WHERE (f.owner_id, f.order_id, f.fill_block, f.trx_in_block)
+                    = (c.owner_id, c.order_id, c.cancel_block, c.trx_in_block)
+                  AND f.fill_op_id < c.cancel_op_id)
+            AND NOT EXISTS (
+                SELECT 1 FROM cancels u
+                WHERE (u.owner_id, u.order_id, u.cancel_block, u.trx_in_block)
+                    = (c.owner_id, c.order_id, c.cancel_block, c.trx_in_block)
+                  AND u.is_user_cancel)
+        FROM cancels c
     ),
     lc_totals AS MATERIALIZED (
         /*
@@ -569,7 +599,8 @@ BEGIN
             c.create_op_id,
             COALESCE(SUM(e.fill_amount), 0)::bigint AS sum_fill,
             MAX(e.block_num) FILTER (WHERE e.is_fill) AS last_fill_block,
-            MIN(e.block_num) FILTER (WHERE NOT e.is_fill) AS cancel_block
+            MIN(e.block_num) FILTER (WHERE NOT e.is_fill AND NOT e.is_dust_cull) AS cancel_block,
+            bool_or(e.is_dust_cull) AS dust_culled
         FROM lc_closing e
         LEFT JOIN lc_creates c
           ON (c.owner_id, c.order_id) = (e.owner_id, e.order_id)
@@ -591,12 +622,12 @@ BEGIN
             c.create_block,
             CASE
                 WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
-                WHEN t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0 THEN t.last_fill_block
+                WHEN t.dust_culled OR (t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0) THEN t.last_fill_block
             END,
             c.nai,
             CASE
                 WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
-                WHEN t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0 THEN 'filled'
+                WHEN t.dust_culled OR (t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0) THEN 'filled'
             END
         FROM lc_creates c
         LEFT JOIN lc_totals t ON t.create_op_id = c.create_op_id
@@ -613,11 +644,11 @@ BEGIN
                filled    = l.filled + t.sum_fill,
                end_block = CASE
                                WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
-                               WHEN t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0 THEN t.last_fill_block
+                               WHEN t.dust_culled OR (t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0) THEN t.last_fill_block
                            END,
                outcome   = CASE
                                WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
-                               WHEN t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0 THEN 'filled'
+                               WHEN t.dust_culled OR (t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0) THEN 'filled'
                            END
           FROM lc_totals t
          WHERE t.create_op_id IS NULL
