@@ -239,3 +239,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT S
 # Allow hived to fullfil vacuum full requests
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT MAINTAIN ON ALL TABLES IN SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT ALL ON SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
+
+# The finalize functions run as btracker_owner (SECURITY DEFINER): only block
+# processing may call them. It runs as btracker_owner, standalone, and as
+# hafbe_owner, a member of btracker_owner, under haf_block_explorer.
+for finalize_function in finalize_massive_sync_before_forking finalize_massive_sync; do
+  psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;REVOKE EXECUTE ON FUNCTION ${BTRACKER_SCHEMA}.${finalize_function}(hive.context_name) FROM PUBLIC;GRANT EXECUTE ON FUNCTION ${BTRACKER_SCHEMA}.${finalize_function}(hive.context_name) TO btracker_owner;"
+done
