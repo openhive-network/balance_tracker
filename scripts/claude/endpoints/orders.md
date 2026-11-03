@@ -42,5 +42,5 @@ after the upgrade until it is resynced. No upgrade step backfills them.
 | Layer | File |
 |-------|------|
 | Endpoints | `endpoints/orders/get_account_order_stats.sql`, `endpoints/orders/get_order_stats.sql` |
-| Backend | `backend/endpoint_helpers/get_order_stats/order_stats.sql` |
+| Backend | `backend/endpoint_helpers/get_order_stats/order_stats.sql` (installed after the rollup tables' transaction, so an upgrade never runs it before they exist); `backend/shared/order_stats_group_blocks.sql` (the group size, also used by the writers and the seed, installed with `backend/shared/`) |
 | Types | `endpoints/types/order_stats.sql` |
