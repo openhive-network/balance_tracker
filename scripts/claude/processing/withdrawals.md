@@ -26,6 +26,7 @@ Power-down (vesting withdrawal) state tracking with routes and delayed voting.
 |-------|------------|---------|
 | `account_withdraws` | RW | Withdrawal state: to_withdraw, withdrawn, rate, routes count, delayed_vests |
 | `account_routes` | RW | Active routing rules (from_account, to_account, percent) |
+| `account_withdraw_history` | W | Power-down state (rate, to_withdraw, withdrawn) after every withdraw_vesting, HF23 reset and fill |
 
 ## Operations Processed
 
@@ -42,16 +43,39 @@ Power-down (vesting withdrawal) state tracking with routes and delayed voting.
 
 The function runs four separate WITH queries:
 
-### Section 1: Withdrawals
+### Section 1: Power-down state
 
-Handles `withdraw_vesting` and `hardfork_hive` operations.
+Handles `withdraw_vesting`, `hardfork_hive` (HF23) and `fill_vesting_withdraw` in one
+statement that replays each account's power-down operation by operation, writes the
+state after every one to `account_withdraw_history` and the state after the last one to
+`account_withdraws`.
 
-**Pattern**: "Last operation wins" - if account changes withdrawal amount multiple times in range, only final state matters.
+- **Timeline**: the state before the batch (`account_withdraws`, as a setting at
+  `source_op` 0; a row without `source_op`, created by a route change only, has never had
+  a power-down) followed by the batch's operations in `source_op` order.
+- **Segments**: `withdraw_vesting` and the HF23 reset set the whole state (rate,
+  to_withdraw, withdrawn = 0) and start a segment; the fills up to the next setting pay
+  that power-down. Fills before an account's first setting change nothing.
+- **Payout**: `withdrawn` = the setting's withdrawn + the segment's running sum of fills.
+  The first fill at which `withdrawn >= to_withdraw`, or the last fill of a payout that
+  leaves 0 VESTS, ends the power-down: rate, to_withdraw and withdrawn are 0 from there to
+  the next setting.
+- **Final state**: the last timeline row; `account_withdraws.source_op` is the setting
+  that started its segment (a fill keeps it).
 
-```sql
-ROW_NUMBER() OVER (PARTITION BY account_name ORDER BY source_op DESC) AS row_num
--- WHERE row_num = 1
-```
+A payout that leaves the account with 0 VESTS ends the power-down as hived's
+`process_vesting_withdrawals` does (`libraries/chain/database_vesting.cpp`: rate,
+`to_withdraw` and `withdrawn` to 0). A payout is all fills of an account in one block;
+the VESTS balance after its last fill is `current_account_balances` minus the batch's
+later VESTS changes in `_btracker_vests_batch`, so the step runs after
+`process_block_range_balances`. Power-downs stored by earlier versions are ended once
+per install by `repair_power_downs_without_vests()` (`db/one_off_repairs.sql`).
+
+`account_withdraw_history` is what the past-block balances read
+(`scripts/claude/endpoints/balances.md`). Only block processing writes it: an install
+upgraded from a version synced before it existed must resync before at-block reads of
+`vesting_withdraw_rate`, `to_withdraw` and `withdrawn` are correct (no upgrade step
+backfills it). `tests/maintenance/delegation_withdraw_history.sql` checks its rows.
 
 ### Section 2: Routes
 
@@ -78,25 +102,6 @@ Special handling for HF23 (Steem→Hive fork). Certain accounts had ALL routes d
 ```sql
 WHERE gi.source_op > ar.source_op  -- Only delete routes created BEFORE HF23
 ```
-
-### Section 3: Fill Withdrawals
-
-Handles `fill_vesting_withdraw` operations (weekly payouts).
-
-**Critical Filter**: Only count fills that belong to the CURRENT withdrawal:
-```sql
-WHERE cp.source_op > aw.source_op  -- Fill happened AFTER withdrawal started
-```
-
-When `withdrawn >= to_withdraw`, reset withdrawal state to 0 (completed).
-
-A payout that leaves the account with 0 VESTS also resets it, as hived's
-`process_vesting_withdrawals` does (`libraries/chain/database_vesting.cpp`: rate,
-`to_withdraw` and `withdrawn` to 0). A payout is all fills of an account in one block;
-the VESTS balance after its last fill is `current_account_balances` minus the batch's
-later VESTS changes in `_btracker_vests_batch`, so the step runs after
-`process_block_range_balances`. Power-downs stored by earlier versions are ended once
-per install by `repair_power_downs_without_vests()` (`db/one_off_repairs.sql`).
 
 ### Section 4: Delayed Voting (HF24+)
 

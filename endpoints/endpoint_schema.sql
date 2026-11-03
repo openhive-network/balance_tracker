@@ -21,6 +21,8 @@ tags:
     description: Information about transfers and their history
   - name: Proposals
     description: Payments from the Decentralized Hive Fund to its proposals
+  - name: Orders
+    description: Limit orders on the internal HBD/HIVE market
   - name: Other
     description: General API information
 servers:
@@ -71,6 +73,10 @@ declare
     {
       "name": "Proposals",
       "description": "Payments from the Decentralized Hive Fund to its proposals"
+    },
+    {
+      "name": "Orders",
+      "description": "Limit orders on the internal HBD/HIVE market"
     },
     {
       "name": "Other",
@@ -293,6 +299,25 @@ declare
             "type": "integer",
             "description": "number of distinct open escrows (sender-view)"
           }
+        }
+      },
+      "btracker_backend.account_balance": {
+        "type": "object",
+        "properties": {
+          "account_name": {
+            "type": "string",
+            "description": "name of the account"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/btracker_backend.balance",
+            "description": "the account''s balances, as `/accounts/{account-name}/balances` returns them"
+          }
+        }
+      },
+      "btracker_backend.array_of_account_balance": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/btracker_backend.account_balance"
         }
       },
       "btracker_backend.balances": {
@@ -934,6 +959,31 @@ declare
           }
         }
       },
+      "btracker_backend.order_stats": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "description": "limit orders created in the block range"
+          },
+          "filled": {
+            "type": "integer",
+            "description": "of those, orders fully filled, whenever that happened"
+          },
+          "cancelled": {
+            "type": "integer",
+            "description": "of those, orders cancelled by their owner or on expiration, whenever that\nhappened, including orders partially filled before\n"
+          },
+          "open": {
+            "type": "integer",
+            "description": "of those, orders still open"
+          },
+          "fill_rate_pct": {
+            "type": "number",
+            "description": "filled / created in percent, rounded to 2 decimal places; null when no order was created"
+          }
+        }
+      },
       "btracker_backend.array_of_aggregated_history": {
         "type": "array",
         "items": {
@@ -949,7 +999,7 @@ declare
           "Accounts"
         ],
         "summary": "Account balances",
-        "description": "Lists account hbd, hive and vest balances\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balances''`\n",
+        "description": "Lists account hbd, hive and vest balances, at the head block or at a past block (`at-block`)\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'', ''4000000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balances''`\n\n* `GET ''https://%1$s/balance-api/accounts/blocktrades/balances?at-block=4000000''`\n",
         "operationId": "btracker_endpoints.get_account_balances",
         "parameters": [
           {
@@ -960,6 +1010,16 @@ declare
               "type": "string"
             },
             "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "at-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Block whose balances to return, either a block-number (integer) or a timestamp\n(in the format YYYY-MM-DD HH:MI:SS), which is converted to the last block\ncreated at or before it. Between block 1 and the last block balance tracker\nhas processed (`/last-synced-block`). Without it, or at the last processed\nblock, the head block''s balances are returned.\n\nAt a block before the last processed one, these fields are the values at that block:\n`hbd_balance`, `hive_balance`, `vesting_shares`, `vesting_balance_hive` (at that\nblock''s VESTS price), `post_voting_power_vests`, `delegated_vests`, `received_vests`,\n`hbd_savings`, `hive_savings`, `vesting_withdraw_rate`, `to_withdraw` and `withdrawn`.\nBalance tracker keeps no history of the other fields: they are `null`.\n\nThe history of `delegated_vests`, `received_vests` (and so `post_voting_power_vests`),\n`vesting_withdraw_rate`, `to_withdraw` and `withdrawn` is written by block processing\nonly: on an install upgraded from a version without it, these are correct at a past\nblock only after a resync.\n\nexample input:\n\n* `2016-09-15 19:47:21`\n\n* `5000000`\n"
           }
         ],
         "responses": {
@@ -1009,8 +1069,99 @@ declare
               }
             }
           },
+          "400": {
+            "description": "The `at-block` is malformed or out of range"
+          },
           "404": {
             "description": "No such account in the database"
+          }
+        }
+      }
+    },
+    "/balances": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Balances of several accounts",
+        "description": "Lists the balances of up to 100 accounts, at the head block or at a past block (`at-block`):\none entry per requested account, in request order, each holding the account''s name and\nits balances exactly as `/accounts/{account-name}/balances` returns them.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_accounts_balances(''blocktrades,gtg'');`\n\n* `SELECT * FROM btracker_endpoints.get_accounts_balances(''blocktrades,gtg'', ''4000000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/balances?accounts=blocktrades,gtg''`\n\n* `GET ''https://%1$s/balance-api/balances?accounts=blocktrades,gtg&at-block=4000000''`\n",
+        "operationId": "btracker_endpoints.get_accounts_balances",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "accounts",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "x-sql-default-value": "NULL"
+            },
+            "description": "Comma-separated account names (at most 100), e.g. `blocktrades,gtg`"
+          },
+          {
+            "in": "query",
+            "name": "at-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Block whose balances to return, as for `/accounts/{account-name}/balances`: a block-number\n(integer) or a timestamp (YYYY-MM-DD HH:MI:SS, converted to the last block created at or\nbefore it), between block 1 and the last block balance tracker has processed. At a block\nbefore the last processed one, the fields without history are `null`.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balances per requested account\n\n* Returns array of `btracker_backend.account_balance`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.array_of_account_balance"
+                },
+                "example": [
+                  {
+                    "account_name": "gtg",
+                    "balance": {
+                      "hbd_balance": 3465,
+                      "hive_balance": 0,
+                      "vesting_shares": "17579100476774",
+                      "vesting_balance_hive": 5852200,
+                      "post_voting_power_vests": "17579100476774",
+                      "delegated_vests": "0",
+                      "received_vests": "0",
+                      "curation_rewards": "19888",
+                      "posting_rewards": "1972916",
+                      "hbd_rewards": 0,
+                      "hive_rewards": 0,
+                      "vests_rewards": "0",
+                      "hive_vesting_rewards": 0,
+                      "hbd_savings": 0,
+                      "hive_savings": 0,
+                      "savings_withdraw_requests": 0,
+                      "vesting_withdraw_rate": "0",
+                      "to_withdraw": "0",
+                      "withdrawn": "0",
+                      "withdraw_routes": 0,
+                      "delayed_vests": "0",
+                      "conversion_pending_amount_hbd": 0,
+                      "conversion_pending_count_hbd": 0,
+                      "conversion_pending_amount_hive": 0,
+                      "conversion_pending_count_hive": 0,
+                      "open_orders_hbd_count": 0,
+                      "open_orders_hive_count": 0,
+                      "open_orders_hive_amount": 0,
+                      "open_orders_hbd_amount": 0,
+                      "savings_pending_amount_hbd": 0,
+                      "savings_pending_amount_hive": 0,
+                      "escrow_pending_amount_hbd": 0,
+                      "escrow_pending_amount_hive": 0,
+                      "escrow_pending_count": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "More than 100 accounts, an unknown account, or a malformed or out-of-range `at-block`"
           }
         }
       }
@@ -2005,6 +2156,123 @@ declare
         }
       }
     },
+    "/accounts/{account-name}/order-stats": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Lifecycle of the limit orders of one account",
+        "description": "How the internal-market limit orders the account created in a block range\nended: fully filled, cancelled (by the owner or on expiration, including\norders partially filled first) or still open, with the fill rate. Outcomes\ncount whenever they happened, also after the range, so\n`created` = `filled` + `cancelled` + `open`.\n\nOrder history is written by block processing only: on an install upgraded\nfrom a version without it, orders created before the upgrade are counted\nonly after a resync.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_account_order_stats(''enki'');`\n\n* `SELECT * FROM btracker_endpoints.get_account_order_stats(''enki'', ''4000000'', ''4500000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/accounts/enki/order-stats''`\n\n* `GET ''https://%1$s/balance-api/accounts/enki/order-stats?from-block=4000000&to-block=4500000''`\n",
+        "operationId": "btracker_endpoints.get_account_order_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account-name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the account"
+          },
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "First block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, from the first block.\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Last block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, up to the head block.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order lifecycle counts\n\n* Returns `btracker_backend.order_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                },
+                "example": {
+                  "created": 11486,
+                  "filled": 11210,
+                  "cancelled": 267,
+                  "open": 9,
+                  "fill_rate_pct": 97.6
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No such account, a block or date that is not valid, or from-block\nafter to-block\n"
+          }
+        }
+      }
+    },
+    "/order-stats": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Lifecycle of all limit orders",
+        "description": "How the internal-market limit orders created in a block range, by every\naccount, ended: fully filled, cancelled (by the owner or on expiration,\nincluding orders partially filled first) or still open, with the fill rate.\nOutcomes count whenever they happened, also after the range, so\n`created` = `filled` + `cancelled` + `open`.\n\nOrder history is written by block processing only: on an install upgraded\nfrom a version without it, orders created before the upgrade are counted\nonly after a resync.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_order_stats(''4000000'', ''4500000'');`\n\nREST call example\n* `GET ''https://%1$s/balance-api/order-stats?from-block=4000000&to-block=4500000''`\n\n* `GET ''https://%1$s/balance-api/order-stats?from-block=2016-09-01 00:00:00&to-block=2016-09-30 23:59:59''`\n",
+        "operationId": "btracker_endpoints.get_order_stats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "First block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, from the first block.\n"
+          },
+          {
+            "in": "query",
+            "name": "to-block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": null
+            },
+            "description": "Last block of the range in which the orders were created, either a block-number\nor a date (YYYY-MM-DD HH:MI:SS). Without it, up to the head block.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order lifecycle counts\n\n* Returns `btracker_backend.order_stats`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/btracker_backend.order_stats"
+                },
+                "example": {
+                  "created": 39382,
+                  "filled": 8280,
+                  "cancelled": 31071,
+                  "open": 31,
+                  "fill_rate_pct": 21.02
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A block or date that is not valid, or from-block after to-block"
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "tags": [
@@ -2036,8 +2304,9 @@ declare
         "tags": [
           "Other"
         ],
-        "summary": "Get last block number synced by balance tracker",
-        "description": "Get the block number of the last block synced by balance tracker.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_last_synced_block();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/last-synced-block''`\n",
+        "summary": "Get last block number synced by balance tracker (deprecated)",
+        "deprecated": true,
+        "description": "**Deprecated** \u2014 superseded by `/sync-status`, which returns the block\nnumber together with its timestamp (enabling single-call staleness\nchecks). This endpoint remains for backward compatibility.\n\nGet the block number of the last block synced by balance tracker.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_last_synced_block();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/last-synced-block''`\n",
         "operationId": "btracker_endpoints.get_btracker_last_synced_block",
         "responses": {
           "200": {
@@ -2053,6 +2322,43 @@ declare
           },
           "404": {
             "description": "No blocks synced"
+          }
+        }
+      }
+    },
+    "/sync-status": {
+      "get": {
+        "tags": [
+          "Other"
+        ],
+        "summary": "Get balance tracker''s sync status",
+        "description": "Get the last block processed by balance tracker as an object containing\nboth the block number and its timestamp (UTC). This is the uniform\nHAF-app sync/health endpoint: the timestamp lets a consumer compute\nstaleness with a single call (`age = now() - last_block_time`) without\nneeding a separate head-block reference. Supersedes the deprecated\n`/last-synced-block`.\n\nSQL example\n* `SELECT * FROM btracker_endpoints.get_btracker_sync_status();`\n\nREST call example\n* `GET ''https://%1$s/balance-api/sync-status''`\n",
+        "operationId": "btracker_endpoints.get_btracker_sync_status",
+        "responses": {
+          "200": {
+            "description": "Last block processed by balance tracker and its timestamp.\n`last_block_time` is null if no block has been processed yet.\nWhile the HAF instance is still in massive sync (indexes not yet\nbuilt) the call fails fast with an error rather than executing an\nunindexed lookup.\n\n* Returns `JSON`\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "last_block_num": {
+                      "type": "integer",
+                      "description": "highest block number processed by the app"
+                    },
+                    "last_block_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "UTC timestamp of that block"
+                    }
+                  }
+                },
+                "example": {
+                  "last_block_num": 5000000,
+                  "last_block_time": "2016-09-15T19:47:21"
+                }
+              }
+            }
           }
         }
       }

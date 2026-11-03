@@ -70,7 +70,8 @@ tests/tavern/
 
 | Endpoint | Test Directory | Purpose |
 |----------|----------------|---------|
-| `get_account_balances` | `patterns-mainnet/get_account_balances/` | Full balance snapshot queries |
+| `get_account_balances` | `patterns-mainnet/get_account_balances/` | Full balance snapshot queries, at the head and at a past block (`at-block` as a number or timestamp, out of range, malformed) |
+| `get_accounts_balances` | `patterns-mainnet/get_accounts_balances/` | Batch balances (`/balances?accounts=`): request order, `at-block`, more than 100 accounts, unknown and missing accounts |
 | `get_balance_history` | `patterns-mainnet/get_balance_history/` | Balance change pagination |
 | `get_balance_delegations` | `patterns-mainnet/get_balance_delegations/` | Delegation pair queries |
 | `get_history_aggregation` | `patterns-mainnet/get_history_aggregation/` | Daily/monthly aggregates |
@@ -79,6 +80,8 @@ tests/tavern/
 | `get_transfer_statistics` | `patterns-mainnet/get_transfer_statistics/` | Volume statistics |
 | `get_proposals_payments` | `patterns-mainnet/get_proposals_payments/` | Proposal payment totals (all zero below HF21), id-list validation |
 | `get_proposal_payments` | `patterns-mainnet/get_proposal_payments/` | Proposal payment history (empty below HF21), parameter validation |
+| `get_order_stats` | `patterns-mainnet/get_order_stats/` | Network order lifecycle counts: whole range, block and date windows, invalid bound, inverted block and date windows |
+| `get_account_order_stats` | `patterns-mainnet/get_account_order_stats/` | Per-account order lifecycle counts: whole range, a window, unknown account, inverted window |
 
 ## How to Add New Tavern Tests
 

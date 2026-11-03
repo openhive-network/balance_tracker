@@ -18,6 +18,22 @@ Processes `delegate_vesting_shares` operations to track VESTS delegated between 
 |-------|---------|
 | `current_accounts_delegations` | Active delegation pairs (delegator, delegatee, amount) |
 | `account_delegations` | Summary totals (total delegated out, total received) |
+| `account_delegation_history` | `account_delegations` totals after every operation that changed them |
+
+## Delegation History
+
+`account_delegation_history` (account, delegated_vests, received_vests, source_op) gets
+one row per account and operation that changed its totals, and one for the first operation
+ever to touch an account (it creates the account's `account_delegations` row, also when it
+changes nothing, e.g. a delegation of 0): the per-operation deltas
+`union_delegations` already computes (delegator increases, delegatee changes, returns,
+HF23 resets), summed per `(account, source_op)`, and added as a running sum to the
+`account_delegations` totals before the batch (the statement still sees them). Its last
+row per account equals `account_delegations`. The past-block balances read it
+(`scripts/claude/endpoints/balances.md`). Only block processing writes it: an install
+upgraded from a version synced before it existed must resync before at-block reads of
+`delegated_vests`, `received_vests` and `post_voting_power_vests` are correct (no upgrade
+step backfills it). `tests/maintenance/delegation_withdraw_history.sql` checks its rows.
 
 ## HF23 Edge Case
 

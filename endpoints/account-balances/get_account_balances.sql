@@ -7,13 +7,17 @@ SET ROLE btracker_owner;
       - Accounts
     summary: Account balances
     description: |
-      Lists account hbd, hive and vest balances
+      Lists account hbd, hive and vest balances, at the head block or at a past block (`at-block`)
 
       SQL example
       * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'');`
 
+      * `SELECT * FROM btracker_endpoints.get_account_balances(''blocktrades'', ''4000000'');`
+
       REST call example
       * `GET ''https://%1$s/balance-api/accounts/blocktrades/balances''`
+
+      * `GET ''https://%1$s/balance-api/accounts/blocktrades/balances?at-block=4000000''`
     operationId: btracker_endpoints.get_account_balances
     parameters:
       - in: path
@@ -22,6 +26,35 @@ SET ROLE btracker_owner;
         schema:
           type: string
         description: Name of the account
+      - in: query
+        name: at-block
+        required: false
+        schema:
+          type: string
+          default: NULL
+        description: |
+          Block whose balances to return, either a block-number (integer) or a timestamp
+          (in the format YYYY-MM-DD HH:MI:SS), which is converted to the last block
+          created at or before it. Between block 1 and the last block balance tracker
+          has processed (`/last-synced-block`). Without it, or at the last processed
+          block, the head block''s balances are returned.
+
+          At a block before the last processed one, these fields are the values at that block:
+          `hbd_balance`, `hive_balance`, `vesting_shares`, `vesting_balance_hive` (at that
+          block''s VESTS price), `post_voting_power_vests`, `delegated_vests`, `received_vests`,
+          `hbd_savings`, `hive_savings`, `vesting_withdraw_rate`, `to_withdraw` and `withdrawn`.
+          Balance tracker keeps no history of the other fields: they are `null`.
+
+          The history of `delegated_vests`, `received_vests` (and so `post_voting_power_vests`),
+          `vesting_withdraw_rate`, `to_withdraw` and `withdrawn` is written by block processing
+          only: on an install upgraded from a version without it, these are correct at a past
+          block only after a resync.
+
+          example input:
+
+          * `2016-09-15 19:47:21`
+
+          * `5000000`
     responses:
       '200':
         description: |
@@ -69,13 +102,16 @@ SET ROLE btracker_owner;
               escrow_pending_amount_hive: 0,
               escrow_pending_count: 0
             }
+      '400':
+        description: The `at-block` is malformed or out of range
       '404':
         description: No such account in the database
  */
 -- openapi-generated-code-begin
 DROP FUNCTION IF EXISTS btracker_endpoints.get_account_balances;
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_account_balances(
-    "account-name" TEXT
+    "account-name" TEXT,
+    "at-block" TEXT = NULL
 )
 RETURNS btracker_backend.balance 
 -- openapi-generated-code-end
@@ -95,8 +131,12 @@ PURPOSE:
 ARCHITECTURE:
   This is a thin wrapper that:
   1. Resolves account name to internal account_id (with 404 on missing account)
-  2. Sets HTTP cache headers for PostgREST (2 second cache for live data)
-  3. Delegates to btracker_backend.get_account_balances() for actual query logic
+     and at-block to a past block (NULL: the head)
+  2. Sets HTTP cache headers for PostgREST (2 second cache for live data, 1 year
+     for an irreversible past block)
+  3. Delegates to btracker_backend.account_balances_at(): the head helper
+     btracker_backend.get_account_balances(), or the history reader
+     btracker_backend.get_account_balances_at_block() for a past block
 
 DATA SOURCES (via backend helper):
   - current_account_balances: Liquid HBD/HIVE/VESTS balances
@@ -122,12 +162,11 @@ RETURN TYPE: btracker_backend.balance (composite type with 33 fields)
 */
 DECLARE
   _account_id INT := btracker_backend.get_account_id("account-name", TRUE);
+  _block_num INT  := btracker_backend.resolve_at_block("at-block");
 BEGIN
-  -- Set short cache duration - balances change frequently with blockchain activity
-  PERFORM set_config('response.headers', '[{"Cache-Control": "public, max-age=2"}]', true);
+  PERFORM btracker_backend.set_history_cache_headers(_block_num);
 
-  -- Delegate to backend helper which performs the actual multi-table query
-  RETURN btracker_backend.get_account_balances(_account_id);
+  RETURN btracker_backend.account_balances_at(_account_id, _block_num);
 END
 $$;
 

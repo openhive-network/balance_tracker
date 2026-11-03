@@ -41,8 +41,8 @@ DECLARE
   __insert_sum_of_routes              INT;
   __delete_hf23_routes_count          INT;
   __delete_hf23_routes                INT;
-  __insert_not_yet_filled_withdrawals INT;
-  __reset_filled_withdrawals          INT;
+  __insert_withdraw_history           INT;
+  __upsert_withdraws                  INT;
 BEGIN
 -- Look up hardfork blocks once at the start
 -- HF16/HF21/HF24 may be NULL if not yet applied in this dataset - SQL comparisons
@@ -58,30 +58,39 @@ FROM hafd.applied_hardforks
 WHERE hardfork_num IN (_hf_vests_precision, _hf_withdraw_rate, _hf_withdraw_rate_round_up, _hf_delayed_voting);
 
 ------------------------------------------------------------------------------
--- SECTION 1: WITHDRAWALS (withdraw_vesting_operation, hardfork_hive_operation)
+-- SECTION 1: POWER-DOWN STATE (withdraw_vesting_operation, hardfork_hive_operation,
+--            fill_vesting_withdraw_operation)
+-- withdraw_vesting sets the whole state (rate, to_withdraw, withdrawn = 0); HF23
+-- resets it to 0 for the accounts it cleared. A weekly payout (fill) adds to
+-- withdrawn; the fill that completes the power-down (withdrawn >= to_withdraw) ends
+-- it, and as in hived's process_vesting_withdrawals so does a payout that leaves
+-- the account with 0 VESTS: ending resets the three fields to 0.
+-- The state after every operation is written to account_withdraw_history, the
+-- state after the last one to account_withdraws.
 ------------------------------------------------------------------------------
-WITH ops_withdraw AS MATERIALIZED (
-  -- MATERIALIZED: prevents re-scanning operations_view when referenced later.
-  -- Single scan extracts both operation types - more efficient than two separate queries.
+WITH ops_power_down AS MATERIALIZED (
+  -- MATERIALIZED: prevents re-scanning the batch when referenced later.
   SELECT ov.body_value AS body, ov.op_type_id, ov.id, ov.block_num
   FROM _btracker_ops_batch ov
   WHERE
-    ov.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive) AND
+    ov.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive, _op_fill_vesting_withdraw) AND
     ov.block_num BETWEEN _from AND _to
 ),
-process_block_range_data_b AS MATERIALIZED
+parsed_ops AS MATERIALIZED
 (
-  -- LATERAL + CASE pattern: Parse each operation with appropriate helper based on op_type_id.
-  -- Alternative would be separate queries per op_type, requiring multiple table scans.
-  -- Hardfork boolean flags passed to helper - determines VESTS precision multiplier and
-  -- withdrawal rate (104 weeks pre-HF16, 13 weeks post-HF16, rounded up post-HF21).
+  -- Operations that set the state. Hardfork boolean flags passed to the helper
+  -- determine the VESTS precision multiplier and the withdrawal rate (104 weeks
+  -- pre-HF16, 13 weeks post-HF16, rounded up post-HF21).
   SELECT
     result.account_name,
-    result.withdrawn,
+    o.id AS source_op,
+    o.block_num,
+    TRUE AS is_set,
     result.vesting_withdraw_rate,
     result.to_withdraw,
-    o.id AS source_op
-  FROM ops_withdraw o
+    result.withdrawn,
+    NULL::BIGINT AS fill_amount
+  FROM ops_power_down o
   CROSS JOIN LATERAL (
     SELECT (
       CASE
@@ -92,69 +101,207 @@ process_block_range_data_b AS MATERIALIZED
             o.block_num > _hf_withdraw_rate_block,    -- HF16: 104->13 week withdrawal
             o.block_num > _hf_withdraw_rate_round_up_block  -- HF21: rate rounded up
           )
-        WHEN o.op_type_id = _op_hardfork_hive
-          -- HF23: Reset withdrawal state to 0 for affected accounts (Steemit Inc accounts)
-          THEN btracker_backend.process_reset_withdraw_hf23(o.body)
+        -- HF23: Reset withdrawal state to 0 for affected accounts (Steemit Inc accounts)
+        ELSE btracker_backend.process_reset_withdraw_hf23(o.body)
       END
     ).*
   ) AS result
-),
-group_by_account AS MATERIALIZED (
-  -- "LAST OPERATION WINS" pattern: If account has multiple withdrawals in block range,
-  -- only the final state matters. ROW_NUMBER() DESC by source_op gives us row_num=1 for latest.
-  -- WHY? withdraw_vesting is a FULL STATE REPLACEMENT - it sets to_withdraw/rate/withdrawn
-  -- from scratch. Intermediate operations are completely superseded by later ones.
-  -- Example: Account sets 1000 VESTS withdrawal, then changes to 500 VESTS - we only store 500.
+  WHERE o.op_type_id IN (_op_withdraw_vesting, _op_hardfork_hive)
+
+  UNION ALL
+
+  -- Payouts. HF1 flag determines the VESTS precision multiplier (pre-HF1 values need *1000000).
   SELECT
-    account_name,
-    withdrawn,
-    vesting_withdraw_rate,
-    to_withdraw,
-    source_op,
-    ROW_NUMBER() OVER w_account_desc AS row_num
-  FROM process_block_range_data_b
-  WINDOW w_account_desc AS (PARTITION BY account_name ORDER BY source_op DESC)
+    result.account_name,
+    o.id,
+    o.block_num,
+    FALSE,
+    NULL,
+    NULL,
+    NULL,
+    result.withdrawn
+  FROM ops_power_down o
+  CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation_for_withdrawals(o.body, o.block_num > _hf_vests_precision_block) AS result
+  WHERE o.op_type_id = _op_fill_vesting_withdraw
 ),
-account_names_withdrawal AS (
-  -- Extract unique account names BEFORE joining to accounts_view.
-  -- This allows batch lookup instead of correlated subquery per row.
-  SELECT DISTINCT account_name FROM group_by_account WHERE row_num = 1
-),
-account_ids_withdrawal AS MATERIALIZED (
-  -- MATERIALIZED + batch lookup: Convert account names to IDs in single scan of accounts_view.
-  -- Without MATERIALIZED, planner might inline this and execute lookup per-row.
+account_ids AS MATERIALIZED (
+  -- Batch lookup: convert account names to IDs in a single scan of accounts_view.
   SELECT av.name AS account_name, av.id AS account_id
   FROM accounts_view av
-  WHERE av.name IN (SELECT account_name FROM account_names_withdrawal)
+  WHERE av.name IN (SELECT DISTINCT account_name FROM parsed_ops)
 ),
-join_latest_withdraw AS (
+power_down_ops AS MATERIALIZED (
   SELECT
     ai.account_id,
-    gba.withdrawn,
-    gba.vesting_withdraw_rate,
-    gba.to_withdraw,
-    gba.source_op
-  FROM group_by_account gba
-  JOIN account_ids_withdrawal ai ON ai.account_name = gba.account_name
-  WHERE gba.row_num = 1
+    po.source_op,
+    po.block_num,
+    po.is_set,
+    po.vesting_withdraw_rate,
+    po.to_withdraw,
+    po.withdrawn,
+    po.fill_amount
+  FROM parsed_ops po
+  JOIN account_ids ai ON ai.account_name = po.account_name
+),
+-- A payout is all fills of an account in one block (one per route); hived checks
+-- the account's VESTS once, after the last of them.
+payouts AS MATERIALIZED (
+  SELECT account_id, MAX(source_op) AS source_op
+  FROM power_down_ops
+  WHERE NOT is_set
+  GROUP BY account_id, block_num
+),
+-- The VESTS balance right after a payout is the current_account_balances balance
+-- (process_block_range_balances already applied the batch) minus the batch's later
+-- changes staged in _btracker_vests_batch. A running sum over the account's changes
+-- with the payouts merged in as zero changes gives those later changes in one pass.
+vests_changes_and_payouts AS (
+  SELECT vb.account_id, vb.source_op, vb.balance, FALSE AS is_payout
+  FROM _btracker_vests_batch vb
+  WHERE vb.account_id IN (SELECT account_id FROM payouts)
+
+  UNION ALL
+
+  SELECT account_id, source_op, 0, TRUE
+  FROM payouts
+),
+payout_later_changes AS (
+  SELECT
+    account_id,
+    source_op,
+    is_payout,
+    SUM(balance) OVER w_account - SUM(balance) OVER w_account_asc AS later_changes
+  FROM vests_changes_and_payouts
+  WINDOW
+    w_account AS (PARTITION BY account_id),
+    w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
+),
+payouts_leaving_no_vests AS MATERIALIZED (
+  SELECT plc.account_id, plc.source_op
+  FROM payout_later_changes plc
+  LEFT JOIN current_account_balances cab ON cab.account = plc.account_id AND cab.nai = _nai_vests
+  WHERE plc.is_payout AND COALESCE(cab.balance, 0) = plc.later_changes
+),
+-- The state before the batch, as the first setting (source_op 0) of each account's
+-- timeline. A row without source_op (created by a route change only) has never had
+-- a power-down: fills before a setting in the batch then change nothing.
+state_before AS (
+  SELECT
+    aw.account AS account_id,
+    0::BIGINT AS source_op,
+    TRUE AS is_set,
+    aw.vesting_withdraw_rate,
+    aw.to_withdraw,
+    aw.withdrawn,
+    NULL::BIGINT AS fill_amount,
+    FALSE AS ends
+  FROM account_withdraws aw
+  WHERE aw.account IN (SELECT account_id FROM account_ids) AND aw.source_op IS NOT NULL
+),
+timeline AS (
+  SELECT
+    pdo.account_id,
+    pdo.source_op,
+    pdo.is_set,
+    pdo.vesting_withdraw_rate,
+    pdo.to_withdraw,
+    pdo.withdrawn,
+    pdo.fill_amount,
+    pn.account_id IS NOT NULL AS ends
+  FROM power_down_ops pdo
+  LEFT JOIN payouts_leaving_no_vests pn ON pn.account_id = pdo.account_id AND pn.source_op = pdo.source_op
+
+  UNION ALL
+
+  SELECT * FROM state_before
+),
+-- Each setting starts a power-down segment; the fills after it, up to the next
+-- setting, pay that power-down. Fills before an account's first setting (segment 0)
+-- have no power-down to pay.
+timeline_segments AS (
+  SELECT
+    t.*,
+    COUNT(*) FILTER (WHERE t.is_set) OVER w_account_asc AS segment
+  FROM timeline t
+  WINDOW w_account_asc AS (PARTITION BY t.account_id ORDER BY t.source_op)
+),
+segment_progress AS (
+  SELECT
+    ts.account_id,
+    ts.source_op,
+    ts.is_set,
+    ts.vesting_withdraw_rate,
+    ts.to_withdraw,
+    ts.withdrawn,
+    ts.segment,
+    FIRST_VALUE(ts.source_op) OVER w_segment_asc AS segment_source_op,
+    FIRST_VALUE(ts.vesting_withdraw_rate) OVER w_segment_asc AS segment_rate,
+    FIRST_VALUE(ts.to_withdraw) OVER w_segment_asc AS segment_to_withdraw,
+    FIRST_VALUE(ts.withdrawn) OVER w_segment_asc + COALESCE(SUM(ts.fill_amount) OVER w_segment_asc, 0) AS segment_withdrawn,
+    ts.ends
+  FROM timeline_segments ts
+  WHERE ts.segment > 0
+  WINDOW w_segment_asc AS (PARTITION BY ts.account_id, ts.segment ORDER BY ts.source_op)
+),
+-- A power-down ends at the first fill that completes it or leaves no VESTS; fills
+-- only add to withdrawn, so it stays ended up to the next setting.
+segment_end AS (
+  SELECT
+    sp.*,
+    BOOL_OR(NOT sp.is_set AND (sp.segment_withdrawn >= sp.segment_to_withdraw OR sp.ends)) OVER w_segment_asc AS ended
+  FROM segment_progress sp
+  WINDOW w_segment_asc AS (PARTITION BY sp.account_id, sp.segment ORDER BY sp.source_op)
+),
+state_after AS MATERIALIZED (
+  SELECT
+    se.account_id,
+    se.source_op,
+    se.segment_source_op,
+    CASE WHEN se.is_set THEN se.vesting_withdraw_rate WHEN se.ended THEN 0 ELSE se.segment_rate END AS vesting_withdraw_rate,
+    CASE WHEN se.is_set THEN se.to_withdraw WHEN se.ended THEN 0 ELSE se.segment_to_withdraw END AS to_withdraw,
+    CASE WHEN se.is_set THEN se.withdrawn WHEN se.ended THEN 0 ELSE se.segment_withdrawn END AS withdrawn,
+    ROW_NUMBER() OVER w_account_desc AS rn
+  FROM segment_end se
+  WINDOW w_account_desc AS (PARTITION BY se.account_id ORDER BY se.source_op DESC)
+),
+insert_withdraw_history AS (
+  INSERT INTO account_withdraw_history
+    (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
+  SELECT
+    sa.account_id,
+    sa.vesting_withdraw_rate,
+    sa.to_withdraw,
+    sa.withdrawn,
+    sa.source_op
+  FROM state_after sa
+  WHERE sa.source_op > 0
+  RETURNING account
+),
+-- The state after the last operation. source_op is the withdraw_vesting (or HF23
+-- reset) that set it; fills keep it.
+upsert_withdraws AS (
+  INSERT INTO account_withdraws
+    (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
+  SELECT
+    sa.account_id,
+    sa.vesting_withdraw_rate,
+    sa.to_withdraw,
+    sa.withdrawn,
+    NULLIF(sa.segment_source_op, 0)
+  FROM state_after sa
+  WHERE sa.rn = 1 AND sa.source_op > 0
+  ON CONFLICT ON CONSTRAINT pk_account_withdraws
+  DO UPDATE SET
+    vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
+    to_withdraw = EXCLUDED.to_withdraw,
+    withdrawn = EXCLUDED.withdrawn,
+    source_op = COALESCE(EXCLUDED.source_op, account_withdraws.source_op)
+  RETURNING account
 )
--- UPSERT pattern: INSERT new accounts, UPDATE existing with new withdrawal state.
--- ON CONFLICT replaces all withdrawal fields - new withdraw_vesting resets the entire state.
-INSERT INTO account_withdraws
-  (account, vesting_withdraw_rate, to_withdraw, withdrawn, source_op)
 SELECT
-  jlw.account_id,
-  jlw.vesting_withdraw_rate,
-  jlw.to_withdraw,
-  jlw.withdrawn,
-  jlw.source_op
-FROM join_latest_withdraw jlw
-ON CONFLICT ON CONSTRAINT pk_account_withdraws
-DO UPDATE SET
-  vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
-  to_withdraw = EXCLUDED.to_withdraw,
-  withdrawn = EXCLUDED.withdrawn,
-  source_op = EXCLUDED.source_op;
+  (SELECT count(*) FROM insert_withdraw_history) AS insert_withdraw_history,
+  (SELECT count(*) FROM upsert_withdraws) AS upsert_withdraws
+INTO __insert_withdraw_history, __upsert_withdraws;
 
 ------------------------------------------------------------------------------
 -- SECTION 2: WITHDRAWAL ROUTES (set_withdraw_vesting_route_operation)
@@ -392,173 +539,6 @@ SELECT
   (SELECT count(*) FROM delete_hf23_routes_count) AS delete_hf23_routes_count,
   (SELECT count(*) FROM delete_hf23_routes) AS delete_hf23_routes
 INTO __delete_hf23_routes_count, __delete_hf23_routes;
-
-------------------------------------------------------------------------------
--- SECTION 3: FILL WITHDRAWS (fill_vesting_withdraw_operation)
--- Virtual operation emitted weekly when withdrawal portion is paid out.
--- Tracks progress: withdrawn += fill_amount. When withdrawn >= to_withdraw, withdrawal completes.
--- As in hived's process_vesting_withdrawals, a payout that leaves the account with
--- 0 VESTS also ends it.
-------------------------------------------------------------------------------
-WITH ops_fill AS MATERIALIZED (
-  SELECT ov.body_value AS body, ov.id, ov.block_num
-  FROM _btracker_ops_batch ov
-  WHERE
-    ov.op_type_id = _op_fill_vesting_withdraw AND
-    ov.block_num BETWEEN _from AND _to
-),
-process_block_range_data_raw AS MATERIALIZED
-(
-  -- HF1 flag determines VESTS precision multiplier (pre-HF1 values need *1000000).
-  SELECT
-    result.account_name,
-    result.withdrawn,
-    o.id AS source_op,
-    o.block_num
-  FROM ops_fill o
-  CROSS JOIN btracker_backend.process_fill_vesting_withdraw_operation_for_withdrawals(o.body,o.block_num > _hf_vests_precision_block) AS result
-),
-account_names_fill AS (
-  SELECT DISTINCT account_name FROM process_block_range_data_raw
-),
-account_ids_fill AS MATERIALIZED (
-  SELECT av.name AS account_name, av.id AS account_id
-  FROM accounts_view av
-  WHERE av.name IN (SELECT account_name FROM account_names_fill)
-),
-process_block_range_data_b AS (
-  SELECT
-    ai.account_id,
-    pr.withdrawn,
-    pr.source_op,
-    pr.block_num
-  FROM process_block_range_data_raw pr
-  JOIN account_ids_fill ai ON ai.account_name = pr.account_name
-),
---------------------------------------------------------------------------------------
-group_by_account AS MATERIALIZED (
-  SELECT DISTINCT account_id
-  FROM process_block_range_data_b
-),
--- A payout is all fills of an account in one block (one per route); hived checks
--- the account's VESTS once, after the last of them.
-payouts AS MATERIALIZED (
-  SELECT account_id, MAX(source_op) AS source_op
-  FROM process_block_range_data_b
-  GROUP BY account_id, block_num
-),
--- The VESTS balance right after a payout is the current_account_balances balance
--- (process_block_range_balances already applied the batch) minus the batch's later
--- changes staged in _btracker_vests_batch. A running sum over the account's changes
--- with the payouts merged in as zero changes gives those later changes in one pass.
-vests_changes_and_payouts AS (
-  SELECT vb.account_id, vb.source_op, vb.balance, FALSE AS is_payout
-  FROM _btracker_vests_batch vb
-  WHERE vb.account_id IN (SELECT account_id FROM group_by_account)
-
-  UNION ALL
-
-  SELECT account_id, source_op, 0, TRUE
-  FROM payouts
-),
-payout_later_changes AS (
-  SELECT
-    account_id,
-    source_op,
-    is_payout,
-    SUM(balance) OVER w_account - SUM(balance) OVER w_account_asc AS later_changes
-  FROM vests_changes_and_payouts
-  WINDOW
-    w_account AS (PARTITION BY account_id),
-    w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
-),
-payouts_leaving_no_vests AS MATERIALIZED (
-  SELECT plc.account_id, plc.source_op
-  FROM payout_later_changes plc
-  LEFT JOIN current_account_balances cab ON cab.account = plc.account_id AND cab.nai = _nai_vests
-  WHERE plc.is_payout AND COALESCE(cab.balance, 0) = plc.later_changes
-),
-join_current_withdraw AS (
-  -- Fetch CURRENT withdrawal state from account_withdraws.
-  -- Need to_withdraw to know when withdrawal completes, and source_op to filter fills.
-  SELECT
-    aw.account,
-    aw.withdrawn,
-    aw.to_withdraw,
-    aw.source_op
-  FROM account_withdraws aw
-  JOIN group_by_account gba ON aw.account = gba.account_id
-),
---------------------------------------------------------------------------------------
-get_fills_concerning_current_withdrawal AS MATERIALIZED (
-  -- CRITICAL: Only count fills that occurred AFTER the current withdrawal started.
-  -- source_op > aw.source_op filters out fills from PREVIOUS withdrawals.
-  --
-  -- WHY this is critical: Operations have monotonically increasing IDs (source_op).
-  -- A fill belongs to the withdrawal that has the highest source_op BELOW the fill's source_op.
-  -- Without this filter, fills from a completed previous withdrawal would inflate the
-  -- current withdrawal's progress, potentially marking it complete prematurely.
-  --
-  -- Edge case: Account completes withdrawal, starts new one, gets fills in same block range.
-  -- The new withdrawal has higher source_op, so old fills (lower source_op) are correctly excluded.
-  --
-  -- SUM(cp.withdrawn) = total filled in this block range
-  -- + aw.withdrawn = previously filled amount (from earlier block range syncs)
-  -- = new total withdrawn
-  --
-  -- ended: one of these payouts left the account with 0 VESTS. No fill of the same
-  -- withdrawal can follow it: only a new withdraw_vesting (a later aw.source_op) does.
-  SELECT
-    cp.account_id,
-    SUM(cp.withdrawn) + aw.withdrawn AS withdrawn,
-    MAX(aw.to_withdraw) AS to_withdraw,
-    BOOL_OR(pn.account_id IS NOT NULL) AS ended
-  FROM process_block_range_data_b cp
-  JOIN join_current_withdraw aw ON aw.account = cp.account_id
-  LEFT JOIN payouts_leaving_no_vests pn ON pn.account_id = cp.account_id AND pn.source_op = cp.source_op
-  WHERE cp.source_op > aw.source_op
-  GROUP BY cp.account_id, aw.withdrawn
-),
-insert_not_yet_filled_withdrawals AS (
-  -- INCOMPLETE withdrawals: withdrawn < to_withdraw. Just update the withdrawn counter.
-  INSERT INTO account_withdraws
-    (account, withdrawn)
-  SELECT
-    gf.account_id,
-    gf.withdrawn
-  FROM get_fills_concerning_current_withdrawal gf
-  WHERE gf.to_withdraw > gf.withdrawn AND NOT gf.ended
-  ON CONFLICT ON CONSTRAINT pk_account_withdraws
-  DO UPDATE SET
-    withdrawn = EXCLUDED.withdrawn
-  RETURNING account
-),
-reset_filled_withdrawals AS (
-  -- COMPLETE withdrawals: withdrawn >= to_withdraw, or ended by a payout that left
-  -- 0 VESTS. Reset withdrawal state to 0 (hived resets the same three fields).
-  -- This signals "no active withdrawal" and prepares for next withdraw_vesting_operation.
-  -- NOTE: Only resets vesting_withdraw_rate, to_withdraw, withdrawn. Other columns
-  -- (withdraw_routes, delayed_vests) are NOT touched - routing rules persist after completion.
-  INSERT INTO account_withdraws
-    (account, vesting_withdraw_rate, to_withdraw, withdrawn)
-  SELECT
-    gf.account_id,
-    0,
-    0,
-    0
-  FROM get_fills_concerning_current_withdrawal gf
-  WHERE gf.to_withdraw <= gf.withdrawn OR gf.ended
-  ON CONFLICT ON CONSTRAINT pk_account_withdraws
-  DO UPDATE SET
-    vesting_withdraw_rate = EXCLUDED.vesting_withdraw_rate,
-    to_withdraw = EXCLUDED.to_withdraw,
-    withdrawn = EXCLUDED.withdrawn
-  RETURNING account
-)
-SELECT
-  (SELECT count(*) FROM insert_not_yet_filled_withdrawals) AS insert_not_yet_filled_withdrawals,
-  (SELECT count(*) FROM reset_filled_withdrawals) AS reset_filled_withdrawals
-INTO __insert_not_yet_filled_withdrawals, __reset_filled_withdrawals;
 
 ------------------------------------------------------------------------------
 -- SECTION 4: DELAYED VOTING (HF24+)

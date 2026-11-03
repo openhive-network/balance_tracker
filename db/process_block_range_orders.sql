@@ -4,6 +4,8 @@ SET ROLE btracker_owner;
  * Processes limit order events (create, fill, cancel) within a block range.
  * Maintains order_state table with current open orders and their remaining amounts.
  * Handles order lifecycle: create -> partial fills -> fully filled or cancelled.
+ * Keeps every order with its outcome in order_lifecycle (PHASE 6), and counts
+ * them per creation block and block group (PHASE 7).
  */
 CREATE OR REPLACE FUNCTION process_block_range_orders(
     IN _from INT,
@@ -28,6 +30,10 @@ DECLARE
     __ins_new     INT := 0;
     __del_any     INT := 0;
     __upd_pre     INT := 0;
+    __ins_lc      INT := 0;
+    __upd_lc      INT := 0;
+    __stats       INT := 0;
+    __group_blocks CONSTANT INT := btracker_backend.order_stats_group_blocks();
 BEGIN
     WITH ops_in_range AS MATERIALIZED (
         /*
@@ -41,7 +47,7 @@ BEGIN
          *   - limit_order_cancel: User manually cancels their order
          *   - limit_order_cancelled: System auto-cancels (e.g., expired order)
          */
-        SELECT ov.id AS op_id, ov.block_num, ov.op_type_id, ov.body_value AS body
+        SELECT ov.id AS op_id, ov.block_num, ov.trx_in_block, ov.op_type_id, ov.body_value AS body
         FROM _btracker_ops_batch ov
         WHERE ov.block_num BETWEEN _from AND _to
           AND ov.op_type_id IN (_op_create1, _op_create2, _op_fill, _op_cancel, _op_cancelled)
@@ -75,6 +81,7 @@ BEGIN
             e.amount,
             o.op_id,
             o.block_num,
+            o.trx_in_block,
             o.op_type_id
         FROM ops_in_range o
         CROSS JOIN LATERAL (
@@ -134,6 +141,7 @@ BEGIN
             er.amount,
             er.op_id,
             er.block_num,
+            er.trx_in_block,
             er.op_type_id
         FROM events_raw er
         JOIN account_ids ai ON ai.account_name = er.owner
@@ -512,16 +520,210 @@ BEGIN
            AND pc.new_remaining > 0
            AND s.remaining <> pc.new_remaining
         RETURNING 1
+    ),
+
+    /*
+     * =========================================================================
+     * PHASE 6: Keep every order with its outcome in order_lifecycle
+     * =========================================================================
+     *
+     * order_lifecycle has one row per create, so unlike order_state each fill
+     * and cancel must be attributed to one incarnation of its order id: the
+     * latest create of the same (owner_id, order_id) before it in this range,
+     * or, when there is none, the order still open from an earlier range.
+     *
+     * Example (one range):
+     *   op 100: Alice's order #5, open since an earlier range, fills 50
+     *   op 101: Alice cancels #5             -> earlier row: cancelled
+     *   op 102: Alice creates #5 for 1000    -> new row
+     *   op 103: #5 fills 1000                -> new row: filled
+     *
+     * An order counts as cancelled when it was cancelled, however much of it
+     * filled before; as filled when fills consumed it; otherwise it stays open.
+     *
+     * Dust cull: when a fill leaves an order unable to buy anything, hived
+     * (database::fill_order) cancels it with a virtual limit_order_cancelled in
+     * the fill's transaction and counts it as fully filled. Such a cancel - in a
+     * transaction (expiry runs at block level, trx_in_block -1), whose nearest
+     * earlier event of the order in that transaction is a fill (not the owner's
+     * limit_order_cancel) - closes the order as filled, its dust left in remaining.
+     */
+    lc_creates AS MATERIALIZED (
+        /*
+         * Creates in this range, each with the next create of the same order id,
+         * which ends the span of operations belonging to it.
+         */
+        SELECT
+            owner_id,
+            order_id,
+            nai,
+            create_amount,
+            create_block,
+            create_op_id,
+            LEAD(create_op_id) OVER (PARTITION BY owner_id, order_id ORDER BY create_op_id) AS next_create_op_id
+        FROM creates
+    ),
+    lc_closing AS (
+        SELECT owner_id, order_id, fill_op_id AS op_id, fill_block AS block_num, fill_amount, TRUE AS is_fill, FALSE AS is_dust_cull
+        FROM fills
+        UNION ALL
+        SELECT
+            owner_id,
+            order_id,
+            op_id,
+            block_num,
+            0,
+            FALSE,
+            op_type_id = _op_cancelled
+            AND trx_in_block >= 0
+            AND prev_op_type_id IS NOT DISTINCT FROM _op_fill
+        FROM (
+            /*
+             * The order's previous event in its transaction decides: hived emits
+             * a transaction-level limit_order_cancelled right after the fill that
+             * culls the order or right after the owner's limit_order_cancel, so
+             * an order id reused within one transaction cannot flip the outcome.
+             */
+            SELECT
+                owner_id,
+                order_id,
+                op_id,
+                block_num,
+                trx_in_block,
+                op_type_id,
+                LAG(op_type_id) OVER (PARTITION BY owner_id, order_id, block_num, trx_in_block ORDER BY op_id) AS prev_op_type_id
+            FROM events
+        ) e
+        WHERE op_type_id IN (_op_cancel, _op_cancelled)
+    ),
+    lc_totals AS MATERIALIZED (
+        /*
+         * Fills and cancels per incarnation; create_op_id is NULL for an order
+         * created before this range.
+         */
+        SELECT
+            e.owner_id,
+            e.order_id,
+            c.create_op_id,
+            COALESCE(SUM(e.fill_amount), 0)::bigint AS sum_fill,
+            MAX(e.block_num) FILTER (WHERE e.is_fill) AS last_fill_block,
+            MIN(e.block_num) FILTER (WHERE NOT e.is_fill AND NOT e.is_dust_cull) AS cancel_block,
+            bool_or(e.is_dust_cull) AS dust_culled
+        FROM lc_closing e
+        LEFT JOIN lc_creates c
+          ON (c.owner_id, c.order_id) = (e.owner_id, e.order_id)
+         AND e.op_id > c.create_op_id
+         AND (c.next_create_op_id IS NULL OR e.op_id < c.next_create_op_id)
+        GROUP BY e.owner_id, e.order_id, c.create_op_id
+    ),
+    lc_ins AS (
+        /*
+         * Orders created in this range, in their state at its end.
+         */
+        INSERT INTO order_lifecycle (create_op_id, order_id, remaining, filled, owner_id, block_created, end_block, nai, outcome)
+        SELECT
+            c.create_op_id,
+            c.order_id,
+            GREATEST(c.create_amount - COALESCE(t.sum_fill, 0), 0)::bigint,
+            COALESCE(t.sum_fill, 0),
+            c.owner_id,
+            c.create_block,
+            CASE
+                WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
+                WHEN t.dust_culled OR (t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0) THEN t.last_fill_block
+            END,
+            c.nai,
+            CASE
+                WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
+                WHEN t.dust_culled OR (t.sum_fill > 0 AND c.create_amount - t.sum_fill <= 0) THEN 'filled'
+            END
+        FROM lc_creates c
+        LEFT JOIN lc_totals t ON t.create_op_id = c.create_op_id
+        RETURNING block_created, outcome
+    ),
+    lc_upd AS (
+        /*
+         * Orders open from an earlier range that were filled or cancelled in this one.
+         * Does not see the rows lc_ins adds (same statement snapshot), so a
+         * reused order id never updates its new incarnation.
+         */
+        UPDATE order_lifecycle l
+           SET remaining = GREATEST(l.remaining - t.sum_fill, 0),
+               filled    = l.filled + t.sum_fill,
+               end_block = CASE
+                               WHEN t.cancel_block IS NOT NULL THEN t.cancel_block
+                               WHEN t.dust_culled OR (t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0) THEN t.last_fill_block
+                           END,
+               outcome   = CASE
+                               WHEN t.cancel_block IS NOT NULL THEN 'cancelled'
+                               WHEN t.dust_culled OR (t.sum_fill > 0 AND l.remaining - t.sum_fill <= 0) THEN 'filled'
+                           END
+          FROM lc_totals t
+         WHERE t.create_op_id IS NULL
+           AND (l.owner_id, l.order_id) = (t.owner_id, t.order_id)
+           AND l.end_block IS NULL
+        RETURNING l.block_created, l.outcome
+    ),
+
+    /*
+     * =========================================================================
+     * PHASE 7: Count the orders per creation block and block group
+     * =========================================================================
+     *
+     * What this statement changed in order_lifecycle, added to the counts of the
+     * creation block (order_stats_by_block) and its group
+     * (order_stats_by_block_group): each inserted row is created there, and
+     * filled or cancelled when it already closed; each updated row that closed
+     * adds its outcome to the block it was created in, earlier. An updated row
+     * was open (end_block IS NULL), so no outcome is counted twice.
+     */
+    lc_stats AS MATERIALIZED (
+        SELECT
+            e.block_created,
+            COUNT(*) FILTER (WHERE e.is_create) AS created,
+            COUNT(*) FILTER (WHERE e.outcome = 'filled') AS filled,
+            COUNT(*) FILTER (WHERE e.outcome = 'cancelled') AS cancelled
+        FROM (
+            SELECT block_created, outcome, TRUE AS is_create FROM lc_ins
+            UNION ALL
+            SELECT block_created, outcome, FALSE FROM lc_upd WHERE outcome IS NOT NULL
+        ) e
+        GROUP BY e.block_created
+    ),
+    stats_by_block AS (
+        INSERT INTO order_stats_by_block AS s (block_created, created, filled, cancelled)
+        SELECT block_created, created, filled, cancelled
+        FROM lc_stats
+        ON CONFLICT (block_created) DO UPDATE
+          SET created   = s.created + EXCLUDED.created,
+              filled    = s.filled + EXCLUDED.filled,
+              cancelled = s.cancelled + EXCLUDED.cancelled
+        RETURNING 1
+    ),
+    stats_by_block_group AS (
+        INSERT INTO order_stats_by_block_group AS s (block_group, created, filled, cancelled)
+        SELECT block_created / __group_blocks, SUM(created), SUM(filled), SUM(cancelled)
+        FROM lc_stats
+        GROUP BY block_created / __group_blocks
+        ON CONFLICT (block_group) DO UPDATE
+          SET created   = s.created + EXCLUDED.created,
+              filled    = s.filled + EXCLUDED.filled,
+              cancelled = s.cancelled + EXCLUDED.cancelled
+        RETURNING 1
     )
     /*
      * Collect row counts for diagnostics/logging.
-     * These counters track: inserts/updates of new orders, deletions, pre-existing updates.
+     * These counters track: inserts/updates of new orders, deletions, pre-existing updates,
+     * order_lifecycle inserts and updates, and the creation blocks and groups counted.
      */
     SELECT
         COALESCE((SELECT COUNT(*) FROM ins_new), 0),
         COALESCE((SELECT COUNT(*) FROM del_any), 0),
-        COALESCE((SELECT COUNT(*) FROM upd_pre), 0)
-    INTO __ins_new, __del_any, __upd_pre;
+        COALESCE((SELECT COUNT(*) FROM upd_pre), 0),
+        COALESCE((SELECT COUNT(*) FROM lc_ins), 0),
+        COALESCE((SELECT COUNT(*) FROM lc_upd), 0),
+        COALESCE((SELECT COUNT(*) FROM stats_by_block), 0) + COALESCE((SELECT COUNT(*) FROM stats_by_block_group), 0)
+    INTO __ins_new, __del_any, __upd_pre, __ins_lc, __upd_lc, __stats;
 END;
 $func$;
 

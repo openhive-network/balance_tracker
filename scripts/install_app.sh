@@ -122,6 +122,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/proposal_payments.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/ranked_holder.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/total_value_locked.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/order_stats.sql"
 
 # --- backend/shared/ : domain primitives (operation-type ids, NAI ids, hardfork
 # constants, asset parsing) shared by BOTH the read endpoints and sync-time processing ---
@@ -161,6 +162,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 # + shared/). Intra-endpoint order matters: vesting_maps before vesting_history;
 # balance_helpers (return type) before balance_history. ---
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_account_balances/account_balances.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_account_balances/balances_at_block.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_top_holders/top_holders.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_total_value_locked/total_value_locked.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_account_delegations/incoming.sql"
@@ -184,6 +186,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_balance_history/prev_balance.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_balance_history/balance_history.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_proposal_payments/proposal_payments.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_order_stats/order_stats.sql"
 
 # Tables (re-run), then the read-side views which depend on them.
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
@@ -209,6 +212,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;SET SEA
 
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_balance_history.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_account_balances.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_accounts_balances.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_history_aggregation.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_account_delegations.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/account-balances/get_rc_delegations.sql"
@@ -220,6 +224,8 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/transfers/get_vesting_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/proposals/get_proposals_payments.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/proposals/get_proposal_payments.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/orders/get_account_order_stats.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/orders/get_order_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_last_synced_block.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_sync_status.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/other/get_btracker_version.sql"
@@ -237,3 +243,10 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT S
 # Allow hived to fullfil vacuum full requests
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT MAINTAIN ON ALL TABLES IN SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;GRANT ALL ON SCHEMA ${BTRACKER_SCHEMA} TO hived_group;"
+
+# The finalize functions run as btracker_owner (SECURITY DEFINER): only block
+# processing may call them. It runs as btracker_owner, standalone, and as
+# hafbe_owner, a member of btracker_owner, under haf_block_explorer.
+for finalize_function in finalize_massive_sync_before_forking finalize_massive_sync; do
+  psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;REVOKE EXECUTE ON FUNCTION ${BTRACKER_SCHEMA}.${finalize_function}(hive.context_name) FROM PUBLIC;GRANT EXECUTE ON FUNCTION ${BTRACKER_SCHEMA}.${finalize_function}(hive.context_name) TO btracker_owner;"
+done

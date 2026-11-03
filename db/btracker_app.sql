@@ -29,6 +29,7 @@
  * 4. DELEGATIONS (VESTS)
  *    - current_accounts_delegations: Active delegation pairs
  *    - account_delegations: Summary per account (total received/delegated)
+ *    - account_delegation_history: account_delegations after every change
  *
  * 5. RC DELEGATIONS (Resource Credits)
  *    - current_rc_delegations: Active RC delegation pairs
@@ -39,6 +40,7 @@
  *
  * 7. WITHDRAWALS (Power-down)
  *    - account_withdraws: Power-down state per account
+ *    - account_withdraw_history: power-down state after every change
  *    - account_routes: Vesting withdrawal routing rules
  *
  * 8. SAVINGS
@@ -53,6 +55,8 @@
  * 10. MARKET & CONVERSIONS
  *    - convert_state: Pending HBD↔HIVE conversions
  *    - order_state: Open market limit orders
+ *    - order_lifecycle: Every limit order with its outcome (filled, cancelled or open)
+ *    - order_stats_by_block/_block_group: order_lifecycle counted per creation block and block group
  *
  * 11. ESCROWS
  *    - escrow_state: Active escrow agreements
@@ -833,19 +837,31 @@ $$;
  * Used to determine if we're transitioning from MASSIVE to LIVE stage.
  * Indexes are created once before entering LIVE processing.
  *
+ * Answers for the schema the function is installed in, which it names itself:
+ * one database may hold several balance tracker schemas (a standalone one and
+ * haf_block_explorer's embedded hafbe_bal), each finalized on its own, and the
+ * callers' search_path need not start with the schema.
+ *
  * @returns TRUE if indexes exist, FALSE otherwise
  */
-CREATE OR REPLACE FUNCTION isIndexesCreated()
-RETURNS BOOLEAN
-LANGUAGE 'plpgsql' STABLE
-AS
-$$
+DO $$
+DECLARE
+  __schema_name TEXT;
 BEGIN
-  RETURN EXISTS(
-      SELECT true FROM pg_index WHERE indexrelid = (
-        SELECT oid FROM pg_class WHERE relname = 'idx_account_balance_nai_balance_idx' LIMIT 1
-      )
-    );
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  EXECUTE format(
+    $BODY$
+      CREATE OR REPLACE FUNCTION %I.isIndexesCreated()
+      RETURNS BOOLEAN
+      LANGUAGE 'plpgsql' STABLE
+      AS
+      $f$
+      BEGIN
+        RETURN to_regclass(%L) IS NOT NULL;
+      END
+      $f$
+    $BODY$, __schema_name, format('%I.idx_account_balance_nai_balance_idx', __schema_name));
 END
 $$;
 
@@ -1161,6 +1177,30 @@ BEGIN
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
   RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
+END
+$$;
+
+/*
+ * The two finalize functions run as btracker_owner (SECURITY DEFINER) and use
+ * unqualified names, so they must not resolve them through the caller's
+ * search_path: a caller could put a schema of its own first and shadow
+ * isIndexesCreated() or a table with its own code. Pin it to the schema they are
+ * installed in, named at install time as isIndexesCreated() names it, which also
+ * holds for a standalone install and for haf_block_explorer's hafbe_bal. pg_temp
+ * last, or it would be searched first for relations. Functions they call inherit
+ * the pinned path. EXECUTE is revoked from PUBLIC by scripts/install_app.sh.
+ * After CREATE OR REPLACE above, which drops a function's SET clauses.
+ */
+DO $$
+DECLARE
+  __schema_name TEXT;
+  __search_path TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+  __search_path := format('%I, hive, hafd, btracker_backend, pg_catalog, pg_temp', __schema_name);
+
+  EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync_before_forking(hive.context_name) SET search_path = %s', __schema_name, __search_path);
+  EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync(hive.context_name) SET search_path = %s', __schema_name, __search_path);
 END
 $$;
 
@@ -1701,6 +1741,178 @@ BEGIN
   ELSE
     PERFORM hive.app_register( __schema_name, ARRAY[ __schema_name ]::hive.contexts_group, __schema_name || '.process_blocks' );
   END IF;
+END
+$$;
+
+/**
+ * Delegation and power-down history
+ * ---------------------------------
+ * account_delegation_history holds an account's account_delegations totals and
+ * account_withdraw_history its account_withdraws power-down state
+ * (vesting_withdraw_rate, to_withdraw, withdrawn) after every operation that
+ * changed them, written by process_block_range_delegations and
+ * process_block_range_withdrawals. The row with the highest source_op at or before
+ * a block is the state at that block; the latest row equals the current state.
+ *
+ * Created here rather than in the context's creation above so that an upgraded
+ * install gets them too, though empty: only block processing fills them, so an
+ * install synced before they existed must resync for at-block delegation and
+ * power-down values to be correct. Their indexes follow the app
+ * index lifecycle: registered while massive sync has dropped the others, they are
+ * built at finalize; on a finalized install they are built here.
+ */
+DO $$
+DECLARE
+  __schema_name VARCHAR;
+  __index TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  IF to_regclass(format('%I.account_delegation_history', __schema_name)) IS NULL THEN
+    CREATE TABLE account_delegation_history
+    (
+      account         INT    NOT NULL, -- Account id
+      delegated_vests BIGINT NOT NULL, -- account_delegations.delegated_vests after source_op
+      received_vests  BIGINT NOT NULL, -- account_delegations.received_vests after source_op
+      source_op       BIGINT NOT NULL  -- The operation that changed them
+    );
+    PERFORM hive.app_register_table( __schema_name, 'account_delegation_history', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.account_withdraw_history', __schema_name)) IS NULL THEN
+    CREATE TABLE account_withdraw_history
+    (
+      account               INT    NOT NULL, -- Account id
+      vesting_withdraw_rate BIGINT NOT NULL, -- account_withdraws columns after source_op
+      to_withdraw           BIGINT NOT NULL,
+      withdrawn             BIGINT NOT NULL,
+      source_op             BIGINT NOT NULL  -- The operation that changed them
+    );
+    PERFORM hive.app_register_table( __schema_name, 'account_withdraw_history', __schema_name );
+  END IF;
+
+  FOREACH __index IN ARRAY ARRAY[
+    format('CREATE INDEX IF NOT EXISTS idx_account_delegation_history_account_block_num ON %I.account_delegation_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name),
+    format('CREATE INDEX IF NOT EXISTS idx_account_withdraw_history_account_block_num ON %I.account_withdraw_history(account, hafd.operation_id_to_block_num(source_op), source_op)', __schema_name)
+  ]
+  LOOP
+    IF isIndexesCreated() THEN
+      EXECUTE __index;
+    END IF;
+    PERFORM hive.app_register_index_dependency(__schema_name, __index);
+  END LOOP;
+END
+$$;
+
+/**
+ * Order lifecycle
+ * ---------------
+ * order_lifecycle holds every limit order, one row per creating operation
+ * (create_op_id): owners reuse an order id once the order closed, so
+ * (owner_id, order_id) names one row only among the open ones. Written by
+ * process_block_range_orders next to order_state: a fill reduces remaining and
+ * adds to filled; an order cancelled (by its owner or on expiry) or fully filled
+ * gets its outcome and end_block, and stays. end_block IS NULL marks an open
+ * order; the open rows equal order_state.
+ *
+ * Created outside the context's creation, as the delegation and power-down
+ * history above, so an upgraded install gets it, though empty: only block
+ * processing fills it, so an install synced before it existed must resync for
+ * the order statistics to count orders created before the upgrade. Processing
+ * looks open orders up by owner and order id from the first block, so that
+ * partial index is built with the table; the creation-block indexes the
+ * statistics read follow the app index lifecycle.
+ *
+ * order_stats_by_block counts the orders created in each block and, of them,
+ * those that ended filled and cancelled; order_stats_by_block_group holds the
+ * same sums per group of btracker_backend.order_stats_group_blocks() blocks
+ * (block_group = block_created / that). process_block_range_orders adds to both
+ * in the statement that writes order_lifecycle, an outcome to the creation
+ * block's row when it lands, so for any creation-block window they count what
+ * order_lifecycle does. The network-wide statistics read whole groups and, at
+ * the window's edges, at most a group's worth of blocks. Each is seeded from
+ * order_lifecycle when it is created, so an install upgraded from a version
+ * that had order_lifecycle but not the rollups counts its earlier orders too:
+ * the additive upserts of later blocks need that base, or an outcome landing on
+ * an earlier order would count it closed but never created.
+ *
+ * Every writer of order_lifecycle must maintain both rollups in the same
+ * statement: today process_block_range_orders and btracker_backend.process_hf_23.
+ */
+DO $$
+DECLARE
+  __schema_name VARCHAR;
+  __index TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  IF to_regclass(format('%I.order_lifecycle', __schema_name)) IS NULL THEN
+    CREATE TABLE order_lifecycle
+    (
+      create_op_id  BIGINT   NOT NULL, -- The limit_order_create(2) operation
+      order_id      BIGINT   NOT NULL, -- Per-owner id, reused after the order closes
+      remaining     BIGINT   NOT NULL, -- Satoshis still for sale; at cancellation, the amount returned
+      filled        BIGINT   NOT NULL, -- Satoshis sold by fills
+      owner_id      INT      NOT NULL, -- hive.accounts_view.id
+      block_created INT      NOT NULL,
+      end_block     INT,               -- Block the order was filled or cancelled in; NULL while open
+      nai           SMALLINT NOT NULL, -- Asset sold: 13=HBD, 21=HIVE
+      outcome       TEXT,              -- 'filled' or 'cancelled'; NULL while open
+
+      CONSTRAINT pk_order_lifecycle PRIMARY KEY (create_op_id),
+      CONSTRAINT ck_order_lifecycle_outcome CHECK (
+        (end_block IS NULL AND outcome IS NULL) OR (end_block IS NOT NULL AND outcome IN ('filled', 'cancelled')))
+    );
+    CREATE INDEX idx_order_lifecycle_open ON order_lifecycle(owner_id, order_id) WHERE end_block IS NULL;
+    PERFORM hive.app_register_table( __schema_name, 'order_lifecycle', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.order_stats_by_block', __schema_name)) IS NULL THEN
+    CREATE TABLE order_stats_by_block
+    (
+      block_created INT NOT NULL,
+      created       INT NOT NULL, -- Orders created in the block
+      filled        INT NOT NULL, -- Of them, the ones that ended filled
+      cancelled     INT NOT NULL, -- Of them, the ones that ended cancelled
+
+      CONSTRAINT pk_order_stats_by_block PRIMARY KEY (block_created)
+    );
+    INSERT INTO order_stats_by_block (block_created, created, filled, cancelled)
+    SELECT block_created, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+    FROM order_lifecycle
+    GROUP BY block_created;
+    PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block', __schema_name );
+  END IF;
+
+  IF to_regclass(format('%I.order_stats_by_block_group', __schema_name)) IS NULL THEN
+    CREATE TABLE order_stats_by_block_group
+    (
+      block_group INT NOT NULL, -- block_created / btracker_backend.order_stats_group_blocks()
+      created     INT NOT NULL,
+      filled      INT NOT NULL,
+      cancelled   INT NOT NULL,
+
+      CONSTRAINT pk_order_stats_by_block_group PRIMARY KEY (block_group)
+    );
+    -- 10000 is btracker_backend.order_stats_group_blocks(), installed after this
+    -- file: keep the two equal.
+    INSERT INTO order_stats_by_block_group (block_group, created, filled, cancelled)
+    SELECT block_created / 10000, count(*), count(*) FILTER (WHERE outcome = 'filled'), count(*) FILTER (WHERE outcome = 'cancelled')
+    FROM order_lifecycle
+    GROUP BY block_created / 10000;
+    PERFORM hive.app_register_table( __schema_name, 'order_stats_by_block_group', __schema_name );
+  END IF;
+
+  FOREACH __index IN ARRAY ARRAY[
+    format('CREATE INDEX IF NOT EXISTS idx_order_lifecycle_block_created ON %I.order_lifecycle(block_created) INCLUDE (outcome)', __schema_name),
+    format('CREATE INDEX IF NOT EXISTS idx_order_lifecycle_owner_block_created ON %I.order_lifecycle(owner_id, block_created) INCLUDE (outcome)', __schema_name)
+  ]
+  LOOP
+    IF isIndexesCreated() THEN
+      EXECUTE __index;
+    END IF;
+    PERFORM hive.app_register_index_dependency(__schema_name, __index);
+  END LOOP;
 END
 $$;
 

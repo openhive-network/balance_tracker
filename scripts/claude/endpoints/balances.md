@@ -9,16 +9,18 @@ Balance endpoints provide comprehensive account balance information including li
 ### get_account_balances
 
 **REST Path**: `GET /accounts/{account-name}/balances`
-**SQL Function**: `btracker_endpoints.get_account_balances(account-name TEXT)`
+**SQL Function**: `btracker_endpoints.get_account_balances(account-name TEXT, at-block TEXT = NULL)`
 **Source**: `endpoints/account-balances/get_account_balances.sql`
 
-Returns comprehensive balance information for a single Hive account.
+Returns comprehensive balance information for a single Hive account, at the head
+block or at a past block (`at-block`).
 
 #### Parameters
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | account-name | TEXT | Yes | Hive account name |
+| at-block | TEXT | No | Block number, or timestamp resolved to the last block at or before it; 1..last processed block |
 
 #### Returns: `btracker_backend.balance`
 
@@ -73,9 +75,39 @@ curl -X GET 'http://localhost:3000/balance-api/accounts/blocktrades/balances'
 
 #### Architecture Notes
 
-- Thin wrapper that resolves account name to ID, then delegates to backend helper
-- 2-second cache (balances change frequently)
+- Thin wrapper that resolves account name to ID and `at-block` to a past block
+  (`btracker_backend.resolve_at_block()`, NULL for absent or the last processed
+  block), then delegates to `btracker_backend.account_balances_at()`
+- Head (no `at-block`, or the last processed block): `btracker_backend.get_account_balances()`,
+  the current-state tables, unchanged by `at-block`
+- Past block: `btracker_backend.get_account_balances_at_block()`
+  (`backend/endpoint_helpers/get_account_balances/balances_at_block.sql`) reads the
+  latest row at or before the block of `account_balance_history` (liquid HBD/HIVE/VESTS),
+  `account_savings_history` (savings), `account_delegation_history` (delegated/received
+  VESTS) and `account_withdraw_history` (power-down rate, to_withdraw, withdrawn), each a
+  backward scan of the table's `(account, [nai,] block)` index, and values VESTS at the
+  block's vesting fund and shares. Every other field has no history and is `null`.
+- `account_delegation_history` and `account_withdraw_history` are filled by block
+  processing only: on an install upgraded from a version before them, past-block
+  `delegated_vests`, `received_vests`, `post_voting_power_vests`, `vesting_withdraw_rate`,
+  `to_withdraw` and `withdrawn` are correct only after a resync
+- `at-block` out of range (before block 1, after the last processed block, a timestamp
+  before the first block) or malformed: an error stating the valid range
+- 2-second cache, 1 year for a past block that is irreversible (`set_history_cache_headers`)
 - Returns 404 if account doesn't exist
+
+---
+
+### get_accounts_balances
+
+**REST Path**: `GET /balances?accounts=a,b,c[&at-block=N]`
+**SQL Function**: `btracker_endpoints.get_accounts_balances(accounts TEXT, at-block TEXT = NULL)`
+**Source**: `endpoints/account-balances/get_accounts_balances.sql`
+
+The balances of up to 100 accounts: an array of `btracker_backend.account_balance`
+(`account_name`, `balance`), one per requested name in request order, `balance` being
+exactly the `get_account_balances` answer for that account and `at-block`. More than 100
+names, a missing list or an unknown account is an error naming it.
 
 ---
 

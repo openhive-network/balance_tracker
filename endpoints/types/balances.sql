@@ -185,6 +185,32 @@ CREATE TYPE btracker_backend.balance AS (
 
 
 /** openapi:components:schemas
+btracker_backend.account_balance:
+  type: object
+  properties:
+    account_name:
+      type: string
+      description: name of the account
+    balance:
+      $ref: '#/components/schemas/btracker_backend.balance'
+      description: the account''s balances, as `/accounts/{account-name}/balances` returns them
+ */
+-- openapi-generated-code-begin
+DROP TYPE IF EXISTS btracker_backend.account_balance CASCADE;
+CREATE TYPE btracker_backend.account_balance AS (
+    "account_name" TEXT,
+    "balance" btracker_backend.balance
+);
+-- openapi-generated-code-end
+
+/** openapi:components:schemas
+btracker_backend.array_of_account_balance:
+  type: array
+  items:
+    $ref: '#/components/schemas/btracker_backend.account_balance'
+*/
+
+/** openapi:components:schemas
 btracker_backend.balances:
   type: object
   properties:

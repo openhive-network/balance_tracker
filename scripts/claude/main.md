@@ -114,13 +114,23 @@ LIVE (new blocks 1 at a time, synchronous_commit=ON)
 HAF re-enters MASSIVE_PROCESSING whenever the app falls more than 101 blocks
 behind (restart, stack switch, slow live processing), not only for the initial
 sync. `finalize_massive_sync()` runs once, on the first LIVE call, and
-`isIndexesCreated()` is the marker that it has happened. Anything that is only
+`isIndexesCreated()` is the marker that it has happened (for its own schema: it names
+the schema it is installed in, so a standalone schema and hafbe_bal are told apart). Anything that is only
 appropriate for the genesis replay must check that marker rather than the stage
 name. Example: `btracker_process_blocks()` ANALYZEs the history tables (at most
 every 10 minutes, `analyze_unless_recent()`) only while `isIndexesCreated()` is
 false; the HAF vacuum request it used to make there ran as `VACUUM FULL ANALYZE`
 under ACCESS EXCLUSIVE and turned each post-restart catch-up into a multi-minute
 outage (#64).
+
+`finalize_massive_sync()` and `finalize_massive_sync_before_forking()` are
+`SECURITY DEFINER` (they run as btracker_owner). The install pins their
+`search_path` to the schema they are installed in (plus `hive`, `hafd`,
+`btracker_backend`, `pg_catalog`, `pg_temp` last) with `ALTER FUNCTION ... SET`
+after their `CREATE OR REPLACE`, so a caller's own schema cannot shadow
+`isIndexesCreated()` or a table, and `scripts/install_app.sh` revokes EXECUTE from
+PUBLIC and grants it to btracker_owner (haf_block_explorer's hafbe_owner is a
+member). A new SECURITY DEFINER function needs the same two steps.
 
 ### Processing while hived replays
 
@@ -257,6 +267,17 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 ### History Tables
 - `account_balance_history` - Every balance change
 - `account_savings_history` - Every savings change
+- `account_delegation_history` - `account_delegations` (delegated/received VESTS) after every change
+- `account_withdraw_history` - power-down state (rate, to_withdraw, withdrawn) of `account_withdraws` after every change
+
+The two power the past-block balances (`at-block`): each is indexed on `(account, block, source_op)`
+(registered with HAF's index lifecycle, built at finalize), and its latest row per account equals
+the current-state table. They are created outside the context's creation in `db/btracker_app.sql`,
+so an upgraded install gets them, but only block processing fills them: an install upgraded from a
+version before they existed must resync before at-block reads of `delegated_vests`, `received_vests`,
+`post_voting_power_vests`, `vesting_withdraw_rate`, `to_withdraw` and `withdrawn` are correct (until
+then a block before the account's first change since the upgrade reads as no delegation and no
+power-down). No upgrade step backfills them.
 
 Both history tables store `op_type_id` (the type of `source_op`), written by the processing functions, so readers never probe `hafd.operations` for it. It sits right after `nai`, in the alignment pad before the first BIGINT, and adds no width; keep it there.
 - `balance_history_by_day/month` - Aggregated snapshots
@@ -265,6 +286,8 @@ Both history tables store `op_type_id` (the type of `source_op`), written by the
 - `account_vesting_history` - Per-account vesting event history (per-impacted-account, with seq_no)
 - `account_vesting_by_day/month` - Per-account vesting aggregates
 - `proposal_payments` - Every `proposal_pay_operation`, numbered per proposal (`payment_seq_no`)
+- `order_lifecycle` - Every limit order, one row per creating operation, with `remaining`, `filled` and, once closed, its `outcome` (`filled`/`cancelled`) and `end_block`; open rows equal `order_state`. An order hived culls for a dust remainder (a virtual `limit_order_cancelled` in a transaction whose nearest earlier event of the order there is a fill, not the owner's `limit_order_cancel`, so an order id reused within one transaction keeps each incarnation's outcome) counts as `filled` with the dust in `remaining`, as hived counts it; user cancels and expiry (block-level) count as `cancelled`. Serves `/accounts/{name}/order-stats` (and, through the count tables below, `/order-stats`). Created outside the context's creation like the delegation and power-down history, so an upgraded install gets it, but only block processing fills it: an install upgraded from a version before it existed must resync before the order statistics count orders created before the upgrade. No upgrade step backfills it.
+- `order_stats_by_block` / `order_stats_by_block_group` - `order_lifecycle` counted per creation block and per 10000-block group (`created`, `filled`, `cancelled`), added to in the same statement as `order_lifecycle` (an outcome goes to its order's creation block when it lands); network-wide `/order-stats` sums them. Seeded from `order_lifecycle` when created, so an upgrade from a version that had `order_lifecycle` but not them needs no resync; every writer of `order_lifecycle` (`process_block_range_orders`, `process_hf_23`) maintains both. `order_stats_group_blocks()` is baked into the stored `block_group` keys (and inlined in the seeding): changing it requires rebuilding `order_stats_by_block_group`.
 
 ## Common SQL Patterns
 
