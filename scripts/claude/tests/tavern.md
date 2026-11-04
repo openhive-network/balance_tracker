@@ -220,6 +220,7 @@ tests/mocks/
 │   ├── recurrent_transfers/  # Recurrent transfer fixtures
 │   ├── delegations/          # Delegation fixtures
 │   ├── delays/               # HF24 delayed voting fixtures
+│   ├── account_clears/       # #61: clears of null and steem.dao (blocks 90000058-64); the installer adds steem.dao and hive.fund
 │   └── escrow/               # Escrow operation fixtures
 ├── sql/
 │   └── *.sql                 # Insertion functions

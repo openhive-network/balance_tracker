@@ -1,0 +1,42 @@
+{
+  "operations_result": [
+    {
+      "balance": "0",
+      "balance_change": "-5",
+      "block_num": 90000061,
+      "op_type_id": 65,
+      "operation_id": "386547318633005058",
+      "prev_balance": "5",
+      "timestamp": "2016-09-16T00:00:21"
+    },
+    {
+      "balance": "5",
+      "balance_change": "5",
+      "block_num": 90000060,
+      "op_type_id": 32,
+      "operation_id": "386547314338037761",
+      "prev_balance": "0",
+      "timestamp": "2016-09-16T00:00:18"
+    },
+    {
+      "balance": "0",
+      "balance_change": "-2",
+      "block_num": 90000058,
+      "op_type_id": 65,
+      "operation_id": "386547305748103175",
+      "prev_balance": "2",
+      "timestamp": "2016-09-16T00:00:12"
+    },
+    {
+      "balance": "2",
+      "balance_change": "2",
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "operation_id": "386547305748103169",
+      "prev_balance": "0",
+      "timestamp": "2016-09-16T00:00:12"
+    }
+  ],
+  "total_operations": 4,
+  "total_pages": 1
+}

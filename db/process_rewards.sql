@@ -49,6 +49,16 @@ DECLARE
   __insert_info_rewards         INT;
 BEGIN
 
+-- #61: hived empties the pending rewards of 'null' / 'steem.dao' at each balance-clearing
+-- op (see btracker_backend.account_clears_in_range). account_rewards keeps no history, so
+-- the clear is applied as: zero the account here, then let only the rewards that arrive
+-- after its last clear in this range through (reward_clears below). The claim math reads
+-- the previous balances from account_rewards, so this must run before the statement.
+UPDATE account_rewards ar
+SET balance = 0
+WHERE ar.balance <> 0
+  AND ar.account IN (SELECT ac.account_id FROM btracker_backend.account_clears_in_range(_from, _to) ac);
+
 -- ============================================================================
 -- CTE: ops
 -- ============================================================================
@@ -61,7 +71,15 @@ BEGIN
 -- into a single batch. This is orders of magnitude faster than processing block-by-block.
 --
 -- Example: Processing blocks 1-1000 in one call vs 1000 separate calls.
-WITH ops AS MATERIALIZED (
+WITH reward_clears AS MATERIALIZED (
+  -- #61: the last clearing op per cleared account in this range
+  SELECT av.name AS account_name, MAX(ac.source_op) AS last_clear_op
+  FROM btracker_backend.account_clears_in_range(_from, _to) ac
+  JOIN accounts_view av ON av.id = ac.account_id
+  GROUP BY av.name
+),
+
+ops AS MATERIALIZED (
   SELECT ov.body_value AS body, ov.op_type_id, ov.id AS source_op, ov.block_num AS source_op_block
   FROM _btracker_ops_batch ov
   WHERE
@@ -342,6 +360,19 @@ union_operations_with_vesting_balance AS (
 
 ),
 
+-- #61: drop the pending-reward rows a later clear in this range has emptied (the lifetime
+-- info totals above keep every reward). Applied here, to the parsed rows, not inside
+-- get_impacted_bal: a filter there on the parsed account name parses every reward
+-- operation twice.
+pending_reward_ops AS (
+  SELECT u.*
+  FROM union_operations_with_vesting_balance u
+  WHERE NOT EXISTS (
+    SELECT 1 FROM reward_clears rc
+    WHERE rc.account_name = u.account_name AND rc.last_clear_op > u.source_op
+  )
+),
+
 -- ============================================================================
 -- CTE: segmented_rows
 -- ============================================================================
@@ -367,7 +398,7 @@ segmented_rows AS (
     -- Claims with 0 VESTS (e.g., claiming only HBD) don't affect NAI 38 calculation
     SUM(CASE WHEN op_type_id = _op_claim_reward_balance AND reward_vests != 0 THEN 1 ELSE 0 END)
       OVER (PARTITION BY account_name ORDER BY source_op) AS segment
-  FROM union_operations_with_vesting_balance
+  FROM pending_reward_ops
 ),
 
 -- ============================================================================

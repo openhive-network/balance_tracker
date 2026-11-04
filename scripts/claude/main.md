@@ -198,6 +198,11 @@ processed a block yet.
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 | `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
 
+Not every fix gets a repair. A major change to block processing is applied by a fresh
+sync instead: the balance clears of `null` and `steem.dao` (#61, see
+`scripts/claude/processing.md`) have no repair, so an install synced before them must be
+synced again from scratch to correct those accounts.
+
 ## HAF Integration
 
 Balance Tracker uses HAF for:

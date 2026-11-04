@@ -1,0 +1,650 @@
+{
+  "operations": [
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          },
+          "memo": "burn"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "op_pos": 1,
+      "trx_in_block": 1,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "2",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 2,
+      "trx_in_block": 2,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "250",
+            "precision": 3
+          },
+          "memo": "burn"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "op_pos": 3,
+      "trx_in_block": 3,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "4",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 4,
+      "trx_in_block": 4,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          },
+          "memo": "old treasury"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 2,
+      "op_pos": 5,
+      "trx_in_block": 5,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000013",
+            "amount": "300",
+            "precision": 3
+          },
+          "memo": "old treasury"
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 32,
+      "op_pos": 6,
+      "trx_in_block": 6,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "steemit",
+          "to": "steem.dao",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "3",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 65,
+      "op_pos": 7,
+      "trx_in_block": -1,
+      "body": {
+        "type": "clear_null_account_balance_operation",
+        "value": {
+          "total_cleared": [
+            {
+              "nai": "@@000000021",
+              "amount": "426705302",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "19777885",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 71,
+      "op_pos": 8,
+      "trx_in_block": -1,
+      "body": {
+        "type": "consolidate_treasury_balance_operation",
+        "value": {
+          "total_moved": [
+            {
+              "nai": "@@000000021",
+              "amount": "2003",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "300",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000058,
+      "op_type_id": 63,
+      "op_pos": 9,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "10",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "20",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "30000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000059,
+      "op_type_id": 2,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "500",
+            "precision": 3
+          },
+          "memo": "burn"
+        }
+      }
+    },
+    {
+      "block_num": 90000059,
+      "op_type_id": 65,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "clear_null_account_balance_operation",
+        "value": {
+          "total_cleared": [
+            {
+              "nai": "@@000000021",
+              "amount": "550",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "10",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000060,
+      "op_type_id": 63,
+      "op_pos": 0,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test-2",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "7",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "3",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "5000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000060,
+      "op_type_id": 32,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_savings_operation",
+        "value": {
+          "from": "hive.fund",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "5",
+            "precision": 3
+          },
+          "memo": ""
+        }
+      }
+    },
+    {
+      "block_num": 90000060,
+      "op_type_id": 52,
+      "op_pos": 2,
+      "trx_in_block": -1,
+      "body": {
+        "type": "curation_reward_operation",
+        "value": {
+          "curator": "null",
+          "reward": {
+            "nai": "@@000000037",
+            "amount": "3000000000",
+            "precision": 6
+          },
+          "author": "poloniex",
+          "permlink": "clear-test-2",
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 3,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 77,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_completed_operation",
+        "value": {
+          "from_account": "poloniex",
+          "to_account": "null",
+          "hive_vested": {
+            "nai": "@@000000021",
+            "amount": "2000",
+            "precision": 3
+          },
+          "vesting_shares_received": {
+            "nai": "@@000000037",
+            "amount": "4000000000",
+            "precision": 6
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 65,
+      "op_pos": 2,
+      "trx_in_block": -1,
+      "body": {
+        "type": "clear_null_account_balance_operation",
+        "value": {
+          "total_cleared": [
+            {
+              "nai": "@@000000021",
+              "amount": "2003",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000061,
+      "op_type_id": 63,
+      "op_pos": 3,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test-3",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "5",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "4",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "3000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000062,
+      "op_type_id": 3,
+      "op_pos": 0,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000062,
+      "op_type_id": 77,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_completed_operation",
+        "value": {
+          "from_account": "poloniex",
+          "to_account": "null",
+          "hive_vested": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          },
+          "vesting_shares_received": {
+            "nai": "@@000000037",
+            "amount": "2000000000",
+            "precision": 6
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000063,
+      "op_type_id": 63,
+      "op_pos": 0,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test-4",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "9",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "9",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "9000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000063,
+      "op_type_id": 65,
+      "op_pos": 1,
+      "trx_in_block": -1,
+      "body": {
+        "type": "clear_null_account_balance_operation",
+        "value": {
+          "total_cleared": [
+            {
+              "nai": "@@000000021",
+              "amount": "677",
+              "precision": 3
+            },
+            {
+              "nai": "@@000000037",
+              "amount": "2000000000",
+              "precision": 6
+            },
+            {
+              "nai": "@@000000013",
+              "amount": "14",
+              "precision": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block_num": 90000063,
+      "op_type_id": 63,
+      "op_pos": 2,
+      "trx_in_block": -1,
+      "body": {
+        "type": "comment_benefactor_reward_operation",
+        "value": {
+          "author": "poloniex",
+          "permlink": "clear-test-5",
+          "benefactor": "null",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "5",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "4",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "3000000",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000063,
+      "op_type_id": 52,
+      "op_pos": 3,
+      "trx_in_block": -1,
+      "body": {
+        "type": "curation_reward_operation",
+        "value": {
+          "curator": "null",
+          "reward": {
+            "nai": "@@000000037",
+            "amount": "1000000",
+            "precision": 6
+          },
+          "author": "poloniex",
+          "permlink": "clear-test-5",
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000063,
+      "op_type_id": 51,
+      "op_pos": 4,
+      "trx_in_block": -1,
+      "body": {
+        "type": "author_reward_operation",
+        "value": {
+          "author": "null",
+          "permlink": "clear-test-6",
+          "hbd_payout": {
+            "nai": "@@000000013",
+            "amount": "1",
+            "precision": 3
+          },
+          "hive_payout": {
+            "nai": "@@000000021",
+            "amount": "2",
+            "precision": 3
+          },
+          "vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "1000000",
+            "precision": 6
+          },
+          "curators_vesting_payout": {
+            "nai": "@@000000037",
+            "amount": "0",
+            "precision": 6
+          },
+          "payout_must_be_claimed": true
+        }
+      }
+    },
+    {
+      "block_num": 90000064,
+      "op_type_id": 70,
+      "op_pos": 0,
+      "trx_in_block": -1,
+      "body": {
+        "type": "delayed_voting_operation",
+        "value": {
+          "voter": "null",
+          "votes": 1000000000
+        }
+      }
+    },
+    {
+      "block_num": 90000064,
+      "op_type_id": 3,
+      "op_pos": 1,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_operation",
+        "value": {
+          "from": "poloniex",
+          "to": "null",
+          "amount": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          }
+        }
+      }
+    },
+    {
+      "block_num": 90000064,
+      "op_type_id": 77,
+      "op_pos": 2,
+      "trx_in_block": 0,
+      "body": {
+        "type": "transfer_to_vesting_completed_operation",
+        "value": {
+          "from_account": "poloniex",
+          "to_account": "null",
+          "hive_vested": {
+            "nai": "@@000000021",
+            "amount": "1000",
+            "precision": 3
+          },
+          "vesting_shares_received": {
+            "nai": "@@000000037",
+            "amount": "2000000000",
+            "precision": 6
+          }
+        }
+      }
+    }
+  ]
+}

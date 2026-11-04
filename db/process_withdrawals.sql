@@ -609,11 +609,12 @@ process_block_range_data_b AS (
 --------------------------------------------------------------------------------------
 -- Flatten operations into (account_id, balance_delta) rows.
 -- One operation may produce TWO rows: one for from_account (withdrawn), one for to_account (deposited).
-union_delays AS MATERIALIZED (
+union_delays_ops AS MATERIALIZED (
   SELECT
     from_account AS account_id,
     withdrawn AS balance,  -- typically negative (reducing delayed vests)
-    source_op
+    source_op,
+    FALSE AS is_clear
   FROM process_block_range_data_b
 
   UNION ALL
@@ -621,9 +622,29 @@ union_delays AS MATERIALIZED (
   SELECT
     to_account AS account_id,
     deposited AS balance,  -- typically positive (adding delayed vests)
-    source_op
+    source_op,
+    FALSE AS is_clear
   FROM process_block_range_data_b
   WHERE to_account IS NOT NULL
+),
+-- #61: hived also empties the delayed votes of 'null' / 'steem.dao' at each balance-clearing
+-- op (sum_delayed_votes = 0; delayed_votes.clear()). A marker at the op resets the clamped
+-- running value below to 0; later ops in the batch continue from it. Only for an account
+-- that has delayed vests stored or touched in this batch, so no empty row is created.
+-- Only the account's LAST clear of the batch: the fold below keeps no intermediate value,
+-- and the last reset makes every earlier clear irrelevant to the final one. (An account
+-- cleared every block - 'null' - would otherwise add a row per block to the recursion,
+-- whose cost grows with the square of its rows.)
+union_delays AS MATERIALIZED (
+  SELECT account_id, balance, source_op, is_clear FROM union_delays_ops
+
+  UNION ALL
+
+  SELECT ac.account_id, 0::BIGINT AS balance, MAX(ac.source_op) AS source_op, TRUE AS is_clear
+  FROM btracker_backend.account_clears_in_range(_from, _to) ac
+  WHERE EXISTS (SELECT 1 FROM union_delays_ops u WHERE u.account_id = ac.account_id)
+     OR EXISTS (SELECT 1 FROM account_withdraws aw WHERE aw.account = ac.account_id AND aw.delayed_vests <> 0)
+  GROUP BY ac.account_id
 ),
 group_by_account AS MATERIALIZED (
   SELECT DISTINCT account_id
@@ -637,7 +658,8 @@ join_prev_delays AS (
   SELECT
     gb.account_id,
     COALESCE(aw.delayed_vests,0) AS balance,
-    0 AS source_op
+    0 AS source_op,
+    FALSE AS is_clear
   FROM group_by_account gb
   LEFT JOIN account_withdraws aw ON aw.account = gb.account_id
 ),
@@ -646,7 +668,8 @@ union_prev_delays AS (
   SELECT
     account_id,
     balance,
-    source_op
+    source_op,
+    is_clear
   FROM join_prev_delays
 
   UNION ALL
@@ -654,7 +677,8 @@ union_prev_delays AS (
   SELECT
     account_id,
     balance,
-    source_op
+    source_op,
+    is_clear
   FROM union_delays
 ),
 add_row_number AS (
@@ -664,6 +688,7 @@ add_row_number AS (
     account_id,
     balance,
     source_op,
+    is_clear,
     ROW_NUMBER() OVER w_account_asc AS row_num
   FROM union_prev_delays
   WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
@@ -703,7 +728,8 @@ recursive_delays AS MATERIALIZED (
     -- GREATEST ensures delayed_vests never goes negative.
     SELECT
       next_cp.account_id,
-      GREATEST(next_cp.balance + prev.balance, 0) AS balance,
+      CASE WHEN next_cp.is_clear THEN 0  -- #61: the clear empties the delayed votes
+           ELSE GREATEST(next_cp.balance + prev.balance, 0) END AS balance,
       next_cp.source_op,
       next_cp.row_num
     FROM calculated_delays prev

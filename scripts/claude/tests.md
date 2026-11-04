@@ -58,6 +58,7 @@ tests/
 │   ├── withdraw_vesting_rate.sql # power-down rate rounding per hardfork era, through processing, and its one-off repair
 │   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair
+│   ├── cleared_accounts_batch.sql # #61 clears of null/steem.dao on the account_clears fixture: values after the sync (finalized), HBD interest, balance_totals, rollups; the same block by block from seeded stored state; one range = block by block
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests
 │   ├── hf_23_orders.sql       # process_hf_23 removes cleared accounts' open orders from order_state and closes their order_lifecycle rows as cancelled at HF23, also in the order counts
 │   ├── delegation_withdraw_history.sql # delegation/power-down history per change (a first delegation of 0 too), balances at past blocks, fork rollback, at-block and /balances endpoints
@@ -98,6 +99,11 @@ Tests depend on the `sync` stage which:
 1. Prepares HAF data cache
 2. Syncs Balance Tracker to 5M blocks
 3. Optionally loads mock data for mock tests
+
+`sync_with_mock_data` also runs `tests/maintenance/cleared_accounts_batch.sql` after the
+mock sync (`-v require_clears=1`), so its result is in the job that syncs the mock
+blocks. Elsewhere (the AIDEV maintenance step on the 5M chain) the test skips with a
+notice: that chain has no clearing ops.
 
 ### Cache Handling
 

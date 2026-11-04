@@ -102,6 +102,17 @@ UPDATE account_rewards SET
   lifetime_hive = lifetime_hive + CASE WHEN op_type = 'claim' THEN claimed_hive ELSE 0 END
 ```
 
+### Balance-clearing operations (#61)
+
+hived empties the pending rewards of `null` / `steem.dao` at each clearing op.
+`account_rewards` has no history, so the function first zeroes the pending rewards of
+every account cleared in the range (before the statement: the claim math reads the
+previous balances), and `pending_reward_ops` then drops the reward and claim rows before
+that account's last clear in the range (`reward_clears`). The filter runs on the parsed
+rows after `union_operations_with_vesting_balance`, not inside `get_impacted_bal`, where it
+would parse every reward operation twice. Lifetime totals (`account_info_rewards`) keep
+every reward.
+
 ## Edge Cases
 
 1. **Claim before earn**: In same block range, claim comes first chronologically but references rewards earned later (impossible in reality, but handle gracefully)

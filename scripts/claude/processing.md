@@ -82,6 +82,8 @@ hived replays").
 | `escrow_transfer` | Create escrow | `process_block_range_escrows` |
 | `escrow_release` | Release from escrow | `process_block_range_escrows`, `process_balances` |
 | `proposal_pay` | DHF pays a proposal (hourly) | `process_balances`, `process_block_range_proposal_payments` |
+| `clear_null_account_balance` | hived empties `null` (burns everything) | `process_balances`, `process_savings`, `process_rewards`, `process_withdrawals` (see Balance-clearing operations) |
+| `consolidate_treasury_balance` | hived empties `steem.dao` into `hive.fund` | same as `clear_null_account_balance` |
 
 ## The Squashing Pattern
 
@@ -175,6 +177,35 @@ after it (`rn = 1`), and adds the per-NAI differences. Any new writer of
 
 History rows carry `op_type_id`: `get_impacted_balances_batch` returns each emission's
 operation type, and `process_savings` already carries it per operation.
+
+### Balance-clearing operations (#61)
+
+hived empties two accounts in consensus, at every block in which they hold anything:
+`clear_null_account_balance` burns everything on `null`, and
+`consolidate_treasury_balance` moves everything on `steem.dao` (the pre-HF24 treasury)
+to `hive.fund`. "Everything" is liquid HIVE/HBD/VESTS, savings, pending rewards and the
+delayed votes. Neither op names the account, and HAF's balance collector emits no debit
+for it, so `get_impacted_balances_batch` (a port of that collector, guarded by
+`tests/parity`) has none either: the stages apply the clear after it.
+`btracker_backend.account_clears_in_range(_from, _to)`
+(`backend/operation_parsers/hardforks.sql`) lists the batch's clearing ops, each with
+the account it empties.
+
+| Stage | What a clear does |
+|-------|-------------------|
+| `process_block_range_balances` | A marker row per liquid asset at the op becomes a debit of exactly the running balance there (`apply_account_clears`): the history gets the debit row (op type 65 or 71), and later deltas in the batch start from 0. A clear of an asset held at 0 writes nothing. Only the cleared accounts take this window path; every other row passes straight through. The HBD-interest accumulator sees the debit like any HBD change. |
+| `process_block_range_savings` | The same for savings (`apply_savings_clears`). Pending savings withdrawals are not cancelled. |
+| `process_block_range_rewards` | `account_rewards` has no history, so the account's pending rewards are zeroed before the statement and only rewards after its last clear in the batch are applied. Lifetime totals (`account_info_rewards`) keep every reward. |
+| `process_block_range_withdrawals` | `account_withdraws.delayed_vests` is reset to 0 at the account's last clear of the batch, inside the clamped fold; later delayed ops continue from 0. Only for an account with delayed vests stored or touched in the batch. |
+
+Known limit, not reached on mainnet: hive.fund's side of a consolidate stays as the
+collector emits it, liquid only (hived moves savings and pending rewards into hive.fund's
+savings and rewards).
+
+**A fresh sync is required.** There is no migration or repair for these clears: an
+install synced by a version without them keeps its old `null` and `steem.dao` rows until
+btracker is synced again from scratch. `tests/maintenance/cleared_accounts_batch.sql`
+checks them (see `scripts/claude/tests.md`).
 
 ### Lifecycle Tracking
 

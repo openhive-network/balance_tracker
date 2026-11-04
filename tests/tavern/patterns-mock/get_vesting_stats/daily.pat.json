@@ -1,7 +1,7 @@
 [
   {
     "date": "2016-09-16T00:00:00",
-    "last_block_num": 90000057,
+    "last_block_num": 90000062,
     "power_down_fill_count": 3,
     "power_down_fill_hive": {
       "amount": "16500",
@@ -19,9 +19,9 @@
       "nai": "@@000000037",
       "precision": 6
     },
-    "power_up_count": 0,
+    "power_up_count": 2,
     "power_up_hive": {
-      "amount": "0",
+      "amount": "3000",
       "nai": "@@000000021",
       "precision": 3
     }

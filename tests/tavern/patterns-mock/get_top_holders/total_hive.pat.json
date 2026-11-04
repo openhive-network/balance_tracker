@@ -1,16 +1,56 @@
 {
-  "total_accounts": 3072,
-  "total_pages": 308,
   "holders_result": [
-    { "rank": 1, "account": "steemit", "value": "4778859891" },
-    { "rank": 2, "account": "poloniex", "value": "1931250425" },
-    { "rank": 3, "account": "bittrex", "value": "499025114" },
-    { "rank": 4, "account": "null", "value": "426704300" },
-    { "rank": 5, "account": "steemit2", "value": "197446682" },
-    { "rank": 6, "account": "aurel", "value": "97417738" },
-    { "rank": 7, "account": "openledger", "value": "52275479" },
-    { "rank": 8, "account": "ben", "value": "50968139" },
-    { "rank": 9, "account": "blocktrades", "value": "29609375" },
-    { "rank": 10, "account": "steem", "value": "29324510" }
-  ]
+    {
+      "account": "steemit",
+      "rank": 1,
+      "value": "4778857888"
+    },
+    {
+      "account": "poloniex",
+      "rank": 2,
+      "value": "1931244923"
+    },
+    {
+      "account": "bittrex",
+      "rank": 3,
+      "value": "499025114"
+    },
+    {
+      "account": "steemit2",
+      "rank": 4,
+      "value": "197446682"
+    },
+    {
+      "account": "aurel",
+      "rank": 5,
+      "value": "97417738"
+    },
+    {
+      "account": "openledger",
+      "rank": 6,
+      "value": "52275479"
+    },
+    {
+      "account": "ben",
+      "rank": 7,
+      "value": "50968139"
+    },
+    {
+      "account": "blocktrades",
+      "rank": 8,
+      "value": "29609375"
+    },
+    {
+      "account": "steem",
+      "rank": 9,
+      "value": "29324510"
+    },
+    {
+      "account": "imadev",
+      "rank": 10,
+      "value": "23787999"
+    }
+  ],
+  "total_accounts": 3072,
+  "total_pages": 308
 }

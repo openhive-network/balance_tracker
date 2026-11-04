@@ -139,4 +139,57 @@ BEGIN
 END
 $$;
 
+-- Balance-clearing virtual operations in a batch (#61).
+--
+-- hived empties two accounts in consensus, every block in which they hold anything:
+--   * clear_null_account_balance_operation   -> 'null': liquid, savings, vesting and reward
+--     balances are burned (database::clear_null_account_balance);
+--   * consolidate_treasury_balance_operation -> 'steem.dao' (the pre-HF24 treasury): the
+--     same balances move to hive.fund (database::consolidate_treasury_balance).
+-- Neither op names the account it empties (it is a protocol constant), and HAF's balance
+-- collector deliberately emits no debit for it, leaving the clear to consumers - the same
+-- contract process_hf_23 honours for hardfork_hive_operation. get_impacted_balances stays
+-- a faithful port of that collector (tests/parity); the pipelines apply these clears
+-- after it: process_balances and process_savings reset the running balance at the op,
+-- process_rewards zeroes the account before applying later rewards.
+--
+-- process_withdrawals resets account_withdraws.delayed_vests at the same ops (hived clears
+-- the delayed votes HF24 introduced along with the vesting shares).
+--
+-- Known limit, not reached on mainnet (checked on a full node 2026-10-23: btracker holds no
+-- savings or reward rows for steem.dao):
+--   * hive.fund's side of a consolidate stays as HAF's collector emits it: total_moved is
+--     credited as liquid, while hived moves savings and pending rewards into hive.fund's
+--     savings and rewards.
+--
+-- Returns one row per op. Reads operations_view through HAF's (op_type_id, block_num)
+-- index rather than the prefetched _btracker_ops_batch: it is called five times per batch
+-- (balances, withdrawals, savings, and twice in rewards), and a scan of the batch (a temp table without indexes) cost 0.5-0.7 s per call on a 10k
+-- batch, clears or not; the index probe costs milliseconds.
+CREATE OR REPLACE FUNCTION btracker_backend.account_clears_in_range(_from INT, _to INT)
+RETURNS TABLE (
+  account_id INT,
+  source_op BIGINT,
+  op_type_id SMALLINT,
+  source_op_block INT
+)
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  _op_clear_null  INT := btracker_backend.op_clear_null_account_balance();
+  _op_consolidate INT := btracker_backend.op_consolidate_treasury_balance();
+BEGIN
+  -- Never returns a NULL account: callers split rows by EXISTS over account_id. (Both
+  -- accounts exist on any chain that emits these ops.)
+  RETURN QUERY
+  SELECT av.id::INT, ov.id::BIGINT, ov.op_type_id::SMALLINT, ov.block_num::INT
+  FROM operations_view ov
+  JOIN accounts_view av
+    ON av.name = CASE WHEN ov.op_type_id = _op_clear_null THEN 'null' ELSE 'steem.dao' END
+  WHERE ov.op_type_id IN (_op_clear_null, _op_consolidate)
+    AND ov.block_num BETWEEN _from AND _to;
+END
+$$;
+
 RESET ROLE;
