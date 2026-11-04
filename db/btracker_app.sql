@@ -744,6 +744,12 @@ BEGIN
   ALTER TABLE account_balance_history SET UNLOGGED;
   ALTER TABLE account_vesting_history SET UNLOGGED;
 
+  -- Crash recovery empties every UNLOGGED table, this marker with the history
+  -- tables above, while the LOGGED tables and the context's current block survive.
+  -- See raise_if_unlogged_history_lost().
+  CREATE UNLOGGED TABLE IF NOT EXISTS unlogged_history_marker (intact BOOLEAN NOT NULL);
+  INSERT INTO unlogged_history_marker VALUES (TRUE);
+
 END
 $$;
 
@@ -958,6 +964,50 @@ $$;
 -- ============================================================================
 
 /**
+ * raise_if_unlogged_history_lost()
+ * --------------------------------
+ * Refuse to go on with a massive sync whose UNLOGGED history tables a PostgreSQL
+ * crash emptied. Crash recovery resets every UNLOGGED table, but the LOGGED
+ * tables and the context's current block survive, so the block processor
+ * reconnects and continues from that block: current balances end up right while
+ * account_balance_history and account_vesting_history (and the rollups backfilled
+ * from them at finalize) silently lack everything before it. The rows cannot be
+ * rebuilt in place; the application must be uninstalled and synced again.
+ *
+ * unlogged_history_marker holds its one row from the install that set the tables
+ * UNLOGGED until finalize sets them LOGGED and drops it. Every history row has a
+ * current_account_balances row, so while that LOGGED table is empty nothing was
+ * lost and the marker is set again. Installs older than the marker have no table
+ * and are not checked.
+ *
+ * @param _context_name  HAF context name (the application schema)
+ * @raises when the marker exists and is empty while current balances exist
+ */
+CREATE OR REPLACE FUNCTION raise_if_unlogged_history_lost(_context_name hive.context_name)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+BEGIN
+  IF to_regclass('unlogged_history_marker') IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM unlogged_history_marker) THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM current_account_balances) THEN
+    INSERT INTO unlogged_history_marker VALUES (TRUE);
+    RETURN;
+  END IF;
+
+  RAISE EXCEPTION 'btracker: a PostgreSQL crash emptied the UNLOGGED account_balance_history and account_vesting_history of % during massive sync; the rows processed before the crash are lost. Uninstall % and sync it again.',
+    _context_name, _context_name;
+END
+$$;
+
+/**
  * request_history_tables_freeze()
  * -------------------------------
  * Ask HAF for one VACUUM (FREEZE, ANALYZE) of the insert-only history tables,
@@ -1049,8 +1099,10 @@ BEGIN
   END IF;
 
 
+  PERFORM raise_if_unlogged_history_lost(_context_name);
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
+  DROP TABLE IF EXISTS unlogged_history_marker;
   PERFORM request_history_tables_freeze(_context_name);
 
   /*
@@ -1269,6 +1321,7 @@ $$
 
 BEGIN
   IF is_massive_sync_pending(_context_name) THEN
+    PERFORM raise_if_unlogged_history_lost(_context_name);
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
     -- Planner statistics for the unindexed, insert-only sync tables. Not a
     -- HAF vacuum request: HAF runs those as VACUUM FULL ANALYZE, a rewrite

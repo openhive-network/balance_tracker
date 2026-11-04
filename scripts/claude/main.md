@@ -157,6 +157,17 @@ replays, before HAF has rebuilt the core indexes it defers (`massive_sync_class 
   waits for `haf_massive_sync_finished()` (`hive.is_instance_ready()`), unless
   the context is already forking (an embedding application switched it).
 
+### UNLOGGED history and crashes
+
+PostgreSQL crash recovery empties every UNLOGGED table, while the LOGGED tables
+and the context's current block survive, so a block processor that reconnects
+would continue the massive sync over history tables missing everything before
+the crash (current balances still right, history and at-block answers wrong).
+The install creates `unlogged_history_marker`, a one-row UNLOGGED table that the
+crash empties too; `raise_if_unlogged_history_lost()` raises on an empty marker
+before every massive batch and before finalize sets the tables LOGGED and drops
+the marker. The data cannot be repaired in place: uninstall and sync again.
+
 ### Insert-only history tables and the visibility map
 
 `account_balance_history` and `account_vesting_history` are insert-only, UNLOGGED
