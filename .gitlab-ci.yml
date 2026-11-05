@@ -65,11 +65,14 @@ variables:
   # Cache manager configuration (from common-ci-configuration)
   CACHE_MANAGER: "/tmp/cache-manager.sh"
   CACHE_MANAGER_REF: "develop"
-  # Set to "true" to run poetry update before install (uses latest dependency versions)
-  TEST_WITH_LATEST_DEPENDENCIES: "false"
   # Common CI configuration reference
   COMMON_CI_REF: "develop"
   COMMON_CI_URL: "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}"
+  # Python API client - see wax-spec-generator's python_api_package template
+  PYTHON_API_SWAGGER_JSON: "${CI_PROJECT_DIR}/build/swagger-doc.json"
+  PYTHON_API_DISTRIBUTION_NAME: "hiveio-balance-api"
+  PYTHON_API_PACKAGE_NAME: "hiveio_balance_api"
+  PYTHON_API_NAMESPACE: "balance_api_client"
 
 # AIDEV branches (ai/*, session/*) and pushes to aidev/integration run no
 # pipeline: AIDEV verifies them through .aidev/project.yaml. A pipeline started
@@ -100,6 +103,9 @@ include:
   - '/templates/test_jobs.gitlab-ci.yml'
   - '/templates/haf_app_testing.gitlab-ci.yml'
   - '/templates/source_change_detection.gitlab-ci.yml'
+- project: 'hive/wax-spec-generator'
+  ref: main
+  file: '/templates/python_api_package.gitlab-ci.yml'
 
 # =============================================================================
 # Early exit for doc-only changes
@@ -173,22 +179,6 @@ lint_sql_scripts:
     artifacts: true
     optional: true
 
-verify_poetry_lock_stability_api_package:
-  stage: lint
-  extends: .verify_poetry_lock_stability_template
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
-  tags:
-  - public-runner-docker
-
-verify_poetry_lock_stability_api_generation:
-  stage: lint
-  extends: .verify_poetry_lock_stability_template
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/api_generation"
-  tags:
-  - public-runner-docker
-
 # Note: prepare_haf_image job removed - find_haf_image now provides
 # HAF_IMAGE_NAME and HAF_COMMIT aliases directly (common-ci-configuration !285)
 
@@ -200,31 +190,24 @@ extract-swagger-json:
   tags:
   - public-runner-docker
 
+# Python API client (hiveio-balance-api): generated, built, tested and published
+# by wax-spec-generator's python_api_package template, which pins the generator
+# and the runtime package (hiveio_api_client) the wheel depends on.
 generate_python_api_client:
-  extends: .project_develop_configuration_template
+  extends: .python_api_package_generate
   stage: build
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/api_generation"
   needs:
   - job: extract-swagger-json
     artifacts: true
-  script:
-  - ${PYPROJECT_DIR}/generate_balance_tracker_api_client.sh
-  artifacts:
-    paths:
-    - "${CI_PROJECT_DIR}/scripts/python_api_package/hiveio_balance_api"
-    - "${CI_PROJECT_DIR}/scripts/python_api_package/hiveio_balance_api/balance_api_client"
   tags:
   - public-runner-docker
 
 build_python_api_client_wheel:
-  extends: .build_wheel_template
+  extends: .python_api_package_build
   stage: build
   needs:
   - job: generate_python_api_client
     artifacts: true
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   tags:
   - public-runner-docker
 
@@ -1010,60 +993,43 @@ rewriter-test:
     curl -s --max-time 15 "http://docker:${REWRITER_PORT}/version"; echo
     BTRACKER_ADDRESS=docker pytest -n ${PYTEST_WORKERS} --junitxml "${JUNIT_REPORT}" "${TAVERN_DIR}"
 
-# pytest and pytest-asyncio come from common-ci's python-test-tools image, at the
-# versions in common-ci-configuration's docker-bake.hcl; the package does not pin
-# them. poetry installs the package's dependencies into the image's venv
-# (VIRTUAL_ENV=/python_venv), next to the tools.
-.python_api_package_test_template:
-  extends: .job-defaults
-  image: "${PYTHON_TEST_TOOLS_IMAGE}"
-  stage: test
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
-  before_script:
-  - *early_exit_check
-  - python3 -V
-  - pip list | grep -i '^pytest'
-
-python_api_client_test:
-  extends: .python_api_package_test_template
-  needs:
-  - job: detect_changes
-    artifacts: true
-    optional: true
-  - job: generate_python_api_client
-    artifacts: true
-  before_script:
-  - !reference [.python_api_package_test_template, before_script]
-  - poetry -C "${PYPROJECT_DIR}" install
-  - !reference [.update_deps_for_tests, script]
-  script:
-  - pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
-  tags:
-  - public-runner-docker
-
 test_python_api_wheel:
-  extends: .python_api_package_test_template
+  extends: .python_api_package_test
+  stage: test
   needs:
   - job: detect_changes
     artifacts: true
     optional: true
   - job: build_python_api_client_wheel
     artifacts: true
-  variables:
-    DIST_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package/dist"
   before_script:
-  - !reference [.python_api_package_test_template, before_script]
-  - !reference [.update_deps_for_tests, script]
-  - poetry -C "${PYPROJECT_DIR}" install --no-root
+  - *early_exit_check
+  - !reference [.python_api_package_base, before_script]
+  tags:
+  - public-runner-docker
+
+# Calls one endpoint of the public API nodes through the wheel and its runtime
+# transport.
+python_api_client_test:
+  extends: .python_api_package_base
+  stage: test
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  needs:
+  - job: detect_changes
+    artifacts: true
+    optional: true
+  - job: build_python_api_client_wheel
+    artifacts: true
+  before_script:
+  - *early_exit_check
+  - !reference [.python_api_package_base, before_script]
   script:
-  - pip install --no-deps "${DIST_DIR}"/*.whl
-  - pytest "${PYPROJECT_DIR}/tests/test_package_import.py" -v
+  - pip install --index-url "${PYTHON_API_INDEX_URL}" ${PYTHON_API_PIP_EXTRA_ARGS} "${PYTHON_API_DIST_DIR}"/*.whl
+  - python3 "${CI_PROJECT_DIR}/tests/python_api_client/call_endpoint.py"
   tags:
   - public-runner-docker
 
@@ -1076,6 +1042,7 @@ publish_images:
   - public-runner-docker
 
 deploy_python_api_packages_to_gitlab:
+  extends: .python_api_package_publish
   stage: publish
   needs:
   - job: detect_changes
@@ -1083,17 +1050,11 @@ deploy_python_api_packages_to_gitlab:
     optional: true
   - job: build_python_api_client_wheel
     artifacts: true
-  - job: generate_python_api_client
-    artifacts: true
   - job: python_api_client_test
   - job: test_python_api_wheel
-  extends: .deploy_wheel_to_gitlab_template
-  variables:
-    PYPROJECT_DIR: "${CI_PROJECT_DIR}/scripts/python_api_package"
   before_script:
   - *early_exit_check
-  - !reference [.deploy_wheel_base, before_script]
-  when: on_success
+  - !reference [.python_api_package_base, before_script]
   tags:
   - public-runner-docker
 

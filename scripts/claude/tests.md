@@ -32,7 +32,7 @@ cd tests/functional && ./test_scripts.sh --host=localhost
 | Performance | [tests/performance.md](tests/performance.md) | Load testing API | JMeter |
 | Regression | [tests/regression.md](tests/regression.md) | Balance accuracy verification | Python/SQL |
 | Functional | [tests/functional.md](tests/functional.md) | Script and installation testing | Shell |
-| Python API Client | [tests/python_client.md](tests/python_client.md) | Generated client validation | pytest |
+| Python API Client | [tests/python_client.md](tests/python_client.md) | Generated client validation | Python script |
 
 ## Test Directory Structure
 
@@ -67,6 +67,8 @@ tests/
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
 │   ├── order_lifecycle.sql    # order_lifecycle after sync (one row per create, open rows = order_state, = an op-by-op replay that models HF23 closes); synthetic fill/cancel/expiry/dust-cull/id-reuse paths (also cancel-then-re-create and cull-then-re-create-and-cancel in one transaction), the replay against them and across a pretend HF23, both /order-stats endpoints' windows; the order count tables = order_lifecycle and /order-stats = order_lifecycle's counts over block/date windows, inverted windows rejected; fork rollback; seed re-run over existing count tables (no lock, no transaction id); upgrade without the count tables (dropped, db/order_stats_rollups.sql re-run: seeded from order_lifecycle, still equal after closing pre-upgrade orders); the same upgrade on a detached context with irreversible block 0 (forking contexts only; all in the base seed, no row id drawn past it, current block unchanged); the same upgrade over three processed blocks past the irreversible block, still equal after forks back to the first of them and to the irreversible block and a different chain past it
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
+├── python_api_client/         # Live call of the generated Python client
+│   └── call_endpoint.py       # One endpoint through the wheel and its runtime transport
 ├── mocks/                     # Mock data infrastructure
 │   ├── install_mock_data.sh   # Mock data installer
 │   ├── fixtures/              # Mock operation data

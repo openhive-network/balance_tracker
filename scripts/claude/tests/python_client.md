@@ -2,137 +2,64 @@
 
 ## Overview
 
-Tests for the auto-generated Python API client that provides type-safe access to Balance Tracker endpoints. The client is generated from the OpenAPI specification extracted from the PostgREST schema.
+The Python client of the REST API (distribution `hiveio-balance-api`, import package `hiveio_balance_api`) is
+generated from the OpenAPI specification in `endpoints/endpoint_schema.sql`. This repository holds no Poetry project or
+lockfile for it: generation, the wheel, its tests and publishing come from the `python_api_package` CI template of
+hive/wax-spec-generator (`templates/python_api_package.gitlab-ci.yml`), included by `.gitlab-ci.yml`. The template
+pins the generator and the runtime package (`hiveio_api_client`) the wheel depends on; the wheel does not depend on
+beekeeper libraries, so their releases do not require changes here.
 
-## Running These Tests
+## CI Jobs
 
-The package does not pin pytest or pytest-asyncio: they come from common-ci's
-`python-test-tools` image (versions set in common-ci-configuration's
-`docker-bake.hcl`). Run the tests in that image, where poetry installs the
-package's dependencies into the image venv next to the tools:
+| Job | Template | What it does |
+|-----|----------|--------------|
+| `generate_python_api_client` | `.python_api_package_generate` | Generates `python-api-package/` (client + `pyproject.toml`) from `build/swagger-doc.json` of `extract-swagger-json` |
+| `build_python_api_client_wheel` | `.python_api_package_build` | Builds the wheel; the version comes from this repo's tags (poetry-dynamic-versioning) |
+| `test_python_api_wheel` | `.python_api_package_test` | Installs the wheel, imports every client module, checks the version is not `0.0.0` and no forbidden dependency is pulled |
+| `python_api_client_test` | `.python_api_package_base` | Installs the wheel and runs `tests/python_api_client/call_endpoint.py` against the public API nodes |
+| `deploy_python_api_packages_to_gitlab` | `.python_api_package_publish` | Uploads the wheel to this project's GitLab PyPI registry |
 
-```bash
-docker run --rm -it -v "$PWD:/src" -w /src \
-  registry.gitlab.syncad.com/hive/common-ci-configuration/python-test-tools:develop bash -c '
-    poetry -C scripts/python_api_package install &&
-    pytest scripts/python_api_package/tests/test_generated_api_client.py -v'
-```
+The template's inputs are the global variables `PYTHON_API_SWAGGER_JSON`, `PYTHON_API_DISTRIBUTION_NAME`,
+`PYTHON_API_PACKAGE_NAME` and `PYTHON_API_NAMESPACE` (`balance_api_client`, the subpackage holding the client).
 
-## Test File Organization
+## Versions
 
-```
-scripts/python_api_package/
-├── pyproject.toml                     # Poetry project configuration
-├── generate_balance_tracker_api_client.sh  # Client generator script
-├── balance_api/
-│   └── balance_api_client/            # Generated client code
-└── tests/
-    ├── __init__.py
-    ├── api_caller.py                  # HTTP request utilities
-    ├── api_collection.py              # Test endpoint definitions
-    └── test_generated_api_client.py   # Main test file
-```
+The version scheme is the one the package always had: the tag on a tag checkout, tag + `.post{timestamp}` on
+develop/master/main, tag + `.dev{timestamp}+unstable` on other branches - so published versions keep increasing.
+`python-api-package/` is in `.gitignore`; an untracked generated tree would mark the version `+dirty`.
 
-## Key Test Files
+## Live Endpoint Check
 
-| File | Purpose |
-|------|---------|
-| `test_generated_api_client.py` | Validates generated client works against live API |
-| `api_collection.py` | Defines test cases and expected responses |
-| `api_caller.py` | HTTP utilities for making API requests |
-
-## Test Scenarios
-
-The tests validate:
-
-1. **Client Generation**: The OpenAPI-to-Python generation succeeds
-2. **Type Safety**: Generated types match API responses
-3. **Endpoint Access**: All exposed endpoints are accessible
-4. **Response Parsing**: JSON responses deserialize correctly
-
-## How to Add New Client Tests
-
-### 1. Add Test Case to api_collection.py
-
-```python
-TEST_CASES = [
-    {
-        "endpoint": "get_account_balances",
-        "params": {"account_name": "blocktrades"},
-        "expected_fields": ["hive_balance", "hbd_balance", "vests_balance"]
-    },
-    # Add new test case here
-]
-```
-
-### 2. Add Test Method (if needed)
-
-```python
-def test_new_endpoint():
-    client = BalanceApiClient(base_url=API_URL)
-    response = client.new_endpoint(param="value")
-    assert response.expected_field is not None
-```
-
-## Client Generation
-
-The client is generated from the OpenAPI spec:
+`tests/python_api_client/call_endpoint.py` calls `accounts_delegations` through
+`hiveio_api_client.AsyncRemoteHandle` and checks the response is parsed into the generated model. Without arguments it
+tries `https://api.syncad.com`, then `https://api.hive.blog`; pass endpoint URLs to call another instance:
 
 ```bash
-# Generate OpenAPI JSON from PostgREST
-./scripts/python_api_package/generate_balance_tracker_api_client.sh
+python3 tests/python_api_client/call_endpoint.py http://localhost:3000
 ```
 
-This script:
-1. Extracts OpenAPI spec from `endpoints/endpoint_schema.sql`
-2. Generates Python client using `datamodel-codegen`
-3. Outputs to `balance_api/balance_api_client/`
+Usage of the client:
+
+```python
+from hiveio_api_client import AsyncRemoteHandle, HttpUrl, RemoteHandleSettings
+from hiveio_balance_api.balance_api_client.balance_api_client import BalanceApi
+
+handle = AsyncRemoteHandle(RemoteHandleSettings(http_endpoint=HttpUrl("https://api.syncad.com")), api=BalanceApi)
+delegations = await handle.api.accounts_delegations("gtg")
+```
 
 ## Common Failure Causes
 
 | Error | Likely Cause | Fix |
 |-------|--------------|-----|
-| Connection refused | API not running | Tests use external `api.syncad.com` |
-| Import error | Client not generated | Run generation script first |
-| Type mismatch | API response changed | Regenerate client |
-| Missing dependency | Poetry deps not installed | Run `poetry install` |
-
-## CI Integration
-
-`python_api_client_test` and `test_python_api_wheel` in `.gitlab-ci.yml` extend
-`.python_api_package_test_template`, which runs in `${PYTHON_TEST_TOOLS_IMAGE}`:
-
-```yaml
-python_api_client_test:
-  extends: .python_api_package_test_template
-  needs:
-  - job: generate_python_api_client
-  before_script:
-  - !reference [.python_api_package_test_template, before_script]
-  - poetry -C "${PYPROJECT_DIR}" install
-  script:
-  - pytest "${PYPROJECT_DIR}/tests/test_generated_api_client.py"
-```
-
-### CI Notes
-
-- **External Dependency**: Tests run against `api.syncad.com` (falling back to `api.hive.blog`)
-- **Test tools**: pytest and pytest-asyncio are the image's; the job log lists their versions. Do not add them to `pyproject.toml`
-- **Python Version**: the image's (3.14). It has no C compiler, so every locked dependency needs a wheel for that Python
-
-## Package Publishing
-
-After tests pass, the client is published:
-
-1. **Build wheel**: `build_python_api_client_wheel` job
-2. **Deploy to GitLab**: `deploy_python_api_packages_to_gitlab` job
-
-Published package: `@hive/balance-tracker-api-client`
+| `No endpoint answered` | Public API nodes down | Retry; the job retries twice |
+| Import error in `test_python_api_wheel` | Generator cannot handle a schema change | Fix the schema or the generator (hive/wax-spec-generator) |
+| Version `0.0.0` | Dynamic versioning did not run (no tags fetched) | The build job needs `GIT_DEPTH: 0` (set by the template) |
+| Runtime package not found | No release of `hiveio_api_client` matches the template's pin | Update the template in hive/wax-spec-generator |
 
 ## Expansion Rules
 
-When modifying Python client tests:
-1. Update `api_collection.py` for new endpoints
-2. Regenerate client if API spec changes
-3. Ensure tests remain independent of local infrastructure
-4. Update this documentation with new test scenarios
+When modifying the Python client:
+1. Generator, runtime and packaging changes belong in hive/wax-spec-generator's template, not here
+2. Keep `call_endpoint.py` independent of local infrastructure by default
+3. Update this documentation with new jobs or checks
