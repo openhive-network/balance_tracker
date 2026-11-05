@@ -495,8 +495,8 @@ BEGIN
 -- and there are none either: nothing below would change.
 --
 -- The account lookup takes the names as a parameter rather than reading
--- _btracker_ops_batch, so its plan survives the per-batch recreation of that
--- temp table.
+-- _btracker_ops_batch, so its plan survives a recreation of that temp table
+-- (every massive-sync batch).
 ------------------------------------------------------------------------------
 IF NOT EXISTS (
   SELECT 1
@@ -537,8 +537,19 @@ END IF;
 -- hive.parse_rc_delegation (one row per delegatee; NULL for an invalid op) and
 -- resolve the account names to IDs.
 ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS _rc_delegation_ops;
-CREATE TEMP TABLE _rc_delegation_ops AS
+-- Both temp tables are kept across single-block batches (live), so the plans
+-- that read them stay cached (btracker_reset_batch_table).
+IF NOT btracker_reset_batch_table('_rc_delegation_ops', _batch_from = _to) THEN
+  CREATE TEMP TABLE _rc_delegation_ops(
+    delegator       INT,
+    delegatee       INT,
+    max_rc          BIGINT,
+    source_op       BIGINT,
+    source_op_block INT
+  );
+END IF;
+
+INSERT INTO _rc_delegation_ops
 WITH ops AS MATERIALIZED (
   SELECT ov.body_value AS body, ov.id, ov.block_num
   FROM _btracker_ops_batch ov
@@ -578,8 +589,15 @@ FROM parsed_rc_delegations p
 JOIN account_ids delegator ON delegator.account_name = p.from_account
 JOIN account_ids delegatee ON delegatee.account_name = p.to_account;
 
-DROP TABLE IF EXISTS _rc_vest_checks;
-CREATE TEMP TABLE _rc_vest_checks AS
+IF NOT btracker_reset_batch_table('_rc_vest_checks', _batch_from = _to) THEN
+  CREATE TEMP TABLE _rc_vest_checks(
+    account         INT,
+    source_op       BIGINT,
+    effective_vests BIGINT
+  );
+END IF;
+
+INSERT INTO _rc_vest_checks
 SELECT * FROM rc_delegation_vest_checks(_batch_from, _from, _to);
 
 ------------------------------------------------------------------------------

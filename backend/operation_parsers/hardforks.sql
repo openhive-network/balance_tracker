@@ -167,9 +167,10 @@ $$;
 -- withdrawals, savings, and twice in rewards) take their range from it with
 -- account_clears_in_range.
 
--- (Re)creates _btracker_clears_batch with one row per clearing op in [_from, _to]:
+-- Fills _btracker_clears_batch with one row per clearing op in [_from, _to]:
 -- (account_id, source_op, op_type_id, source_op_block). _btracker_ops_batch must hold
--- that range's operations (_batch_rows of them).
+-- that range's operations (_batch_rows of them). A single-block batch (live) keeps the
+-- previous batch's table (btracker_reset_batch_table), so the readers' plans stay cached.
 CREATE OR REPLACE FUNCTION btracker_backend.prefetch_account_clears(_from INT, _to INT, _batch_rows BIGINT)
 RETURNS VOID
 LANGUAGE 'plpgsql' VOLATILE
@@ -184,13 +185,20 @@ DECLARE
   -- on a 10k-block batch, the probe milliseconds - still far more than a live block's scan.
   __scan_batch    BOOLEAN := _batch_rows <= 5000;
 BEGIN
-  DROP TABLE IF EXISTS _btracker_clears_batch;
+  IF NOT btracker_reset_batch_table('_btracker_clears_batch', _from = _to) THEN
+    CREATE TEMP TABLE _btracker_clears_batch(
+      account_id      INT,
+      source_op       BIGINT,
+      op_type_id      SMALLINT,
+      source_op_block INT
+    );
+  END IF;
 
   -- The account is a scalar lookup by name (an index probe, run only once a clear is
   -- found), not a join on the computed name: that join sorts all of hafd.accounts.
   -- Never a NULL account: callers split rows by EXISTS over account_id. (Both accounts
   -- exist on any chain that emits these ops.)
-  CREATE TEMP TABLE _btracker_clears_batch AS
+  INSERT INTO _btracker_clears_batch
   WITH clear_ops AS (
     SELECT ov.id, ov.op_type_id, ov.block_num
     FROM _btracker_ops_batch ov

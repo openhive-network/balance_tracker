@@ -36,6 +36,19 @@ context is unfinalized and non-forking: it keeps processing massively instead
 (`is_massive_sync_pending()`, see `scripts/claude/main.md`, "Processing while
 hived replays").
 
+The batch's session temp tables (`_btracker_ops_batch`, `_btracker_clears_batch`,
+`_hbd_batch_rows`, `_btracker_vests_batch`, `_rc_delegation_ops`, `_rc_vest_checks`)
+are reset through `btracker_reset_batch_table()` (`db/btracker_app.sql`, #118). A
+multi-block batch (massive sync) drops and creates them, and `_btracker_ops_batch` is
+analyzed. A single-block batch (live) keeps an existing table and empties it with
+DELETE and does not analyze it: DROP/CREATE, TRUNCATE and ANALYZE all invalidate
+the cached plans of every statement reading the table, and re-planning the process_*
+statements cost about 22 ms of each live block. DELETE leaves dead rows that only
+VACUUM reclaims (never run on temp tables), so a kept table over 64 pages is
+dropped and created again (`_btracker_ops_batch` grows about a page per live block).
+The plan cache's default `auto` mode then uses generic plans where they are not
+costlier than custom ones. A new per-batch temp table follows the same pattern.
+
 ## Processing Functions Inventory
 
 | Function | File | Operations Handled | Tables Updated |

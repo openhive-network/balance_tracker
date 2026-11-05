@@ -72,7 +72,8 @@ btracker reproduces it in `process_rc_delegation_range`:
   `current_rc_delegations` (nearly every block): then there is neither a
   `delegate_rc` to apply nor a check that could reduce a delegation. The account
   lookup takes the op's account names as an array parameter so its plan stays
-  cached across the per-batch recreation of `_btracker_ops_batch`.
+  cached across a recreation of `_btracker_ops_batch` (every massive-sync batch;
+  live keeps the table, see `btracker_reset_batch_table` in `../processing.md`).
 - The delegatee order is the HAF account id, which follows hived's account
   creation order like its `account_id_type`.
 - A payout that leaves the account with 0 VESTS ends its power-down (as hived's
