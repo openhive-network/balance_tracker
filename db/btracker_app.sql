@@ -933,6 +933,50 @@ $$;
 -- redundant view scans across the 11 process_* functions.
 
 /**
+ * btracker_reset_batch_table()
+ * ----------------------------
+ * Empty the session temp table _table for the next batch, keeping it when
+ * _keep allows. A kept table is emptied with DELETE, so it keeps its OID and
+ * the cached plans of the process_* statements that read it stay valid:
+ * DROP/CREATE, TRUNCATE and ANALYZE all invalidate them, and planning those
+ * statements again cost about 22 ms of every live block (#118).
+ *
+ * DELETE leaves the dead rows in place (autovacuum skips temp tables and VACUUM
+ * cannot run inside a block's transaction), so the heap of _btracker_ops_batch
+ * grows by about a page per live block, and each of the ~20 scans of it a block
+ * runs reads every page (about 0.8 us per dead page). A table over
+ * __max_kept_pages is dropped instead: re-planning once per ~64 blocks costs
+ * less than scanning a larger heap, and the bound still holds the largest live
+ * blocks (~1,000 operations, ~35 pages).
+ *
+ * @param _table  Temp table name
+ * @param _keep   Keep an existing table (live, single-block processing);
+ *                FALSE drops it (massive sync, whose batches vary in size and
+ *                need fresh statistics)
+ * @returns TRUE when the table was kept and emptied, FALSE when it does not
+ *          exist any more and the caller must create it
+ */
+CREATE OR REPLACE FUNCTION btracker_reset_batch_table(_table TEXT, _keep BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql VOLATILE
+AS
+$$
+DECLARE
+  __max_kept_pages CONSTANT INT := 64;
+  __table REGCLASS := to_regclass('pg_temp.' || quote_ident(_table));
+BEGIN
+  IF _keep AND __table IS NOT NULL
+     AND pg_relation_size(__table) <= __max_kept_pages * current_setting('block_size')::INT THEN
+    EXECUTE format('DELETE FROM %s', __table);
+    RETURN TRUE;
+  END IF;
+
+  EXECUTE format('DROP TABLE IF EXISTS pg_temp.%I', _table);
+  RETURN FALSE;
+END
+$$;
+
+/**
  * btracker_prefetch_operations()
  * ------------------------------
  * Pre-fetch all operations for a block range into a temporary table.
@@ -941,6 +985,11 @@ $$;
  * independently (eliminating 10+ redundant view traversals per batch).
  * Also resolves the batch's balance-clearing ops into _btracker_clears_batch
  * (btracker_backend.prefetch_account_clears).
+ *
+ * A single-block batch (live) keeps the table of the previous one
+ * (btracker_reset_batch_table) and is not analyzed: ANALYZE invalidates the
+ * cached plans of its readers like a DROP does. The table is analyzed whenever
+ * it is created, so massive sync analyzes every batch.
  *
  * @param _from  First block number in range
  * @param _to    Last block number in range
@@ -953,14 +1002,23 @@ $$
 DECLARE
   __rows BIGINT;
 BEGIN
-  DROP TABLE IF EXISTS _btracker_ops_batch;
-  CREATE TEMP TABLE _btracker_ops_batch AS
-  SELECT id, block_num, trx_in_block, op_pos, op_type_id,
-         body_value, custom_json_type_id
-  FROM operations_view
-  WHERE block_num BETWEEN _from AND _to;
-  GET DIAGNOSTICS __rows = ROW_COUNT;
-  ANALYZE _btracker_ops_batch;
+  IF btracker_reset_batch_table('_btracker_ops_batch', _from = _to) THEN
+    INSERT INTO _btracker_ops_batch
+    SELECT id, block_num, trx_in_block, op_pos, op_type_id,
+           body_value, custom_json_type_id
+    FROM operations_view
+    WHERE block_num BETWEEN _from AND _to;
+    GET DIAGNOSTICS __rows = ROW_COUNT;
+  ELSE
+    -- CREATE TABLE AS fills a 10k-block batch about 25% faster than an INSERT.
+    CREATE TEMP TABLE _btracker_ops_batch AS
+    SELECT id, block_num, trx_in_block, op_pos, op_type_id,
+           body_value, custom_json_type_id
+    FROM operations_view
+    WHERE block_num BETWEEN _from AND _to;
+    GET DIAGNOSTICS __rows = ROW_COUNT;
+    ANALYZE _btracker_ops_batch;
+  END IF;
 
   PERFORM btracker_backend.prefetch_account_clears(_from, _to, __rows);
 END

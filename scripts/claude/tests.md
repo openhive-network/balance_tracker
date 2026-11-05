@@ -55,6 +55,7 @@ tests/
 │   ├── history_tables_vacuum.sql  # history tables' vacuum setup
 │   ├── balance_totals.sql     # balance_totals = aggregates of current_account_balances after sync, a live block, a fork rollback
 │   ├── history_op_type.sql    # stored op_type_id = hafd.operations.op_type_id; no extra tuple width
+│   ├── batch_temp_tables.sql  # per-batch temp tables: recreated per massive batch, kept (same OID, only the block's rows) across live blocks, recreated once over the page bound
 │   ├── withdraw_vesting_rate.sql # power-down rate rounding per hardfork era, through processing, and its one-off repair
 │   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair

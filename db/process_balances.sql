@@ -173,25 +173,29 @@ WHERE hardfork_num = 1;
 
 -- Staging table for the HBD interest accumulator (consumed by
 -- btracker_backend.accumulate_hbd_interest after the main statement below).
-DROP TABLE IF EXISTS _hbd_batch_rows;
-CREATE TEMP TABLE _hbd_batch_rows(
-  account_id      INT,
-  balance         BIGINT,
-  source_op       BIGINT,
-  source_op_block INT,
-  balance_seq_no  BIGINT,
-  trx_in_block    SMALLINT
-);
+-- It and _btracker_vests_batch below are kept across single-block batches (live),
+-- so the plans that read them stay cached (btracker_reset_batch_table).
+IF NOT btracker_reset_batch_table('_hbd_batch_rows', _from = _to) THEN
+  CREATE TEMP TABLE _hbd_batch_rows(
+    account_id      INT,
+    balance         BIGINT,
+    source_op       BIGINT,
+    source_op_block INT,
+    balance_seq_no  BIGINT,
+    trx_in_block    SMALLINT
+  );
+END IF;
 -- The batch's VESTS changes, one row per (account, operation) emission: the
 -- vesting each account had at any operation of the batch is its
 -- current_account_balances VESTS balance minus the changes after it. Read by
 -- process_block_range_rc_delegations, which runs next.
-DROP TABLE IF EXISTS _btracker_vests_batch;
-CREATE TEMP TABLE _btracker_vests_batch(
-  account_id INT,
-  source_op  BIGINT,
-  balance    BIGINT  -- the change, not the resulting balance
-);
+IF NOT btracker_reset_batch_table('_btracker_vests_batch', _from = _to) THEN
+  CREATE TEMP TABLE _btracker_vests_batch(
+    account_id INT,
+    source_op  BIGINT,
+    balance    BIGINT  -- the change, not the resulting balance
+  );
+END IF;
 --RAISE NOTICE 'Processing balances';
 
 /*
