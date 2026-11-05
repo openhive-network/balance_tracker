@@ -136,6 +136,7 @@ BEGIN
   ) AS f(pos, op)
   JOIN hafd.operation_types ot ON ot.name = 'hive::protocol::' || (f.op ->> 'type');
 
+  PERFORM btracker_backend.prefetch_account_clears(__block, __block, (SELECT count(*) FROM _btracker_ops_batch));
   PERFORM process_block_range_balances(__block, __block);
 
   PERFORM pg_temp.assert_balance_totals('after a live block');

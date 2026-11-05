@@ -187,9 +187,16 @@ to `hive.fund`. "Everything" is liquid HIVE/HBD/VESTS, savings, pending rewards 
 delayed votes. Neither op names the account, and HAF's balance collector emits no debit
 for it, so `get_impacted_balances_batch` (a port of that collector, guarded by
 `tests/parity`) has none either: the stages apply the clear after it.
-`btracker_backend.account_clears_in_range(_from, _to)`
-(`backend/operation_parsers/hardforks.sql`) lists the batch's clearing ops, each with
-the account it empties.
+`btracker_prefetch_operations` resolves the batch's clearing ops once, each with the
+account it empties, into the temp table `_btracker_clears_batch`
+(`btracker_backend.prefetch_account_clears`, `backend/operation_parsers/hardforks.sql`):
+from `_btracker_ops_batch` for a batch of up to 5,000 operations (live), otherwise by
+HAF's `(op_type_id, block_num)` index on `operations_view` (massive sync). The account
+is a scalar lookup by name, never a join on the computed name (that sorts all of
+`hafd.accounts`). The stages read their range of it with
+`btracker_backend.account_clears_in_range(_from, _to)`. Code that builds
+`_btracker_ops_batch` by hand (tests/maintenance) must call
+`prefetch_account_clears` before running these stages.
 
 | Stage | What a clear does |
 |-------|-------------------|

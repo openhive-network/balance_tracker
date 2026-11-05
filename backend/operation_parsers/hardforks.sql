@@ -162,10 +162,69 @@ $$;
 --     credited as liquid, while hived moves savings and pending rewards into hive.fund's
 --     savings and rewards.
 --
--- Returns one row per op. Reads operations_view through HAF's (op_type_id, block_num)
--- index rather than the prefetched _btracker_ops_batch: it is called five times per batch
--- (balances, withdrawals, savings, and twice in rewards), and a scan of the batch (a temp table without indexes) cost 0.5-0.7 s per call on a 10k
--- batch, clears or not; the index probe costs milliseconds.
+-- Resolved once per batch by btracker_prefetch_operations into the temp table
+-- _btracker_clears_batch (prefetch_account_clears below); the five readers (balances,
+-- withdrawals, savings, and twice in rewards) take their range from it with
+-- account_clears_in_range.
+
+-- (Re)creates _btracker_clears_batch with one row per clearing op in [_from, _to]:
+-- (account_id, source_op, op_type_id, source_op_block). _btracker_ops_batch must hold
+-- that range's operations (_batch_rows of them).
+CREATE OR REPLACE FUNCTION btracker_backend.prefetch_account_clears(_from INT, _to INT, _batch_rows BIGINT)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _op_clear_null  INT := btracker_backend.op_clear_null_account_balance();
+  _op_consolidate INT := btracker_backend.op_consolidate_treasury_balance();
+  -- A batch up to this many operations (a live block holds a few dozen) is searched in
+  -- _btracker_ops_batch; a larger one (massive sync) probes operations_view through HAF's
+  -- (op_type_id, block_num) index instead: a scan of the unindexed batch cost 0.5-0.7 s
+  -- on a 10k-block batch, the probe milliseconds - still far more than a live block's scan.
+  __scan_batch    BOOLEAN := _batch_rows <= 5000;
+BEGIN
+  DROP TABLE IF EXISTS _btracker_clears_batch;
+
+  -- The account is a scalar lookup by name (an index probe, run only once a clear is
+  -- found), not a join on the computed name: that join sorts all of hafd.accounts.
+  -- Never a NULL account: callers split rows by EXISTS over account_id. (Both accounts
+  -- exist on any chain that emits these ops.)
+  CREATE TEMP TABLE _btracker_clears_batch AS
+  WITH clear_ops AS (
+    SELECT ov.id, ov.op_type_id, ov.block_num
+    FROM _btracker_ops_batch ov
+    WHERE __scan_batch
+      AND ov.op_type_id IN (_op_clear_null, _op_consolidate)
+      AND ov.block_num BETWEEN _from AND _to
+
+    UNION ALL
+
+    SELECT ov.id, ov.op_type_id, ov.block_num
+    FROM operations_view ov
+    WHERE NOT __scan_batch
+      AND ov.op_type_id IN (_op_clear_null, _op_consolidate)
+      AND ov.block_num BETWEEN _from AND _to
+  ),
+  resolved AS (
+    SELECT
+      CASE WHEN co.op_type_id = _op_clear_null
+        THEN (SELECT av.id FROM accounts_view av WHERE av.name = 'null')
+        ELSE (SELECT av.id FROM accounts_view av WHERE av.name = 'steem.dao')
+      END::INT AS account_id,
+      co.id::BIGINT AS source_op,
+      co.op_type_id::SMALLINT AS op_type_id,
+      co.block_num::INT AS source_op_block
+    FROM clear_ops co
+  )
+  SELECT r.account_id, r.source_op, r.op_type_id, r.source_op_block
+  FROM resolved r
+  WHERE r.account_id IS NOT NULL;
+END
+$$;
+
+-- The batch's clearing ops in [_from, _to] (a sub-range of the prefetched batch, as
+-- around HF23), one row per op.
 CREATE OR REPLACE FUNCTION btracker_backend.account_clears_in_range(_from INT, _to INT)
 RETURNS TABLE (
   account_id INT,
@@ -176,19 +235,11 @@ RETURNS TABLE (
 LANGUAGE 'plpgsql' STABLE
 AS
 $$
-DECLARE
-  _op_clear_null  INT := btracker_backend.op_clear_null_account_balance();
-  _op_consolidate INT := btracker_backend.op_consolidate_treasury_balance();
 BEGIN
-  -- Never returns a NULL account: callers split rows by EXISTS over account_id. (Both
-  -- accounts exist on any chain that emits these ops.)
   RETURN QUERY
-  SELECT av.id::INT, ov.id::BIGINT, ov.op_type_id::SMALLINT, ov.block_num::INT
-  FROM operations_view ov
-  JOIN accounts_view av
-    ON av.name = CASE WHEN ov.op_type_id = _op_clear_null THEN 'null' ELSE 'steem.dao' END
-  WHERE ov.op_type_id IN (_op_clear_null, _op_consolidate)
-    AND ov.block_num BETWEEN _from AND _to;
+  SELECT cb.account_id, cb.source_op, cb.op_type_id, cb.source_op_block
+  FROM _btracker_clears_batch cb
+  WHERE cb.source_op_block BETWEEN _from AND _to;
 END
 $$;
 
