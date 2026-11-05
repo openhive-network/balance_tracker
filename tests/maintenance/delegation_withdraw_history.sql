@@ -104,6 +104,7 @@ BEGIN
 
   INSERT INTO _synthetic_ops SELECT id FROM _btracker_ops_batch;
 
+  PERFORM btracker_backend.prefetch_account_clears(_block, _block, (SELECT count(*) FROM _btracker_ops_batch));
   PERFORM process_block_range_balances(_block, _block);
   PERFORM process_rc_delegation_range(_block, _block, _block);
   PERFORM process_block_range_withdrawals(_block, _block);

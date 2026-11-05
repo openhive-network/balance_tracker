@@ -152,6 +152,7 @@ BEGIN
          NULL::INT AS custom_json_type_id
   FROM unnest(_ops) WITH ORDINALITY AS o(op, pos);
 
+  PERFORM btracker_backend.prefetch_account_clears(__block, __block, (SELECT count(*) FROM _btracker_ops_batch));
   PERFORM process_block_range_balances(__block, __block);
   PERFORM process_rc_delegation_range(__block, __block, __block);
   PERFORM process_block_range_withdrawals(__block, __block);

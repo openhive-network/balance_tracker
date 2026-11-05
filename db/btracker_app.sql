@@ -939,6 +939,8 @@ $$;
  * Called once per batch before the 11 process_* functions, which then
  * read from _btracker_ops_batch instead of scanning operations_view
  * independently (eliminating 10+ redundant view traversals per batch).
+ * Also resolves the batch's balance-clearing ops into _btracker_clears_batch
+ * (btracker_backend.prefetch_account_clears).
  *
  * @param _from  First block number in range
  * @param _to    Last block number in range
@@ -948,6 +950,8 @@ RETURNS VOID
 LANGUAGE plpgsql VOLATILE
 AS
 $$
+DECLARE
+  __rows BIGINT;
 BEGIN
   DROP TABLE IF EXISTS _btracker_ops_batch;
   CREATE TEMP TABLE _btracker_ops_batch AS
@@ -955,7 +959,10 @@ BEGIN
          body_value, custom_json_type_id
   FROM operations_view
   WHERE block_num BETWEEN _from AND _to;
+  GET DIAGNOSTICS __rows = ROW_COUNT;
   ANALYZE _btracker_ops_batch;
+
+  PERFORM btracker_backend.prefetch_account_clears(_from, _to, __rows);
 END
 $$;
 

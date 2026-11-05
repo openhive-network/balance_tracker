@@ -88,6 +88,7 @@ BEGIN
 
   SELECT array_agg(format('%s:%s', b.id, b.op_type_id) ORDER BY b.id) INTO __expected FROM _btracker_ops_batch b;
 
+  PERFORM btracker_backend.prefetch_account_clears(__block, __block, (SELECT count(*) FROM _btracker_ops_batch));
   PERFORM process_block_range_savings(__block, __block);
 
   SELECT array_agg(format('%s:%s', h.source_op, h.op_type_id) ORDER BY h.source_op) INTO __actual
