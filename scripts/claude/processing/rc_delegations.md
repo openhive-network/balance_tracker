@@ -66,6 +66,13 @@ btracker reproduces it in `process_rc_delegation_range`:
   the rest in later blocks (`rc_expired_delegation_object`, during which it rejects
   the account's `delegate_rc`). btracker applies the whole reduction at the
   triggering operation, which leaves the same delegations.
+- The step returns before building its temp tables when the range has no
+  `custom_json` with id `rc` and none of its `withdraw_vesting` /
+  `fill_vesting_withdraw` / `delegate_vesting_shares` names an account with rows in
+  `current_rc_delegations` (nearly every block): then there is neither a
+  `delegate_rc` to apply nor a check that could reduce a delegation. The account
+  lookup takes the op's account names as an array parameter so its plan stays
+  cached across the per-batch recreation of `_btracker_ops_batch`.
 - The delegatee order is the HAF account id, which follows hived's account
   creation order like its `account_id_type`.
 - A payout that leaves the account with 0 VESTS ends its power-down (as hived's

@@ -476,14 +476,60 @@ SET jit = OFF
 AS
 $$
 DECLARE
-  -- Operation type ID (looked up dynamically from hafd.operation_types)
-  _op_custom_json INT := btracker_backend.op_custom_json();
+  -- Operation type IDs (looked up dynamically from hafd.operation_types)
+  _op_custom_json             INT := btracker_backend.op_custom_json();
+  _op_withdraw_vesting        INT := btracker_backend.op_withdraw_vesting();
+  _op_fill_vesting_withdraw   INT := btracker_backend.op_fill_vesting_withdraw();
+  _op_delegate_vesting_shares INT := btracker_backend.op_delegate_vesting_shares();
+  __vest_check_names TEXT[];
   __event RECORD;
   -- Counters
   __insert_current_rc_delegations INT;
   __delete_canceled_rc_delegations INT;
   __insert_rc_delegations INT;
 BEGIN
+------------------------------------------------------------------------------
+-- Nearly every block has no delegate_rc op and no vest check of an account
+-- with RC delegations. Then _rc_delegation_ops is empty, so the checks are
+-- limited to current RC delegators (rc_delegation_vest_checks.rc_delegators)
+-- and there are none either: nothing below would change.
+--
+-- The account lookup takes the names as a parameter rather than reading
+-- _btracker_ops_batch, so its plan survives the per-batch recreation of that
+-- temp table.
+------------------------------------------------------------------------------
+IF NOT EXISTS (
+  SELECT 1
+  FROM _btracker_ops_batch ov
+  WHERE
+    ov.op_type_id = _op_custom_json AND
+    ov.block_num BETWEEN _from AND _to AND
+    (ov.body_value->>'id') = 'rc'
+) THEN
+  SELECT array_agg(DISTINCT n.account_name)
+  INTO __vest_check_names
+  FROM _btracker_ops_batch ov
+  CROSS JOIN LATERAL (VALUES
+    (ov.body_value->>'account'),
+    (ov.body_value->>'from_account'),
+    (ov.body_value->>'delegator'),
+    (ov.body_value->>'delegatee')
+  ) AS n(account_name)
+  WHERE
+    ov.op_type_id IN (_op_withdraw_vesting, _op_fill_vesting_withdraw, _op_delegate_vesting_shares) AND
+    ov.block_num BETWEEN _from AND _to AND
+    n.account_name IS NOT NULL;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM hive.accounts_view av
+    JOIN current_rc_delegations crd ON crd.delegator = av.id
+    WHERE av.name = ANY(__vest_check_names)
+  ) THEN
+    RETURN;
+  END IF;
+END IF;
+
 ------------------------------------------------------------------------------
 -- STEPS 1-4: the range's delegate_rc ops, one row per delegatee
 --
