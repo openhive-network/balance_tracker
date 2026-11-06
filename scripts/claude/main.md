@@ -206,9 +206,9 @@ processed a block yet.
 |--------|----------|----------|
 | `vesting_withdraw_rate_hf21_rounding` | `repair_vesting_withdraw_rate()` | `account_withdraws.vesting_withdraw_rate` of active power-downs, recomputed from their `withdraw_vesting` (minimum 1, rounded up from HF21) |
 | `power_downs_without_vests` | `repair_power_downs_without_vests()` | ends (`vesting_withdraw_rate`, `to_withdraw`, `withdrawn` = 0) the power-down of every account with 0 VESTS, which hived ended at the payout that took its last VESTS; runs before `rc_delegation_overflow` |
+| `hf_23_pending_delegation_returns` | `repair_hf_23_pending_delegation_returns()` | takes the pending delegation returns hived dropped at HF23 off each cleared account's `account_delegations.delegated_vests` and its `account_delegation_history` rows from its HF23 operation on (0 row added there); runs before `rc_delegation_overflow`, which reads `delegated_vests`; RC delegations cut against the old value need a resync; nothing until the app has processed HF23 |
 | `rc_delegation_overflow` | `repair_rc_delegation_overflow()` | RC delegations over their delegator's effective vests now, reduced as hived does; delegations hived reduced at an earlier vest change, after which the vesting grew back, need a resync (see `scripts/claude/processing/rc_delegations.md`) |
 | `hf_23_cleared_withdraw_requests` | `repair_hf_23_withdraw_requests()` | deletes the `transfer_saving_id` rows of HF23-cleared accounts requested up to the HF23 block (hived removed them without a fill or cancel); nothing until the app has processed HF23 |
-| `hf_23_pending_delegation_returns` | `repair_hf_23_pending_delegation_returns()` | takes the pending delegation returns hived dropped at HF23 off each cleared account's `account_delegations.delegated_vests` and its `account_delegation_history` rows from its HF23 operation on (0 row added there); RC delegations cut against the old value need a resync; nothing until the app has processed HF23 |
 
 Not every fix gets a repair. A major change to block processing is applied by a fresh
 sync instead: the balance clears of `null` and `steem.dao` (#61, see

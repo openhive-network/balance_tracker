@@ -292,7 +292,8 @@ $$;
  * Drops the pending delegation returns hived removed at HF23 and earlier versions
  * of process_block_range_delegations left in account_delegations.delegated_vests
  * of the cleared accounts (see drop_hf_23_pending_delegation_returns). Does
- * nothing until the application has processed the HF23 block.
+ * nothing until the application has processed the HF23 block. Runs before
+ * repair_rc_delegation_overflow, which reads account_delegations.delegated_vests.
  *
  * RC delegations an earlier version reduced against those delegated vests stay
  * as stored: the vesting at each past check is not kept, so they need a resync
@@ -413,9 +414,9 @@ BEGIN
     FROM (VALUES
       (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
       (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
-      (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
-      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests'),
-      (5, 'hf_23_pending_delegation_returns', 'repair_hf_23_pending_delegation_returns')
+      (3, 'hf_23_pending_delegation_returns', 'repair_hf_23_pending_delegation_returns'),
+      (4, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
+      (5, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position
