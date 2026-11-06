@@ -287,6 +287,113 @@ END
 $$;
 
 /**
+ * repair_hf_23_pending_delegation_returns()
+ * -----------------------------------------
+ * Drops the pending delegation returns hived removed at HF23 and earlier versions
+ * of process_block_range_delegations left in account_delegations.delegated_vests
+ * of the cleared accounts (see drop_hf_23_pending_delegation_returns). Does
+ * nothing until the application has processed the HF23 block.
+ *
+ * RC delegations an earlier version reduced against those delegated vests stay
+ * as stored: the vesting at each past check is not kept, so they need a resync
+ * to be corrected.
+ *
+ * @returns number of account_delegations and account_delegation_history rows changed
+ */
+CREATE OR REPLACE FUNCTION repair_hf_23_pending_delegation_returns()
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __hardfork_23_block INT := (SELECT block_num FROM hafd.applied_hardforks WHERE hardfork_num = 23);
+BEGIN
+  IF __hardfork_23_block IS NULL
+     OR COALESCE(hive.app_get_current_block_num(current_schema()), 0) < __hardfork_23_block THEN
+    RETURN 0;
+  END IF;
+
+  RETURN drop_hf_23_pending_delegation_returns(__hardfork_23_block);
+END
+$$;
+
+/**
+ * drop_hf_23_pending_delegation_returns(__hardfork_23_block)
+ * ----------------------------------------------------------
+ * hived's clear_account removed a cleared account's pending delegation returns
+ * with its delegations, and no return_vesting_delegation followed for them, so
+ * the account's delegated_vests is 0 right after its hardfork_hive_operation.
+ * What an earlier version kept there (the account_delegation_history value at or
+ * before that operation) is taken off account_delegations and every later
+ * history row, and the history gets the 0 row at the operation the fixed
+ * processing writes. Only valid once the application has processed the HF23 block.
+ *
+ * @param __hardfork_23_block  block of HF23
+ * @returns number of account_delegations and account_delegation_history rows changed
+ */
+CREATE OR REPLACE FUNCTION drop_hf_23_pending_delegation_returns(__hardfork_23_block INT)
+RETURNS INT
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  _op_hardfork_hive  INT := btracker_backend.op_hardfork_hive();
+  __accounts         INT[];
+  __source_ops       BIGINT[];
+  __kept             BIGINT[];
+  __received         BIGINT[];
+  __at_op            BOOLEAN[];
+  __changed          INT;
+  __repaired         INT := 0;
+BEGIN
+  SELECT array_agg(c.account_id), array_agg(c.source_op), array_agg(h.delegated_vests), array_agg(h.received_vests), array_agg(h.source_op = c.source_op)
+  INTO __accounts, __source_ops, __kept, __received, __at_op
+  FROM (
+    SELECT av.id AS account_id, ov.id AS source_op
+    FROM operations_view ov
+    JOIN accounts_view av ON av.name = ov.body_value->>'account'
+    WHERE ov.op_type_id = _op_hardfork_hive AND ov.block_num = __hardfork_23_block
+  ) c
+  CROSS JOIN LATERAL (
+    SELECT adh.delegated_vests, adh.received_vests, adh.source_op
+    FROM account_delegation_history adh
+    WHERE adh.account = c.account_id AND adh.source_op <= c.source_op
+    ORDER BY adh.source_op DESC
+    LIMIT 1
+  ) h
+  WHERE h.delegated_vests <> 0;
+
+  IF __accounts IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  UPDATE account_delegations ad
+  SET delegated_vests = ad.delegated_vests - r.kept
+  FROM unnest(__accounts, __kept) AS r(account, kept)
+  WHERE ad.account = r.account;
+
+  GET DIAGNOSTICS __changed = ROW_COUNT;
+  __repaired := __repaired + __changed;
+
+  UPDATE account_delegation_history adh
+  SET delegated_vests = adh.delegated_vests - r.kept
+  FROM unnest(__accounts, __source_ops, __kept) AS r(account, source_op, kept)
+  WHERE adh.account = r.account AND adh.source_op >= r.source_op;
+
+  GET DIAGNOSTICS __changed = ROW_COUNT;
+  __repaired := __repaired + __changed;
+
+  INSERT INTO account_delegation_history (account, delegated_vests, received_vests, source_op)
+  SELECT r.account, 0, r.received, r.source_op
+  FROM unnest(__accounts, __source_ops, __received, __at_op) AS r(account, source_op, received, at_op)
+  WHERE NOT r.at_op;
+
+  GET DIAGNOSTICS __changed = ROW_COUNT;
+  RETURN __repaired + __changed;
+END
+$$;
+
+/**
  * run_one_off_repairs()
  * ---------------------
  * Applies, in list order, every repair not yet recorded in one_off_repairs, each
@@ -307,7 +414,8 @@ BEGIN
       (1, 'vesting_withdraw_rate_hf21_rounding', 'repair_vesting_withdraw_rate'),
       (2, 'power_downs_without_vests', 'repair_power_downs_without_vests'),
       (3, 'rc_delegation_overflow', 'repair_rc_delegation_overflow'),
-      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests')
+      (4, 'hf_23_cleared_withdraw_requests', 'repair_hf_23_withdraw_requests'),
+      (5, 'hf_23_pending_delegation_returns', 'repair_hf_23_pending_delegation_returns')
     ) AS r(position, name, function_name)
     WHERE NOT EXISTS (SELECT 1 FROM one_off_repairs a WHERE a.name = r.name)
     ORDER BY r.position

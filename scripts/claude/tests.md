@@ -57,7 +57,7 @@ tests/
 │   ├── history_op_type.sql    # stored op_type_id = hafd.operations.op_type_id; no extra tuple width
 │   ├── batch_temp_tables.sql  # per-batch temp tables: recreated per massive batch, kept (same OID, only the block's rows) across live blocks, recreated once over the page bound
 │   ├── withdraw_vesting_rate.sql # power-down rate rounding per hardfork era, through processing, and its one-off repair
-│   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair
+│   ├── rc_delegation_overflow.sql # hived's implicit RC delegation reduction after a power-down start, a weekly payout, a vesting delegation; delegate_rc around it; its one-off repair; an HF23 clear drops pending delegation returns (no cut at a later payout) and the repair of the returns earlier versions kept
 │   ├── power_down_without_vests.sql # a payout that leaves 0 VESTS ends the power-down; RC overflow at and after it; its one-off repair
 │   ├── cleared_accounts_batch.sql # #61 clears of null/steem.dao on the account_clears fixture: values after the sync (finalized), HBD interest, balance_totals, rollups; the same block by block from seeded stored state; one range = block by block
 │   ├── hf_23_withdraw_requests.sql # process_hf_23 deletes cleared accounts' pending withdrawals; its one-off repair keeps post-HF23 requests

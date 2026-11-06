@@ -417,6 +417,36 @@ union_delegations AS (
   WHERE op_type_id = _op_return_vesting_delegation
 ),
 ------------------------------------------------------------------------------
+-- PART D: HF23 drops the account's pending delegation returns
+--
+-- hived's clear_account removes the account's vesting_delegation_expiration
+-- objects along with its delegations, and no return_vesting_delegation follows
+-- for them: the account's delegated_vests is 0 right after its
+-- hardfork_hive_operation. This takes off what PARTS A-C leave of it there.
+------------------------------------------------------------------------------
+hf23_dropped_returns AS (
+  SELECT
+    hf.delegator AS account_id,
+    hf.source_op,
+    0 AS received_vests,
+    (-(COALESCE(ad.delegated_vests, 0) + COALESCE(SUM(ud.delegated_vests), 0)))::BIGINT AS delegated_vests
+  FROM process_block_range_data_b hf
+  LEFT JOIN account_delegations ad ON ad.account = hf.delegator
+  LEFT JOIN union_delegations ud ON ud.account_id = hf.delegator AND ud.source_op <= hf.source_op
+  WHERE hf.op_type_id = _op_hardfork_hive
+  GROUP BY hf.delegator, hf.source_op, ad.delegated_vests
+  HAVING COALESCE(ad.delegated_vests, 0) + COALESCE(SUM(ud.delegated_vests), 0) <> 0
+),
+all_delegation_changes AS (
+  SELECT account_id, source_op, received_vests, delegated_vests
+  FROM union_delegations
+
+  UNION ALL
+
+  SELECT account_id, source_op, received_vests, delegated_vests
+  FROM hf23_dropped_returns
+),
+------------------------------------------------------------------------------
 -- Changes per account and operation (an HF23 reset of several delegations is
 -- one operation), with the account's first operation of the batch marked.
 ------------------------------------------------------------------------------
@@ -427,7 +457,7 @@ delegation_changes AS MATERIALIZED (
     SUM(ud.received_vests) AS received_vests,
     SUM(ud.delegated_vests) AS delegated_vests,
     ud.source_op = MIN(ud.source_op) OVER (PARTITION BY ud.account_id) AS first_in_batch
-  FROM union_delegations ud
+  FROM all_delegation_changes ud
   GROUP BY ud.account_id, ud.source_op
 ),
 ------------------------------------------------------------------------------
@@ -438,7 +468,7 @@ sum_delegations AS (
     ud.account_id,
     SUM(ud.received_vests) AS received_vests,
     SUM(ud.delegated_vests) AS delegated_vests
-  FROM union_delegations ud
+  FROM all_delegation_changes ud
   GROUP BY ud.account_id
 ),
 ------------------------------------------------------------------------------

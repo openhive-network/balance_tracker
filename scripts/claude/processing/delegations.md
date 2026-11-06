@@ -44,6 +44,22 @@ At Hard Fork 23, some accounts had their balances "returned" via delegation oper
 WHERE d.delegator != d.delegatee
 ```
 
+## HF23 Clear (`hardfork_hive_operation`)
+
+hived's `clear_account` removes a cleared account's delegations and its pending
+delegation returns (`vesting_delegation_expiration` objects), and emits no
+`return_vesting_delegation` for them: the account's `delegated_vests` is 0 right after
+its `hardfork_hive_operation`. `union_delegations` resets the account's delegation pairs
+at that operation (negative deltas allowed there), and `hf23_dropped_returns` takes off
+whatever delegated vests are left (the pending returns), only when nonzero.
+
+Earlier versions kept the pending returns in `delegated_vests` forever (15 accounts on
+mainnet, e.g. funtraveller 1,989,220,886,866), which lowered their effective vests in
+the RC overflow checks (`rc_delegations.md`). Existing installs:
+`repair_hf_23_pending_delegation_returns()` (`db/one_off_repairs.sql`) takes the value
+kept at each cleared account's HF23 operation off `account_delegations` and the
+account's later history rows, and adds the 0 history row at the operation.
+
 ## Data Flow
 
 ```

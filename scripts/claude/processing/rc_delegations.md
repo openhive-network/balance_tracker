@@ -81,6 +81,14 @@ btracker reproduces it in `process_rc_delegation_range`:
   check of the same power-down use a next withdrawal of 0, before the withdrawals
   step stores the ended power-down.
 
+The delegated vests come from `account_delegations`, so they must be hived's
+`delegated_vesting_shares`: an HF23-cleared account's pending delegation returns
+are dropped at its clear (`delegations.md`, "HF23 Clear"). With them kept, funtraveller's
+effective vests were 1.99T low: btracker removed all its RC delegations at the
+94,377,007 payout where hived left 10,951,707,315 to redalas, and cut photocircle at
+111,273,799 where hived cut nothing. Delegations an earlier version cut that way stay
+until a resync; the one-off repair fixes only `account_delegations`.
+
 Existing installs: `repair_rc_delegation_overflow()` (`db/one_off_repairs.sql`)
 applies the reduction once to every delegator over its effective vests now. A
 delegation hived reduced at an earlier vest change, after which the delegator's
