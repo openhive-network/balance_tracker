@@ -75,11 +75,12 @@ process_blocks() {
     # The generic HAF block-processing driver (haf#341) runs the registered
     # ${BTRACKER_SCHEMA}.process_blocks procedure per delivered range and idles
     # on its own connection between blocks. It ships with the psql base image.
+    # The application is registered under its lock name (scripts/install_app.sh).
     # exec it directly: as PID 1 it must receive SIGTERM itself to stop cleanly.
     if command -v haf_app_driver.py >/dev/null 2>&1; then
         local limit_arg=()
         [ "$n_blocks" != "null" ] && limit_arg=(--stop-at-block="$n_blocks")
-        exec haf_app_driver.py --app="${BTRACKER_SCHEMA}" --postgres-url="$POSTGRES_ACCESS" --lock=balance_tracker "${limit_arg[@]}"
+        exec haf_app_driver.py --app=balance_tracker --postgres-url="$POSTGRES_ACCESS" --lock=balance_tracker "${limit_arg[@]}"
     fi
 
     echo "WARNING: haf_app_driver.py not found, falling back to the legacy CALL main() loop"
