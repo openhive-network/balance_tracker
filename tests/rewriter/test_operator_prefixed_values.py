@@ -1,4 +1,4 @@
-"""A REST value that starts with a PostgREST operator prefix reaches its function verbatim (#82).
+"""A REST value that starts with a PostgREST operator prefix reaches its function verbatim.
 
 PostgREST reads such a GET argument as a filter (PGRST100, or the argument dropped and
 PGRST202). The rewriter forwards GETs as form POSTs, so each case here must answer through
@@ -13,7 +13,7 @@ import pytest
 
 from common import direct_post, postgrest_code, via_rewriter
 
-VALUES = ["not.existing", "eq.blocktrades", "in.(gtg)", "like.gtg*", "is.null", "fts.gtg"]
+VALUES = ["not.existing", "not.blocktrades", "eq.blocktrades", "in.(gtg)", "like.gtg*", "is.null", "fts.gtg"]
 
 # (public path with {v} where the value goes in the path, function, its fixed arguments,
 #  the argument {v} is, and whether {v} is a query parameter instead of a path segment)
@@ -64,7 +64,7 @@ def _get(path, fixed, arg, value, in_query):
 
 @pytest.mark.parametrize("value", VALUES)
 @pytest.mark.parametrize("case", CASES, ids=_id)
-def test_value_reaches_function_verbatim(case, value):
+def test_value_reaches_function_verbatim(case, value) -> None:
     path, function, fixed, arg, in_query = case
     got = _get(path, fixed, arg, value, in_query)
     want = direct_post(function, {**fixed, arg: value})
@@ -75,7 +75,7 @@ def test_value_reaches_function_verbatim(case, value):
 
 @pytest.mark.parametrize("value", VALUES)
 @pytest.mark.parametrize("path", ["/accounts/{v}/balances", "/get_account_balances"])
-def test_value_arrives_unchanged(path, value):
+def test_value_arrives_unchanged(path, value) -> None:
     """An unknown account is answered with its name, so the value the function received is
     visible: as a path segment and as a query parameter (the catch-all route)."""
     if "{v}" in path:

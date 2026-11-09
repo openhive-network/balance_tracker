@@ -5,8 +5,10 @@ set -o pipefail
 
 SCRIPTDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit 1; pwd -P )"
 
-# Fetch process_openapi.py from common-ci-configuration if not available locally
-COMMON_CI_REF="${COMMON_CI_REF:-develop}"
+# Fetch process_openapi.py from common-ci-configuration if not available locally.
+# The default ref is the commit whose script also writes rpc_arguments.lua, the
+# argument map the rewriter's hive.rpc_form module takes (not yet on develop).
+COMMON_CI_REF="${COMMON_CI_REF:-1d952fd19118762d0e66f91953e194ff08e69bb0}"
 COMMON_CI_URL="${COMMON_CI_URL:-https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}}"
 PROCESS_OPENAPI="${SCRIPTDIR}/process_openapi.py"
 
@@ -18,6 +20,7 @@ fi
 endpoints="endpoints"
 rewrite_dir="${endpoints}_openapi"
 input_file="rewrite_rules.conf"
+rpc_arguments_file="rpc_arguments.lua"
 temp_output_file=$(mktemp)
 
 # Default directories with fixed order if none provided
@@ -126,8 +129,14 @@ echo "Using endpoints directories"
 echo "$ENDPOINTS_IN_ORDER"
 
 # run openapi rewrite script
+rm -f "$rpc_arguments_file"
 # shellcheck disable=SC2086
 python3 "$PROCESS_OPENAPI" $OUTPUT $ENDPOINTS_IN_ORDER
+
+if [[ ! -f "$rpc_arguments_file" ]]; then
+    echo "$PROCESS_OPENAPI wrote no $rpc_arguments_file: remove it to fetch one that does (ref: ${COMMON_CI_REF})" >&2
+    exit 1
+fi
 
 # Move rewritten directory to endpoints_openapi
 rm -rf "$SCRIPTDIR/../$rewrite_dir"
@@ -138,4 +147,5 @@ rm -rf "$SCRIPTDIR/output"
 reverse_lines > "$temp_output_file"
 mv "$temp_output_file" "$SCRIPTDIR/../$rewrite_dir/$input_file"
 rm "$input_file"
-echo "Rewritten scripts saved in $rewrite_dir"
+mv "$rpc_arguments_file" "$SCRIPTDIR/../$rewrite_dir/$rpc_arguments_file"
+echo "Rewritten scripts, $input_file and $rpc_arguments_file saved in $rewrite_dir"

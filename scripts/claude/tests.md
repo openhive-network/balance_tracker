@@ -89,6 +89,7 @@ Tests run automatically in GitLab CI. Key jobs in `.gitlab-ci.yml`:
 | `regression-test` | Balance comparison | hived snapshot |
 | `setup-scripts-test` | Functional | Fresh install |
 | `python_api_client_test` | Python client | External API |
+| `rewriter-test` | Public REST paths through the postgrest-rewriter image (`tests/rewriter`): operator-prefixed arguments, column filters, select/order/limit, HEAD framing, argument map vs SQL signatures | Synced mainnet (5M blocks) |
 
 ### Pipeline Stages
 
