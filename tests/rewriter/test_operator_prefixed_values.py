@@ -64,7 +64,7 @@ def _get(path, fixed, arg, value, in_query):
 
 @pytest.mark.parametrize("value", VALUES)
 @pytest.mark.parametrize("case", CASES, ids=_id)
-def test_value_reaches_function_verbatim(case, value):
+def test_value_reaches_function_verbatim(case, value) -> None:
     path, function, fixed, arg, in_query = case
     got = _get(path, fixed, arg, value, in_query)
     want = direct_post(function, {**fixed, arg: value})
@@ -75,7 +75,7 @@ def test_value_reaches_function_verbatim(case, value):
 
 @pytest.mark.parametrize("value", VALUES)
 @pytest.mark.parametrize("path", ["/accounts/{v}/balances", "/get_account_balances"])
-def test_value_arrives_unchanged(path, value):
+def test_value_arrives_unchanged(path, value) -> None:
     """An unknown account is answered with its name, so the value the function received is
     visible: as a path segment and as a query parameter (the catch-all route)."""
     if "{v}" in path:

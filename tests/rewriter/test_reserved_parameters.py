@@ -54,21 +54,21 @@ def test_argument_map_matches_endpoint_signatures() -> None:
     assert shipped == declared
 
 
-def test_limit_trims_rows():
+def test_limit_trims_rows() -> None:
     full = _full()
     got = via_rewriter(ROWS_PATH, {**ROWS_ARGS, "limit": "2"})
     assert _rows(got) == full[:2]
     assert got == direct_post("get_balance_aggregation", ROWS_FUNCTION_ARGS, query={"limit": "2"})
 
 
-def test_offset_and_limit():
+def test_offset_and_limit() -> None:
     full = _full()
     got = via_rewriter(ROWS_PATH, {**ROWS_ARGS, "offset": "1", "limit": "2"})
     assert _rows(got) == full[1:3]
     assert got == direct_post("get_balance_aggregation", ROWS_FUNCTION_ARGS, query={"offset": "1", "limit": "2"})
 
 
-def test_order_and_select():
+def test_order_and_select() -> None:
     full = _full()
     got = via_rewriter(ROWS_PATH, {**ROWS_ARGS, "select": "date", "order": "date.desc", "limit": "2"})
     want = [{"date": r["date"]} for r in sorted(full, key=lambda r: r["date"], reverse=True)[:2]]
@@ -124,7 +124,7 @@ def test_head_then_get_on_one_connection() -> None:
         conn.close()
 
 
-def test_value_with_a_space():
+def test_value_with_a_space() -> None:
     """A timestamp from-block carries a space, sent as `+`: in the form body PostgREST must
     decode it back, as it does in a query string."""
     args = {**ROWS_ARGS, "from-block": "2016-06-01 00:00:00"}
@@ -134,13 +134,13 @@ def test_value_with_a_space():
     assert got != via_rewriter(ROWS_PATH, ROWS_ARGS)
 
 
-def test_limit_on_the_catch_all_route():
+def test_limit_on_the_catch_all_route() -> None:
     """The catch-all rule (/<function>) splits the same way: arguments to the body, limit to the URL."""
     got = via_rewriter("/get_balance_aggregation", {**ROWS_FUNCTION_ARGS, "limit": "1"})
     assert _rows(got) == _full()[:1]
 
 
-def test_limit_beside_operator_prefixed_argument():
+def test_limit_beside_operator_prefixed_argument() -> None:
     got = via_rewriter("/accounts/not.existing/aggregated-history", {**ROWS_ARGS, "limit": "1"})
     want = direct_post("get_balance_aggregation", {**ROWS_FUNCTION_ARGS, "account-name": "not.existing"},
                        query={"limit": "1"})
@@ -148,7 +148,7 @@ def test_limit_beside_operator_prefixed_argument():
     assert got == want
 
 
-def test_calls_without_arguments_and_json_posts_unchanged():
+def test_calls_without_arguments_and_json_posts_unchanged() -> None:
     assert via_rewriter("/version") == direct_post("get_btracker_version", {})
     assert via_rewriter("/last-synced-block") == direct_get("get_btracker_last_synced_block", "")
     # Only GETs are converted: a JSON POST goes through as sent.
