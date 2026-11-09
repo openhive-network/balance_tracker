@@ -2401,7 +2401,7 @@ $$;
 begin
   return openapi;
 end
-$_$ language plpgsql;'
+$_$ language plpgsql stable;'
 , __swagger_url);
 
 END

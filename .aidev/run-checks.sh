@@ -13,7 +13,8 @@
 #                     database)
 #   - install         a copy-on-write clone of the shared 5M-block HAF for this run
 #                     (haf_shared.clone_run_database on AIDEV_EXTERNAL_HAF_HOST:_PORT,
-#                     as haf_shared_consumer), scripts/install_app.sh into it
+#                     as haf_shared_consumer), scripts/install_app.sh into it; no
+#                     function in btracker_endpoints is left VOLATILE
 #   - sync            the candidate's block processing over the clone's 5,000,000
 #                     blocks (haf_app_driver.py, as scripts/process_blocks.sh runs it),
 #                     then finalize_massive_sync and ANALYZE, as CI's `sync` job does
@@ -180,6 +181,7 @@ install() {
     (cd "$stage" && bash -e scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
     q -Atc "select hive.app_context_exists('$SCHEMA')" | grep -qx t || { echo "context $SCHEMA was not created"; return 1; }
     registered_as "$APP_NAME" || return 1
+    q -q -f .aidev/endpoint_volatility_check.sql || return 1
     q -Atc "select git_hash from $SCHEMA.version"
 }
 
