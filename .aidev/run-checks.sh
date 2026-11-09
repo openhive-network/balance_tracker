@@ -11,6 +11,9 @@
 #   - sql-registered  every .sql file under db/, backend/ and endpoints/ is applied
 #                     by scripts/install_app.sh (a file it misses never reaches a
 #                     database)
+#   - rewriter-map    tests/rewriter/test_argument_map.py: endpoints/rpc_arguments.lua
+#                     names every btracker_endpoints function with exactly its SQL
+#                     parameters (files only, no container)
 #   - install         a copy-on-write clone of the shared 5M-block HAF for this run
 #                     (haf_shared.clone_run_database on AIDEV_EXTERNAL_HAF_HOST:_PORT,
 #                     as haf_shared_consumer), scripts/install_app.sh into it; no
@@ -30,6 +33,10 @@
 #   - tavern          the tavern pattern tests (tests/tavern/patterns-mainnet) against
 #                     PostgREST over the clone, by .aidev/btracker_tavern.py; one junit
 #                     case per test
+#   - rewriter        tests/rewriter (CI's rewriter-test) through a postgrest-rewriter
+#                     image built from Dockerfile.rewriter, beside a PostgREST over the
+#                     clone, by .aidev/btracker_rewriter.py; one junit case per test;
+#                     skipped, with the reason, where no docker daemon is reachable
 #   - reinstall       scripts/install_app.sh again over the installed, synced schema
 #                     (an upgrade in place, as CI's setup-scripts-test), then the
 #                     synced block is checked to be unchanged and the history tables'
@@ -44,8 +51,10 @@
 #
 # Every step after install needs the shared HAF (sandbox.external haf, provider
 # haf/haf); the clone is dropped when the script exits, pass or fail. sync needs
-# install; parity, regression, maintenance and tavern need sync. Reports go to
-# test-results/<suite>/: junit.xml (one case per step) plus tavern.xml.
+# install; parity, regression, maintenance, tavern and rewriter need sync. Reports go
+# to test-results/<suite>/: junit.xml (one case per step) plus tavern.xml and
+# rewriter.xml. A step exiting with SKIPPED is reported skipped, its log's last line
+# the reason.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -58,6 +67,8 @@ SCHEMA=btracker_app
 # The registry row's name: the instance's lock name (scripts/install_app.sh).
 APP_NAME=balance_tracker
 STOP_AT_BLOCK=5000000
+# The exit status a step's command reports a precondition the runtime lacks with.
+SKIPPED=77
 
 # The shared HAF trusts haf_shared_consumer from the fleet LAN: no password.
 CONSUMER_URL="postgresql://haf_shared_consumer@${AIDEV_EXTERNAL_HAF_HOST:-}:${AIDEV_EXTERNAL_HAF_PORT:-5432}"
@@ -72,6 +83,8 @@ status=0
 record() {
     if [ "$3" -eq 0 ]; then
         printf 'case\t%s\tpass\t%s\t\n' "$2" "$4" >> "$1"
+    elif [ "$3" -eq "$SKIPPED" ]; then
+        printf 'case\t%s\tskip\t%s\t%s\n' "$2" "$4" "$(tail -n 1 "$5" | tr '\t' ' ')" >> "$1"
     else
         printf 'case\t%s\tfail\t%s\texit %s\t%s\n' "$2" "$4" "$3" "$5" >> "$1"
     fi
@@ -82,7 +95,11 @@ step() {
     local log="$out/$name.log" t0=$SECONDS rc=0
     echo "== $name" >&2
     "$@" > "$log" 2>&1 < /dev/null || rc=$?
-    [ "$rc" -eq 0 ] || { status=1; tail -40 "$log" >&2; }
+    if [ "$rc" -eq "$SKIPPED" ]; then
+        echo "skipped: $(tail -n 1 "$log")" >&2
+    elif [ "$rc" -ne 0 ]; then
+        status=1; tail -40 "$log" >&2
+    fi
     record "$cases" "$name" "$rc" "$((SECONDS - t0))" "$log"
 }
 
@@ -356,12 +373,14 @@ for s in "$@"; do
     case "$s" in
         shellcheck) step shellcheck run_shellcheck ;;
         sql-registered) step sql-registered sql_registered ;;
+        rewriter-map) step rewriter-map python3 -m pytest -p no:cacheprovider tests/rewriter/test_argument_map.py ;;
         install) step install install ;;
         sync) step sync needs_clone sync_blocks ;;
         parity) step parity needs_clone parity ;;
         maintenance) step maintenance needs_sync maintenance ;;
         regression) step regression needs_sync regression ;;
         tavern) step tavern needs_sync python3 .aidev/btracker_tavern.py "$out" ;;
+        rewriter) step rewriter needs_sync python3 .aidev/btracker_rewriter.py "$out" ;;
         reinstall) step reinstall needs_clone reinstall ;;
         registry) step registry needs_clone registry ;;
         uninstall) step uninstall needs_clone uninstall ;;
