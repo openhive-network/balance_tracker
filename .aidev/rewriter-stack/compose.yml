@@ -1,0 +1,32 @@
+# The services the rewriter step (.aidev/btracker_rewriter.py) tests in AIDEV's full and
+# canary gates: sandbox.compose in .aidev/project.yaml. AIDEV builds both from the tree under
+# test, starts them before the slot's suite and connects them to the run's network under
+# their service names, where the suite reaches them and the shared HAF's relay.
+#
+# Paths are relative to the repository root, which AIDEV passes as --project-directory.
+services:
+  # The name docker/balance_tracker_nginx.conf.template proxies to. It forwards to the
+  # PostgREST over the run's clone, which the rewriter step serves in the test runtime and
+  # registers here once the clone exists (upstream.py).
+  balance-tracker-postgrest:
+    build:
+      context: .aidev/rewriter-stack
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 3000), 2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # The postgrest-rewriter image as the candidate builds it. Kept running when openresty
+  # exits, so a rewrite configuration that does not load fails the rewriter step (its
+  # /version never answers) instead of refusing the whole slot's stack.
+  rewriter:
+    build:
+      context: .
+      dockerfile: Dockerfile.rewriter
+    # sh is PID 1 here and would not pass a stop signal on.
+    init: true
+    entrypoint: ["/bin/sh", "-c", "/entrypoint.sh; echo \"openresty exited with $$?\"; exec sleep 2147483647"]
+    depends_on:
+      balance-tracker-postgrest:
+        condition: service_healthy

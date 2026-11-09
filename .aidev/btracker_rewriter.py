@@ -3,22 +3,31 @@
 
     btracker_rewriter.py OUT_DIR
 
-As CI's rewriter-test runs them, against the balance tracker synced to block 5000000:
-Dockerfile.rewriter is built from this checkout, and run on a private docker network
-beside a PostgREST container (docker/docker-compose-test.yml's postgrest service,
-POSTGREST_IMAGE overriding its image) under the alias the nginx template proxies to,
-connecting with BTRACKER_TEST_DB_URL (the run's clone). Both publish to loopback ports,
-which the tests reach as REWRITER_URL and POSTGREST_URL, so the tests must run where the
-docker daemon's loopback is theirs (a host, or a container on the host's network).
+As CI's rewriter-test runs them, against the balance tracker synced to block 5000000, by
+the first of these the runtime offers:
 
-Writes OUT_DIR/rewriter.xml (one junit case per test) and the two containers' logs
-(rewriter-*-container.log), and
-exits with pytest's status; with SKIPPED, and the reason as its last line, when there is
-no docker to build and run the images with.
+- the rewriter stack (.aidev/rewriter-stack/compose.yml, sandbox.compose in the profile),
+  which AIDEV builds from the tree and starts for the slot: BTRACKER_REWRITER_URL is its
+  rewriter and BTRACKER_REWRITER_UPSTREAM the registration address of its
+  balance-tracker-postgrest. PostgREST over BTRACKER_TEST_DB_URL (the run's clone) is
+  served here, on every interface, and registered there, so the rewriter's upstream is
+  this PostgREST.
+- a docker daemon: Dockerfile.rewriter is built from this checkout, and run on a private
+  docker network beside a PostgREST container (docker/docker-compose-test.yml's postgrest
+  service, POSTGREST_IMAGE overriding its image) under the alias the nginx template proxies
+  to, connecting with BTRACKER_TEST_DB_URL. Both publish to loopback ports, so the tests
+  must run where the docker daemon's loopback is theirs (a host, or a container on the
+  host's network).
+
+The tests reach the two as REWRITER_URL and POSTGREST_URL. Writes OUT_DIR/rewriter.xml
+(one junit case per test) and PostgREST's log (the containers' logs, with docker), and
+exits with pytest's status; with SKIPPED, and the reason as its last line, when the
+runtime offers neither.
 """
 import os
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -27,6 +36,8 @@ import urllib.request
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from postgrest import serving
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 SKIPPED = 77
@@ -34,6 +45,9 @@ POSTGREST_IMAGE = os.environ.get("POSTGREST_IMAGE", "registry.gitlab.syncad.com/
 # The upstream name and port docker/balance_tracker_nginx.conf.template proxies to.
 POSTGREST_ALIAS = "balance-tracker-postgrest"
 STARTUP_TIMEOUT_S = 90
+# Set by the profile's sandbox.env for the slots that start the rewriter stack.
+STACK_REWRITER = "BTRACKER_REWRITER_URL"
+STACK_UPSTREAM = "BTRACKER_REWRITER_UPSTREAM"
 WORKERS = "4"
 
 
@@ -43,11 +57,13 @@ def _docker(*args: str, stdout: int | None = None) -> subprocess.CompletedProces
 
 def _docker_unavailable() -> str | None:
     if shutil.which("docker") is None:
-        return "no docker client in the test runtime: the rewriter image cannot be built or run here"
+        return (f"no rewriter stack ({STACK_REWRITER} unset) and no docker client in the test runtime: "
+                "the rewriter image cannot be built or run here")
     info = subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=False)
     if info.returncode != 0:
         reason = (info.stderr.strip().splitlines() or ["no output"])[-1]
-        return f"the test runtime reaches no docker daemon ({reason}): the rewriter image cannot be built or run here"
+        return (f"no rewriter stack ({STACK_REWRITER} unset) and the test runtime reaches no docker daemon "
+                f"({reason}): the rewriter image cannot be built or run here")
     return None
 
 
@@ -73,8 +89,26 @@ def _wait_for(url: str) -> None:
         time.sleep(1)
 
 
+def _register(upstream: str, port: str) -> None:
+    host, register_port = upstream.rsplit(":", 1)
+    with socket.create_connection((host, int(register_port)), timeout=10) as conn:
+        conn.sendall(f"{port}\n".encode())
+        reply = conn.makefile().readline().strip()
+    if reply != "ok":
+        raise RuntimeError(f"{upstream} refused PostgREST's port {port}: {reply or 'no answer'}")
+
+
 @contextmanager
-def _stack(out: str) -> Iterator[tuple[str, str]]:
+def _declared_stack(out: str, rewriter_url: str, upstream: str) -> Iterator[tuple[str, str]]:
+    """Serve PostgREST and register it as the stack's rewriter upstream; yield (rewriter URL, PostgREST URL)."""
+    with serving(os.path.join(out, "postgrest-rewriter.log"), listen="*4") as postgrest_url:
+        _register(upstream, postgrest_url.rsplit(":", 1)[1])
+        _wait_for(rewriter_url + "/version")
+        yield rewriter_url, postgrest_url
+
+
+@contextmanager
+def _docker_stack(out: str) -> Iterator[tuple[str, str]]:
     """Build the rewriter, run it and PostgREST; yield (rewriter URL, PostgREST URL).
 
     Removes the containers, the network and the image afterwards, keeping their logs in out.
@@ -115,13 +149,18 @@ def _stack(out: str) -> Iterator[tuple[str, str]]:
 
 
 def main(out: str) -> int:
-    reason = _docker_unavailable()
-    if reason:
-        print(reason)
-        return SKIPPED
     out = os.path.abspath(out)
+    rewriter, upstream = os.environ.get(STACK_REWRITER), os.environ.get(STACK_UPSTREAM)
+    if rewriter and upstream:
+        stack = _declared_stack(out, rewriter, upstream)
+    else:
+        reason = _docker_unavailable()
+        if reason:
+            print(reason)
+            return SKIPPED
+        stack = _docker_stack(out)
     os.makedirs(out, exist_ok=True)
-    with _stack(out) as (rewriter_url, postgrest_url):
+    with stack as (rewriter_url, postgrest_url):
         print(f"rewriter {rewriter_url}, PostgREST {postgrest_url}", flush=True)
         env = dict(os.environ, REWRITER_URL=rewriter_url, POSTGREST_URL=postgrest_url)
         return subprocess.run(
