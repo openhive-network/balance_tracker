@@ -1,8 +1,9 @@
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/nginx:9f5e12cd984bf12746ce9af081868e09ced8068f
+FROM registry.gitlab.syncad.com/hive/common-ci-configuration/nginx:1d952fd19118762d0e66f91953e194ff08e69bb0
 
 COPY docker/balance_tracker_nginx.conf.template /usr/local/openresty/nginx/conf/nginx.conf.template
 COPY docker/rewriter_entrypoint.sh /entrypoint.sh
 COPY endpoints/rewrite_rules.conf /usr/local/openresty/nginx/conf/rewrite_rules.conf
+COPY endpoints/rpc_arguments.lua /usr/local/openresty/nginx/conf/rpc_arguments.lua
 
 CMD ["/entrypoint.sh"]
 

@@ -9,6 +9,7 @@ rewriter's (docker/docker-compose-test.yml, profile "rewriter"). POSTGREST_URL a
 REWRITER_URL override either base URL whole.
 """
 import os
+from typing import Any
 
 import requests
 
@@ -49,6 +50,6 @@ def direct_get(function: str, query: str):
     return answer(requests.get(f"{POSTGREST}/rpc/{function}?{query}", timeout=TIMEOUT_S))
 
 
-def postgrest_code(ans):
+def postgrest_code(ans: tuple[int, Any]) -> Any:
     status, body = ans
     return body.get("code") if isinstance(body, dict) else None

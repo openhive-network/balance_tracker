@@ -1,4 +1,4 @@
-"""A REST value that starts with a PostgREST operator prefix reaches its function verbatim (#82).
+"""A REST value that starts with a PostgREST operator prefix reaches its function verbatim.
 
 PostgREST reads such a GET argument as a filter (PGRST100, or the argument dropped and
 PGRST202). The rewriter forwards GETs as form POSTs, so each case here must answer through
@@ -13,7 +13,7 @@ import pytest
 
 from common import direct_post, postgrest_code, via_rewriter
 
-VALUES = ["not.existing", "eq.blocktrades", "in.(gtg)", "like.gtg*", "is.null", "fts.gtg"]
+VALUES = ["not.existing", "not.blocktrades", "eq.blocktrades", "in.(gtg)", "like.gtg*", "is.null", "fts.gtg"]
 
 # (public path with {v} where the value goes in the path, function, its fixed arguments,
 #  the argument {v} is, and whether {v} is a query parameter instead of a path segment)

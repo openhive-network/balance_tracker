@@ -91,6 +91,10 @@ History endpoints use page-based pagination:
 - `page-size`: Results per page (max 1000)
 - `direction`: `asc` (oldest first) or `desc` (newest first)
 
+### Rewriter argument map
+
+The postgrest-rewriter (`docker/balance_tracker_nginx.conf.template`) calls common-ci-configuration's `hive.rpc_form` module: a GET or HEAD of `/rpc/<function>` goes to PostgREST as a form POST of the parameters `endpoints/rpc_arguments.lua` lists for that function, and every other query parameter (column filters, `select`, `order`, `limit`, `offset`) stays in the URL. When you add an endpoint or change its parameters, run `scripts/openapi_rewrite.sh` (from `scripts/`) and copy `endpoints_openapi/rewrite_rules.conf` and `endpoints_openapi/rpc_arguments.lua` into `endpoints/`. `tests/rewriter/test_reserved_parameters.py` fails when the map and the SQL signatures disagree.
+
 ### Volatility
 
 Declare every function in `btracker_endpoints` `STABLE` (or `IMMUTABLE`). The postgrest-rewriter forwards GETs to PostgREST as POSTs, and PostgREST runs a POST to a VOLATILE function read-write. In a generated endpoint put the clause after `-- openapi-generated-code-end` so regeneration keeps it (`root()` carries it in its `$_$ language plpgsql stable;` tail). The `install` check (`.aidev/endpoint_volatility_check.sql`) fails naming any VOLATILE one.
