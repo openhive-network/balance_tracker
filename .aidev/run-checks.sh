@@ -38,7 +38,7 @@
 #                     keeps it paused; an install over a row under the old name
 #                     (the schema's) fails and leaves the row; with the entry
 #                     procedure dropped the block processor is refused its lock
-#                     (skipped, with the reason, on a HAF without haf#403)
+#                     (skipped, with the reason, on a HAF without haf#403/haf#454)
 #   - uninstall       scripts/uninstall_app.sh, then the context and schemas are gone,
 #                     then install again from scratch
 #
@@ -321,8 +321,10 @@ registry() {
     install_again > /dev/null || { echo "reinstall after unregistering the old row failed"; return 1; }
     registered_as "$APP_NAME" || return 1
 
-    if [ "$(q -Atc "select to_regproc('hive._missing_app_process_procedure') is null")" = t ]; then
-        echo "entry-procedure case skipped: this HAF lacks haf#403 (no hive._missing_app_process_procedure)"
+    # haf#454 renamed haf#403's hive._missing_app_process_procedure to hive._app_broken_reason.
+    if [ "$(q -Atc "select coalesce(to_regprocedure('hive._app_broken_reason(text)'),
+                                     to_regprocedure('hive._missing_app_process_procedure(text)')) is null")" = t ]; then
+        echo "entry-procedure case skipped: this HAF lacks haf#403 (neither hive._app_broken_reason(text) nor hive._missing_app_process_procedure(text))"
         return 0
     fi
     q -c "SET ROLE btracker_owner; DROP PROCEDURE $SCHEMA.process_blocks(hive.blocks_range)" || return 1
