@@ -70,11 +70,16 @@ sandbox:
 # seven gates report on the same evidence while claiming to check seven
 # different things.
 #
-# Lightweight first: lint, then install of the candidate's SQL into a clone of
-# the shared 5M-block HAF, its block processing to block 5000000, CI's parity
-# and regression tests (every account's balances against hived's), and for full
-# and canary the tavern pattern tests (CI's pattern-test), an upgrade in place
-# and an uninstall followed by a fresh install (CI's setup-scripts-test).
+# Lightweight first: lint and the rewriter's argument map against the endpoints'
+# SQL signatures, then install of the candidate's SQL into a clone of the shared
+# 5M-block HAF, its block processing to block 5000000, CI's parity and regression
+# tests (every account's balances against hived's), and for full and canary the
+# tavern pattern tests (CI's pattern-test), the public REST paths through a
+# postgrest-rewriter image built from the candidate (CI's rewriter-test), an
+# upgrade in place and an uninstall followed by a fresh install (CI's
+# setup-scripts-test). The rewriter step needs a docker daemon the runtime
+# container can reach; AIDEV's runtime gets none, so there it reports skipped,
+# naming that reason, and the argument map is what the gates check of it.
 # CI's mock-data patterns, JMeter benchmarks and python api client tests aren't
 # bound; see .aidev/README.md.
 #
@@ -95,12 +100,12 @@ sandbox:
 verification:
   quick:
     adapter: command
-    args: [".aidev/run-checks.sh", "quick", "shellcheck", "sql-registered"]
+    args: [".aidev/run-checks.sh", "quick", "shellcheck", "sql-registered", "rewriter-map"]
     stack: false
     artifacts: ["test-results/quick/"]
   full:
     adapter: command
-    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "registry", "uninstall"]
+    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/full/"]
     timeout: 1800
   baseline:
@@ -109,7 +114,7 @@ verification:
     artifacts: ["test-results/baseline/"]
   canary:
     adapter: command
-    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "registry", "uninstall"]
+    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/canary/"]
     timeout: 1800
   # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks

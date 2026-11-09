@@ -1,20 +1,16 @@
 """PostgREST's own parameters keep their meaning through the rewriter.
 
 The rewriter's hive.rpc_form module moves into a form body only the parameters the called
-function declares (endpoints/rpc_arguments.lua) and keeps every other one in the URL: column
-filters, select, order, limit, offset. So they still shape the result instead of becoming
-unknown arguments.
+function declares (endpoints/rpc_arguments.lua, checked by test_argument_map.py) and keeps
+every other one in the URL: column filters, select, order, limit, offset. So they still
+shape the result instead of becoming unknown arguments.
 """
 import http.client
 import json
-import pathlib
-import re
 from typing import Any
 from urllib.parse import urlsplit
 
 from common import REWRITER, TIMEOUT_S, direct_get, direct_post, postgrest_code, rewriter_post, via_rewriter
-
-ENDPOINTS = pathlib.Path(__file__).resolve().parents[2] / "endpoints"
 
 # A row-returning endpoint (SETOF) with a handful of rows on the 5M-block lane.
 ROWS_PATH = "/accounts/blocktrades/aggregated-history"
@@ -33,25 +29,6 @@ def _full() -> list[Any]:
     full = _rows(via_rewriter(ROWS_PATH, ROWS_ARGS))
     assert len(full) >= 3, full
     return full
-
-
-def test_argument_map_matches_endpoint_signatures() -> None:
-    """A parameter the map misses would stay in the URL, where PostgREST reads an operator-
-    prefixed value as a filter. The shipped map must name every btracker_endpoints function
-    a REST path reaches with exactly its SQL parameters (all overloads together)."""
-    signature = re.compile(r"CREATE OR REPLACE FUNCTION btracker_endpoints\.(\w+)\s*\((.*?)\)\s*RETURNS",
-                           re.S | re.I)
-    declared: dict[str, set[str]] = {}
-    for sql in ENDPOINTS.rglob("*.sql"):
-        for fn, params in signature.findall(sql.read_text(encoding="utf-8")):
-            declared.setdefault(fn, set()).update(re.findall(r'"([^"]+)"', re.sub(r"--[^\n]*", "", params)))
-    # root() serves the OpenAPI document at /, a call without arguments.
-    declared.pop("root", None)
-    shipped = {fn: set(re.findall(r'\["([^"]+)"\] = true', fields))
-               for fn, fields in re.findall(r'^\s*\["([^"]+)"\] = \{(.*)\},$',
-                                            (ENDPOINTS / "rpc_arguments.lua").read_text(encoding="utf-8"), re.M)}
-    assert len(declared) >= 15, f"found only {len(declared)} endpoint functions under {ENDPOINTS}"
-    assert shipped == declared
 
 
 def test_limit_trims_rows() -> None:
