@@ -34,9 +34,11 @@
 #                     PostgREST over the clone, by .aidev/btracker_tavern.py; one junit
 #                     case per test
 #   - rewriter        tests/rewriter (CI's rewriter-test) through a postgrest-rewriter
-#                     image built from Dockerfile.rewriter, beside a PostgREST over the
-#                     clone, by .aidev/btracker_rewriter.py; one junit case per test;
-#                     skipped, with the reason, where no docker daemon is reachable
+#                     image built from Dockerfile.rewriter, in front of a PostgREST over
+#                     the clone, by .aidev/btracker_rewriter.py: the profile's rewriter
+#                     stack (.aidev/rewriter-stack/) where AIDEV starts it, else a docker
+#                     daemon; one junit case per test; skipped, with the reason, where
+#                     neither is offered
 #   - reinstall       scripts/install_app.sh again over the installed, synced schema
 #                     (an upgrade in place, as CI's setup-scripts-test), then the
 #                     synced block is checked to be unchanged and the history tables'

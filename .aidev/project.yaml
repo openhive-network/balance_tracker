@@ -51,9 +51,22 @@ issues:
 # as AIDEV_EXTERNAL_HAF_HOST/_PORT. .aidev/run-checks.sh takes a copy-on-write
 # clone of it per run, installs the candidate's own SQL into the clone, syncs the
 # candidate's block processing over the clone's 5M blocks (about 4 minutes) and
-# drops the clone on exit, so no data is copied and no image is built. The
+# drops the clone on exit, so no HAF data is copied or built into an image. The
 # consumer role is trusted from the fleet LAN: no secret. See .aidev/README.md.
+#
+# The same slots start the rewriter stack (.aidev/rewriter-stack/compose.yml): the
+# postgrest-rewriter built from the tree's Dockerfile.rewriter, and under the name its
+# nginx template proxies to, a forwarder to the PostgREST over the run's clone that the
+# rewriter step serves in the runtime container once install has made the clone. The
+# stack is joined to the run's network under its service names; the env below is
+# where the step finds it. Only full and canary run the step; baseline starts the stack
+# too, as a slot that declares `stack: false` is given no external service either.
 sandbox:
+  compose: .aidev/rewriter-stack/compose.yml
+  resource_class: light
+  env:
+    BTRACKER_REWRITER_URL: "http://rewriter"
+    BTRACKER_REWRITER_UPSTREAM: "balance-tracker-postgrest:3001"
   external:
     - name: haf
       provider: "haf/haf"
@@ -77,9 +90,9 @@ sandbox:
 # tavern pattern tests (CI's pattern-test), the public REST paths through a
 # postgrest-rewriter image built from the candidate (CI's rewriter-test), an
 # upgrade in place and an uninstall followed by a fresh install (CI's
-# setup-scripts-test). The rewriter step needs a docker daemon the runtime
-# container can reach; AIDEV's runtime gets none, so there it reports skipped,
-# naming that reason, and the argument map is what the gates check of it.
+# setup-scripts-test). The rewriter step runs against the rewriter stack above;
+# where neither that stack nor a docker daemon is offered it reports skipped,
+# naming that reason.
 # CI's mock-data patterns, JMeter benchmarks and python api client tests aren't
 # bound; see .aidev/README.md.
 #

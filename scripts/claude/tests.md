@@ -91,7 +91,7 @@ Tests run automatically in GitLab CI. Key jobs in `.gitlab-ci.yml`:
 | `python_api_client_test` | Python client | External API |
 | `rewriter-test` | Public REST paths through the postgrest-rewriter image (`tests/rewriter`): operator-prefixed arguments, column filters, select/order/limit, HEAD framing, argument map vs SQL signatures | Synced mainnet (5M blocks) |
 
-AIDEV runs `tests/rewriter/test_argument_map.py` (files only) in its quick slot as `rewriter-map`, and the whole of `tests/rewriter` in full/canary as `rewriter` (`.aidev/btracker_rewriter.py`, image built from the candidate's `Dockerfile.rewriter`); `rewriter` reports skipped where no docker daemon is reachable. See `.aidev/README.md`.
+AIDEV runs `tests/rewriter/test_argument_map.py` (files only) in its quick slot as `rewriter-map`, and the whole of `tests/rewriter` in full/canary as `rewriter` (`.aidev/btracker_rewriter.py`, image built from the candidate's `Dockerfile.rewriter`); in AIDEV's gates against the profile's rewriter stack (`.aidev/rewriter-stack/compose.yml`), elsewhere through a docker daemon; `rewriter` reports skipped where neither is offered. See `.aidev/README.md`.
 
 ### Pipeline Stages
 

@@ -26,7 +26,7 @@ the failure body. `tavern` also writes one case per test (`tavern.xml`).
 | `regression` | `tests/regression` (CI's `regression-test`): every account's balances at block 5,000,000 against hived's `database_api.list_accounts` dump `accounts_dump.json.gz`; no account may differ. The dump is loaded server-side (one `COPY`, then `btracker_test.load_expected_account` per row in one statement) instead of by `load_expected_balances.py`'s one round trip per account |
 | `maintenance` | `tests/maintenance/*.sql` (with `-v schema=btracker_app`): the history tables' insert-only autovacuum reloptions, no HAF vacuum request for them from the sync, finalize or a post-finalize MASSIVE catch-up (which must not rewrite or ANALYZE them either), and the post-finalize `'freeze'` request, against a test double when the shared HAF has no request kind (hive/haf#360) |
 | `tavern` | `.aidev/btracker_tavern.py`: the tavern pattern tests `tests/tavern/patterns-mainnet` (CI's `pattern-test`) against PostgREST over the clone, configured as `docker/docker-compose.yml`'s `backend-postgrest` (schema `btracker_endpoints`, anonymous role `btracker_user`, extra search path `btracker_app`), 4 xdist workers, run from a copy in `test-results/<suite>/tavern/` (the comparator writes each answer beside its test) |
-| `rewriter` | `.aidev/btracker_rewriter.py`: `tests/rewriter` (CI's `rewriter-test`) through an image built from `Dockerfile.rewriter` in the checkout, run on a private docker network beside a PostgREST container over the clone (`docker/docker-compose-test.yml`'s image, `POSTGREST_IMAGE` overrides it) under the alias the nginx template proxies to; both publish to loopback ports the tests reach as `REWRITER_URL`/`POSTGREST_URL`, 4 xdist workers, one junit case per test in `rewriter.xml`. Needs a docker daemon whose loopback the tests share; with no docker client or daemon it **reports skipped**, the reason in the junit case — which is what AIDEV's runtime container (no docker socket) reports |
+| `rewriter` | `.aidev/btracker_rewriter.py`: `tests/rewriter` (CI's `rewriter-test`) through a postgrest-rewriter image built from `Dockerfile.rewriter` in the checkout, 4 xdist workers, one junit case per test in `rewriter.xml`. In AIDEV's gates the image is the rewriter stack's (`sandbox.compose`, `.aidev/rewriter-stack/compose.yml`, below): the step serves PostgREST over the clone in the runtime container and registers it with the stack's `balance-tracker-postgrest`, the forwarder the nginx template proxies to. Without that stack it builds and runs the image itself through a docker daemon, beside a PostgREST container over the clone (`docker/docker-compose-test.yml`'s image, `POSTGREST_IMAGE` overrides it), both on loopback ports the tests must share. With neither it **reports skipped**, the reason in the junit case |
 | `reinstall` | `scripts/install_app.sh` again over the installed, synced schema — an upgrade in place, as CI's `setup-scripts-test` — and the synced block must not move; the history tables' reloptions, reset beforehand, must be back |
 | `uninstall` | `scripts/uninstall_app.sh` (without its role statements), the leftover `btracker_endpoints`/`btracker_backend` schemas dropped, the context and the three schemas checked gone, then `install` again from scratch |
 
@@ -67,7 +67,7 @@ suite still runs.
 | block processing: `db/process_*.sql`, an operation parser | `install sync regression` | 5 to 7 minutes |
 | what a query returns: `endpoints/`, `backend/endpoint_helpers/` | `install sync tavern` | 5 to 7 minutes |
 | an endpoint's parameters, `endpoints/rpc_arguments.lua` | `rewriter-map` (`aidev test run --slot quick`) | seconds |
-| `Dockerfile.rewriter`, `docker/balance_tracker_nginx.conf.template`, `endpoints/rewrite_rules.conf`, `tests/rewriter` | `install sync rewriter`, by hand where docker runs (below) | 6 to 8 minutes |
+| `Dockerfile.rewriter`, `docker/balance_tracker_nginx.conf.template`, `endpoints/rewrite_rules.conf`, `tests/rewriter` | `install sync rewriter` (`aidev test run --slot full`, or by hand where docker runs, below) | 6 to 8 minutes |
 | the history tables, their vacuum requests or `finalize_massive_sync` | `install sync maintenance` | 5 to 7 minutes |
 
 `sync` is the cost: about 4 minutes on a quiet host and up to 10 under load, while
@@ -153,6 +153,31 @@ daemon's: add `--network host`, the docker socket, the docker client and the soc
 group, e.g. `--network host -v /var/run/docker.sock:/var/run/docker.sock -v
 "$(command -v docker)":/usr/local/bin/docker:ro --group-add "$(stat -c %g
 /var/run/docker.sock)"`, and name `install sync rewriter`.
+
+## The rewriter stack (`sandbox.compose`)
+
+Every slot that reaches the shared HAF also starts `.aidev/rewriter-stack/compose.yml`,
+which AIDEV builds from the tree under test and connects to the run's network under its
+service names:
+
+- `rewriter`: `Dockerfile.rewriter`, the image CI publishes as postgrest-rewriter. Its
+  entrypoint is wrapped to keep the container up when openresty exits, so a rewrite
+  configuration that does not load fails the `rewriter` step (its `/version` never
+  answers) rather than refusing the slot's whole stack.
+- `balance-tracker-postgrest`: the name the nginx template proxies to, held by
+  `rewriter-stack/upstream.py`. nginx resolves that name when it starts, before the
+  clone it would serve exists, so the service is a forwarder: the `rewriter` step starts
+  PostgREST over the clone in the runtime container on every interface, sends its port
+  to `balance-tracker-postgrest:3001`, and from then on port 3000 forwards to it.
+
+The profile's `sandbox.env` tells the step where the stack is (`BTRACKER_REWRITER_URL`,
+`BTRACKER_REWRITER_UPSTREAM`). The tests reach the rewriter as `http://rewriter` and
+PostgREST on the runtime's loopback. `baseline` starts the stack without using it: a
+slot declaring `stack: false` is given no external service either.
+
+`sandbox` is a protected profile section: a change to this declaration runs under the
+approved one until it lands, unless a maintainer approves it for the workflow
+(`--approve-sandbox-change`); the compose file and `rewriter-stack/` are the candidate's.
 
 ## The test runtime image (`runtime/`)
 

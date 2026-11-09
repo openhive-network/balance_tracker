@@ -2,7 +2,7 @@
 
 Configured as docker/docker-compose.yml's backend-postgrest service (schema
 btracker_endpoints, anonymous role btracker_user, extra search path btracker_app),
-on a free loopback port, connecting with BTRACKER_TEST_DB_URL (the run's clone of
+on a free port, connecting with BTRACKER_TEST_DB_URL (the run's clone of
 the shared HAF, as haf_shared_consumer, which switches to btracker_user through
 btracker_owner).
 """
@@ -35,11 +35,12 @@ def _answers(base: str) -> bool:
 
 
 @contextlib.contextmanager
-def serving(log_path: str) -> Iterator[str]:
-    """Run PostgREST for the duration of the block; yield its base URL.
+def serving(log_path: str, listen: str = "127.0.0.1") -> Iterator[str]:
+    """Run PostgREST for the duration of the block; yield its loopback base URL.
 
-    Its output goes to log_path. Raises RuntimeError when it exits or does not
-    answer within STARTUP_TIMEOUT_S.
+    It listens on listen (a PostgREST server-host: an address, or "*4" for every
+    IPv4 interface) and its output goes to log_path. Raises RuntimeError when it
+    exits or does not answer within STARTUP_TIMEOUT_S.
     """
     port = _free_port()
     base = f"http://127.0.0.1:{port}"
@@ -48,7 +49,7 @@ def serving(log_path: str) -> Iterator[str]:
                PGRST_DB_SCHEMA="btracker_endpoints",
                PGRST_DB_ANON_ROLE="btracker_user",
                PGRST_DB_EXTRA_SEARCH_PATH="btracker_app",
-               PGRST_SERVER_HOST="127.0.0.1",
+               PGRST_SERVER_HOST=listen,
                PGRST_SERVER_PORT=str(port))
     with open(log_path, "w") as log:
         proc = subprocess.Popen(["postgrest"], env=env, stdout=log, stderr=subprocess.STDOUT)
