@@ -125,6 +125,7 @@ CREATE OR REPLACE FUNCTION btracker_endpoints.get_transfer_statistics(
 RETURNS SETOF btracker_backend.transfer_stats 
 -- openapi-generated-code-end
 LANGUAGE 'plpgsql'
+STABLE
 SET jit = OFF
 AS
 $$
@@ -245,6 +246,7 @@ PURPOSE:
 CREATE OR REPLACE FUNCTION btracker_endpoints.get_transfer_statistics()
 RETURNS jsonb
 LANGUAGE plpgsql
+STABLE
 AS $$
 BEGIN
   RAISE EXCEPTION 'Missing required parameter: "coin-type"';

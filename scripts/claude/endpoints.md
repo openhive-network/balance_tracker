@@ -91,6 +91,10 @@ History endpoints use page-based pagination:
 - `page-size`: Results per page (max 1000)
 - `direction`: `asc` (oldest first) or `desc` (newest first)
 
+### Volatility
+
+Declare every function in `btracker_endpoints` `STABLE` (or `IMMUTABLE`). The postgrest-rewriter forwards GETs to PostgREST as POSTs, and PostgREST runs a POST to a VOLATILE function read-write. In a generated endpoint put the clause after `-- openapi-generated-code-end` so regeneration keeps it (`root()` carries it in its `$_$ language plpgsql stable;` tail). The `install` check (`.aidev/endpoint_volatility_check.sql`) fails naming any VOLATILE one.
+
 ### Per-row and plan-cache costs
 
 - Build amount objects with `btracker_backend.create_amount_object()`: it is an inlinable `LANGUAGE sql IMMUTABLE` CASE on the NAI, guarded against `asset_table` at install. Do not turn it back into a plpgsql table lookup; the statistics endpoints call it four times per output row.
