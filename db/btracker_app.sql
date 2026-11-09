@@ -1828,6 +1828,7 @@ $$;
 DO $$
 DECLARE
   __schema_name VARCHAR;
+  __app_name TEXT;
   __owning_app TEXT;
 BEGIN
   SHOW SEARCH_PATH INTO __schema_name;
@@ -1847,17 +1848,29 @@ BEGIN
 
   -- Register with the HAF application registry so a generic driver can run
   -- this application and other applications can declare dependencies on it.
-  -- An embedding application (haf_block_explorer) re-registers this context as
-  -- part of its own context group afterwards. On a re-install under such an
-  -- application the context already belongs to it, and registering would fail:
-  -- leave the embedding registration in place.
+  -- HAF's lock helpers find the registry row by the application's lock name
+  -- (custom.app_name, set by scripts/install_app.sh), so the row carries that
+  -- name. An embedding application (haf_block_explorer) registers under the
+  -- same lock name and re-registers this context as part of its own context
+  -- group afterwards: on a re-install that registration is kept as it is.
+  -- A row under any other name (one registered before rows were named after
+  -- the lock) is refused rather than migrated: HAF would otherwise keep it and
+  -- the block processor would never find this application's row.
+  __app_name := current_setting('custom.app_name', true);
+  IF COALESCE(__app_name, '') = '' THEN
+    RAISE EXCEPTION 'custom.app_name is not set: install % with scripts/install_app.sh, which sets it to the application''s lock name', __schema_name;
+  END IF;
+
   SELECT a.name INTO __owning_app
   FROM hafd.applications a
-  WHERE a.name != __schema_name AND a.contexts @> ARRAY[ __schema_name::TEXT ];
-  IF __owning_app IS NOT NULL THEN
-    RAISE NOTICE 'Context % already belongs to application %; keeping that registration', __schema_name, __owning_app;
+  WHERE a.contexts @> ARRAY[ __schema_name::TEXT ];
+  IF __owning_app IS NULL THEN
+    PERFORM hive.app_register( __app_name, ARRAY[ __schema_name ]::hive.contexts_group, __schema_name || '.process_blocks' );
+  ELSIF __owning_app = __app_name THEN
+    RAISE NOTICE 'Context % is already registered under application %; keeping that registration', __schema_name, __owning_app;
   ELSE
-    PERFORM hive.app_register( __schema_name, ARRAY[ __schema_name ]::hive.contexts_group, __schema_name || '.process_blocks' );
+    RAISE EXCEPTION 'Context % is registered under application %, but must be registered under its lock name %. Replay from scratch, or run SELECT hive.app_unregister(''%''); and reinstall',
+      __schema_name, __owning_app, __app_name, __owning_app;
   END IF;
 END
 $$;

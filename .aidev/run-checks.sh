@@ -33,6 +33,11 @@
 #                     (an upgrade in place, as CI's setup-scripts-test), then the
 #                     synced block is checked to be unchanged and the history tables'
 #                     reloptions, removed beforehand, to be back
+#   - registry        the HAF registry row: a reinstall over a paused registration
+#                     keeps it paused; an install over a row under the old name
+#                     (the schema's) fails and leaves the row; with the entry
+#                     procedure dropped the block processor is refused its lock
+#                     (skipped, with the reason, on a HAF without haf#403)
 #   - uninstall       scripts/uninstall_app.sh, then the context and schemas are gone,
 #                     then install again from scratch
 #
@@ -49,6 +54,8 @@ rm -rf "$out"; mkdir -p "$out"
 cases="$out/cases.tsv"; : > "$cases"
 
 SCHEMA=btracker_app
+# The registry row's name: the instance's lock name (scripts/install_app.sh).
+APP_NAME=balance_tracker
 STOP_AT_BLOCK=5000000
 
 # The shared HAF trusts haf_shared_consumer from the fleet LAN: no password.
@@ -170,9 +177,25 @@ install() {
     stage_sources && open_clone || return 1
     # The consumer owns the clone; the app's roles need to create its schemas in it.
     q -c "GRANT CREATE, CONNECT ON DATABASE \"$clone\" TO btracker_owner, btracker_user" || return 1
-    (cd "$stage" && bash scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
+    (cd "$stage" && bash -e scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
     q -Atc "select hive.app_context_exists('$SCHEMA')" | grep -qx t || { echo "context $SCHEMA was not created"; return 1; }
+    registered_as "$APP_NAME" || return 1
     q -Atc "select git_hash from $SCHEMA.version"
+}
+
+# The application rows holding the context, as "name|contexts|process_procedure|paused".
+registry_rows() {
+    q -Atc "SELECT name || '|' || array_to_string(contexts, ',') || '|' || coalesce(process_procedure, '-') || '|' || paused
+              FROM hafd.applications WHERE contexts @> ARRAY['$SCHEMA'] ORDER BY name"
+}
+
+# The context is registered under exactly one row, named $1, driven by its entry procedure.
+registered_as() {
+    local rows
+    rows="$(registry_rows)" || return 1
+    echo "registry: $rows"
+    [ "$(cut -d'|' -f1-3 <<< "$rows")" = "$1|$SCHEMA|$SCHEMA.process_blocks" ] \
+        || { echo "expected context $SCHEMA registered as $1 only"; return 1; }
 }
 
 current_block() {
@@ -184,7 +207,7 @@ current_block() {
 # sync job runs (in CI the massive stage never turns live).
 sync_blocks() {
     local block
-    haf_app_driver.py --app="$SCHEMA" \
+    haf_app_driver.py --app="$APP_NAME" \
         --postgres-url="$BTRACKER_TEST_DB_URL?application_name=btracker_block_processing&options=-c%20role%3Dbtracker_owner" \
         --lock=balance_tracker --stop-at-block="$STOP_AT_BLOCK" --startup-marker='' \
         --server-messages=WARNING || return 1
@@ -260,12 +283,56 @@ reinstall() {
     q -c "SET ROLE btracker_owner;
           ALTER TABLE $SCHEMA.account_balance_history RESET (autovacuum_vacuum_insert_scale_factor, autovacuum_vacuum_insert_threshold, autovacuum_freeze_min_age, autovacuum_analyze_scale_factor, autovacuum_analyze_threshold);
           ALTER TABLE $SCHEMA.account_vesting_history RESET (autovacuum_vacuum_insert_scale_factor, autovacuum_vacuum_insert_threshold, autovacuum_freeze_min_age, autovacuum_analyze_scale_factor, autovacuum_analyze_threshold);" || return 1
-    (cd "$stage" && bash scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
+    (cd "$stage" && bash -e scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") || return 1
     after="$(current_block)" || return 1
     echo "synced block before $before, after $after"
     [ "$before" = "$after" ] || { echo "reinstalling over a synced schema moved its block"; return 1; }
     echo "history table reloptions before the reset:"; echo "$options"
     [ "$(history_reloptions)" = "$options" ] || { echo "reinstall left the history tables with:"; history_reloptions; return 1; }
+}
+
+# -e as the script's shebang sets it: run through bash, a failed step would not stop it.
+install_again() {
+    (cd "$stage" && bash -e scripts/install_app.sh --postgres-url="$BTRACKER_TEST_DB_URL") 2>&1
+}
+
+registry() {
+    local out before
+    q -c "SET ROLE btracker_owner; SELECT hive.app_pause('$APP_NAME')" || return 1
+    install_again > /dev/null || { echo "reinstall over a paused registration failed"; return 1; }
+    registered_as "$APP_NAME" || return 1
+    [ "$(registry_rows | cut -d'|' -f4)" = true ] || { echo "the reinstall unpaused the application"; return 1; }
+    q -c "SET ROLE btracker_owner; SELECT hive.app_resume('$APP_NAME')" || return 1
+
+    # A registration from before rows were named after the lock.
+    q -c "SET ROLE btracker_owner;
+          SELECT hive.app_unregister('$APP_NAME');
+          SELECT hive.app_register('$SCHEMA', ARRAY['$SCHEMA']::hive.contexts_group, '$SCHEMA.process_blocks');" || return 1
+    before="$(registry_rows)" || return 1
+    if out="$(install_again)"; then
+        echo "install over an old-name registration ($before) succeeded"; return 1
+    fi
+    grep -F "SELECT hive.app_unregister('$SCHEMA'); and reinstall" <<< "$out" \
+        || { echo "install failed without naming the old row:"; tail -20 <<< "$out"; return 1; }
+    [ "$(registry_rows)" = "$before" ] || { echo "the failed install changed the registry: $(registry_rows)"; return 1; }
+    q -c "SET ROLE btracker_owner; SELECT hive.app_unregister('$SCHEMA')" || return 1
+    install_again > /dev/null || { echo "reinstall after unregistering the old row failed"; return 1; }
+    registered_as "$APP_NAME" || return 1
+
+    if [ "$(q -Atc "select to_regproc('hive._missing_app_process_procedure') is null")" = t ]; then
+        echo "entry-procedure case skipped: this HAF lacks haf#403 (no hive._missing_app_process_procedure)"
+        return 0
+    fi
+    q -c "SET ROLE btracker_owner; DROP PROCEDURE $SCHEMA.process_blocks(hive.blocks_range)" || return 1
+    if out="$(haf_app_driver.py --app="$APP_NAME" \
+            --postgres-url="$BTRACKER_TEST_DB_URL?application_name=btracker_block_processing&options=-c%20role%3Dbtracker_owner" \
+            --lock="$APP_NAME" --stop-at-block="$(current_block)" --startup-marker='' 2>&1)"; then
+        echo "the block processor ran without its entry procedure"; return 1
+    fi
+    grep -F "reinstall the application" <<< "$out" \
+        || { echo "the block processor failed without asking for a reinstall:"; tail -20 <<< "$out"; return 1; }
+    install_again > /dev/null || { echo "reinstall restoring the entry procedure failed"; return 1; }
+    registered_as "$APP_NAME"
 }
 
 uninstall() {
@@ -292,6 +359,7 @@ for s in "$@"; do
         regression) step regression needs_sync regression ;;
         tavern) step tavern needs_sync python3 .aidev/btracker_tavern.py "$out" ;;
         reinstall) step reinstall needs_clone reinstall ;;
+        registry) step registry needs_clone registry ;;
         uninstall) step uninstall needs_clone uninstall ;;
         *) echo "unknown step: $s" >&2; exit 2 ;;
     esac

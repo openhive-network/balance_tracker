@@ -100,7 +100,7 @@ verification:
     artifacts: ["test-results/quick/"]
   full:
     adapter: command
-    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
+    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/full/"]
     timeout: 1800
   baseline:
@@ -109,7 +109,7 @@ verification:
     artifacts: ["test-results/baseline/"]
   canary:
     adapter: command
-    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "uninstall"]
+    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "install", "sync", "parity", "regression", "maintenance", "tavern", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/canary/"]
     timeout: 1800
   # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks

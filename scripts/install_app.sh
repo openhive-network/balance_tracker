@@ -89,12 +89,14 @@ POSTGRES_ACCESS=${POSTGRES_URL:-"postgresql://$POSTGRES_USER@$POSTGRES_HOST:$POS
 # and each must match the block-processor that drives its context:
 # btracker_app.main drives btracker_app -> 'balance_tracker';
 # hafbe_app.main drives hafbe_bal       -> 'haf_block_explorer'.
+# HAF finds an application's registry row by its lock name, so the instance
+# registers under that name too (db/btracker_app.sql reads it as custom.app_name).
+case "${BTRACKER_SCHEMA}" in
+  hafbe_bal) APP_LOCK_NAME=haf_block_explorer ;;
+  *)         APP_LOCK_NAME=balance_tracker ;;
+esac
 if [[ -z "${HAF_INSTALL_LOCK_HELD:-}" ]]; then
   if command -v python3 >/dev/null 2>&1 && [[ -f /usr/local/bin/install_with_app_lock.py ]]; then
-    case "${BTRACKER_SCHEMA}" in
-      hafbe_bal) APP_LOCK_NAME=haf_block_explorer ;;
-      *)         APP_LOCK_NAME=balance_tracker ;;
-    esac
     export HAF_INSTALL_LOCK_HELD=1
     exec python3 /usr/local/bin/install_with_app_lock.py "$APP_LOCK_NAME" "$POSTGRES_ACCESS" "$0" "${ORIGINAL_ARGS[@]}"
   else
@@ -108,7 +110,7 @@ echo "Installing app..."
 # Set forking mode before schema creation
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -f "$SCRIPTPATH/../db/builtin_roles.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET ROLE btracker_owner;CREATE SCHEMA IF NOT EXISTS ${BTRACKER_SCHEMA} AUTHORIZATION btracker_owner;"
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.is_forking = '$IS_FORKING'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.is_forking = '$IS_FORKING'; SET custom.app_name = '$APP_LOCK_NAME'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.swagger_url = '$SWAGGER_URL'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/endpoint_schema.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/coin_type.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../endpoints/types/granularity.sql"
@@ -189,7 +191,7 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_S
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_proposal_payments/proposal_payments.sql"
 
 # Tables (re-run), then the read-side views which depend on them.
-psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET custom.app_name = '$APP_LOCK_NAME'; SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/btracker_app.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/shared_functions/views.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_balances.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_savings.sql"

@@ -221,6 +221,15 @@ Balance Tracker uses HAF for:
 
 - **Context**: `hive.app_create_context('btracker_app')`
 - **Table registration**: `hive.app_register_table()` for reversible data
+- **Application registry**: `hive.app_register()` registers the context with its
+  `process_blocks` entry procedure under the instance's **lock name**, not its schema:
+  `balance_tracker` standalone, `haf_block_explorer` embedded (`hafbe_bal`). HAF's lock
+  helpers find the row by that name. `scripts/install_app.sh` derives it from
+  `BTRACKER_SCHEMA` and passes it to `db/btracker_app.sql` as `custom.app_name`;
+  `haf_app_driver.py --app=` uses it too. A row under the lock name that already holds
+  the context (hafbe's two-context registration) is kept; a row under any other name
+  (an install from before this naming) fails the install, asking for a replay or
+  `hive.app_unregister('<old name>')` and a reinstall
 - **Block iteration**: `hive.app_next_iteration()` provides block ranges
 - **Operation access**: `hive.operations_view` for blockchain operations
 - **Balance extraction**: `btracker_backend.get_impacted_balances()` — a SQL/JSONB port of HAF's C function `hive.get_impacted_balances()`, kept in sync via `tests/parity/impacted_balances_parity.sql` (see `backend/operation_parsers/impacted_balances.sql`)
