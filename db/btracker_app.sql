@@ -1578,6 +1578,16 @@ $$;
  * Called for each new block after initial sync is complete.
  * Processes all operation types for the given block.
  *
+ * Runs the block's statements with generic plans (plan_cache_mode, restored
+ * before returning). In the default auto mode the plan cache kept planning most
+ * process_* statements again on every block: a custom plan folds the plpgsql
+ * variables (block range, op type ids, branch flags such as __scan_batch in
+ * prefetch_account_clears) into constants and so always looks cheaper than the
+ * generic one, which it never switches to. Planning was the bulk of each
+ * function's time outside its statements (#131). A generic plan suits a
+ * single-block batch: the range filters only read the batch temp tables, and
+ * the permanent tables are reached by key.
+ *
  * @param _block  Block number to process
  * @param _logs   Enable progress logging
  */
@@ -1591,8 +1601,10 @@ $$
 DECLARE
   __start_ts timestamptz;
   __end_ts   timestamptz;
+  __plan_cache_mode TEXT := current_setting('plan_cache_mode');
 BEGIN
   PERFORM set_config('synchronous_commit', 'ON', false);
+  PERFORM set_config('plan_cache_mode', 'force_generic_plan', true);
 
   -- Pre-fetch operations for this single block
   PERFORM btracker_prefetch_operations(_block, _block);
@@ -1617,6 +1629,7 @@ BEGIN
   PERFORM process_block_range_escrows(_block, _block);
   PERFORM process_block_range_proposal_payments(_block, _block);
 
+  PERFORM set_config('plan_cache_mode', __plan_cache_mode, true);
 
   IF _logs THEN
     __end_ts := clock_timestamp();
