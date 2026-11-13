@@ -46,8 +46,17 @@ the cached plans of every statement reading the table, and re-planning the proce
 statements cost about 22 ms of each live block. DELETE leaves dead rows that only
 VACUUM reclaims (never run on temp tables), so a kept table over 64 pages is
 dropped and created again (`_btracker_ops_batch` grows about a page per live block).
-The plan cache's default `auto` mode then uses generic plans where they are not
-costlier than custom ones. A new per-batch temp table follows the same pattern.
+A new per-batch temp table follows the same pattern.
+
+Kept tables keep the plans cached, but the default `auto` plan cache mode still
+planned most statements again on each block: a custom plan folds the plpgsql
+variables (block range, op type ids, branch flags) into constants, always costs
+less than the generic plan and so is never given up (#131). `btracker_single_processing`
+therefore runs a live block under `plan_cache_mode = force_generic_plan` (set
+transaction-locally, restored before it returns); massive sync keeps `auto`, since
+its batches are multi-block ranges whose custom plans are worth having. A live
+statement must stay sound as a generic plan: filter on `_from`/`_to` only in the
+batch temp tables and reach permanent tables by key.
 
 ## Processing Functions Inventory
 
