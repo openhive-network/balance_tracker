@@ -56,7 +56,12 @@ therefore runs a live block under `plan_cache_mode = force_generic_plan` (set
 transaction-locally, restored before it returns); massive sync keeps `auto`, since
 its batches are multi-block ranges whose custom plans are worth having. A live
 statement must stay sound as a generic plan: filter on `_from`/`_to` only in the
-batch temp tables and reach permanent tables by key.
+batch temp tables and reach permanent tables by key. `hive.blocks_view` (a
+reversible-union view) is the exception that needs a range: read the batch's
+blocks from it once in a `MATERIALIZED` CTE and join that CTE, as
+`process_block_range_balances` does (`batch_blocks`). Joined directly with a
+`BETWEEN _from AND _to` guard, the generic plan estimates the range at millions of
+rows and re-executes the view once per joined row (#133).
 
 ## Processing Functions Inventory
 

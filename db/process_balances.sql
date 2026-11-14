@@ -754,6 +754,21 @@ insert_account_balance_history AS (
  * These truncated timestamps become the grouping keys for daily/monthly aggregation.
  * Multiple operations on the same day will share the same by_day value.
  */
+-- The batch's block timestamps, read from blocks_view once. blocks_view is a
+-- reversible-union view and the planner cannot propagate the batch range through
+-- a join equivalence into it: joined directly, a plan that misjudges the range
+-- (the generic plan a live block runs, #133, estimates millions of rows for
+-- BETWEEN $1 AND $2) re-executes the view per emission - one pk_hive_blocks probe
+-- plus a reversible Append each - instead of scanning it once. Materialized, the
+-- view is scanned once whatever the estimate. Same planner guard as
+-- haf_block_explorer!503.
+batch_blocks AS MATERIALIZED (
+  SELECT bv.num, bv.created_at
+  FROM hive.blocks_view bv
+  WHERE bv.num BETWEEN _from AND _to
+    AND __maintain_period_rollups
+),
+
 -- aggregated balance history by day and month
 -- Join block timestamps once and compute all aggregations in a single pass
 join_created_at_to_balance_history AS MATERIALIZED (
@@ -769,14 +784,7 @@ join_created_at_to_balance_history AS MATERIALIZED (
     date_trunc('day', bv.created_at) AS by_day,
     date_trunc('month', bv.created_at) AS by_month
   FROM remove_latest_stored_balance_record rls
-  -- The explicit range on bv.num is redundant with the join condition but
-  -- necessary: blocks_view is a reversible-union view and the planner cannot
-  -- propagate the batch range through the join equivalence - without it, the
-  -- view is re-executed per row (one pk_hive_blocks probe plus a reversible
-  -- Append per emission, ~76k executions per op-dense batch) instead of being
-  -- scanned once and hash-joined. Same planner guard as haf_block_explorer!503.
-  JOIN hive.blocks_view bv ON bv.num = rls.source_op_block
-                          AND bv.num BETWEEN _from AND _to
+  JOIN batch_blocks bv ON bv.num = rls.source_op_block
   -- One-time filter: with the HBD accumulator moved out of this statement
   -- (btracker_backend.accumulate_hbd_interest), the period rollups are this
   -- CTE's only consumers, so massive batches skip the timestamp join entirely
