@@ -1076,7 +1076,8 @@ $$;
  * request_history_tables_freeze()
  * -------------------------------
  * Ask HAF for one VACUUM (FREEZE, ANALYZE) of the insert-only history tables,
- * which the SET LOGGED rewrite at finalize leaves without a visibility map.
+ * which the key-order and SET LOGGED rewrites at finalize leave without a
+ * visibility map.
  * VACUUM cannot run inside the application's transaction, so it goes through
  * HAF's out-of-transaction executor; the request is committed with the caller's
  * transaction and runs after it, once that transaction's ACCESS EXCLUSIVE lock
@@ -1103,14 +1104,56 @@ BEGIN
       AND proname = 'app_request_table_vacuum'
       AND pronargs = 4
   ) THEN
-    RAISE NOTICE 'btracker: HAF has no non-FULL vacuum request kind; skipping VACUUM (FREEZE, ANALYZE) of %.account_balance_history and %.account_vesting_history', _context_name, _context_name;
+    RAISE NOTICE 'btracker: HAF has no non-FULL vacuum request kind; skipping VACUUM (FREEZE, ANALYZE) of %.account_balance_history, %.account_savings_history and %.account_vesting_history', _context_name, _context_name, _context_name;
     RETURN;
   END IF;
 
-  FOREACH __table IN ARRAY ARRAY['account_balance_history', 'account_vesting_history'] LOOP
+  FOREACH __table IN ARRAY ARRAY['account_balance_history', 'account_savings_history', 'account_vesting_history'] LOOP
     -- Dynamic so this compiles against a HAF without the four-argument form.
     EXECUTE 'SELECT hive.app_request_table_vacuum($1, $2, NULL::INTERVAL, ''freeze'')'
       USING _context_name::TEXT, __table;
+  END LOOP;
+END
+$$;
+
+/**
+ * order_history_tables_by_key()
+ * -----------------------------
+ * Rewrite account_balance_history and account_savings_history in
+ * (account, nai, balance_seq_no) order, the order balance-history pages read
+ * them in. Massive sync inserts them in block order across all accounts, about
+ * one heap page per row of a page; in key order a 5000-row history is a few
+ * dozen pages.
+ *
+ * CLUSTER needs an index on the key, and the registered seq-num indexes are
+ * dropped during massive sync (HAF restores them after finalize), so each table
+ * is clustered on a temporary index that is dropped again. CLUSTER rewrites the
+ * table in place under ACCESS EXCLUSIVE, keeping the relation and its HAF
+ * registration, and fires no triggers. account_balance_history is still
+ * UNLOGGED here, so its rewrite writes no WAL; the caller's SET LOGGED copy
+ * must keep the order. Neither rewrite leaves a visibility map; see
+ * request_history_tables_freeze().
+ *
+ * Transient disk until commit: a copy of each table and two builds of its
+ * temporary index. Each table's time is logged.
+ */
+CREATE OR REPLACE FUNCTION order_history_tables_by_key()
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+AS
+$$
+DECLARE
+  __table TEXT;
+  __index TEXT;
+  __started TIMESTAMPTZ;
+BEGIN
+  FOREACH __table IN ARRAY ARRAY['account_balance_history', 'account_savings_history'] LOOP
+    __started := clock_timestamp();
+    __index := __table || '_key_order_tmp_idx';
+    EXECUTE format('CREATE INDEX %I ON %I (account, nai, balance_seq_no)', __index, __table);
+    EXECUTE format('CLUSTER %I USING %I', __table, __index);
+    EXECUTE format('DROP INDEX %I', __index);
+    RAISE NOTICE 'btracker: ordered % by (account, nai, balance_seq_no) in %', __table, clock_timestamp() - __started;
   END LOOP;
 END
 $$;
@@ -1120,7 +1163,9 @@ $$;
  * --------------------------------------
  * The part of massive-sync finalization that bulk-writes registered tables, and
  * therefore MUST run before the context is switched to forking:
- *   1. Switch UNLOGGED tables back to LOGGED (WAL-safe)
+ *   1. Rewrite the balance and savings history in key order
+ *      (order_history_tables_by_key), then switch UNLOGGED tables back to
+ *      LOGGED (WAL-safe)
  *   2. Backfill the by-day/by-month balance and savings rollups that are deferred
  *      during massive sync (~70M rows on mainnet)
  *
@@ -1150,6 +1195,9 @@ LANGUAGE 'plpgsql' VOLATILE
 SECURITY DEFINER
 AS
 $$
+DECLARE
+  __synchronize_seqscans TEXT;
+  __started TIMESTAMPTZ;
 BEGIN
   IF isIndexesCreated() THEN
     RETURN;  -- Already finalized
@@ -1165,8 +1213,17 @@ BEGIN
 
 
   PERFORM raise_if_unlogged_history_lost(_context_name);
+  PERFORM order_history_tables_by_key();
+
+  -- SET LOGGED copies the table with a sequential scan; a synchronized scan
+  -- could start it mid-table and store the ordered rows rotated.
+  __synchronize_seqscans := current_setting('synchronize_seqscans');
+  PERFORM set_config('synchronize_seqscans', 'off', true);
+  __started := clock_timestamp();
   ALTER TABLE account_balance_history SET LOGGED;
   ALTER TABLE account_vesting_history SET LOGGED;
+  RAISE NOTICE 'btracker: history tables set LOGGED in %', clock_timestamp() - __started;
+  PERFORM set_config('synchronize_seqscans', __synchronize_seqscans, true);
   DROP TABLE IF EXISTS unlogged_history_marker;
   PERFORM request_history_tables_freeze(_context_name);
 
@@ -1266,8 +1323,9 @@ $$;
  * -----------------------
  * Transition from massive sync to LIVE-ready state.
  * Reverses the optimizations applied during setup:
- *   1. Switch UNLOGGED tables back to LOGGED, request their freeze vacuum and
- *      backfill the deferred rollups (finalize_massive_sync_before_forking, see
+ *   1. Rewrite the balance and savings history in key order, switch UNLOGGED
+ *      tables back to LOGGED, request their freeze vacuum and backfill the
+ *      deferred rollups (finalize_massive_sync_before_forking, see
  *      there for why it comes first)
  *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
  *   3. Restore app indexes (updates HAF tracking table)

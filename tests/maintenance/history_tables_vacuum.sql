@@ -6,16 +6,17 @@
  *
  *   - both tables carry the insert-only autovacuum reloptions;
  *   - the massive sync and finalize left no pending HAF vacuum request for either
- *     table other than finalize's one 'freeze' request per table (none at all on
- *     a HAF without request kinds, where every request runs as VACUUM FULL
- *     ANALYZE); a VACUUM FULL request HAF already carried out, as an install
+ *     table or account_savings_history other than finalize's one 'freeze'
+ *     request per table (none at all on a HAF without request kinds, where every
+ *     request runs as VACUUM FULL ANALYZE); a VACUUM FULL request HAF already carried out, as an install
  *     synced before an upgrade keeps, is not a leftover;
  *   - a MASSIVE_PROCESSING catch-up after finalize adds no vacuum request, does
  *     not rewrite either table and does not ANALYZE it (skipped when the context
  *     has left that stage);
  *   - request_history_tables_freeze() asks for one 'freeze' request per table
- *     when HAF has the request kind (a test double records it when the installed
- *     HAF lacks it), and requests nothing when it does not;
+ *     (account_savings_history too, which finalize also rewrites) when HAF has
+ *     the request kind (a test double records it when the installed HAF lacks
+ *     it), and requests nothing when it does not;
  *   - a leftover 'full' request for a history table fails the request check, also
  *     next to a carried-out one.
  *
@@ -42,7 +43,7 @@ AS $f$
   FROM hafd.vacuum_requests r
   CROSS JOIN LATERAL (SELECT coalesce(to_jsonb(r) ->> 'kind', 'full') AS kind) k
   WHERE r.schema_name = current_setting('btracker_test.schema')
-    AND r.table_name IN ('account_balance_history', 'account_vesting_history')
+    AND r.table_name IN ('account_balance_history', 'account_savings_history', 'account_vesting_history')
     AND (k.kind <> 'full' OR r.status = 'requested')
 $f$;
 
@@ -66,13 +67,13 @@ AS $f$
     WHERE pronamespace = 'hive'::regnamespace AND proname = 'app_request_table_vacuum' AND pronargs = 4)
 $f$;
 
--- The requests finalize_massive_sync leaves: one 'freeze' per table when HAF
--- has the request kind, none when it does not.
+-- The requests finalize_massive_sync leaves: one 'freeze' per table it
+-- rewrites when HAF has the request kind, none when it does not.
 CREATE FUNCTION pg_temp.requests_after_finalize()
 RETURNS TEXT[] LANGUAGE sql STABLE
 AS $f$
   SELECT CASE WHEN pg_temp.haf_has_request_kind()
-    THEN ARRAY['account_balance_history:freeze', 'account_vesting_history:freeze']
+    THEN ARRAY['account_balance_history:freeze', 'account_savings_history:freeze', 'account_vesting_history:freeze']
     ELSE '{}'::TEXT[] END
 $f$;
 
@@ -307,12 +308,13 @@ BEGIN
   FROM recorded_vacuum_requests;
   __expected := ARRAY[
     format('%s.account_balance_history/none/freeze', __schema),
+    format('%s.account_savings_history/none/freeze', __schema),
     format('%s.account_vesting_history/none/freeze', __schema)];
 
   IF __recorded IS DISTINCT FROM __expected THEN
     RAISE EXCEPTION 'expected freeze requests %, recorded %', __expected, __recorded;
   END IF;
-  RAISE NOTICE 'PASS: one unthrottled freeze request per history table';
+  RAISE NOTICE 'PASS: one unthrottled freeze request per rewritten history table';
 END
 $$;
 ROLLBACK;

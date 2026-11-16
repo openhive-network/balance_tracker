@@ -187,6 +187,43 @@ Three things keep them all-visible (#69):
   request-kind argument of hive/haf#360, and otherwise skips it with a NOTICE.
   Until HAF has it, the first insert-triggered autovacuum after finalize builds
   the visibility map.
+  `account_savings_history`, which finalize also rewrites (below), gets the same
+  request.
+
+### Physical order of the balance and savings history
+
+Balance-history pages read `account_balance_history` and `account_savings_history`
+by `(account, nai, balance_seq_no)`, but massive sync inserts them in block order
+across all accounts (about one heap page per row of a page). Before `SET LOGGED`,
+`finalize_massive_sync_before_forking()` calls `order_history_tables_by_key()`,
+which CLUSTERs each table on a temporary `(account, nai, balance_seq_no)` index
+(the registered seq-num indexes are dropped until HAF restores them after
+finalize) and drops it again. CLUSTER rewrites the table in place, keeping the
+relation and its HAF registration; never replace a registered table with a sorted
+copy. `account_balance_history` is still UNLOGGED then, so its sort writes no
+WAL; the `SET LOGGED` copy runs with `synchronize_seqscans` off so a synchronized
+scan cannot store the rows rotated. Both steps log their time (`btracker: ordered
+... in`, `btracker: history tables set LOGGED in`). Transient disk until the
+finalize transaction commits: a copy of each table and two builds of its
+temporary index, on top of the `SET LOGGED` copy. Steady-state size is unchanged.
+`tests/maintenance/history_physical_order.sql` checks the order after a sync.
+
+Live blocks append new rows at the end, so recent pages of active accounts decay
+back toward one page per row until the table is re-clustered; nothing re-clusters
+it periodically.
+
+Upgrading a node synced before this: it gets the order on its next full resync,
+or with block processing stopped (about 15 minutes on mainnet under ACCESS
+EXCLUSIVE, needing free space for a copy of the table and its indexes):
+
+```sql
+SET ROLE btracker_owner;
+CLUSTER <schema>.account_balance_history USING idx_account_balance_history_account_seq_num_idx;
+CLUSTER <schema>.account_savings_history USING idx_account_savings_history_account_seq_num_idx;
+ALTER TABLE <schema>.account_balance_history SET WITHOUT CLUSTER;
+ALTER TABLE <schema>.account_savings_history SET WITHOUT CLUSTER;
+VACUUM (FREEZE, ANALYZE) <schema>.account_balance_history, <schema>.account_savings_history;
+```
 
 ### One-off repairs of synced state
 
