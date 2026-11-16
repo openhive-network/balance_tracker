@@ -206,13 +206,35 @@ scan cannot store the rows rotated. Both steps log their time (`btracker: ordere
 ... in`, `btracker: history tables set LOGGED in`). Transient disk until the
 finalize transaction commits: a copy of each table and two builds of its
 temporary index, on top of the `SET LOGGED` copy. Steady-state size is unchanged.
+Before it, finalize logs both tables' `pg_total_relation_size` (`btracker: history
+tables to order by key: ...`), whether or not the reorder runs.
 `tests/maintenance/history_physical_order.sql` checks the order after a sync.
+
+On a host without that headroom, turn the reorder off before (or after a failed)
+finalize; finalize then logs `btracker: custom.btracker_order_history_by_key is
+off; skipped ordering ...` and continues with `SET LOGGED`, leaving the tables in
+insertion order (correct, only slower to page). Finalize runs in the block
+processor's session, possibly days after install, so set it persistently on the
+database (or on the processing role with `ALTER ROLE ... SET`); it applies to
+sessions opened afterwards, so restart the block processor. A placeholder setting
+like this one can only be stored by a superuser (or a role granted `SET` on it):
+
+```sql
+ALTER DATABASE haf_block_log SET custom.btracker_order_history_by_key = 'off';
+-- back to the default (on) afterwards:
+ALTER DATABASE haf_block_log RESET custom.btracker_order_history_by_key;
+```
+
+Unset or empty means on; a value that is not a boolean makes finalize raise.
+`history_key_order_enabled()` reads it.
 
 Live blocks append new rows at the end, so recent pages of active accounts decay
 back toward one page per row until the table is re-clustered; nothing re-clusters
 it periodically.
 
-Upgrading a node synced before this: it gets the order on its next full resync,
+Upgrading a node synced before this: it gets the order on its next full resync
+(unless `custom.btracker_order_history_by_key` is off, above; check the disk
+headroom for the reorder before starting one),
 or with block processing stopped (about 15 minutes on mainnet under ACCESS
 EXCLUSIVE, needing free space for a copy of the table and its indexes):
 
