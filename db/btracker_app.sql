@@ -93,7 +93,10 @@ SET ROLE btracker_owner;
  * a fixed insert threshold makes autovacuum visit them every day or two,
  * freeze_min_age = 0 freezes each page on that first visit (so the
  * anti-wraparound pass can skip it), and a fixed analyze threshold keeps the
- * planner statistics current.
+ * planner statistics current. account_savings_history is not rewritten, but
+ * the same relative trigger leaves its live inserts unvacuumed for months.
+ * Each visit also sets the visibility map, which the balance-history pages'
+ * index-only scans of the covering seq-num indexes depend on.
  *
  * Idempotent and metadata-only (ShareUpdateExclusiveLock); the reloptions live
  * in pg_class and survive SET LOGGED and VACUUM FULL rewrites.
@@ -112,6 +115,13 @@ BEGIN
     autovacuum_analyze_threshold = 1000000
   );
   ALTER TABLE account_vesting_history SET (
+    autovacuum_vacuum_insert_scale_factor = 0,
+    autovacuum_vacuum_insert_threshold = 10000,
+    autovacuum_freeze_min_age = 0,
+    autovacuum_analyze_scale_factor = 0,
+    autovacuum_analyze_threshold = 100000
+  );
+  ALTER TABLE account_savings_history SET (
     autovacuum_vacuum_insert_scale_factor = 0,
     autovacuum_vacuum_insert_threshold = 10000,
     autovacuum_freeze_min_age = 0,
@@ -706,10 +716,8 @@ BEGIN
   ------------- INDEX REGISTRATION AND MASSIVE SYNC OPTIMIZATION ----------------
   -- Register app indexes with HAF for drop/restore lifecycle.
   -- Indexes are dropped during massive sync (no reads) and restored at LIVE transition.
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, balance_seq_no)');
-  PERFORM hive.app_register_index_dependency(__schema_name,
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON ' || __schema_name || '.account_savings_history(account, nai, balance_seq_no)');
+  -- The covering seq-num indexes of the balance and savings history are registered
+  -- at the end of this file, where an upgrade replaces the older ones.
   PERFORM hive.app_register_index_dependency(__schema_name,
     'CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON ' || __schema_name || '.account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op))');
   PERFORM hive.app_register_index_dependency(__schema_name,
@@ -1751,14 +1759,14 @@ $$;
  * Index Purposes:
  * ---------------
  * Balance History:
- *   - idx_account_balance_history_account_seq_num_idx
- *     Cursor-based pagination by sequence number
+ *   - idx_account_balance_history_account_seq_num_covering
+ *     Cursor-based pagination by sequence number (index-only: covers the page)
  *   - idx_account_balance_history_account_block_num_idx
  *     Block range filtering (uses function-based index)
  *
  * Savings History:
- *   - idx_account_savings_history_account_seq_num_idx
- *     Cursor-based pagination by sequence number
+ *   - idx_account_savings_history_account_seq_num_covering
+ *     Cursor-based pagination by sequence number (index-only: covers the page)
  *   - idx_account_savings_history_account_block_num_idx
  *     Block range filtering
  *
@@ -1787,9 +1795,9 @@ AS
 $$
 BEGIN
   -- Balance history: pagination by sequence number (default ordering)
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_idx ON account_balance_history(account, nai, balance_seq_no);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_covering ON account_balance_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op);
   -- Savings history: pagination by sequence number (default ordering)
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_idx ON account_savings_history(account, nai, balance_seq_no);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_covering ON account_savings_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op);
   -- Balance history: block range filtering (function-based index on source_op)
   CREATE INDEX IF NOT EXISTS idx_account_balance_history_account_block_num_idx ON account_balance_history(account, nai, hafd.operation_id_to_block_num(source_op));
   -- Savings history: block range filtering (function-based index on source_op)
@@ -2012,4 +2020,88 @@ BEGIN
 END
 $$;
 
+/**
+ * Covering seq-num indexes of the balance and savings history
+ * -----------------------------------------------------------
+ * A balance-history page reads balance, op_type_id and source_op by
+ * (account, nai, balance_seq_no). An account's rows lie scattered in insertion
+ * order, about one heap page per row, so the unique seq-num indexes INCLUDE
+ * those columns and a page is an index-only scan. That relies on the visibility
+ * map: see set_history_tables_insert_only_reloptions() and
+ * request_history_tables_freeze().
+ *
+ * Installs that predate them have the seq-num indexes without INCLUDE, as
+ * idx_account_*_history_account_seq_num_idx, registered with HAF. HAF keeps
+ * the command first registered under a name, so the covering indexes take new
+ * names and the old registrations are removed; a kept one would rebuild the old
+ * index at the next drop/restore cycle. On a finalized install each covering
+ * index is built CONCURRENTLY (readers and block processing keep running), and
+ * only then is the old one dropped, so the key stays unique throughout. An
+ * interrupted build leaves an invalid index that IF NOT EXISTS would keep: it
+ * is dropped and built again. During massive sync the app indexes are dropped
+ * and only the registrations change; finalize builds the covering indexes.
+ *
+ * Top-level psql statements rather than a DO block: CREATE and DROP INDEX
+ * CONCURRENTLY cannot run inside a function or transaction block.
+ */
+SELECT isIndexesCreated() AS build_covering_seq_num_indexes,
+  EXISTS (
+    SELECT 1 FROM pg_index
+    WHERE indexrelid = to_regclass(format('%I.idx_account_balance_history_account_seq_num_covering', current_schema()))
+      AND NOT indisvalid
+  ) AS invalid_balance_seq_num_covering,
+  EXISTS (
+    SELECT 1 FROM pg_index
+    WHERE indexrelid = to_regclass(format('%I.idx_account_savings_history_account_seq_num_covering', current_schema()))
+      AND NOT indisvalid
+  ) AS invalid_savings_seq_num_covering \gset
+
+\if :invalid_balance_seq_num_covering
+DROP INDEX CONCURRENTLY idx_account_balance_history_account_seq_num_covering;
+\endif
+\if :invalid_savings_seq_num_covering
+DROP INDEX CONCURRENTLY idx_account_savings_history_account_seq_num_covering;
+\endif
+
+\if :build_covering_seq_num_indexes
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_account_balance_history_account_seq_num_covering ON account_balance_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_account_savings_history_account_seq_num_covering ON account_savings_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op);
+DROP INDEX CONCURRENTLY IF EXISTS idx_account_balance_history_account_seq_num_idx;
+DROP INDEX CONCURRENTLY IF EXISTS idx_account_savings_history_account_seq_num_idx;
+\endif
+
+-- After the build: registered while the index exists, HAF records it as created.
+DO $$
+DECLARE
+  __schema_name VARCHAR;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balance_history_account_seq_num_covering ON ' || __schema_name || '.account_balance_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op)');
+  PERFORM hive.app_register_index_dependency(__schema_name,
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_account_savings_history_account_seq_num_covering ON ' || __schema_name || '.account_savings_history(account, nai, balance_seq_no) INCLUDE (balance, op_type_id, source_op)');
+END
+$$;
+
 RESET ROLE;
+
+-- HAF offers applications no call that removes one index registration, and only
+-- HAF's owner may write hafd.indexes_constraints: removed as the installing
+-- superuser (haf_admin), through HAF's own hive.remove_index_dependency. Its
+-- DROP INDEX IF EXISTS finds nothing on a finalized install, where the old
+-- index was dropped concurrently above.
+DO $$
+DECLARE
+  __schema_name TEXT;
+BEGIN
+  SHOW SEARCH_PATH INTO __schema_name;
+
+  PERFORM hive.remove_index_dependency(hc.id, ic.table_name, ic.index_constraint_name)
+  FROM hafd.indexes_constraints ic
+  JOIN hafd.contexts hc ON hc.id = ANY(ic.contexts)
+  WHERE hc.name = __schema_name
+    AND ic.table_name IN (__schema_name || '.account_balance_history', __schema_name || '.account_savings_history')
+    AND ic.index_constraint_name IN ('idx_account_balance_history_account_seq_num_idx', 'idx_account_savings_history_account_seq_num_idx');
+END
+$$;
