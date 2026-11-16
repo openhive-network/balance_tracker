@@ -1159,12 +1159,39 @@ END
 $$;
 
 /**
+ * history_key_order_enabled()
+ * ---------------------------
+ * Whether finalize rewrites the history in key order: the boolean setting
+ * custom.btracker_order_history_by_key, ON when unset or empty. It has to be
+ * visible in the block processor's session days after install, so operators set
+ * it persistently (ALTER DATABASE ... SET or ALTER ROLE ... SET), not per psql
+ * call. A value that is not a boolean raises rather than guessing.
+ */
+CREATE OR REPLACE FUNCTION history_key_order_enabled()
+RETURNS BOOLEAN
+LANGUAGE 'plpgsql' STABLE
+AS
+$$
+DECLARE
+  __value TEXT := NULLIF(btrim(current_setting('custom.btracker_order_history_by_key', true)), '');
+BEGIN
+  IF __value IS NULL THEN
+    RETURN TRUE;
+  END IF;
+  RETURN __value::BOOLEAN;
+EXCEPTION WHEN invalid_text_representation THEN
+  RAISE EXCEPTION 'btracker: custom.btracker_order_history_by_key is %, expected on or off', quote_literal(__value);
+END
+$$;
+
+/**
  * finalize_massive_sync_before_forking()
  * --------------------------------------
  * The part of massive-sync finalization that bulk-writes registered tables, and
  * therefore MUST run before the context is switched to forking:
  *   1. Rewrite the balance and savings history in key order
- *      (order_history_tables_by_key), then switch UNLOGGED tables back to
+ *      (order_history_tables_by_key, unless history_key_order_enabled() says
+ *      off), then switch UNLOGGED tables back to
  *      LOGGED (WAL-safe)
  *   2. Backfill the by-day/by-month balance and savings rollups that are deferred
  *      during massive sync (~70M rows on mainnet)
@@ -1213,7 +1240,14 @@ BEGIN
 
 
   PERFORM raise_if_unlogged_history_lost(_context_name);
-  PERFORM order_history_tables_by_key();
+  RAISE NOTICE 'btracker: history tables to order by key: account_balance_history %, account_savings_history %',
+    pg_size_pretty(pg_total_relation_size('account_balance_history')),
+    pg_size_pretty(pg_total_relation_size('account_savings_history'));
+  IF history_key_order_enabled() THEN
+    PERFORM order_history_tables_by_key();
+  ELSE
+    RAISE NOTICE 'btracker: custom.btracker_order_history_by_key is off; skipped ordering account_balance_history and account_savings_history by key';
+  END IF;
 
   -- SET LOGGED copies the table with a sequential scan; a synchronized scan
   -- could start it mid-table and store the ordered rows rotated.

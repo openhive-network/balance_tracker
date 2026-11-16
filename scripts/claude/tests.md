@@ -54,6 +54,7 @@ tests/
 ├── maintenance/               # SQL checks of a synced schema; psql -v schema=<app schema>, after sync + finalize
 │   ├── history_tables_vacuum.sql  # history tables' vacuum setup
 │   ├── history_physical_order.sql # balance and savings history stored in (account, nai, balance_seq_no) order after finalize; all-visible once HAF ran the freeze
+│   ├── history_key_order_switch.sql # custom.btracker_order_history_by_key: on when unset, honours on/off, rejects other values
 │   ├── balance_totals.sql     # balance_totals = aggregates of current_account_balances after sync, a live block, a fork rollback
 │   ├── history_op_type.sql    # stored op_type_id = hafd.operations.op_type_id; no extra tuple width
 │   ├── batch_temp_tables.sql  # per-batch temp tables: recreated per massive batch, kept (same OID, only the block's rows) across live blocks, recreated once over the page bound
