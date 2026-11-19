@@ -169,7 +169,8 @@ measured LOGGED-from-the-start as faster end to end, hive/hivemind#460, because
 it drops the `SET LOGGED` rewrite). A crash now loses only the in-flight batch,
 which the context's block position replays (#137). An install synced in part by
 the older code, with the tables still UNLOGGED, is not upgraded in place:
-uninstall it and sync again.
+uninstall it and sync again. `finalize_massive_sync_before_forking()` enforces this:
+it raises, naming the tables, when any table of the schema is UNLOGGED (#138).
 
 ### Insert-only history tables and the visibility map
 
