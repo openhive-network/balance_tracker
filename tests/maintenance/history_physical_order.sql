@@ -6,9 +6,9 @@
  * the order balance-history pages read them in:
  *
  *   - no row lies on an earlier heap page than the row before it in key order
- *     (so neither the key-order rewrite nor the SET LOGGED copy after it was
- *     skipped or rotated); an empty account_savings_history (a synced range
- *     before savings existed) is skipped;
+ *     (so the key-order rewrite was not skipped); an empty
+ *     account_savings_history (a synced range before savings existed) is
+ *     skipped;
  *   - once HAF has carried out finalize's 'freeze' request for a table, at least
  *     95% of its pages are all-visible (skipped while the request is pending or
  *     on a HAF without request kinds).

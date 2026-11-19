@@ -100,7 +100,7 @@ run_tests() {
 
   postgres_access="${postgres_url:-postgresql://$postgres_user@$postgres_host:$postgres_port/haf_block_log}"
 
-  echo "Ensuring massive sync is finalized (LOGGED + forking + indexes)..."
+  echo "Ensuring massive sync is finalized (rollups + forking + indexes)..."
   psql -a -v "ON_ERROR_STOP=1" "$postgres_access" -c "SET SEARCH_PATH TO ${btracker_schema};" -c "SET ROLE btracker_owner; SELECT ${btracker_schema}.finalize_massive_sync('${btracker_schema}');"
 
   test_summary_report_path="${test_result_path%jtl}xml"

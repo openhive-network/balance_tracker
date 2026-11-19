@@ -94,7 +94,7 @@ never emits kind=4.
 - `vesting_seq_no` is per-account, monotonic across all kinds, assigned at
   write time (`MAX(seq_no) + ROW_NUMBER() OVER (PARTITION BY account
   ORDER BY source_op)` per batch)
-- UNLOGGED during massive sync; switched to LOGGED in `finalize_massive_sync`
+- LOGGED throughout, massive sync included (see `main.md`)
 - Indexes built post-sync via `create_btracker_indexes()`:
   - `(account, vesting_seq_no)` UNIQUE — fast `MAX(seq_no)` for
     filter='all' COUNT and pagination ordering

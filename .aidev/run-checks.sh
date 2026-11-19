@@ -20,7 +20,8 @@
 #                     function in btracker_endpoints is left VOLATILE
 #   - sync            the candidate's block processing over the clone's 5,000,000
 #                     blocks (haf_app_driver.py, as scripts/process_blocks.sh runs it),
-#                     then finalize_massive_sync and ANALYZE, as CI's `sync` job does
+#                     no table of the schema left UNLOGGED by it, then
+#                     finalize_massive_sync and ANALYZE, as CI's `sync` job does
 #   - parity          tests/parity: the SQL impacted-balances port against HAF's C visitor
 #   - maintenance     tests/maintenance: the history tables' autovacuum reloptions, no
 #                     HAF vacuum request from the sync, finalize or a later catch-up
@@ -229,7 +230,7 @@ current_block() {
 # image's scripts/process_blocks.sh runs it, then the post-replay finalisation CI's
 # sync job runs (in CI the massive stage never turns live).
 sync_blocks() {
-    local block
+    local block unlogged
     haf_app_driver.py --app="$APP_NAME" \
         --postgres-url="$BTRACKER_TEST_DB_URL?application_name=btracker_block_processing&options=-c%20role%3Dbtracker_owner" \
         --lock=balance_tracker --stop-at-block="$STOP_AT_BLOCK" --startup-marker='' \
@@ -244,6 +245,11 @@ sync_blocks() {
               AND last_analyze IS NOT NULL" | sort | paste -sd' ' \
         | grep -qx 'account_balance_history account_vesting_history' \
         || { echo "the massive sync did not ANALYZE both history tables"; return 1; }
+    # A crash recovery empties UNLOGGED tables; the history stays LOGGED through
+    # the massive sync, not only once finalize ran (#137).
+    unlogged="$(q -Atc "SELECT string_agg(relname, ' ' ORDER BY relname) FROM pg_class
+              WHERE relnamespace = '$SCHEMA'::regnamespace AND relpersistence <> 'p'")" || return 1
+    [ -z "$unlogged" ] || { echo "tables not LOGGED during the massive sync: $unlogged"; return 1; }
     q -c "SET search_path TO $SCHEMA, public; SET ROLE btracker_owner; SELECT finalize_massive_sync('$SCHEMA');" || return 1
     q -c "SET ROLE btracker_owner; ANALYZE;" 2>&1 | grep -v 'WARNING:  permission denied to analyze' || true
     synced=yes

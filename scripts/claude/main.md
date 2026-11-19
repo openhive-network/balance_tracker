@@ -157,21 +157,24 @@ replays, before HAF has rebuilt the core indexes it defers (`massive_sync_class 
   waits for `haf_massive_sync_finished()` (`hive.is_instance_ready()`), unless
   the context is already forking (an embedding application switched it).
 
-### UNLOGGED history and crashes
+### History tables stay LOGGED through massive sync
 
-PostgreSQL crash recovery empties every UNLOGGED table, while the LOGGED tables
-and the context's current block survive, so a block processor that reconnects
-would continue the massive sync over history tables missing everything before
-the crash (current balances still right, history and at-block answers wrong).
-The install creates `unlogged_history_marker`, a one-row UNLOGGED table that the
-crash empties too; `raise_if_unlogged_history_lost()` raises on an empty marker
-before every massive batch and before finalize sets the tables LOGGED and drops
-the marker. The data cannot be repaired in place: uninstall and sync again.
+`account_balance_history` and `account_vesting_history` are LOGGED for their
+whole life. Do not set them UNLOGGED for massive sync: PostgreSQL crash recovery
+empties every UNLOGGED table while the LOGGED tables and the context's current
+block survive, so any backend crash during a sync (twice so far: OOM kills on a
+fixture, a segfault on steem-20) cost a full uninstall and resync, while the WAL
+saved on HAF's `wal_level=minimal`/`fsync=off` settings is small (hivemind
+measured LOGGED-from-the-start as faster end to end, hive/hivemind#460, because
+it drops the `SET LOGGED` rewrite). A crash now loses only the in-flight batch,
+which the context's block position replays (#137). An install synced in part by
+the older code, with the tables still UNLOGGED, is not upgraded in place:
+uninstall it and sync again.
 
 ### Insert-only history tables and the visibility map
 
-`account_balance_history` and `account_vesting_history` are insert-only, UNLOGGED
-during massive sync and rewritten by `SET LOGGED` at finalize, which leaves them
+`account_balance_history` and `account_vesting_history` are insert-only;
+finalize rewrites `account_balance_history` in key order (below), which leaves it
 without a visibility map (every index-only scan then fetches every heap row).
 Three things keep them all-visible (#69):
 
@@ -189,13 +192,15 @@ Three things keep them all-visible (#69):
   the visibility map.
   `account_savings_history`, which finalize also rewrites (below), gets the same
   request.
-- The rewrite gives every row of `account_balance_history` and
-  `account_vesting_history` the finalize transaction's xid, and a VACUUM marks a
-  page all-visible only once that xid is older than every snapshot it waits for.
-  Right after finalize hived's background `CREATE INDEX CONCURRENTLY` builds hold
-  snapshots taken while finalize ran (on steem-20, 2026-11-18, for 1.5 hours), so
-  HAF's freeze vacuum completes without marking a page (#136). With the request
-  kind, finalize records the rows' xid in `history_freeze_pending`, and
+- A VACUUM marks a page all-visible only once its rows' xmins are older than
+  every snapshot it waits for. Every history row's xmin is at most the finalize
+  transaction's xid (the massive-sync batches inserted them before it, and
+  CLUSTER keeps xmins). Right after finalize hived's background `CREATE INDEX
+  CONCURRENTLY` builds hold snapshots taken while finalize ran (on steem-20,
+  2026-11-18, for 1.5 hours), so HAF's freeze vacuum may complete without
+  marking a page (#136). With the request kind, finalize records its own xid in
+  `history_freeze_pending` (a bound for every row's xmin, found without scanning
+  the tables), and
   `retry_history_tables_freeze()` (SECURITY DEFINER, after every live block)
   waits until HAF has carried out finalize's requests and `vacuum_horizon_passed()`
   says no backend of this database (or walsender), replication slot or prepared
@@ -224,25 +229,24 @@ empty.
 
 Balance-history pages read `account_balance_history` and `account_savings_history`
 by `(account, nai, balance_seq_no)`, but massive sync inserts them in block order
-across all accounts (about one heap page per row of a page). Before `SET LOGGED`,
+across all accounts (about one heap page per row of a page).
 `finalize_massive_sync_before_forking()` calls `order_history_tables_by_key()`,
 which CLUSTERs each table on a temporary `(account, nai, balance_seq_no)` index
 (the registered seq-num indexes are dropped until HAF restores them after
 finalize) and drops it again. CLUSTER rewrites the table in place, keeping the
 relation and its HAF registration; never replace a registered table with a sorted
-copy. `account_balance_history` is still UNLOGGED then, so its sort writes no
-WAL; the `SET LOGGED` copy runs with `synchronize_seqscans` off so a synchronized
-scan cannot store the rows rotated. Both steps log their time (`btracker: ordered
-... in`, `btracker: history tables set LOGGED in`). Transient disk until the
-finalize transaction commits: a copy of each table and two builds of its
-temporary index, on top of the `SET LOGGED` copy. Steady-state size is unchanged.
+copy. Both tables are LOGGED: with `wal_level=minimal` (HAF nodes) the rewrite
+of the new relfilenode is fsynced at commit instead of WAL-logged; otherwise it
+writes the whole table to WAL. Each table's time is logged (`btracker: ordered
+... in`). Transient disk until the finalize transaction commits: a copy of each
+table and two builds of its temporary index. Steady-state size is unchanged.
 Before it, finalize logs both tables' `pg_total_relation_size` (`btracker: history
 tables to order by key: ...`), whether or not the reorder runs.
 `tests/maintenance/history_physical_order.sql` checks the order after a sync.
 
 On a host without that headroom, turn the reorder off before (or after a failed)
 finalize; finalize then logs `btracker: custom.btracker_order_history_by_key is
-off; skipped ordering ...` and continues with `SET LOGGED`, leaving the tables in
+off; skipped ordering ...` and continues, leaving the tables in
 insertion order (correct, only slower to page). Finalize runs in the block
 processor's session, possibly days after install, so set it persistently on the
 database (or on the processing role with `ALTER ROLE ... SET`); it applies to

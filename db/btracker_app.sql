@@ -87,16 +87,16 @@ SET ROLE btracker_owner;
 /**
  * set_history_tables_insert_only_reloptions()
  * -------------------------------------------
- * Autovacuum settings for the insert-only history tables. After sync they are
- * rewritten (SET LOGGED) and left without a visibility map, and the default
- * insert trigger (1000 + 0.2 * reltuples) is then never reached by live sync:
+ * Autovacuum settings for the insert-only history tables. After sync
+ * account_balance_history is rewritten in key order (CLUSTER) and left without a
+ * visibility map, and the default insert trigger (1000 + 0.2 * reltuples) is then never reached by live sync:
  * a fixed insert threshold makes autovacuum visit them every day or two,
  * freeze_min_age = 0 freezes each page on that first visit (so the
  * anti-wraparound pass can skip it), and a fixed analyze threshold keeps the
  * planner statistics current.
  *
  * Idempotent and metadata-only (ShareUpdateExclusiveLock); the reloptions live
- * in pg_class and survive SET LOGGED and VACUUM FULL rewrites.
+ * in pg_class and survive CLUSTER and VACUUM FULL rewrites.
  */
 CREATE OR REPLACE FUNCTION set_history_tables_insert_only_reloptions()
 RETURNS VOID
@@ -736,20 +736,6 @@ BEGIN
   -- Drop app indexes for massive sync (will be restored at LIVE transition)
   PERFORM hive.app_save_and_drop_indexes(__schema_name);
 
-  -- Set append-only tables (no ON CONFLICT upserts) to UNLOGGED to skip WAL.
-  -- Note: balance_history_by_day, balance_history_by_month, account_rewards use
-  -- ON CONFLICT ON CONSTRAINT pk_* during processing, so they must keep their PKs
-  -- and remain LOGGED.
-  -- Risk: data lost on PostgreSQL crash, but massive sync can be restarted.
-  ALTER TABLE account_balance_history SET UNLOGGED;
-  ALTER TABLE account_vesting_history SET UNLOGGED;
-
-  -- Crash recovery empties every UNLOGGED table, this marker with the history
-  -- tables above, while the LOGGED tables and the context's current block survive.
-  -- See raise_if_unlogged_history_lost().
-  CREATE UNLOGGED TABLE IF NOT EXISTS unlogged_history_marker (intact BOOLEAN NOT NULL);
-  INSERT INTO unlogged_history_marker VALUES (TRUE);
-
 END
 $$;
 
@@ -901,7 +887,7 @@ $$;
  * against the estimated chain head, so it stays massive while hived replays,
  * but the context can catch up within the live threshold near the end of the
  * replay, while HAF is still restoring its indexes. Finalizing then would
- * build the app indexes and SET LOGGED long before HAF is done.
+ * build the app indexes and rewrite the history long before HAF is done.
  *
  * A context already switched to forking was finalized (or, under an embedding
  * application, finalize_massive_sync_before_forking() already ran for it), so
@@ -1029,50 +1015,6 @@ $$;
 -- ============================================================================
 
 /**
- * raise_if_unlogged_history_lost()
- * --------------------------------
- * Refuse to go on with a massive sync whose UNLOGGED history tables a PostgreSQL
- * crash emptied. Crash recovery resets every UNLOGGED table, but the LOGGED
- * tables and the context's current block survive, so the block processor
- * reconnects and continues from that block: current balances end up right while
- * account_balance_history and account_vesting_history (and the rollups backfilled
- * from them at finalize) silently lack everything before it. The rows cannot be
- * rebuilt in place; the application must be uninstalled and synced again.
- *
- * unlogged_history_marker holds its one row from the install that set the tables
- * UNLOGGED until finalize sets them LOGGED and drops it. Every history row has a
- * current_account_balances row, so while that LOGGED table is empty nothing was
- * lost and the marker is set again. Installs older than the marker have no table
- * and are not checked.
- *
- * @param _context_name  HAF context name (the application schema)
- * @raises when the marker exists and is empty while current balances exist
- */
-CREATE OR REPLACE FUNCTION raise_if_unlogged_history_lost(_context_name hive.context_name)
-RETURNS VOID
-LANGUAGE 'plpgsql' VOLATILE
-AS
-$$
-BEGIN
-  IF to_regclass('unlogged_history_marker') IS NULL THEN
-    RETURN;
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM unlogged_history_marker) THEN
-    RETURN;
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM current_account_balances) THEN
-    INSERT INTO unlogged_history_marker VALUES (TRUE);
-    RETURN;
-  END IF;
-
-  RAISE EXCEPTION 'btracker: a PostgreSQL crash emptied the UNLOGGED account_balance_history and account_vesting_history of % during massive sync; the rows processed before the crash are lost. Uninstall % and sync it again.',
-    _context_name, _context_name;
-END
-$$;
-
-/**
  * haf_has_vacuum_request_kind()
  * -----------------------------
  * Whether HAF has the vacuum request kinds of hive/haf#360: the four-argument
@@ -1095,8 +1037,7 @@ $$;
  * request_history_tables_freeze()
  * -------------------------------
  * Ask HAF for one VACUUM (FREEZE, ANALYZE) of the insert-only history tables,
- * which the key-order and SET LOGGED rewrites at finalize leave without a
- * visibility map.
+ * which the key-order rewrite at finalize leaves without a visibility map.
  * VACUUM cannot run inside the application's transaction, so it goes through
  * HAF's out-of-transaction executor; the request is committed with the caller's
  * transaction and runs after it, once that transaction's ACCESS EXCLUSIVE lock
@@ -1167,13 +1108,15 @@ $$;
  * Request finalize's freeze vacuum of the history tables once more when it ran
  * too early to set their visibility map.
  *
- * SET LOGGED rewrites account_balance_history and account_vesting_history with
- * every row's xmin set to the finalize transaction (history_freeze_pending
- * records it). VACUUM marks a page all-visible only when that xmin is older than
- * every snapshot still running, and right after finalize hived holds snapshots
- * taken while finalize ran (its background CREATE INDEX CONCURRENTLY builds, for
- * hours on mainnet): the freeze vacuum HAF runs then completes without marking
- * a page (#136).
+ * Every history row's xmin is at most the finalize transaction's id, which
+ * history_freeze_pending records: the massive-sync batches inserted them before
+ * finalize, and the key-order rewrite (CLUSTER) keeps their xmins. VACUUM marks a
+ * page all-visible only when its rows' xmins are older than every snapshot still
+ * running, and right after finalize hived holds snapshots taken while finalize
+ * ran (its background CREATE INDEX CONCURRENTLY builds, for hours on mainnet):
+ * the freeze vacuum HAF runs then may complete without marking a page (#136).
+ * Waiting for the horizon to pass the finalize transaction covers every row
+ * without reading the tables for their newest xmin.
  *
  * Called once per live block. While history_freeze_pending exists it waits for
  * HAF to have carried out finalize's freeze requests and for the vacuum horizon
@@ -1221,7 +1164,7 @@ BEGIN
     AND c.relallvisible < 0.95 * c.relpages;
 
   IF __unmapped IS NOT NULL THEN
-    RAISE NOTICE 'btracker: the freeze vacuum of % ran before every snapshot could see finalize''s rewrite (xid %) and left no visibility map; requesting it again',
+    RAISE NOTICE 'btracker: the freeze vacuum of % ran while a snapshot older than finalize (xid %) was held and left no visibility map; requesting it again',
       array_to_string(__unmapped, ', '), __rewrite_xid;
     PERFORM request_history_tables_freeze(_context_name);
   END IF;
@@ -1242,9 +1185,10 @@ $$;
  * dropped during massive sync (HAF restores them after finalize), so each table
  * is clustered on a temporary index that is dropped again. CLUSTER rewrites the
  * table in place under ACCESS EXCLUSIVE, keeping the relation and its HAF
- * registration, and fires no triggers. account_balance_history is still
- * UNLOGGED here, so its rewrite writes no WAL; the caller's SET LOGGED copy
- * must keep the order. Neither rewrite leaves a visibility map; see
+ * registration, and fires no triggers. Both tables are LOGGED: with
+ * wal_level=minimal the rewrite of a relfilenode created in the same transaction
+ * is fsynced at commit instead of WAL-logged, otherwise it writes the whole table
+ * to WAL. CLUSTER keeps the rows' xmins and leaves no visibility map; see
  * request_history_tables_freeze().
  *
  * Transient disk until commit: a copy of each table and two builds of its
@@ -1304,8 +1248,7 @@ $$;
  * therefore MUST run before the context is switched to forking:
  *   1. Rewrite the balance and savings history in key order
  *      (order_history_tables_by_key, unless history_key_order_enabled() says
- *      off), then switch UNLOGGED tables back to
- *      LOGGED (WAL-safe)
+ *      off) and request their freeze vacuum
  *   2. Backfill the by-day/by-month balance and savings rollups that are deferred
  *      during massive sync (~70M rows on mainnet)
  *
@@ -1335,9 +1278,6 @@ LANGUAGE 'plpgsql' VOLATILE
 SECURITY DEFINER
 AS
 $$
-DECLARE
-  __synchronize_seqscans TEXT;
-  __started TIMESTAMPTZ;
 BEGIN
   IF isIndexesCreated() THEN
     RETURN;  -- Already finalized
@@ -1351,8 +1291,6 @@ BEGIN
     RAISE WARNING 'btracker: context % is already forking: the rollup backfill will be copied row by row into the shadow tables and bloat them (haf#346). Call finalize_massive_sync_before_forking() before hive.app_context_set_forking().', _context_name;
   END IF;
 
-
-  PERFORM raise_if_unlogged_history_lost(_context_name);
   RAISE NOTICE 'btracker: history tables to order by key: account_balance_history %, account_savings_history %',
     pg_size_pretty(pg_total_relation_size('account_balance_history')),
     pg_size_pretty(pg_total_relation_size('account_savings_history'));
@@ -1362,27 +1300,12 @@ BEGIN
     RAISE NOTICE 'btracker: custom.btracker_order_history_by_key is off; skipped ordering account_balance_history and account_savings_history by key';
   END IF;
 
-  -- SET LOGGED copies the table with a sequential scan; a synchronized scan
-  -- could start it mid-table and store the ordered rows rotated.
-  __synchronize_seqscans := current_setting('synchronize_seqscans');
-  PERFORM set_config('synchronize_seqscans', 'off', true);
-  __started := clock_timestamp();
-  ALTER TABLE account_balance_history SET LOGGED;
-  ALTER TABLE account_vesting_history SET LOGGED;
-  RAISE NOTICE 'btracker: history tables set LOGGED in %', clock_timestamp() - __started;
-  PERFORM set_config('synchronize_seqscans', __synchronize_seqscans, true);
-  DROP TABLE IF EXISTS unlogged_history_marker;
   PERFORM request_history_tables_freeze(_context_name);
-  -- The rows' xmin, which a subtransaction would make newer than the top
-  -- transaction's id; see retry_history_tables_freeze().
+  -- See retry_history_tables_freeze().
   IF haf_has_vacuum_request_kind() THEN
     CREATE TABLE IF NOT EXISTS history_freeze_pending (rewrite_xid XID NOT NULL);
     DELETE FROM history_freeze_pending;
-    INSERT INTO history_freeze_pending
-    SELECT coalesce(
-      (SELECT xmin FROM account_balance_history LIMIT 1),
-      (SELECT xmin FROM account_vesting_history LIMIT 1),
-      pg_current_xact_id()::XID);
+    INSERT INTO history_freeze_pending VALUES (pg_current_xact_id()::XID);
   END IF;
 
   /*
@@ -1481,10 +1404,9 @@ $$;
  * -----------------------
  * Transition from massive sync to LIVE-ready state.
  * Reverses the optimizations applied during setup:
- *   1. Rewrite the balance and savings history in key order, switch UNLOGGED
- *      tables back to LOGGED, request their freeze vacuum and backfill the
- *      deferred rollups (finalize_massive_sync_before_forking, see
- *      there for why it comes first)
+ *   1. Rewrite the balance and savings history in key order, request their
+ *      freeze vacuum and backfill the deferred rollups
+ *      (finalize_massive_sync_before_forking, see there for why it comes first)
  *   2. Enable fork tracking (creates hive_rowid indexes + rewind triggers)
  *   3. Restore app indexes (updates HAF tracking table)
  *
@@ -1509,7 +1431,7 @@ BEGIN
 
   PERFORM hive.app_context_set_forking(_context_name);
   PERFORM hive.app_restore_indexes(_context_name);
-  RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + LOGGED + forking + indexes restored)';
+  RAISE NOTICE 'btracker: massive sync finalized (rollups backfilled + forking + indexes restored)';
 END
 $$;
 
@@ -1604,7 +1526,6 @@ $$
 
 BEGIN
   IF is_massive_sync_pending(_context_name) THEN
-    PERFORM raise_if_unlogged_history_lost(_context_name);
     CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
     -- Planner statistics for the unindexed, insert-only sync tables. Not a
     -- HAF vacuum request: HAF runs those as VACUUM FULL ANALYZE, a rewrite
