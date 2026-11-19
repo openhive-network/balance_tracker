@@ -1073,6 +1073,25 @@ END
 $$;
 
 /**
+ * haf_has_vacuum_request_kind()
+ * -----------------------------
+ * Whether HAF has the vacuum request kinds of hive/haf#360: the four-argument
+ * hive.app_request_table_vacuum(schema, table, interval, kind).
+ */
+CREATE OR REPLACE FUNCTION haf_has_vacuum_request_kind()
+RETURNS BOOLEAN
+LANGUAGE 'sql' STABLE
+AS
+$$
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE pronamespace = 'hive'::regnamespace
+      AND proname = 'app_request_table_vacuum'
+      AND pronargs = 4
+  )
+$$;
+
+/**
  * request_history_tables_freeze()
  * -------------------------------
  * Ask HAF for one VACUUM (FREEZE, ANALYZE) of the insert-only history tables,
@@ -1098,12 +1117,7 @@ $$
 DECLARE
   __table TEXT;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_proc
-    WHERE pronamespace = 'hive'::regnamespace
-      AND proname = 'app_request_table_vacuum'
-      AND pronargs = 4
-  ) THEN
+  IF NOT haf_has_vacuum_request_kind() THEN
     RAISE NOTICE 'btracker: HAF has no non-FULL vacuum request kind; skipping VACUUM (FREEZE, ANALYZE) of %.account_balance_history, %.account_savings_history and %.account_vesting_history', _context_name, _context_name, _context_name;
     RETURN;
   END IF;
@@ -1113,6 +1127,105 @@ BEGIN
     EXECUTE 'SELECT hive.app_request_table_vacuum($1, $2, NULL::INTERVAL, ''freeze'')'
       USING _context_name::TEXT, __table;
   END LOOP;
+END
+$$;
+
+/**
+ * vacuum_horizon_passed()
+ * -----------------------
+ * Whether a VACUUM of an application table starting now sees rows inserted by
+ * _xid as visible to all, so it can mark their pages all-visible: every
+ * transaction and snapshot it waits for is newer than _xid. It counts what
+ * VACUUM's horizon counts: backends of this database or of none (a walsender's
+ * hot_standby_feedback), except those running a VACUUM themselves, replication
+ * slots and this database's prepared transactions. False for the caller's own
+ * transaction.
+ *
+ * @param _xid  Transaction id the rows were inserted by
+ */
+CREATE OR REPLACE FUNCTION vacuum_horizon_passed(_xid XID)
+RETURNS BOOLEAN
+LANGUAGE 'sql' VOLATILE
+AS
+$$
+  -- age() orders xids across wraparound: age(x) >= age(_xid) is "x is not newer".
+  SELECT age(_xid) > coalesce(age(pg_current_xact_id_if_assigned()::XID), -1)
+     AND NOT EXISTS (
+           SELECT 1 FROM pg_stat_activity a
+           WHERE (a.datid IS NULL OR a.datname = current_database())
+             AND (age(a.backend_xmin) >= age(_xid) OR age(a.backend_xid) >= age(_xid))
+             AND NOT EXISTS (SELECT 1 FROM pg_stat_progress_vacuum v WHERE v.pid = a.pid))
+     AND NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE age(xmin) >= age(_xid))
+     AND NOT EXISTS (
+           SELECT 1 FROM pg_prepared_xacts
+           WHERE database = current_database() AND age(transaction) >= age(_xid))
+$$;
+
+/**
+ * retry_history_tables_freeze()
+ * -----------------------------
+ * Request finalize's freeze vacuum of the history tables once more when it ran
+ * too early to set their visibility map.
+ *
+ * SET LOGGED rewrites account_balance_history and account_vesting_history with
+ * every row's xmin set to the finalize transaction (history_freeze_pending
+ * records it). VACUUM marks a page all-visible only when that xmin is older than
+ * every snapshot still running, and right after finalize hived holds snapshots
+ * taken while finalize ran (its background CREATE INDEX CONCURRENTLY builds, for
+ * hours on mainnet): the freeze vacuum HAF runs then completes without marking
+ * a page (#136).
+ *
+ * Called once per live block. While history_freeze_pending exists it waits for
+ * HAF to have carried out finalize's freeze requests and for the vacuum horizon
+ * to pass the recorded xid (vacuum_horizon_passed); then, if a history table
+ * has fewer than 95% of its pages all-visible, it requests the freeze for the
+ * three tables again, which can now set the map, and drops
+ * history_freeze_pending either way. A no-op once it is gone.
+ *
+ * @param _context_name  HAF context name (the application schema)
+ */
+CREATE OR REPLACE FUNCTION retry_history_tables_freeze(_context_name hive.context_name)
+RETURNS VOID
+LANGUAGE 'plpgsql' VOLATILE
+SECURITY DEFINER
+AS
+$$
+DECLARE
+  __rewrite_xid XID;
+  __unmapped TEXT[];
+BEGIN
+  IF to_regclass('history_freeze_pending') IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM hafd.vacuum_requests
+    WHERE schema_name = _context_name
+      AND table_name IN ('account_balance_history', 'account_savings_history', 'account_vesting_history')
+      AND kind = 'freeze'
+      AND status = 'requested'
+  ) THEN
+    RETURN;
+  END IF;
+
+  SELECT rewrite_xid INTO __rewrite_xid FROM history_freeze_pending;
+  IF NOT vacuum_horizon_passed(__rewrite_xid) THEN
+    RETURN;
+  END IF;
+
+  SELECT array_agg(c.relname::TEXT ORDER BY c.relname)
+  INTO __unmapped
+  FROM pg_class c
+  WHERE c.oid IN ('account_balance_history'::regclass, 'account_savings_history'::regclass, 'account_vesting_history'::regclass)
+    AND c.relpages > 0
+    AND c.relallvisible < 0.95 * c.relpages;
+
+  IF __unmapped IS NOT NULL THEN
+    RAISE NOTICE 'btracker: the freeze vacuum of % ran before every snapshot could see finalize''s rewrite (xid %) and left no visibility map; requesting it again',
+      array_to_string(__unmapped, ', '), __rewrite_xid;
+    PERFORM request_history_tables_freeze(_context_name);
+  END IF;
+  DROP TABLE history_freeze_pending;
 END
 $$;
 
@@ -1260,6 +1373,17 @@ BEGIN
   PERFORM set_config('synchronize_seqscans', __synchronize_seqscans, true);
   DROP TABLE IF EXISTS unlogged_history_marker;
   PERFORM request_history_tables_freeze(_context_name);
+  -- The rows' xmin, which a subtransaction would make newer than the top
+  -- transaction's id; see retry_history_tables_freeze().
+  IF haf_has_vacuum_request_kind() THEN
+    CREATE TABLE IF NOT EXISTS history_freeze_pending (rewrite_xid XID NOT NULL);
+    DELETE FROM history_freeze_pending;
+    INSERT INTO history_freeze_pending
+    SELECT coalesce(
+      (SELECT xmin FROM account_balance_history LIMIT 1),
+      (SELECT xmin FROM account_vesting_history LIMIT 1),
+      pg_current_xact_id()::XID);
+  END IF;
 
   /*
    * Backfill the by-day/by-month balance rollups that process_block_range_balances
@@ -1390,8 +1514,8 @@ END
 $$;
 
 /*
- * The two finalize functions run as btracker_owner (SECURITY DEFINER) and use
- * unqualified names, so they must not resolve them through the caller's
+ * The two finalize functions and retry_history_tables_freeze() run as
+ * btracker_owner (SECURITY DEFINER) and use unqualified names, so they must not resolve them through the caller's
  * search_path: a caller could put a schema of its own first and shadow
  * isIndexesCreated() or a table with its own code. Pin it to the schema they are
  * installed in, named at install time as isIndexesCreated() names it, which also
@@ -1410,6 +1534,7 @@ BEGIN
 
   EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync_before_forking(hive.context_name) SET search_path = %s', __schema_name, __search_path);
   EXECUTE format('ALTER FUNCTION %I.finalize_massive_sync(hive.context_name) SET search_path = %s', __schema_name, __search_path);
+  EXECUTE format('ALTER FUNCTION %I.retry_history_tables_freeze(hive.context_name) SET search_path = %s', __schema_name, __search_path);
 END
 $$;
 
@@ -1458,7 +1583,8 @@ $$;
  *   ANALYZEs the history tables only during the initial sync (before
  *   finalize_massive_sync); HAF also uses this stage for catch-ups of more
  *   than 101 blocks after the app is already finalized.
- * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing().
+ * - LIVE: Finalizes massive sync (once), then calls btracker_single_processing()
+ *   and retry_history_tables_freeze().
  *   Before the first finalize, and while HAF's own massive sync is still
  *   running, processes massively instead (is_massive_sync_pending).
  *
@@ -1497,6 +1623,7 @@ BEGIN
 
   PERFORM finalize_massive_sync(_context_name);
   CALL btracker_single_processing(_block_range.first_block, _logs);
+  PERFORM retry_history_tables_freeze(_context_name);
 END
 $$;
 

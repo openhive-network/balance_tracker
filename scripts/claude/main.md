@@ -189,6 +189,36 @@ Three things keep them all-visible (#69):
   the visibility map.
   `account_savings_history`, which finalize also rewrites (below), gets the same
   request.
+- The rewrite gives every row of `account_balance_history` and
+  `account_vesting_history` the finalize transaction's xid, and a VACUUM marks a
+  page all-visible only once that xid is older than every snapshot it waits for.
+  Right after finalize hived's background `CREATE INDEX CONCURRENTLY` builds hold
+  snapshots taken while finalize ran (on steem-20, 2026-11-18, for 1.5 hours), so
+  HAF's freeze vacuum completes without marking a page (#136). With the request
+  kind, finalize records the rows' xid in `history_freeze_pending`, and
+  `retry_history_tables_freeze()` (SECURITY DEFINER, after every live block)
+  waits until HAF has carried out finalize's requests and `vacuum_horizon_passed()`
+  says no backend of this database (or walsender), replication slot or prepared
+  transaction still predates that xid. Then, if a history table has fewer than
+  95% of its pages all-visible, it requests the freeze once more, and drops
+  `history_freeze_pending` either way. While waiting it costs a
+  `hafd.vacuum_requests` lookup per block, and once HAF ran the requests a scan
+  of `pg_stat_activity` (about 0.3 ms on steem-20).
+
+Upgrading a node finalized before this whose `account_balance_history` (or
+`account_vesting_history`) has no visibility map (`relallvisible` far below
+`relpages` in `pg_class`): once hived's background index builds have finished
+(no `CREATE INDEX CONCURRENTLY` left in `pg_stat_activity`), run
+
+```sql
+VACUUM (FREEZE, ANALYZE, VERBOSE) hafbe_bal.account_balance_history, hafbe_bal.account_vesting_history, hafbe_bal.account_savings_history;
+```
+
+(schema `btracker_app` standalone). It takes no lock that blocks block
+processing (SHARE UPDATE EXCLUSIVE); on mainnet it reads and rewrites the 31 GB
+table once. VERBOSE's `removable cutoff` must be newer than the rows' `xmin`;
+if it is not, a snapshot older than finalize is still held and the map stays
+empty.
 
 ### Physical order of the balance and savings history
 
