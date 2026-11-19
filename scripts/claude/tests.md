@@ -52,7 +52,7 @@ tests/
 ├── functional/                # Script validation tests
 │   └── test_scripts.sh        # Installation script tests
 ├── maintenance/               # SQL checks of a synced schema; psql -v schema=<app schema>, after sync + finalize
-│   ├── history_tables_vacuum.sql  # history tables' vacuum setup
+│   ├── history_tables_vacuum.sql  # history tables' vacuum setup; freeze retry under a held horizon (second connection); visibility map >= 95% after finalize's freeze
 │   ├── history_physical_order.sql # balance and savings history stored in (account, nai, balance_seq_no) order after finalize; all-visible once HAF ran the freeze
 │   ├── history_key_order_switch.sql # custom.btracker_order_history_by_key: on when unset, honours on/off, rejects other values
 │   ├── balance_totals.sql     # balance_totals = aggregates of current_account_balances after sync, a live block, a fork rollback

@@ -20,9 +20,20 @@
  *   - a leftover 'full' request for a history table fails the request check, also
  *     next to a carried-out one.
  *
+ *   - retry_history_tables_freeze() (when finalize recorded history_freeze_pending)
+ *     waits while finalize's freeze requests are pending and while another
+ *     connection holds a snapshot older than the rewrite (a real second
+ *     connection, opened from BTRACKER_TEST_DB_URL; skipped without it), and
+ *     requests the freeze again once the horizon has passed;
+ *   - after finalize's freeze requests are carried out as HAF runs them, at least
+ *     95% of the pages of each non-empty history table are all-visible, and the
+ *     retry stops without requesting anything.
+ *
  * Expects psql variable `schema` (the application schema, also its context name)
  * and a synced, finalized schema. Every case that changes state runs in a
- * transaction that is rolled back. Run under `psql -v ON_ERROR_STOP=on`.
+ * transaction that is rolled back, except the last, which carries out
+ * finalize's freeze requests (the VACUUM HAF would run) and lets the retry drop
+ * history_freeze_pending. Run under `psql -v ON_ERROR_STOP=on`.
  */
 
 \set ON_ERROR_STOP on
@@ -318,3 +329,230 @@ BEGIN
 END
 $$;
 ROLLBACK;
+
+-- retry_history_tables_freeze() (#136). Finalize records the xid of its rewrite
+-- in history_freeze_pending when HAF has the request kind; the cases below need
+-- it and are skipped without it.
+SELECT to_regclass('history_freeze_pending') IS NOT NULL AS freeze_pending \gset
+
+-- Statuses of the history tables' 'freeze' requests as sorted 'table:status' pairs.
+CREATE FUNCTION pg_temp.freeze_request_statuses()
+RETURNS TEXT[] LANGUAGE sql STABLE
+AS $f$
+  SELECT coalesce(array_agg(r.table_name || ':' || r.status ORDER BY r.table_name), '{}')
+  FROM hafd.vacuum_requests r
+  WHERE r.schema_name = current_setting('btracker_test.schema')
+    AND r.table_name IN ('account_balance_history', 'account_savings_history', 'account_vesting_history')
+    AND to_jsonb(r) ->> 'kind' = 'freeze'
+$f$;
+
+-- What a freeze vacuum HAF ran while the horizon was held leaves: its requests
+-- carried out, the visibility map still empty; and the rewrite's xid set to
+-- _xid.
+CREATE FUNCTION pg_temp.freeze_ran_too_early(_xid XID)
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+BEGIN
+  UPDATE hafd.vacuum_requests
+  SET status = 'vacuumed', last_vacuumed_time = now()
+  WHERE schema_name = current_setting('btracker_test.schema')
+    AND table_name IN ('account_balance_history', 'account_savings_history', 'account_vesting_history')
+    AND kind = 'freeze';
+  SET LOCAL ROLE btracker_owner;
+  UPDATE history_freeze_pending SET rewrite_xid = _xid;
+  RESET ROLE;
+END
+$f$;
+
+CREATE FUNCTION pg_temp.retry_freeze()
+RETURNS VOID LANGUAGE plpgsql
+AS $f$
+BEGIN
+  SET LOCAL ROLE btracker_owner;
+  PERFORM retry_history_tables_freeze(current_setting('btracker_test.schema'));
+  RESET ROLE;
+END
+$f$;
+
+-- Whether account_balance_history, which every synced range fills, has no
+-- visibility map yet, as the SET LOGGED rewrite leaves it.
+CREATE FUNCTION pg_temp.balance_history_unmapped()
+RETURNS BOOLEAN LANGUAGE sql STABLE
+AS $f$
+  SELECT relallvisible < 0.95 * relpages FROM pg_class WHERE oid = 'account_balance_history'::regclass
+$f$;
+
+\if :freeze_pending
+
+-- While finalize's freeze requests are pending the retry waits for them.
+BEGIN;
+DO
+$$
+DECLARE
+  __statuses_before CONSTANT TEXT[] := pg_temp.freeze_request_statuses();
+BEGIN
+  IF NOT 'account_balance_history:requested' = ANY (__statuses_before) THEN
+    RAISE NOTICE 'SKIP: retry with pending requests: HAF has already carried them out (%)', __statuses_before;
+    RETURN;
+  END IF;
+  PERFORM pg_temp.retry_freeze();
+  IF to_regclass('history_freeze_pending') IS NULL THEN
+    RAISE EXCEPTION 'retry_history_tables_freeze() dropped history_freeze_pending while finalize''s requests were pending';
+  END IF;
+  IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __statuses_before THEN
+    RAISE EXCEPTION 'retry with pending requests changed them: % -> %', __statuses_before, pg_temp.freeze_request_statuses();
+  END IF;
+  RAISE NOTICE 'PASS: the retry waits while finalize''s freeze requests are pending';
+END
+$$;
+ROLLBACK;
+
+-- A freeze vacuum run while another backend holds a snapshot older than the
+-- rewrite marks nothing all-visible: the retry waits while such a snapshot
+-- exists, then requests the freeze again. The holder is a second connection,
+-- opened from the URL run-checks.sh exports.
+\set test_db_url `echo "$BTRACKER_TEST_DB_URL"`
+SELECT :'test_db_url' <> '' AND pg_temp.balance_history_unmapped() AS horizon_case \gset
+\if :horizon_case
+
+\! PGAPPNAME=btracker_test_horizon_holder psql "$BTRACKER_TEST_DB_URL" -X -q -c 'BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1; SELECT pg_sleep(120); COMMIT' > /dev/null 2>&1 &
+
+-- Top-level DO: each COMMIT releases this session's snapshot, so its own xmin
+-- never holds the horizon it is waiting on.
+DO
+$$
+BEGIN
+  FOR __i IN 1 .. 60 LOOP
+    IF EXISTS (SELECT 1 FROM pg_stat_activity
+               WHERE application_name = 'btracker_test_horizon_holder' AND backend_xmin IS NOT NULL) THEN
+      RETURN;
+    END IF;
+    PERFORM pg_sleep(0.5);
+    COMMIT;
+  END LOOP;
+  RAISE EXCEPTION 'the horizon-holding connection did not take its snapshot within 30 s';
+END
+$$;
+
+-- A committed xid newer than the holder's snapshot stands for the rewrite's.
+SELECT pg_current_xact_id()::XID AS rewrite_xid \gset
+SELECT set_config('btracker_test.rewrite_xid', :'rewrite_xid', false);
+
+BEGIN;
+DO
+$$
+DECLARE
+  __xid CONSTANT XID := current_setting('btracker_test.rewrite_xid')::XID;
+  __statuses TEXT[];
+BEGIN
+  PERFORM pg_temp.freeze_ran_too_early(__xid);
+  __statuses := pg_temp.freeze_request_statuses();
+  IF vacuum_horizon_passed(__xid) THEN
+    RAISE EXCEPTION 'vacuum_horizon_passed(%) while a backend holds an older snapshot', __xid;
+  END IF;
+  PERFORM pg_temp.retry_freeze();
+  IF to_regclass('history_freeze_pending') IS NULL THEN
+    RAISE EXCEPTION 'retry_history_tables_freeze() dropped history_freeze_pending while the horizon was held';
+  END IF;
+  IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __statuses THEN
+    RAISE EXCEPTION 'retry under a held horizon requested a vacuum: % -> %', __statuses, pg_temp.freeze_request_statuses();
+  END IF;
+  RAISE NOTICE 'PASS: the retry waits while a snapshot older than the rewrite is held';
+END
+$$;
+ROLLBACK;
+
+SELECT count(pg_terminate_backend(pid)) AS holders_terminated
+FROM pg_stat_activity WHERE application_name = 'btracker_test_horizon_holder';
+
+DO
+$$
+BEGIN
+  FOR __i IN 1 .. 600 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    IF vacuum_horizon_passed(current_setting('btracker_test.rewrite_xid')::XID) THEN
+      RETURN;
+    END IF;
+    PERFORM pg_sleep(0.5);
+    COMMIT;
+  END LOOP;
+  RAISE EXCEPTION 'the horizon did not pass xid % within 300 s of terminating the holder: %',
+    current_setting('btracker_test.rewrite_xid'),
+    (SELECT array_agg(format('%s/%s xmin %s xid %s', pid, backend_type, backend_xmin, backend_xid))
+     FROM pg_stat_activity WHERE backend_xmin IS NOT NULL OR backend_xid IS NOT NULL);
+END
+$$;
+
+BEGIN;
+DO
+$$
+DECLARE
+  __expected CONSTANT TEXT[] := ARRAY[
+    'account_balance_history:requested', 'account_savings_history:requested', 'account_vesting_history:requested'];
+BEGIN
+  PERFORM pg_temp.freeze_ran_too_early(current_setting('btracker_test.rewrite_xid')::XID);
+  PERFORM pg_temp.retry_freeze();
+  IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __expected THEN
+    RAISE EXCEPTION 'expected the retry to request the freeze again (%), found %', __expected, pg_temp.freeze_request_statuses();
+  END IF;
+  IF to_regclass('history_freeze_pending') IS NOT NULL THEN
+    RAISE EXCEPTION 'retry_history_tables_freeze() kept history_freeze_pending after requesting the freeze again';
+  END IF;
+  PERFORM pg_temp.assert_history_vacuum_requests(pg_temp.requests_after_finalize(), 'the retry');
+  RAISE NOTICE 'PASS: once the horizon passes the rewrite, the retry requests the freeze again and stops';
+END
+$$;
+ROLLBACK;
+
+\else
+SELECT 'SKIP: retry under a held horizon: needs BTRACKER_TEST_DB_URL and a history table without a visibility map' AS skipped;
+\endif
+
+-- finalize's freeze requests carried out as HAF's executor runs them, outside
+-- any transaction, after finalize committed: the visibility map ends up set, and
+-- the next live block's retry finds nothing to request again. Not rolled back.
+SET ROLE btracker_owner;
+VACUUM (FREEZE, ANALYZE) account_balance_history, account_savings_history, account_vesting_history;
+RESET ROLE;
+UPDATE hafd.vacuum_requests
+SET status = 'vacuumed', last_vacuumed_time = now()
+WHERE schema_name = current_setting('btracker_test.schema')
+  AND table_name IN ('account_balance_history', 'account_savings_history', 'account_vesting_history')
+  AND kind = 'freeze' AND status = 'requested';
+
+DO
+$$
+DECLARE
+  __statuses TEXT[];
+  __table TEXT;
+  __pages INT;
+  __all_visible INT;
+BEGIN
+  __statuses := pg_temp.freeze_request_statuses();
+  PERFORM pg_temp.retry_freeze();
+  IF to_regclass('history_freeze_pending') IS NOT NULL THEN
+    RAISE EXCEPTION 'retry_history_tables_freeze() kept history_freeze_pending after the freeze vacuum ran';
+  END IF;
+  IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __statuses THEN
+    RAISE EXCEPTION 'the retry requested a vacuum after the freeze set the map: % -> %', __statuses, pg_temp.freeze_request_statuses();
+  END IF;
+
+  FOREACH __table IN ARRAY ARRAY['account_balance_history', 'account_savings_history', 'account_vesting_history'] LOOP
+    SELECT relpages, relallvisible INTO __pages, __all_visible FROM pg_class WHERE oid = __table::regclass;
+    IF __pages = 0 THEN
+      RAISE NOTICE 'SKIP: % visibility map: the synced range left it empty', __table;
+      CONTINUE;
+    END IF;
+    IF __all_visible < 0.95 * __pages THEN
+      RAISE EXCEPTION '%: % of % pages all-visible after finalize''s freeze vacuum, expected at least 95%%',
+        __table, __all_visible, __pages;
+    END IF;
+    RAISE NOTICE 'PASS: % of % pages of % all-visible after finalize''s freeze vacuum', __all_visible, __pages, __table;
+  END LOOP;
+  RAISE NOTICE 'PASS: the retry stops without a request once the freeze vacuum set the map';
+END
+$$;
+
+\else
+SELECT 'SKIP: retry_history_tables_freeze(): finalize recorded no history_freeze_pending (HAF has no request kind)' AS skipped;
+\endif

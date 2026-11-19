@@ -1,8 +1,8 @@
 /*
  * finalize_security_definer.sql
  * =============================
- * finalize_massive_sync() and finalize_massive_sync_before_forking() run as
- * btracker_owner (SECURITY DEFINER):
+ * finalize_massive_sync(), finalize_massive_sync_before_forking() and
+ * retry_history_tables_freeze() run as btracker_owner (SECURITY DEFINER):
  *
  *   - a caller with a schema of its own first in its search_path, holding a
  *     function named isIndexesCreated, does not get that function called;
@@ -28,7 +28,7 @@ BEGIN
     RAISE EXCEPTION 'expected a finalized schema';
   END IF;
 
-  FOREACH __function IN ARRAY ARRAY['finalize_massive_sync_before_forking', 'finalize_massive_sync'] LOOP
+  FOREACH __function IN ARRAY ARRAY['finalize_massive_sync_before_forking', 'finalize_massive_sync', 'retry_history_tables_freeze'] LOOP
     IF EXISTS (
       SELECT 1
       FROM pg_proc p, aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
@@ -60,7 +60,7 @@ BEGIN
   PERFORM set_config('search_path', format('%I, public', __schema), true);
 
   SET LOCAL ROLE btracker_user;
-  FOREACH __function IN ARRAY ARRAY['finalize_massive_sync_before_forking', 'finalize_massive_sync'] LOOP
+  FOREACH __function IN ARRAY ARRAY['finalize_massive_sync_before_forking', 'finalize_massive_sync', 'retry_history_tables_freeze'] LOOP
     BEGIN
       EXECUTE format('SELECT %I.%I($1)', __schema, __function) USING __schema;
       RAISE EXCEPTION '%: btracker_user is not refused', __function;

@@ -25,6 +25,8 @@
 #   - maintenance     tests/maintenance: the history tables' autovacuum reloptions, no
 #                     HAF vacuum request from the sync, finalize or a later catch-up
 #                     besides finalize's 'freeze' requests, and those freeze requests;
+#                     their retry under a snapshot held by a second connection, and
+#                     the history tables' visibility map once they have run;
 #                     balance_totals against current_account_balances after the sync,
 #                     a live block and its fork rollback; the history tables' stored
 #                     op_type_id against hafd.operations
