@@ -330,8 +330,8 @@ END
 $$;
 ROLLBACK;
 
--- retry_history_tables_freeze() (#136). Finalize records the xid of its rewrite
--- in history_freeze_pending when HAF has the request kind; the cases below need
+-- retry_history_tables_freeze() (#136). Finalize records its own xid, which
+-- bounds every history row's xmin, in history_freeze_pending when HAF has the request kind; the cases below need
 -- it and are skipped without it.
 SELECT to_regclass('history_freeze_pending') IS NOT NULL AS freeze_pending \gset
 
@@ -375,7 +375,7 @@ END
 $f$;
 
 -- Whether account_balance_history, which every synced range fills, has no
--- visibility map yet, as the SET LOGGED rewrite leaves it.
+-- visibility map yet, as the key-order rewrite leaves it.
 CREATE FUNCTION pg_temp.balance_history_unmapped()
 RETURNS BOOLEAN LANGUAGE sql STABLE
 AS $f$
