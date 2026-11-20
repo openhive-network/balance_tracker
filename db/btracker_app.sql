@@ -1246,8 +1246,6 @@ $$;
  * --------------------------------------
  * The part of massive-sync finalization that bulk-writes registered tables, and
  * therefore MUST run before the context is switched to forking:
- *   0. Refuse (raise) when a table of the schema is UNLOGGED: such an install
- *      was synced in part by older code and must be uninstalled and synced again
  *   1. Rewrite the balance and savings history in key order
  *      (order_history_tables_by_key, unless history_key_order_enabled() says
  *      off) and request their freeze vacuum
@@ -1280,8 +1278,6 @@ LANGUAGE 'plpgsql' VOLATILE
 SECURITY DEFINER
 AS
 $$
-DECLARE
-  __unlogged_tables TEXT;
 BEGIN
   IF isIndexesCreated() THEN
     RETURN;  -- Already finalized
@@ -1289,22 +1285,6 @@ BEGIN
 
   IF current_setting('btracker.rollups_backfilled', true) = 'true' THEN
     RETURN;  -- Already done earlier in this transaction
-  END IF;
-
-  /*
-   * The history tables are LOGGED from the install on (#137). An install synced
-   * in part by older code, which kept them UNLOGGED until finalize, has no
-   * upgrade path: going live with them UNLOGGED would let the next crash
-   * recovery empty them silently. current_schema() is the install schema: the
-   * search_path is pinned below.
-   */
-  SELECT string_agg(c.relname, ', ' ORDER BY c.relname) INTO __unlogged_tables
-  FROM pg_class c
-  WHERE c.relnamespace = current_schema()::regnamespace
-    AND c.relkind IN ('r', 'p')
-    AND c.relpersistence = 'u';
-  IF __unlogged_tables IS NOT NULL THEN
-    RAISE EXCEPTION 'btracker: tables of schema % are UNLOGGED: %. A crash recovery would empty them. This install was synced in part by an older balance tracker; uninstall it and sync again.', current_schema(), __unlogged_tables;
   END IF;
 
   IF hive.app_is_forking(_context_name) AND hive.app_context_is_attached(_context_name) THEN
