@@ -630,6 +630,10 @@ sync_with_mock_data:
     IFS=" " read -ra COMPOSE_OPTIONS <<< $COMPOSE_OPTIONS_STRING
     docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -v ON_ERROR_STOP=on \
       -v schema=btracker_app -v require_clears=1 -f - < "${CI_PROJECT_DIR}/tests/maintenance/cleared_accounts_batch.sql"
+    # The delayed VESTS each payout takes (withdraw_delayed_vests), over the
+    # mock data's simulated HF24 (rolled back)
+    docker compose "${COMPOSE_OPTIONS[@]}" exec -T haf psql -U haf_admin -d haf_block_log -v ON_ERROR_STOP=on \
+      -v schema=btracker_app -f - < "${CI_PROJECT_DIR}/tests/maintenance/withdraw_delayed_vests.sql"
     popd
 
     # === Stop containers and save cache in main script ===

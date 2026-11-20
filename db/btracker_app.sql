@@ -41,6 +41,7 @@
  * 7. WITHDRAWALS (Power-down)
  *    - account_withdraws: Power-down state per account
  *    - account_withdraw_history: power-down state after every change
+ *    - withdraw_delayed_vests: delayed VESTS each payout took (db/withdraw_delayed_vests.sql)
  *    - account_routes: Vesting withdrawal routing rules
  *
  * 8. SAVINGS

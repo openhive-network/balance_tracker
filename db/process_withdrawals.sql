@@ -564,7 +564,8 @@ process_block_range_data_raw AS MATERIALIZED
     result.to_account AS to_account_name,
     result.withdrawn,
     result.deposited,
-    o.id AS source_op
+    o.id AS source_op,
+    o.op_type_id
   FROM ops_delays o
   CROSS JOIN LATERAL (
     SELECT (
@@ -601,7 +602,8 @@ process_block_range_data_b AS (
     ai_to.account_id AS to_account,
     pr.withdrawn,
     pr.deposited,
-    pr.source_op
+    pr.source_op,
+    pr.op_type_id
   FROM process_block_range_data_raw pr
   JOIN account_ids_delays ai_from ON ai_from.account_name = pr.from_account_name
   LEFT JOIN account_ids_delays ai_to ON ai_to.account_name = pr.to_account_name
@@ -609,12 +611,15 @@ process_block_range_data_b AS (
 --------------------------------------------------------------------------------------
 -- Flatten operations into (account_id, balance_delta) rows.
 -- One operation may produce TWO rows: one for from_account (withdrawn), one for to_account (deposited).
+-- is_withdrawal marks a fill_vesting_withdraw's withdrawer row: the VESTS the fill
+-- takes from its delayed VESTS are recorded in withdraw_delayed_vests.
 union_delays_ops AS MATERIALIZED (
   SELECT
     from_account AS account_id,
     withdrawn AS balance,  -- typically negative (reducing delayed vests)
     source_op,
-    FALSE AS is_clear
+    FALSE AS is_clear,
+    op_type_id = _op_fill_vesting_withdraw AS is_withdrawal
   FROM process_block_range_data_b
 
   UNION ALL
@@ -623,7 +628,8 @@ union_delays_ops AS MATERIALIZED (
     to_account AS account_id,
     deposited AS balance,  -- typically positive (adding delayed vests)
     source_op,
-    FALSE AS is_clear
+    FALSE AS is_clear,
+    FALSE AS is_withdrawal
   FROM process_block_range_data_b
   WHERE to_account IS NOT NULL
 ),
@@ -636,11 +642,11 @@ union_delays_ops AS MATERIALIZED (
 -- cleared every block - 'null' - would otherwise add a row per block to the recursion,
 -- whose cost grows with the square of its rows.)
 union_delays AS MATERIALIZED (
-  SELECT account_id, balance, source_op, is_clear FROM union_delays_ops
+  SELECT account_id, balance, source_op, is_clear, is_withdrawal FROM union_delays_ops
 
   UNION ALL
 
-  SELECT ac.account_id, 0::BIGINT AS balance, MAX(ac.source_op) AS source_op, TRUE AS is_clear
+  SELECT ac.account_id, 0::BIGINT AS balance, MAX(ac.source_op) AS source_op, TRUE AS is_clear, FALSE AS is_withdrawal
   FROM btracker_backend.account_clears_in_range(_from, _to) ac
   WHERE EXISTS (SELECT 1 FROM union_delays_ops u WHERE u.account_id = ac.account_id)
      OR EXISTS (SELECT 1 FROM account_withdraws aw WHERE aw.account = ac.account_id AND aw.delayed_vests <> 0)
@@ -659,7 +665,8 @@ join_prev_delays AS (
     gb.account_id,
     COALESCE(aw.delayed_vests,0) AS balance,
     0 AS source_op,
-    FALSE AS is_clear
+    FALSE AS is_clear,
+    FALSE AS is_withdrawal
   FROM group_by_account gb
   LEFT JOIN account_withdraws aw ON aw.account = gb.account_id
 ),
@@ -669,7 +676,8 @@ union_prev_delays AS (
     account_id,
     balance,
     source_op,
-    is_clear
+    is_clear,
+    is_withdrawal
   FROM join_prev_delays
 
   UNION ALL
@@ -678,20 +686,27 @@ union_prev_delays AS (
     account_id,
     balance,
     source_op,
-    is_clear
+    is_clear,
+    is_withdrawal
   FROM union_delays
 ),
 add_row_number AS (
   -- Number rows per account, ordered by source_op.
   -- row_num=1 is the previous balance, row_num=2+ are operations.
+  -- The two rows of a fill that routes VESTS to its own withdrawer (auto_vest to
+  -- itself) share a source_op: the deposit goes first. hived nets the route against
+  -- the withdrawal (delayed_voting::add_votes), so the route alone takes nothing
+  -- from the delayed VESTS; withdrawal first, the clamp could empty them and the
+  -- deposit would then add delayed VESTS hived never adds.
   SELECT
     account_id,
     balance,
     source_op,
     is_clear,
+    is_withdrawal,
     ROW_NUMBER() OVER w_account_asc AS row_num
   FROM union_prev_delays
-  WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op)
+  WINDOW w_account_asc AS (PARTITION BY account_id ORDER BY source_op, balance < 0)
 ),
 --------------------------------------------------------------------------------------
 -- WHY RECURSIVE CTE?
@@ -737,6 +752,32 @@ recursive_delays AS MATERIALIZED (
   )
   SELECT * FROM calculated_delays
 ),
+-- The VESTS each fill_vesting_withdraw took from its withdrawer's delayed VESTS: the
+-- value before the operation's first row minus the value after its last one (a fill
+-- routing VESTS to its own withdrawer has two rows). hived lowers the withdrawer's
+-- governance weight only by the rest of the withdrawal (database_vesting.cpp,
+-- process_vesting_withdrawals): the weight change of a fill is its (negative) VESTS
+-- change plus what it took.
+delayed_vests_taken AS (
+  SELECT
+    f.account_id,
+    f.source_op,
+    before_fill.balance - after_fill.balance AS taken
+  FROM (
+    SELECT account_id, source_op, MIN(row_num) AS first_row, MAX(row_num) AS last_row
+    FROM add_row_number
+    GROUP BY account_id, source_op
+    HAVING bool_or(is_withdrawal)
+  ) f
+  JOIN recursive_delays before_fill ON before_fill.account_id = f.account_id AND before_fill.row_num = f.first_row - 1
+  JOIN recursive_delays after_fill ON after_fill.account_id = f.account_id AND after_fill.row_num = f.last_row
+),
+insert_delayed_vests_taken AS (
+  INSERT INTO withdraw_delayed_vests (account, source_op, delayed_vests)
+  SELECT account_id, source_op, taken
+  FROM delayed_vests_taken
+  WHERE taken > 0
+),
 latest_rows AS (
   -- Extract final balance per account (highest row_num = last operation processed).
   SELECT
@@ -745,7 +786,8 @@ latest_rows AS (
     ROW_NUMBER() OVER w_account_desc AS rn
   FROM
     recursive_delays
-  WINDOW w_account_desc AS (PARTITION BY account_id ORDER BY source_op DESC)
+  -- row_num, not source_op: a fill routing VESTS to its own withdrawer has two rows under one source_op.
+  WINDOW w_account_desc AS (PARTITION BY account_id ORDER BY row_num DESC)
 )
 --------------------------------------------------------------------------------------
 INSERT INTO account_withdraws

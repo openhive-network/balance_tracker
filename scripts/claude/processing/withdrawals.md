@@ -27,6 +27,7 @@ Power-down (vesting withdrawal) state tracking with routes and delayed voting.
 | `account_withdraws` | RW | Withdrawal state: to_withdraw, withdrawn, rate, routes count, delayed_vests |
 | `account_routes` | RW | Active routing rules (from_account, to_account, percent) |
 | `account_withdraw_history` | W | Power-down state (rate, to_withdraw, withdrawn) after every withdraw_vesting, HF23 reset and fill |
+| `withdraw_delayed_vests` | W | The VESTS a fill took from its withdrawer's delayed VESTS (section 4), one row per such fill |
 
 ## Operations Processed
 
@@ -123,6 +124,28 @@ WITH RECURSIVE calculated_delays AS (
   JOIN add_row_number next_cp ON next_cp.row_num = prev.row_num + 1
 )
 ```
+
+### Delayed VESTS a payout takes
+
+hived takes a power-down payout from the delayed VESTS first: a payout of W VESTS with D
+delayed erases `min(W, D)` of them and lowers the withdrawer's governance weight by
+`max(0, W - D)` only (`process_vesting_withdrawals`, `delayed_voting::update_votes`). The
+erased delayed VESTS never mature, so no later `delayed_voting` adds them back. Section 4
+records what each `fill_vesting_withdraw` took in `withdraw_delayed_vests`: the
+clamped running value before the fill's first row minus the value after its last. A fill
+without a row took nothing; a reader's weight change for a fill is its VESTS change plus
+the row's `delayed_vests`. Rows exist for fills processed from the version that added the
+table on: an upgraded install has none for earlier ones. `db/withdraw_delayed_vests.sql`
+creates the table in the transaction that installs `db/process_withdrawals.sql`, so an
+application running through the upgrade records every fill from its first batch that sees
+the table. `latest_rows` picks an account's final value by `row_num`, not `source_op`, for
+the same two-row fills.
+
+A fill that routes VESTS to its own withdrawer (`auto_vest` route to itself) has a deposit
+and a withdrawal row under one `source_op`. The deposit is ordered first, so the route
+leaves the delayed VESTS as they were: hived nets it against the withdrawal
+(`delayed_voting::add_votes`) and adds no delayed VESTS for it. Withdrawal first, the clamp
+could empty them and the deposit would then add delayed VESTS hived never adds.
 
 ### Balance-clearing operations (#61)
 
