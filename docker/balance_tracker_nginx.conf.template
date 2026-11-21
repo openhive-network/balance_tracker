@@ -17,9 +17,20 @@ http {
         rpc_arguments = dofile(ngx.config.prefix() .. "conf/rpc_arguments.lua")
     }
 
+    # ${RESOLVER} will be replaced by the docker entrypoint script. A variable proxy_pass
+    # resolves its name through it on each lookup (cached for 10s), so a recreated PostgREST
+    # is followed at its new address without restarting or reloading nginx.
+    resolver ${RESOLVER} valid=10s;
+
     server {
             listen 0.0.0.0:80 default_server;
             server_name _;
+
+            # Set at server level, before location / runs its rewrite rules: a `rewrite ... break`
+            # there ends the rewrite module's directives for the location, so a `set` after it
+            # would never run for a rewritten request. No URI part, so the request URI goes
+            # upstream as rewritten, the same as a literal proxy_pass would send it.
+            set $postgrest_upstream http://balance-tracker-postgrest:3000;
 
             location / {
                     include rewrite_rules.conf;
@@ -42,7 +53,7 @@ http {
                         rpc_form.restore_head()
                     }
 
-                    proxy_pass  http://balance-tracker-postgrest:3000;  # my PostREST is  here!
+                    proxy_pass $postgrest_upstream;
 
                     proxy_set_header Host $host;
                     proxy_set_header X-Real-IP $remote_addr;
