@@ -385,6 +385,7 @@ For HAFBE documentation, see parent repo's `scripts/claude/`.
 - `account_savings_history` - Every savings change
 - `account_delegation_history` - `account_delegations` (delegated/received VESTS) after every change
 - `account_withdraw_history` - power-down state (rate, to_withdraw, withdrawn) of `account_withdraws` after every change
+- `withdraw_delayed_vests` - the VESTS each `fill_vesting_withdraw` took from its withdrawer's delayed VESTS (only fills that took some); a fill's governance-weight change is its VESTS change plus this. Created by `db/withdraw_delayed_vests.sql` in the transaction that installs `db/process_withdrawals.sql`, so it is complete from the upgrade on (see `scripts/claude/processing/withdrawals.md`)
 
 The two power the past-block balances (`at-block`): each is indexed on `(account, block, source_op)`
 (registered with HAF's index lifecycle, built at finalize), and its latest row per account equals
