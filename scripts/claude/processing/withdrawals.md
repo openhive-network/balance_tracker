@@ -128,8 +128,9 @@ WITH RECURSIVE calculated_delays AS (
 ### Delayed VESTS a payout takes
 
 hived takes a power-down payout from the delayed VESTS first: a payout of W VESTS with D
-delayed erases `min(W, D)` of them and lowers the withdrawer's governance weight by
-`max(0, W - D)` only (`process_vesting_withdrawals`, `delayed_voting::update_votes`). The
+delayed, S of them routed back to the withdrawer as VESTS, erases `min(W - S, D)` of them
+and lowers the withdrawer's governance weight by `max(0, W - S - D)` only
+(`process_vesting_withdrawals`, `delayed_voting::update_votes`). The
 erased delayed VESTS never mature, so no later `delayed_voting` adds them back. Section 4
 records what each `fill_vesting_withdraw` took in `withdraw_delayed_vests`: the
 clamped running value before the fill's first row minus the value after its last. A fill

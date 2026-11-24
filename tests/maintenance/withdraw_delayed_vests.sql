@@ -2,8 +2,9 @@
  * withdraw_delayed_vests.sql
  * ==========================
  * hived takes a power-down payout from the withdrawer's delayed VESTS first: a payout
- * of W VESTS with D delayed erases min(W, D) of them and lowers the governance weight
- * by max(0, W - D) only (database_vesting.cpp process_vesting_withdrawals,
+ * of W VESTS with D delayed, S of them routed back to the withdrawer as VESTS, erases
+ * min(W - S, D) of them and lowers the governance weight by max(0, W - S - D) only
+ * (database_vesting.cpp process_vesting_withdrawals,
  * delayed_voting::update_votes). process_block_range_withdrawals records what each
  * fill_vesting_withdraw took in withdraw_delayed_vests:
  *
