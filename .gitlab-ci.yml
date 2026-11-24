@@ -202,12 +202,32 @@ generate_python_api_client:
   tags:
   - public-runner-docker
 
+# pip wheel copies the wheel onto PYTHON_API_DIST_DIR when that path is not a
+# directory at copy time, leaving a file named dist that `dist/*.whl` never
+# matches; the template neither creates the directory nor checks the result.
+.python_api_dist_wheel_check:
+  script: &python_api_dist_wheel_check
+  - |
+    wheels=("${PYTHON_API_DIST_DIR}"/*.whl)
+    if [[ ! -d "${PYTHON_API_DIST_DIR}" || ${#wheels[@]} -ne 1 || ! -f "${wheels[0]}" ]]; then
+      echo "Expected the directory ${PYTHON_API_DIST_DIR} to hold exactly one wheel built by build_python_api_client_wheel; found:" >&2
+      ls -al "${PYTHON_API_DIST_DIR}" >&2 || true
+      exit 1
+    fi
+
 build_python_api_client_wheel:
   extends: .python_api_package_build
   stage: build
   needs:
   - job: generate_python_api_client
     artifacts: true
+  before_script:
+  - !reference [.python_api_package_base, before_script]
+  - rm -rf "${PYTHON_API_DIST_DIR}"
+  - mkdir -p "${PYTHON_API_DIST_DIR}"
+  script:
+  - !reference [.python_api_package_build, script]
+  - *python_api_dist_wheel_check
   tags:
   - public-runner-docker
 
@@ -1009,6 +1029,7 @@ test_python_api_wheel:
   before_script:
   - *early_exit_check
   - !reference [.python_api_package_base, before_script]
+  - *python_api_dist_wheel_check
   tags:
   - public-runner-docker
 
@@ -1031,6 +1052,7 @@ python_api_client_test:
   before_script:
   - *early_exit_check
   - !reference [.python_api_package_base, before_script]
+  - *python_api_dist_wheel_check
   script:
   - pip install --index-url "${PYTHON_API_INDEX_URL}" ${PYTHON_API_PIP_EXTRA_ARGS} "${PYTHON_API_DIST_DIR}"/*.whl
   - python3 "${CI_PROJECT_DIR}/tests/python_api_client/call_endpoint.py"
