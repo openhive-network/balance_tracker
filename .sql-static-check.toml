@@ -1,0 +1,12 @@
+# sql-static-check configuration for balance_tracker.
+#
+# SQL-X01 (unknown table) is a blocking gate at zero: every table a query names
+# must be declared somewhere in this tree. The exceptions below are relations
+# that live in the HAF (Hive Application Framework) database, installed
+# separately — their DDL is not in this repo and cannot be.
+#
+# Adding an entry hides a whole class of typo from the gate. Add one only when
+# no DDL in this tree could ever declare it, and say why.
+
+[external_tables]
+applications = "HAF application registry (hafd.applications). HAF is installed separately; its schema DDL is not in this repo. The parallel sync reads this table to look up the registered entry procedure for the application that owns a context."
