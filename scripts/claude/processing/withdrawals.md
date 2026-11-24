@@ -107,7 +107,7 @@ WHERE gi.source_op > ar.source_op  -- Only delete routes created BEFORE HF23
 ### Section 4: Delayed Voting (HF24+)
 
 Handles three operations affecting `delayed_vests`:
-- `fill_vesting_withdraw`: Reduces delayed_vests proportionally
+- `fill_vesting_withdraw`: Takes from delayed_vests first (see "Delayed VESTS a payout takes")
 - `transfer_to_vesting_completed`: Adds to delayed_vests
 - `delayed_voting`: Removes from delayed_vests
 
@@ -127,7 +127,8 @@ WITH RECURSIVE calculated_delays AS (
 
 ### Delayed VESTS a payout takes
 
-hived takes a power-down payout from the delayed VESTS first: a payout of W VESTS with D
+hived takes a power-down payout (all of a withdrawer's fills in a block) from the delayed
+VESTS first: a payout of W VESTS with D
 delayed, S of them routed back to the withdrawer as VESTS, erases `min(W - S, D)` of them
 and lowers the withdrawer's governance weight by `max(0, W - S - D)` only
 (`process_vesting_withdrawals`, `delayed_voting::update_votes`). The
@@ -198,7 +199,8 @@ Some accounts had all state zeroed. Routes created AFTER HF23 operation in the s
 
 ### Negative Delayed Vests Prevention
 
-Withdrawals reduce delayed_vests proportionally. Recursive CTE with GREATEST(..., 0) prevents underflow.
+A payout takes from delayed_vests first, up to the VESTS it withdraws net of a VESTS route
+back to the withdrawer. Recursive CTE with GREATEST(..., 0) prevents underflow.
 
 ## Related Processing
 

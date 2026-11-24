@@ -48,5 +48,5 @@ steem:       HIVE 29325210, VESTS 15636872956265,   delayed_vests: 0
 ## Notes
 
 - `delayed_voting_operation` clears delayed vests after the 30-day period
-- Power-downs reduce delayed_vests proportionally
+- Power-downs take from delayed_vests first, up to the VESTS they withdraw
 - This mock data requires HF24 to be simulated (done by `update_irreversible_block()`)

@@ -6,7 +6,8 @@ SET ROLE btracker_owner;
  * withdraw_delayed_vests holds, for each fill_vesting_withdraw that took VESTS from
  * its withdrawer's delayed VESTS (account_withdraws.delayed_vests, a power-up still
  * in its 30-day delay), the VESTS it took, written by process_block_range_withdrawals.
- * hived takes a payout from the delayed VESTS first: a payout of W VESTS with D
+ * hived takes a payout (all of a withdrawer's fills in a block) from the delayed VESTS
+ * first: a payout of W VESTS with D
  * delayed, S of them routed back to the withdrawer as VESTS, erases min(W - S, D) of
  * them and lowers the withdrawer's governance weight by max(0, W - S - D) only
  * (database_vesting.cpp process_vesting_withdrawals, delayed_voting::update_votes).

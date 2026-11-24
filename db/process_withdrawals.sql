@@ -556,7 +556,7 @@ process_block_range_data_raw AS MATERIALIZED
 (
   -- Only process ops AFTER HF24 - delayed voting didn't exist before.
   -- Operations affect delayed_vests differently:
-  --   fill_vesting_withdraw: NEGATIVE (withdrawals reduce delayed vests proportionally)
+  --   fill_vesting_withdraw: NEGATIVE (a payout takes from the delayed vests first)
   --   transfer_to_vesting_completed: POSITIVE (power-up adds to delayed vests)
   --   delayed_voting: NEGATIVE (delay period ends, vests become "active")
   SELECT
@@ -755,7 +755,8 @@ recursive_delays AS MATERIALIZED (
 -- The VESTS each fill_vesting_withdraw took from its withdrawer's delayed VESTS: the
 -- value before the operation's first row minus the value after its last one (a fill
 -- routing VESTS to its own withdrawer has two rows). hived lowers the withdrawer's
--- governance weight only by the rest of the withdrawal (database_vesting.cpp,
+-- governance weight only by the rest of the withdrawal, net of a VESTS route back to
+-- the withdrawer (database_vesting.cpp,
 -- process_vesting_withdrawals): the weight change of a fill is its (negative) VESTS
 -- change plus what it took.
 delayed_vests_taken AS (

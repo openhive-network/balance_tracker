@@ -9,7 +9,8 @@
  * fill_vesting_withdraw took in withdraw_delayed_vests:
  *
  *   - no row when the withdrawer has no delayed VESTS;
- *   - min(W, D) when it has, and account_withdraws.delayed_vests drops by it;
+ *   - min(W, D) when it has, for a payout of one fill, and
+ *     account_withdraws.delayed_vests drops by it;
  *   - a payout split over routes: each fill takes from what the earlier ones left;
  *     a VESTS route credits its recipient's delayed VESTS, with no row for it;
  *   - a fill routing VESTS to its own withdrawer (auto_vest to itself) takes nothing
