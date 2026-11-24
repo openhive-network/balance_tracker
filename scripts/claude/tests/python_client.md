@@ -14,13 +14,18 @@ beekeeper libraries, so their releases do not require changes here.
 | Job | Template | What it does |
 |-----|----------|--------------|
 | `generate_python_api_client` | `.python_api_package_generate` | Generates `python-api-package/` (client + `pyproject.toml`) from `build/swagger-doc.json` of `extract-swagger-json` |
-| `build_python_api_client_wheel` | `.python_api_package_build` | Builds the wheel; the version comes from this repo's tags (poetry-dynamic-versioning) |
+| `build_python_api_client_wheel` | `.python_api_package_build` | Builds the wheel into a freshly created `python-api-package/dist/`, then fails unless that directory holds exactly one `.whl`; the version comes from this repo's tags (poetry-dynamic-versioning) |
 | `test_python_api_wheel` | `.python_api_package_test` | Installs the wheel, imports every client module, checks the version is not `0.0.0` and no forbidden dependency is pulled |
 | `python_api_client_test` | `.python_api_package_base` | Installs the wheel and runs `tests/python_api_client/call_endpoint.py` against the public API nodes |
 | `deploy_python_api_packages_to_gitlab` | `.python_api_package_publish` | Uploads the wheel to this project's GitLab PyPI registry |
 
 The template's inputs are the global variables `PYTHON_API_SWAGGER_JSON`, `PYTHON_API_DISTRIBUTION_NAME`,
 `PYTHON_API_PACKAGE_NAME` and `PYTHON_API_NAMESPACE` (`balance_api_client`, the subpackage holding the client).
+
+The build job and both test jobs run `.python_api_dist_wheel_check` (in `.gitlab-ci.yml`, not the template). It
+stops the job with a named message when `python-api-package/dist` is not a directory holding exactly one wheel. If
+the path is not a directory when the wheel is copied, pip writes the wheel as a file named `dist`, and the template's
+`dist/*.whl` then fails with `Invalid wheel filename ... '*'`.
 
 ## Versions
 
@@ -55,6 +60,7 @@ delegations = await handle.api.accounts_delegations("gtg")
 | `No endpoint answered` | Public API nodes down | Retry; the job retries twice |
 | Import error in `test_python_api_wheel` | Generator cannot handle a schema change | Fix the schema or the generator (hive/wax-spec-generator) |
 | Version `0.0.0` | Dynamic versioning did not run (no tags fetched) | The build job needs `GIT_DEPTH: 0` (set by the template) |
+| `Expected the directory python-api-package/dist to hold exactly one wheel` | The build left no wheel, several wheels, or a file named `dist` | Read the `build_python_api_client_wheel` log; retrying only the test jobs reuses the same artifact, so retry the build job |
 | Runtime package not found | No release of `hiveio_api_client` matches the template's pin | Update the template in hive/wax-spec-generator |
 
 ## Expansion Rules
