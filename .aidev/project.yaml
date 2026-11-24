@@ -87,6 +87,8 @@ sandbox:
 # SQL signatures, then install of the candidate's SQL into a clone of the shared
 # 5M-block HAF, its block processing to block 5000000, CI's parity and regression
 # tests (every account's balances against hived's), and for full and canary the
+# concurrent massive sync of a second instance compared with it (CI's
+# parallel-sync-test, about 2 minutes on steem-20, 2026-11-24), the
 # tavern pattern tests (CI's pattern-test), the public REST paths through a
 # postgrest-rewriter image built from the candidate (CI's rewriter-test), an
 # upgrade in place and an uninstall followed by a fresh install (CI's
@@ -118,7 +120,7 @@ verification:
     artifacts: ["test-results/quick/"]
   full:
     adapter: command
-    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
+    args: [".aidev/run-checks.sh", "full", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parallel", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/full/"]
     timeout: 1800
   baseline:
@@ -127,7 +129,7 @@ verification:
     artifacts: ["test-results/baseline/"]
   canary:
     adapter: command
-    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
+    args: [".aidev/run-checks.sh", "canary", "shellcheck", "sql-registered", "rewriter-map", "install", "sync", "parallel", "parity", "regression", "maintenance", "tavern", "rewriter", "reinstall", "registry", "uninstall"]
     artifacts: ["test-results/canary/"]
     timeout: 1800
   # There is no coverage measurement for SQL; `coverage` runs the tree-wide checks

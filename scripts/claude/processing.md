@@ -205,6 +205,38 @@ after it (`rn = 1`), and adds the per-NAI differences. Any new writer of
 History rows carry `op_type_id`: `get_impacted_balances_batch` returns each emission's
 operation type, and `process_savings` already carries it per operation.
 
+### Concurrent massive sync (#145)
+
+With `BTRACKER_SYNC_PARALLELISM` above 1, `scripts/process_blocks.sh` runs
+`haf_app_driver.py --process-python=btracker_parallel:process_blocks`
+(`scripts/btracker_parallel.py`, on haf_stats' design, hive/haf_stats#140-#148). The SQL half
+is `db/parallel_sync.sql`, installed per schema. For each massive-sync range:
+
+1. `begin_parallel_range` (driver's transaction) refuses outside massive sync, while the context
+   is attached, for the HF23 batch, and when the driver's transaction locked a relation of the
+   schema (HAF detaching the context in it); a refused range takes the serial path unchanged.
+2. The range is staged once into UNLOGGED shared tables, two slots (`shared_batch_ops_<slot>`,
+   `shared_batch_clears_<slot>`, `shared_batch_marker`) by `stage_shared_batch` on a worker
+   connection, usually while the previous batch's groups ran (staged ahead). It reads
+   `hafd.operations`/`hafd.accounts`, not the context's views, which a driver transaction that
+   attaches or detaches the context holds locked.
+3. The processor groups (`processor_group_processors()`) run at once on up to N worker
+   connections, each group in its own transaction committing its writes with its
+   `processor_group_progress` row; a group reads the slot through temp views named
+   `_btracker_ops_batch`/`_btracker_clears_batch` (pg_temp is searched first).
+4. `finish_parallel_range` (driver's transaction) checks every group applied the range, deletes
+   the progress rows and marks the range applied; the registered entry procedure then runs as
+   usual and `btracker_process_blocks` skips the applied range (`applied_by_processor_groups`),
+   which also raises if groups applied part of an uncommitted batch (never process it serially).
+
+Groups follow the read/write sets: `vests` keeps balances, rc_delegations, withdrawals and
+delegations together in their serial order (see "Step order and batch staging"); every other
+processor is a group of its own. A new processor needs a group, derived the same way; the
+`parallel` test fails until it has one. Crash recovery: a group that committed skips the batch
+when it is delivered again; a crash recovery empties the staging and its marker together, and the
+batch is staged again. The staging tables are the only UNLOGGED tables in the schema and are
+emptied when massive sync ends.
+
 ### Balance-clearing operations (#61)
 
 hived empties two accounts in consensus, at every block in which they hold anything:

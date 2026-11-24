@@ -895,6 +895,35 @@ setup-scripts-test:
     ./test_scripts.sh --host=docker
     echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
 
+# The concurrent massive sync (BTRACKER_SYNC_PARALLELISM > 1) of a second instance to the
+# cached serial sync's block, killed mid-batch twice, compared with it table by table.
+parallel-sync-test:
+  extends: .test-with-docker-compose
+  <<: *test-needs-sync
+  timeout: 1 hour
+  variables:
+    # haf_app_driver.py as .aidev/runtime/Dockerfile pins it; the test runner image lacks it.
+    HAF_APP_DRIVER_COMMIT: 3839feb0c30846aa3ae262143f216a3c1a0fa20b
+    HAF_APP_DRIVER_SHA256: 55f82b1c0d024a02149ba2d0157d3b7394773631514d5117ebaa3446555dc8d7
+  script:
+  - |
+    set -o pipefail
+    echo -e "\e[0Ksection_start:$(date +%s):tests\r\e[0KRunning tests..."
+    mkdir -p "${CI_PROJECT_DIR}/.driver"
+    curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${HAF_APP_DRIVER_COMMIT}/haf-app-tools/scripts/haf_app_driver.py" \
+      -o "${CI_PROJECT_DIR}/.driver/haf_app_driver.py"
+    echo "${HAF_APP_DRIVER_SHA256}  ${CI_PROJECT_DIR}/.driver/haf_app_driver.py" | sha256sum -c -
+    chmod +x "${CI_PROJECT_DIR}/.driver/haf_app_driver.py"
+    export PATH="${CI_PROJECT_DIR}/.driver:${PATH}"
+    "${CI_PROJECT_DIR}/tests/parallel_sync/run_test.sh" --postgres-url=postgresql://haf_admin@docker:5432/haf_block_log 2>&1 \
+      | tee "${CI_PROJECT_DIR}/tests/parallel_sync/parallel_sync_test.log"
+    echo -e "\e[0Ksection_end:$(date +%s):tests\r\e[0K"
+  artifacts:
+    paths:
+    - tests/parallel_sync/parallel_sync_test.log
+    - docker/container-logs.tar.gz
+    when: always
+
 performance-test:
   extends: .test-with-docker-compose
   <<: *test-needs-sync

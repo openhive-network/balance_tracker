@@ -9,7 +9,7 @@
 # A shape holds no rows, only the source's schema and statistics, so the files
 # that create the application's tables and HAF context (db/btracker_app.sql,
 # db/order_stats_rollups.sql, db/withdraw_delayed_vests.sql, db/builtin_roles.sql) and the
-# block-processing code (db/process_*.sql) are not
+# block-processing code (db/process_*.sql, db/parallel_sync.sql) are not
 # run: they would replace the shape's tables, and with them their statistics,
 # and nothing an API query plans with lives in them. Every other file
 # install_app.sh feeds to psql is run, in its order, through
@@ -107,7 +107,7 @@ seed="$(awk '/INSERT INTO asset_table/,/;/' db/btracker_app.sql)"
 # shellcheck disable=SC2016  # $SCRIPTPATH is matched literally in install_app.sh's text
 mapfile -t files < <(grep -oE '"\$SCRIPTPATH/\.\./[^"]+\.sql"' scripts/install_app.sh \
     | sed -E 's#^"\$SCRIPTPATH/\.\./##; s#"$##' \
-    | grep -vE '^db/(btracker_app|builtin_roles|order_stats_rollups|withdraw_delayed_vests|process_[a-z_]+)\.sql$')
+    | grep -vE '^db/(btracker_app|builtin_roles|order_stats_rollups|withdraw_delayed_vests|parallel_sync|process_[a-z_]+)\.sql$')
 [ "${#files[@]}" -gt 0 ] || { echo "shape-apply.sh: no SQL files found in scripts/install_app.sh" >&2; exit 2; }
 
 for f in "${files[@]}"; do

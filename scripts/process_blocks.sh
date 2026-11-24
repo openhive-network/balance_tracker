@@ -16,8 +16,17 @@ OPTIONS:
     --url=URL                Allows to specify a PostgreSQL URL (empty by default, overrides options above)
     --stop-at-block=VALUE            Allows to specify maximum number of blocks to process (defaults to 0, which means 'process all the blocks and wait for more')
     --help,-h,-?             Displays this help message
+
+ENVIRONMENT:
+    BTRACKER_SYNC_PARALLELISM  Connections the massive sync spreads each batch's processor
+                             groups over (default 1: one session, the serial path). Above 1
+                             haf_app_driver.py runs scripts/btracker_parallel.py as its range
+                             processor; live sync stays on one session either way. The legacy
+                             CALL main() loop ignores it.
 EOF
 }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 POSTGRES_USER=${POSTGRES_USER:-"btracker_owner"}
 POSTGRES_HOST=${POSTGRES_HOST:-"localhost"}
@@ -25,6 +34,7 @@ POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_URL=${POSTGRES_URL:-""}
 PROCESS_BLOCK_LIMIT=${PROCESS_BLOCK_LIMIT:-null}
 BTRACKER_SCHEMA=${BTRACKER_SCHEMA:-"btracker_app"}
+BTRACKER_SYNC_PARALLELISM=${BTRACKER_SYNC_PARALLELISM:-1}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -78,9 +88,25 @@ process_blocks() {
     # The application is registered under its lock name (scripts/install_app.sh).
     # exec it directly: as PID 1 it must receive SIGTERM itself to stop cleanly.
     if command -v haf_app_driver.py >/dev/null 2>&1; then
-        local limit_arg=()
+        local limit_arg=() parallel_arg=()
         [ "$n_blocks" != "null" ] && limit_arg=(--stop-at-block="$n_blocks")
-        exec haf_app_driver.py --app=balance_tracker --postgres-url="$POSTGRES_ACCESS" --lock=balance_tracker "${limit_arg[@]}"
+        # A value that is not a positive integer falls back to the serial path rather than
+        # stopping the container.
+        case "$BTRACKER_SYNC_PARALLELISM" in
+            ''|*[!0-9]*|0)
+                echo "WARNING: BTRACKER_SYNC_PARALLELISM='$BTRACKER_SYNC_PARALLELISM' is not a positive integer; using 1"
+                BTRACKER_SYNC_PARALLELISM=1
+                ;;
+        esac
+        if [ "$BTRACKER_SYNC_PARALLELISM" -gt 1 ]; then
+            # btracker_parallel.py reads both itself; PYTHONPATH is how the driver's
+            # --process-python import finds it.
+            export BTRACKER_SYNC_PARALLELISM BTRACKER_SCHEMA
+            export PYTHONPATH="${SCRIPT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
+            parallel_arg=(--process-python=btracker_parallel:process_blocks)
+        fi
+        echo "Running haf_app_driver.py (massive-sync parallelism $BTRACKER_SYNC_PARALLELISM)"
+        exec haf_app_driver.py --app=balance_tracker --postgres-url="$POSTGRES_ACCESS" --lock=balance_tracker "${limit_arg[@]}" "${parallel_arg[@]}"
     fi
 
     echo "WARNING: haf_app_driver.py not found, falling back to the legacy CALL main() loop"
