@@ -338,6 +338,24 @@ HAFBE dispatches block ranges to btracker alongside other submodules:
 PERFORM btracker_process_blocks(_context_btracker, _block_range, false);
 ```
 
+### Concurrent massive sync under HAFBE
+
+`btracker_process_blocks` stays the entry point HAFBE calls. The concurrent mode
+(`scripts/claude/processing.md`, "Concurrent massive sync") reaches it through the driver:
+`scripts/btracker_parallel.py` runs btracker's processor groups for the range on worker
+connections, then CALLs the application's registered entry procedure (`hafbe_app.process_blocks`
+under HAFBE), whose `btracker_process_blocks(hafbe_bal, range)` finds the range applied and only
+ANALYZEs. HAFBE adopts it with no SQL change:
+
+- `scripts/process_blocks.sh` (`run_driver`): when `BTRACKER_SYNC_PARALLELISM` > 1, export
+  `BTRACKER_SCHEMA=hafbe_bal`, `BTRACKER_SYNC_PARALLELISM` and
+  `PYTHONPATH=<dir holding btracker_parallel.py>`, and add
+  `--process-python=btracker_parallel:process_blocks` to the `haf_app_driver.py` command.
+- Its Dockerfile: copy `submodules/btracker/scripts/btracker_parallel.py` into that directory.
+- Its compose service / stack env: pass `BTRACKER_SYNC_PARALLELISM` through.
+
+Until then HAFBE syncs serially.
+
 ### What HAFBE Can Query
 
 Any HAFBE endpoint can query btracker data directly:

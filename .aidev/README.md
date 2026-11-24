@@ -22,6 +22,7 @@ the failure body. `tavern` also writes one case per test (`tavern.xml`).
 | `rewriter-map` | `tests/rewriter/test_argument_map.py`: `endpoints/rpc_arguments.lua` names every `btracker_endpoints` function with exactly its SQL parameters, each difference named as function and parameter. Reads files only. A map not regenerated (`scripts/openapi_rewrite.sh`) after an endpoint or parameter was added makes the rewriter pass that parameter to PostgREST as a filter |
 | `install` | a per-run copy-on-write clone of the shared HAF (below), `scripts/install_app.sh` into it as `haf_shared_consumer`; the context `btracker_app` must exist afterwards |
 | `sync` | the candidate's own block processing over the clone's 5,000,000 blocks, run as `scripts/process_blocks.sh` runs it in the production image (`haf_app_driver.py --app=btracker_app --lock=balance_tracker --stop-at-block=5000000`, as `btracker_owner`), then `finalize_massive_sync('btracker_app')` and `ANALYZE`, as CI's `sync` job does; before finalize both history tables must have been ANALYZEd by the sync itself. About 4 minutes |
+| `parallel` | `tests/parallel_sync/run_test.sh`, right after `sync`: a second instance (`hafbe_bal`, registered as `haf_block_explorer`) synced to the same block by the concurrent massive sync (`scripts/btracker_parallel.py`, parallelism 4), a worker backend and then the driver process killed mid-batch, at least two worker backends busy at once; finalized and compared with `btracker_app` table by table (`compare_schemas.sql`); then `btracker_app` reinstalled and `hafbe_bal` uninstalled. About 2 minutes |
 | `parity` | `tests/parity/*.sql`: the SQL port of the impacted-balances visitor against HAF's C implementation (CI's `setup-scripts-test`, test 3) |
 | `regression` | `tests/regression` (CI's `regression-test`): every account's balances at block 5,000,000 against hived's `database_api.list_accounts` dump `accounts_dump.json.gz`; no account may differ. The dump is loaded server-side (one `COPY`, then `btracker_test.load_expected_account` per row in one statement) instead of by `load_expected_balances.py`'s one round trip per account |
 | `maintenance` | `tests/maintenance/*.sql` (with `-v schema=btracker_app`): the history tables' insert-only autovacuum reloptions, no HAF vacuum request for them from the sync, finalize or a post-finalize MASSIVE catch-up (which must not rewrite or ANALYZE them either), and the post-finalize `'freeze'` request, against a test double when the shared HAF has no request kind (hive/haf#360) |
@@ -38,7 +39,7 @@ checkout has no usable git), because a workflow checkout may have no `.git`.
 |---|---|---|
 | quick | shellcheck, sql-registered, rewriter-map | no |
 | coverage | shellcheck, sql-registered | no |
-| full, canary | quick's plus install, sync, parity, regression, maintenance, tavern, rewriter, reinstall, registry, uninstall | yes |
+| full, canary | quick's plus install, sync, parallel, parity, regression, maintenance, tavern, rewriter, reinstall, registry, uninstall | yes |
 | baseline | install, sync, parity, regression, tavern | yes |
 
 `static` and `system` are unbound: AIDEV runs neither for a project. `uninstall` needs
@@ -65,6 +66,7 @@ suite still runs.
 | the install or upgrade path: `scripts/install_app.sh`, a schema change, reloptions | `install reinstall`, and `install uninstall` for `scripts/uninstall_app.sh` | under a minute |
 | `tests/parity`, or the impacted-balances port it checks (`backend/operation_parsers/`) | `install parity` | under a minute |
 | block processing: `db/process_*.sql`, an operation parser | `install sync regression` | 5 to 7 minutes |
+| the concurrent massive sync: `db/parallel_sync.sql`, `scripts/btracker_parallel.py`, a processor added or moved | `install sync parallel` | 6 to 9 minutes |
 | what a query returns: `endpoints/`, `backend/endpoint_helpers/` | `install sync tavern` | 5 to 7 minutes |
 | an endpoint's parameters, `endpoints/rpc_arguments.lua` | `rewriter-map` (`aidev test run --slot quick`) | seconds |
 | `Dockerfile.rewriter`, `docker/balance_tracker_nginx.conf.template`, `endpoints/rewrite_rules.conf`, `tests/rewriter` | `install sync rewriter` (`aidev test run --slot full`, or by hand where docker runs, below) | 6 to 8 minutes |
@@ -73,7 +75,7 @@ suite still runs.
 `sync` is the cost: about 4 minutes on a quiet host and up to 10 under load, while
 `install`, `parity`, `reinstall` and `uninstall` take seconds to a minute each and
 `regression` 1 to 2 minutes. `sync` needs `install`; `parity`, `reinstall` and
-`uninstall` need only `install`; `regression`, `maintenance` and `tavern` need `sync`.
+`uninstall` need only `install`; `parallel`, `regression`, `maintenance` and `tavern` need `sync`.
 Put every step you want from one sync into one run rather than syncing twice. The steps
 after `shellcheck` and `sql-registered` need the shared HAF: run them in the test image
 as in [the shared HAF](#the-shared-haf-sandboxexternal) section below, naming the steps,

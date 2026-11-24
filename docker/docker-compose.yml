@@ -48,6 +48,7 @@ services:
     environment:
       POSTGRES_HOST: haf
       POSTGRES_USER: btracker_owner
+      BTRACKER_SYNC_PARALLELISM: ${BTRACKER_SYNC_PARALLELISM:-1}
     networks:
       haf-network:
     healthcheck:

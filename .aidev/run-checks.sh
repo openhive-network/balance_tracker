@@ -22,6 +22,11 @@
 #                     blocks (haf_app_driver.py, as scripts/process_blocks.sh runs it),
 #                     no table of the schema left UNLOGGED by it, then
 #                     finalize_massive_sync and ANALYZE, as CI's `sync` job does
+#   - parallel        tests/parallel_sync (CI's parallel-sync-test): a second instance
+#                     (hafbe_bal) synced to the same block by the concurrent massive sync
+#                     (scripts/btracker_parallel.py), killed mid-batch twice, equal to the
+#                     serial sync table by table; then the serial schema reinstalled and
+#                     the second one uninstalled
 #   - parity          tests/parity: the SQL impacted-balances port against HAF's C visitor
 #   - maintenance     tests/maintenance: the history tables' autovacuum reloptions, no
 #                     HAF vacuum request from the sync, finalize or a later catch-up
@@ -56,7 +61,7 @@
 #
 # Every step after install needs the shared HAF (sandbox.external haf, provider
 # haf/haf); the clone is dropped when the script exits, pass or fail. sync needs
-# install; parity, regression, maintenance, tavern and rewriter need sync. Reports go
+# install; parallel, parity, regression, maintenance, tavern and rewriter need sync. Reports go
 # to test-results/<suite>/: junit.xml (one case per step) plus tavern.xml and
 # rewriter.xml. A step exiting with SKIPPED is reported skipped, its log's last line
 # the reason.
@@ -246,13 +251,23 @@ sync_blocks() {
         | grep -qx 'account_balance_history account_vesting_history' \
         || { echo "the massive sync did not ANALYZE both history tables"; return 1; }
     # A crash recovery empties UNLOGGED tables; the history stays LOGGED through
-    # the massive sync, not only once finalize ran (#137).
+    # the massive sync, not only once finalize ran (#137). The concurrent massive
+    # sync's staging (db/parallel_sync.sql) is UNLOGGED on purpose and holds no
+    # synced state: exempt exactly those tables.
     unlogged="$(q -Atc "SELECT string_agg(relname, ' ' ORDER BY relname) FROM pg_class
-              WHERE relnamespace = '$SCHEMA'::regnamespace AND relpersistence <> 'p'")" || return 1
+              WHERE relnamespace = '$SCHEMA'::regnamespace AND relpersistence <> 'p'
+                AND relname NOT IN ('shared_batch_marker', 'pk_shared_batch_marker',
+                                    'shared_batch_ops_0', 'shared_batch_ops_1',
+                                    'shared_batch_clears_0', 'shared_batch_clears_1')")" || return 1
     [ -z "$unlogged" ] || { echo "tables not LOGGED during the massive sync: $unlogged"; return 1; }
     q -c "SET search_path TO $SCHEMA, public; SET ROLE btracker_owner; SELECT finalize_massive_sync('$SCHEMA');" || return 1
     q -c "SET ROLE btracker_owner; ANALYZE;" 2>&1 | grep -v 'WARNING:  permission denied to analyze' || true
     synced=yes
+}
+
+# Right after sync, while the serial schema holds exactly what the serial sync wrote.
+parallel_sync() {
+    bash tests/parallel_sync/run_test.sh --postgres-url="$BTRACKER_TEST_DB_URL" --source-dir="$stage"
 }
 
 parity() {
@@ -386,6 +401,7 @@ for s in "$@"; do
         rewriter-map) step rewriter-map python3 -m pytest -p no:cacheprovider tests/rewriter/test_argument_map.py ;;
         install) step install install ;;
         sync) step sync needs_clone sync_blocks ;;
+        parallel) step parallel needs_sync parallel_sync ;;
         parity) step parity needs_clone parity ;;
         maintenance) step maintenance needs_sync maintenance ;;
         regression) step regression needs_sync regression ;;

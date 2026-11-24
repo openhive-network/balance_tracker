@@ -216,6 +216,9 @@ psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on --single-transaction -c "SET SEARCH_
 # version without them, an earlier reader would fail /order-stats until the commit.
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../backend/endpoint_helpers/get_order_stats/order_stats.sql"
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/process_proposal_payments.sql"
+# The concurrent massive sync's groups, staging and entry points (scripts/btracker_parallel.py),
+# once every process_* function they run is in place.
+psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/parallel_sync.sql"
 
 # One-off repairs of state synced by an earlier version, each applied once per install.
 psql "$POSTGRES_ACCESS" -v ON_ERROR_STOP=on  -c "SET SEARCH_PATH TO ${BTRACKER_SCHEMA};" -f "$SCRIPTPATH/../db/one_off_repairs.sql"

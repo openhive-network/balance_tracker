@@ -56,6 +56,7 @@ USER hived
 COPY scripts/install_app.sh /app/scripts/install_app.sh
 COPY scripts/uninstall_app.sh /app/scripts/uninstall_app.sh
 COPY scripts/process_blocks.sh /app/scripts/process_blocks.sh
+COPY scripts/btracker_parallel.py /app/scripts/btracker_parallel.py
 COPY db /app/db
 COPY backend /app/backend
 COPY --from=version-calculcation /home/hived/src/endpoints /app/endpoints

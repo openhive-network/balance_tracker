@@ -1510,6 +1510,10 @@ $$;
  *   and retry_history_tables_freeze().
  *   Before the first finalize, and while HAF's own massive sync is still
  *   running, processes massively instead (is_massive_sync_pending).
+ * - A range the processor groups of the concurrent massive sync applied in this
+ *   transaction (db/parallel_sync.sql) is not processed again; only the
+ *   ANALYZE above runs. applied_by_processor_groups raises when groups applied
+ *   part of an uncommitted batch, which this would apply a second time.
  *
  * @param _context_name  HAF context name (typically schema name)
  * @param _block_range   Range of blocks to process (first_block, last_block)
@@ -1525,9 +1529,13 @@ LANGUAGE 'plpgsql' VOLATILE
 AS
 $$
 
+DECLARE
+  __applied_by_groups BOOLEAN := applied_by_processor_groups(_context_name, _block_range);
 BEGIN
   IF is_massive_sync_pending(_context_name) THEN
-    CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
+    IF NOT __applied_by_groups THEN
+      CALL btracker_massive_processing(_block_range.first_block, _block_range.last_block, _logs);
+    END IF;
     -- Planner statistics for the unindexed, insert-only sync tables. Not a
     -- HAF vacuum request: HAF runs those as VACUUM FULL ANALYZE, a rewrite
     -- under ACCESS EXCLUSIVE that reclaims nothing here, stalls every reader

@@ -71,6 +71,9 @@ tests/
 │   ├── proposal_payments.sql  # proposal payment totals, numbering and both /proposals endpoints over synthetic payments; fork rollback
 │   ├── order_lifecycle.sql    # order_lifecycle after sync (one row per create, open rows = order_state, = an op-by-op replay that models HF23 closes); synthetic fill/cancel/expiry/dust-cull/id-reuse paths (also cancel-then-re-create and cull-then-re-create-and-cancel in one transaction), the replay against them and across a pretend HF23, both /order-stats endpoints' windows; the order count tables = order_lifecycle and /order-stats = order_lifecycle's counts over block/date windows, inverted windows rejected; fork rollback; seed re-run over existing count tables (no lock, no transaction id); upgrade without the count tables (dropped, db/order_stats_rollups.sql re-run: seeded from order_lifecycle, still equal after closing pre-upgrade orders); the same upgrade on a detached context with irreversible block 0 (forking contexts only; all in the base seed, no row id drawn past it, current block unchanged); the same upgrade over three processed blocks past the irreversible block, still equal after forks back to the first of them and to the irreversible block and a different chain past it
 │   └── early_block_processing.sql # early block processing opt-in; no finalize in LIVE during HAF's massive sync
+├── parallel_sync/             # Concurrent massive sync against the serial one
+│   ├── run_test.sh            # hafbe_bal synced with btracker_parallel.py, killed mid-batch twice, compared, removed
+│   └── compare_schemas.sql    # every table of two schemas row for row (EXCEPT ALL), hive_rowid left out
 ├── python_api_client/         # Live call of the generated Python client
 │   └── call_endpoint.py       # One endpoint through the wheel and its runtime transport
 ├── mocks/                     # Mock data infrastructure
@@ -93,10 +96,17 @@ Tests run automatically in GitLab CI. Key jobs in `.gitlab-ci.yml`:
 | `setup-scripts-test` | Functional | Fresh install |
 | `python_api_client_test` | Python client | External API |
 | `rewriter-test` | Public REST paths through the postgrest-rewriter image (`tests/rewriter`): operator-prefixed arguments, column filters, select/order/limit, HEAD framing, argument map vs SQL signatures | Synced mainnet (5M blocks) |
+| `parallel-sync-test` | Concurrent massive sync (`tests/parallel_sync/run_test.sh`): a second instance (`hafbe_bal`) synced with `scripts/btracker_parallel.py` to the serial sync's block, a worker backend and then the driver process killed mid-batch, more than one worker busy at once, every table equal to the serial schema's (`compare_schemas.sql`, `hive_rowid` left out) | Synced mainnet (5M blocks) |
 
 AIDEV runs `tests/rewriter/test_argument_map.py` (files only) in its quick slot as `rewriter-map`, and the whole of `tests/rewriter` in full/canary as `rewriter` (`.aidev/btracker_rewriter.py`, image built from the candidate's `Dockerfile.rewriter`); in AIDEV's gates against the profile's rewriter stack (`.aidev/rewriter-stack/compose.yml`), elsewhere through a docker daemon; `rewriter` reports skipped where neither is offered. See `.aidev/README.md`.
 
 `tests/rewriter/upstream_recreate_dual_stack_test.sh` is run by hand with a docker daemon (no CI job or slot runs it): it builds the rewriter, puts it on an IPv6-enabled network beside an IPv4-only stand-in for PostgREST, recreates the stand-in, and fails if the rewriter's log shows a connect to an IPv6 upstream address (the resolver's `ipv6=off`). Exits 77 with the reason where the daemon cannot create an IPv6 network.
+
+AIDEV runs the same script as the `parallel` step of full/canary, right after `sync`, while
+the serial schema holds exactly the serial sync's output. Installing a second instance repoints
+the shared `btracker_backend` views at it, so the script reinstalls the serial schema before it
+uninstalls `hafbe_bal`. A processor added to `btracker_massive_processing` but to no group in
+`db/parallel_sync.sql` makes it fail (its tables differ).
 
 ### Pipeline Stages
 
