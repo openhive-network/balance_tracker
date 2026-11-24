@@ -18,9 +18,11 @@ http {
     }
 
     # ${RESOLVER} will be replaced by the docker entrypoint script. A variable proxy_pass
-    # resolves its name through it on each lookup (cached for 10s), so a recreated PostgREST
-    # is followed at its new address without restarting or reloading nginx.
-    resolver ${RESOLVER} valid=10s;
+    # resolves its name through it on each lookup (cached for 5s), so a recreated PostgREST
+    # is followed at its new address without restarting or reloading nginx. Each worker keeps
+    # its own cache, so for up to that long after a recreate a worker may still connect to the
+    # old address; the short cache narrows that window and proxy_connect_timeout below bounds it.
+    resolver ${RESOLVER} valid=5s;
 
     server {
             listen 0.0.0.0:80 default_server;
@@ -54,6 +56,10 @@ http {
                     }
 
                     proxy_pass $postgrest_upstream;
+                    # On a Docker network a connect to a stale address goes unanswered rather than
+                    # refused, so without this a request waits out the 60s default. PostgREST is on
+                    # the same network, where a healthy connect takes milliseconds.
+                    proxy_connect_timeout 5s;
 
                     proxy_set_header Host $host;
                     proxy_set_header X-Real-IP $remote_addr;
