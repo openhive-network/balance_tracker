@@ -22,7 +22,10 @@ http {
     # is followed at its new address without restarting or reloading nginx. Each worker keeps
     # its own cache, so for up to that long after a recreate a worker may still connect to the
     # old address; the short cache narrows that window and proxy_connect_timeout below bounds it.
-    resolver ${RESOLVER} valid=5s;
+    # ipv6=off: PostgREST listens on IPv4 only (its default server-host is !4), so on a
+    # dual-stack network the container's AAAA address would refuse or hang the connect. It
+    # stops only AAAA lookups; an IPv6 ${RESOLVER} still works as the nameserver.
+    resolver ${RESOLVER} valid=5s ipv6=off;
 
     server {
             listen 0.0.0.0:80 default_server;

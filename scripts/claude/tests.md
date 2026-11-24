@@ -96,6 +96,8 @@ Tests run automatically in GitLab CI. Key jobs in `.gitlab-ci.yml`:
 
 AIDEV runs `tests/rewriter/test_argument_map.py` (files only) in its quick slot as `rewriter-map`, and the whole of `tests/rewriter` in full/canary as `rewriter` (`.aidev/btracker_rewriter.py`, image built from the candidate's `Dockerfile.rewriter`); in AIDEV's gates against the profile's rewriter stack (`.aidev/rewriter-stack/compose.yml`), elsewhere through a docker daemon; `rewriter` reports skipped where neither is offered. See `.aidev/README.md`.
 
+`tests/rewriter/upstream_recreate_dual_stack_test.sh` is run by hand with a docker daemon (no CI job or slot runs it): it builds the rewriter, puts it on an IPv6-enabled network beside an IPv4-only stand-in for PostgREST, recreates the stand-in, and fails if the rewriter's log shows a connect to an IPv6 upstream address (the resolver's `ipv6=off`). Exits 77 with the reason where the daemon cannot create an IPv6 network.
+
 ### Pipeline Stages
 
 ```
