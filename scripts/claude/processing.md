@@ -209,7 +209,10 @@ operation type, and `process_savings` already carries it per operation.
 
 With `BTRACKER_SYNC_PARALLELISM` above 1, `scripts/process_blocks.sh` runs
 `haf_app_driver.py --process-python=btracker_parallel:process_blocks`
-(`scripts/btracker_parallel.py`, on haf_stats' design, hive/haf_stats#140-#148). The SQL half
+(`scripts/btracker_parallel.py`, on haf_stats' design, hive/haf_stats#140-#148). The option
+needs a driver from common-ci-configuration psql `3839feb0` or later (`PSQL_CLIENT_VERSION` in
+`Dockerfile`; the `docker-setup-docker-image-build` CI job checks the built image's driver
+`--help` for it). A driver whose `--help` lacks it gets a WARNING and the serial path. The SQL half
 is `db/parallel_sync.sql`, installed per schema. For each massive-sync range:
 
 1. `begin_parallel_range` (driver's transaction) refuses outside massive sync, while the context
