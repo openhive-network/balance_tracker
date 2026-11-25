@@ -98,6 +98,12 @@ process_blocks() {
                 BTRACKER_SYNC_PARALLELISM=1
                 ;;
         esac
+        # An image built on an older psql base ships a driver without --process-python; it
+        # would exit 2 on the option and restart-loop the container.
+        if [ "$BTRACKER_SYNC_PARALLELISM" -gt 1 ] && [[ "$(haf_app_driver.py --help 2>/dev/null || true)" != *--process-python* ]]; then
+            echo "WARNING: haf_app_driver.py does not support --process-python; ignoring BTRACKER_SYNC_PARALLELISM=$BTRACKER_SYNC_PARALLELISM and using 1"
+            BTRACKER_SYNC_PARALLELISM=1
+        fi
         if [ "$BTRACKER_SYNC_PARALLELISM" -gt 1 ]; then
             # btracker_parallel.py reads both itself; PYTHONPATH is how the driver's
             # --process-python import finds it.

@@ -2,7 +2,9 @@
 # Pinned to the c-c-c develop SHA tag that introduces python3 + py3-psycopg2
 # + /usr/local/bin/install_with_app_lock.py (the wrapper used by install_app.sh).
 # Bump when c-c-c publishes a new semver tag that includes the wrapper.
-ARG PSQL_CLIENT_VERSION=da9ffb6003edfb5cbaf1dfcde8e1847667af7d24
+# Must ship a haf_app_driver.py with --process-python (BTRACKER_SYNC_PARALLELISM>1);
+# the docker-setup-docker-image-build CI job checks the built image for it.
+ARG PSQL_CLIENT_VERSION=3839feb0c30846aa3ae262143f216a3c1a0fa20b
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation

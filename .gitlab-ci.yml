@@ -328,6 +328,18 @@ docker-setup-docker-image-build:
     BASE_TAG: "$CI_COMMIT_SHORT_SHA"
     NAME: ""
     TARGET: "full-ci"
+  script:
+  - !reference [.docker-build-template, script]
+  - |
+    # scripts/process_blocks.sh passes --process-python when BTRACKER_SYNC_PARALLELISM>1; the
+    # tests download a driver that has it, so the image's own driver must have it too.
+    image="$CI_REGISTRY_IMAGE:$BASE_TAG"
+    driver_help="$(docker run --rm --entrypoint haf_app_driver.py "$image" --help)"
+    if [[ "$driver_help" != *--process-python* ]]; then
+      echo "ERROR: haf_app_driver.py in $image does not support --process-python; bump PSQL_CLIENT_VERSION in Dockerfile"
+      exit 1
+    fi
+    echo "haf_app_driver.py in $image supports --process-python"
 
 sync:
   extends:
