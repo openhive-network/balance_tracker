@@ -125,6 +125,9 @@ sample_concurrency() {
     done
 }
 
+# install_app.sh loads scripts/set_version_in_sql.pgsql, which is generated, not committed.
+bash "$SOURCE_DIR/scripts/generate_version_sql.sh" "$SOURCE_DIR"
+
 cleanup() {
     local pid
     for pid in "$driver_pid" "$sampler_pid"; do
