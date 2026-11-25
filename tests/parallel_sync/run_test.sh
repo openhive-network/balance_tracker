@@ -126,7 +126,10 @@ sample_concurrency() {
 }
 
 # install_app.sh loads scripts/set_version_in_sql.pgsql, which is generated, not committed.
-bash "$SOURCE_DIR/scripts/generate_version_sql.sh" "$SOURCE_DIR"
+# Generate it only when absent: the canary stages the source without .git and writes it itself.
+if [ ! -f "$SOURCE_DIR/scripts/set_version_in_sql.pgsql" ]; then
+    bash "$SOURCE_DIR/scripts/generate_version_sql.sh" "$SOURCE_DIR"
+fi
 
 cleanup() {
     local pid
