@@ -483,14 +483,42 @@ BEGIN
 END
 $$;
 
+-- HAF's vacuum worker (running finalize's committed freeze requests) or
+-- autovacuum may map the history tables during the horizon wait, which would
+-- rightly make the retry request nothing. A role that can update pg_class
+-- clears relallvisible inside this rolled-back transaction, so the re-request
+-- path runs every time. Any other role re-checks the retry's own predicate just
+-- before it and expects no request when no table is unmapped any more.
 BEGIN;
 DO
 $$
 DECLARE
   __expected CONSTANT TEXT[] := ARRAY[
     'account_balance_history:requested', 'account_savings_history:requested', 'account_vesting_history:requested'];
+  __statuses TEXT[];
 BEGIN
   PERFORM pg_temp.freeze_ran_too_early(current_setting('btracker_test.rewrite_xid')::XID);
+  IF has_table_privilege('pg_catalog.pg_class', 'UPDATE') THEN
+    UPDATE pg_class SET relallvisible = 0
+    WHERE oid IN ('account_balance_history'::regclass, 'account_savings_history'::regclass, 'account_vesting_history'::regclass)
+      AND relpages > 0;
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM pg_class
+    WHERE oid IN ('account_balance_history'::regclass, 'account_savings_history'::regclass, 'account_vesting_history'::regclass)
+      AND relpages > 0
+      AND relallvisible < 0.95 * relpages) THEN
+    __statuses := pg_temp.freeze_request_statuses();
+    PERFORM pg_temp.retry_freeze();
+    IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __statuses THEN
+      RAISE EXCEPTION 'the retry requested a vacuum although every history table is mapped: % -> %', __statuses, pg_temp.freeze_request_statuses();
+    END IF;
+    IF to_regclass('history_freeze_pending') IS NOT NULL THEN
+      RAISE EXCEPTION 'retry_history_tables_freeze() kept history_freeze_pending once the horizon passed the rewrite';
+    END IF;
+    RAISE NOTICE 'NOT EXERCISED: the history tables gained a visibility map during the horizon wait and % cannot update pg_class; the re-request path did not run', current_user;
+    RAISE NOTICE 'PASS: once the horizon passes the rewrite, the retry finds the tables mapped, requests nothing and stops';
+    RETURN;
+  END IF;
   PERFORM pg_temp.retry_freeze();
   IF pg_temp.freeze_request_statuses() IS DISTINCT FROM __expected THEN
     RAISE EXCEPTION 'expected the retry to request the freeze again (%), found %', __expected, pg_temp.freeze_request_statuses();
