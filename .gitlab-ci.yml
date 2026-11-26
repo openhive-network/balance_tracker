@@ -915,8 +915,8 @@ parallel-sync-test:
   timeout: 1 hour
   variables:
     # haf_app_driver.py as .aidev/runtime/Dockerfile pins it; the test runner image lacks it.
-    HAF_APP_DRIVER_COMMIT: 3839feb0c30846aa3ae262143f216a3c1a0fa20b
-    HAF_APP_DRIVER_SHA256: 55f82b1c0d024a02149ba2d0157d3b7394773631514d5117ebaa3446555dc8d7
+    HAF_APP_DRIVER_COMMIT: a1c5a22600f6e5b6abd2b7a10d0d0a21884b947e
+    HAF_APP_DRIVER_SHA256: ff403765dbdfae5b8bcd82e03e55c16e7a5b13eac84879ce79aa8c1cddfb2f15
   script:
   - |
     set -o pipefail
