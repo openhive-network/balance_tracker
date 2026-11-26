@@ -20,14 +20,14 @@ ARG BASE_IMAGE=registry.gitlab.syncad.com/hive/common-ci-configuration/haf-app-t
 FROM ${BASE_IMAGE}
 
 ARG TESTS_API_COMMIT=455898cc3462d4e5ee2274756e5e3d44688fe204
-ARG DRIVER_COMMIT=3839feb0c30846aa3ae262143f216a3c1a0fa20b
+ARG DRIVER_COMMIT=a1c5a22600f6e5b6abd2b7a10d0d0a21884b947e
 
 # The base's USER (hived) owns the tools venv, so this installs next to the tools.
 RUN pip install --no-cache-dir \
         "https://gitlab.syncad.com/hive/tests_api/-/archive/${TESTS_API_COMMIT}/tests_api-${TESTS_API_COMMIT}.tar.gz"
 
 ADD --chmod=755 \
-    --checksum=sha256:55f82b1c0d024a02149ba2d0157d3b7394773631514d5117ebaa3446555dc8d7 \
+    --checksum=sha256:ff403765dbdfae5b8bcd82e03e55c16e7a5b13eac84879ce79aa8c1cddfb2f15 \
     https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/${DRIVER_COMMIT}/haf-app-tools/scripts/haf_app_driver.py \
     /usr/local/bin/haf_app_driver.py
 

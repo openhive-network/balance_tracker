@@ -4,7 +4,7 @@
 # Bump when c-c-c publishes a new semver tag that includes the wrapper.
 # Must ship a haf_app_driver.py with --process-python (BTRACKER_SYNC_PARALLELISM>1);
 # the docker-setup-docker-image-build CI job checks the built image for it.
-ARG PSQL_CLIENT_VERSION=3839feb0c30846aa3ae262143f216a3c1a0fa20b
+ARG PSQL_CLIENT_VERSION=a1c5a22600f6e5b6abd2b7a10d0d0a21884b947e
 FROM registry.gitlab.syncad.com/hive/common-ci-configuration/psql:${PSQL_CLIENT_VERSION} AS psql
 
 FROM psql as version-calculcation
